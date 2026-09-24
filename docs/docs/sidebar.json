@@ -32,160 +32,184 @@
               "items": [
                 {
                   "items": [
-                    "hackagent/attacks/techniques/advprefix/attack",
-                    "hackagent/attacks/techniques/advprefix/completions",
-                    "hackagent/attacks/techniques/advprefix/config",
-                    "hackagent/attacks/techniques/advprefix/eval_pipeline",
-                    "hackagent/attacks/techniques/advprefix/generate",
-                    "hackagent/attacks/techniques/advprefix/utils"
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/adaptive/advprefix/attack",
+                        "hackagent/attacks/techniques/adaptive/advprefix/completions",
+                        "hackagent/attacks/techniques/adaptive/advprefix/config",
+                        "hackagent/attacks/techniques/adaptive/advprefix/eval_pipeline",
+                        "hackagent/attacks/techniques/adaptive/advprefix/generate",
+                        "hackagent/attacks/techniques/adaptive/advprefix/utils"
+                      ],
+                      "label": "hackagent.attacks.techniques.adaptive.advprefix",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/attack",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/autodan_eval",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/config",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/core",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/dashboard_tracing",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/lifelong",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/log_styles",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/strategy_library",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/summarizer",
+                        "hackagent/attacks/techniques/adaptive/autodan_turbo/warm_up"
+                      ],
+                      "label": "hackagent.attacks.techniques.adaptive.autodan_turbo",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/adaptive/bon/attack",
+                        "hackagent/attacks/techniques/adaptive/bon/config",
+                        "hackagent/attacks/techniques/adaptive/bon/generation"
+                      ],
+                      "label": "hackagent.attacks.techniques.adaptive.bon",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/adaptive/pair/attack",
+                        "hackagent/attacks/techniques/adaptive/pair/config"
+                      ],
+                      "label": "hackagent.attacks.techniques.adaptive.pair",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/adaptive/pap/attack",
+                        "hackagent/attacks/techniques/adaptive/pap/config",
+                        "hackagent/attacks/techniques/adaptive/pap/generation",
+                        "hackagent/attacks/techniques/adaptive/pap/taxonomy"
+                      ],
+                      "label": "hackagent.attacks.techniques.adaptive.pap",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/adaptive/tap/attack",
+                        "hackagent/attacks/techniques/adaptive/tap/config",
+                        "hackagent/attacks/techniques/adaptive/tap/generation",
+                        "hackagent/attacks/techniques/adaptive/tap/tap_evaluation"
+                      ],
+                      "label": "hackagent.attacks.techniques.adaptive.tap",
+                      "type": "category"
+                    }
                   ],
-                  "label": "hackagent.attacks.techniques.advprefix",
+                  "label": "hackagent.attacks.techniques.adaptive",
                   "type": "category"
                 },
                 {
                   "items": [
-                    "hackagent/attacks/techniques/autodan_turbo/attack",
-                    "hackagent/attacks/techniques/autodan_turbo/autodan_eval",
-                    "hackagent/attacks/techniques/autodan_turbo/config",
-                    "hackagent/attacks/techniques/autodan_turbo/core",
-                    "hackagent/attacks/techniques/autodan_turbo/dashboard_tracing",
-                    "hackagent/attacks/techniques/autodan_turbo/lifelong",
-                    "hackagent/attacks/techniques/autodan_turbo/log_styles",
-                    "hackagent/attacks/techniques/autodan_turbo/strategy_library",
-                    "hackagent/attacks/techniques/autodan_turbo/summarizer",
-                    "hackagent/attacks/techniques/autodan_turbo/warm_up"
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/indirect/rag/attack",
+                        "hackagent/attacks/techniques/indirect/rag/config",
+                        "hackagent/attacks/techniques/indirect/rag/jailbreak"
+                      ],
+                      "label": "hackagent.attacks.techniques.indirect.rag",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/indirect/tool_output_ipi/attack",
+                        "hackagent/attacks/techniques/indirect/tool_output_ipi/config",
+                        "hackagent/attacks/techniques/indirect/tool_output_ipi/generation"
+                      ],
+                      "label": "hackagent.attacks.techniques.indirect.tool_output_ipi",
+                      "type": "category"
+                    }
                   ],
-                  "label": "hackagent.attacks.techniques.autodan_turbo",
+                  "label": "hackagent.attacks.techniques.indirect",
                   "type": "category"
                 },
                 {
                   "items": [
-                    "hackagent/attacks/techniques/baseline/attack",
-                    "hackagent/attacks/techniques/baseline/generation"
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/multi_turn/crescendo/attack",
+                        "hackagent/attacks/techniques/multi_turn/crescendo/config"
+                      ],
+                      "label": "hackagent.attacks.techniques.multi_turn.crescendo",
+                      "type": "category"
+                    }
                   ],
-                  "label": "hackagent.attacks.techniques.baseline",
+                  "label": "hackagent.attacks.techniques.multi_turn",
                   "type": "category"
                 },
                 {
                   "items": [
-                    "hackagent/attacks/techniques/bon/attack",
-                    "hackagent/attacks/techniques/bon/config",
-                    "hackagent/attacks/techniques/bon/generation"
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/static/baseline/attack",
+                        "hackagent/attacks/techniques/static/baseline/generation"
+                      ],
+                      "label": "hackagent.attacks.techniques.static.baseline",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/static/cipherchat/attack",
+                        "hackagent/attacks/techniques/static/cipherchat/config",
+                        "hackagent/attacks/techniques/static/cipherchat/generation"
+                      ],
+                      "label": "hackagent.attacks.techniques.static.cipherchat",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/static/fc/attack",
+                        "hackagent/attacks/techniques/static/fc/config",
+                        "hackagent/attacks/techniques/static/fc/flowchart_renderer",
+                        "hackagent/attacks/techniques/static/fc/generation"
+                      ],
+                      "label": "hackagent.attacks.techniques.static.fc",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/static/flipattack/attack",
+                        "hackagent/attacks/techniques/static/flipattack/config",
+                        "hackagent/attacks/techniques/static/flipattack/generation"
+                      ],
+                      "label": "hackagent.attacks.techniques.static.flipattack",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/static/h4rm3l/attack",
+                        "hackagent/attacks/techniques/static/h4rm3l/config",
+                        "hackagent/attacks/techniques/static/h4rm3l/decorators",
+                        "hackagent/attacks/techniques/static/h4rm3l/generation"
+                      ],
+                      "label": "hackagent.attacks.techniques.static.h4rm3l",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/static/mml/attack",
+                        "hackagent/attacks/techniques/static/mml/config",
+                        "hackagent/attacks/techniques/static/mml/generation",
+                        "hackagent/attacks/techniques/static/mml/image_encoder",
+                        "hackagent/attacks/techniques/static/mml/prompts"
+                      ],
+                      "label": "hackagent.attacks.techniques.static.mml",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "hackagent/attacks/techniques/static/static_template/attack",
+                        "hackagent/attacks/techniques/static/static_template/config",
+                        "hackagent/attacks/techniques/static/static_template/generation",
+                        "hackagent/attacks/techniques/static/static_template/static_eval"
+                      ],
+                      "label": "hackagent.attacks.techniques.static.static_template",
+                      "type": "category"
+                    }
                   ],
-                  "label": "hackagent.attacks.techniques.bon",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/cipherchat/attack",
-                    "hackagent/attacks/techniques/cipherchat/config",
-                    "hackagent/attacks/techniques/cipherchat/generation"
-                  ],
-                  "label": "hackagent.attacks.techniques.cipherchat",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/crescendo/attack",
-                    "hackagent/attacks/techniques/crescendo/config"
-                  ],
-                  "label": "hackagent.attacks.techniques.crescendo",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/fc/attack",
-                    "hackagent/attacks/techniques/fc/config",
-                    "hackagent/attacks/techniques/fc/flowchart_renderer",
-                    "hackagent/attacks/techniques/fc/generation"
-                  ],
-                  "label": "hackagent.attacks.techniques.fc",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/flipattack/attack",
-                    "hackagent/attacks/techniques/flipattack/config",
-                    "hackagent/attacks/techniques/flipattack/generation"
-                  ],
-                  "label": "hackagent.attacks.techniques.flipattack",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/h4rm3l/attack",
-                    "hackagent/attacks/techniques/h4rm3l/config",
-                    "hackagent/attacks/techniques/h4rm3l/decorators",
-                    "hackagent/attacks/techniques/h4rm3l/generation"
-                  ],
-                  "label": "hackagent.attacks.techniques.h4rm3l",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/mml/attack",
-                    "hackagent/attacks/techniques/mml/config",
-                    "hackagent/attacks/techniques/mml/generation",
-                    "hackagent/attacks/techniques/mml/image_encoder",
-                    "hackagent/attacks/techniques/mml/prompts"
-                  ],
-                  "label": "hackagent.attacks.techniques.mml",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/pair/attack",
-                    "hackagent/attacks/techniques/pair/config"
-                  ],
-                  "label": "hackagent.attacks.techniques.pair",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/pap/attack",
-                    "hackagent/attacks/techniques/pap/config",
-                    "hackagent/attacks/techniques/pap/generation",
-                    "hackagent/attacks/techniques/pap/taxonomy"
-                  ],
-                  "label": "hackagent.attacks.techniques.pap",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/rag/attack",
-                    "hackagent/attacks/techniques/rag/config",
-                    "hackagent/attacks/techniques/rag/jailbreak"
-                  ],
-                  "label": "hackagent.attacks.techniques.rag",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/static_template/attack",
-                    "hackagent/attacks/techniques/static_template/config",
-                    "hackagent/attacks/techniques/static_template/generation",
-                    "hackagent/attacks/techniques/static_template/static_eval"
-                  ],
-                  "label": "hackagent.attacks.techniques.static_template",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/tap/attack",
-                    "hackagent/attacks/techniques/tap/config",
-                    "hackagent/attacks/techniques/tap/generation",
-                    "hackagent/attacks/techniques/tap/tap_evaluation"
-                  ],
-                  "label": "hackagent.attacks.techniques.tap",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "hackagent/attacks/techniques/tool_output_ipi/attack",
-                    "hackagent/attacks/techniques/tool_output_ipi/config",
-                    "hackagent/attacks/techniques/tool_output_ipi/generation"
-                  ],
-                  "label": "hackagent.attacks.techniques.tool_output_ipi",
+                  "label": "hackagent.attacks.techniques.static",
                   "type": "category"
                 },
                 "hackagent/attacks/techniques/base",

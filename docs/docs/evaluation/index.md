@@ -103,4 +103,4 @@ Row-level helpers that used to live next to these functions are gone. `generate_
 
 `hackagent.attacks.evaluator` is gone, including `sync.py`, `_already_evaluated`, and the progress/sync helpers. There is no import shim.
 
-Static Template still writes its own evaluation status with `_sync_evaluation_to_server` in `hackagent.attacks.techniques.static_template.static_eval`. Technique-local `eval_*` writers stay in the techniques. That helper stays technique-local. It is not a public evaluation API. Record `eval_*` columns for a run are produced by [`hackagent.orchestrator.mapping`](../hackagent/orchestrator/mapping.md).
+Static Template still writes its own evaluation status with `_sync_evaluation_to_server` in `hackagent.attacks.techniques.static.static_template.static_eval`. Technique-local `eval_*` writers stay in the techniques. That helper stays technique-local. It is not a public evaluation API. Record `eval_*` columns for a run are produced by [`hackagent.orchestrator.mapping`](../hackagent/orchestrator/mapping.md).

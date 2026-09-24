@@ -29,6 +29,19 @@ Tags do not replace the primary category. Filter or label with them when the cha
 
 tFC is the text-only sibling of FC, so it stays **static** and is **not** tagged multimodal. RAG is **static** in how it hits the target (poison once, then query) and tagged **indirect** and **rag**. Tool-output IPI is **adaptive** (attempt/refine over poisoned observations) and tagged **indirect** only — never `rag`.
 
+## Package layout
+
+Technique packages sit in the folder of their group in these docs, under `hackagent/attacks/techniques/`:
+
+| Folder | Techniques |
+|--------|------------|
+| `static/` | `baseline`, `static_template`, `flipattack`, `cipherchat`, `h4rm3l`, `mml`, `fc` (also `tfc`) |
+| `adaptive/` | `pair`, `tap`, `pap`, `bon`, `advprefix`, `autodan_turbo` |
+| `multi_turn/` | `crescendo` |
+| `indirect/` | `rag`, `tool_output_ipi` |
+
+The **indirect** tag decides the folder first; otherwise the primary category does. So RAG lives in `indirect/` although it is static, and Tool-output IPI although it is adaptive. A unit test checks every registered technique against this rule.
+
 ## Choosing by category
 
 - Start with **static** attacks for a fast first pass and a control condition (Baseline).

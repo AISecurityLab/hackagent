@@ -64,7 +64,7 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         FIXED: pattern/keyword evaluation removed; evaluate_responses is now
         a lightweight error-detection stub. LLM judge evaluation is the only path.
         """
-        from hackagent.attacks.techniques.static_template import (
+        from hackagent.attacks.techniques.static.static_template import (
             static_eval as evaluation,
         )
         import inspect
@@ -131,7 +131,7 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         The execute_prompts function now uses Tracker with goal_contexts
         to track results. Each goal gets a Context object with a result_id.
         """
-        from hackagent.attacks.techniques.static_template import generation
+        from hackagent.attacks.techniques.static.static_template import generation
         import inspect
 
         # Check the execute_prompts function source
@@ -152,7 +152,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
         The evaluation step syncs status to storage via _sync_evaluation_to_server.
         """
-        from hackagent.attacks.techniques.static_template import (
+        from hackagent.attacks.techniques.static.static_template import (
             static_eval as evaluation,
         )
         import inspect
@@ -167,7 +167,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
     def test_sync_evaluation_function_exists(self):
         """Test that _sync_evaluation_to_server function exists and is called."""
-        from hackagent.attacks.techniques.static_template.static_eval import (
+        from hackagent.attacks.techniques.static.static_template.static_eval import (
             _sync_evaluation_to_server,
             execute,
         )
@@ -182,7 +182,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
     def test_update_result_status_function(self):
         """Test that _update_result_status function works correctly."""
-        from hackagent.attacks.techniques.static_template.static_eval import (
+        from hackagent.attacks.techniques.static.static_template.static_eval import (
             _update_result_status,
         )
 
@@ -217,7 +217,7 @@ class TestStaticTemplateTrackerConsistency(unittest.TestCase):
         return backend
 
     def test_execute_prompts_reuses_existing_goal_context(self):
-        from hackagent.attacks.techniques.static_template.generation import (
+        from hackagent.attacks.techniques.static.static_template.generation import (
             execute_prompts,
         )
 
@@ -255,7 +255,7 @@ class TestStaticTemplateTrackerConsistency(unittest.TestCase):
         )
 
     def test_finalize_goals_marks_missing_prompts_as_failed(self):
-        from hackagent.attacks.techniques.static_template.static_eval import (
+        from hackagent.attacks.techniques.static.static_template.static_eval import (
             _finalize_goals_with_tracker,
         )
 
@@ -297,7 +297,7 @@ class TestStaticTemplateTrackerConsistency(unittest.TestCase):
         )
 
     def test_generate_prompts_respects_goal_index_offset(self):
-        from hackagent.attacks.techniques.static_template.generation import (
+        from hackagent.attacks.techniques.static.static_template.generation import (
             generate_prompts,
         )
 

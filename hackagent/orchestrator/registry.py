@@ -17,55 +17,55 @@ from hackagent.catalog.taxonomy import AttackId
 
 # Canonical ids only. There are no display-name aliases.
 ATTACK_REGISTRY: Dict[str, str] = {
-    "baseline": "hackagent.attacks.techniques.baseline.attack:BaselineAttack",
+    "baseline": "hackagent.attacks.techniques.static.baseline.attack:BaselineAttack",
     "static_template": (
-        "hackagent.attacks.techniques.static_template.attack:StaticTemplateAttack"
+        "hackagent.attacks.techniques.static.static_template.attack:StaticTemplateAttack"
     ),
-    "flipattack": "hackagent.attacks.techniques.flipattack.attack:FlipAttack",
-    "cipherchat": "hackagent.attacks.techniques.cipherchat.attack:CipherChatAttack",
-    "h4rm3l": "hackagent.attacks.techniques.h4rm3l.attack:H4rm3lAttack",
-    "mml": "hackagent.attacks.techniques.mml.attack:MMLAttack",
-    "fc": "hackagent.attacks.techniques.fc.attack:FCAttack",
-    "tfc": "hackagent.attacks.techniques.fc.attack:tFCAttack",
-    "rag": "hackagent.attacks.techniques.rag.attack:RagAttack",
-    "pair": "hackagent.attacks.techniques.pair.attack:PAIRAttack",
-    "tap": "hackagent.attacks.techniques.tap.attack:TAPAttack",
-    "pap": "hackagent.attacks.techniques.pap.attack:PAPAttack",
-    "bon": "hackagent.attacks.techniques.bon.attack:BoNAttack",
-    "advprefix": "hackagent.attacks.techniques.advprefix.attack:AdvPrefixAttack",
+    "flipattack": "hackagent.attacks.techniques.static.flipattack.attack:FlipAttack",
+    "cipherchat": "hackagent.attacks.techniques.static.cipherchat.attack:CipherChatAttack",
+    "h4rm3l": "hackagent.attacks.techniques.static.h4rm3l.attack:H4rm3lAttack",
+    "mml": "hackagent.attacks.techniques.static.mml.attack:MMLAttack",
+    "fc": "hackagent.attacks.techniques.static.fc.attack:FCAttack",
+    "tfc": "hackagent.attacks.techniques.static.fc.attack:tFCAttack",
+    "rag": "hackagent.attacks.techniques.indirect.rag.attack:RagAttack",
+    "pair": "hackagent.attacks.techniques.adaptive.pair.attack:PAIRAttack",
+    "tap": "hackagent.attacks.techniques.adaptive.tap.attack:TAPAttack",
+    "pap": "hackagent.attacks.techniques.adaptive.pap.attack:PAPAttack",
+    "bon": "hackagent.attacks.techniques.adaptive.bon.attack:BoNAttack",
+    "advprefix": "hackagent.attacks.techniques.adaptive.advprefix.attack:AdvPrefixAttack",
     "autodan_turbo": (
-        "hackagent.attacks.techniques.autodan_turbo.attack:AutoDANTurboAttack"
+        "hackagent.attacks.techniques.adaptive.autodan_turbo.attack:AutoDANTurboAttack"
     ),
     "tool_output_ipi": (
-        "hackagent.attacks.techniques.tool_output_ipi.attack:ToolOutputIPIAttack"
+        "hackagent.attacks.techniques.indirect.tool_output_ipi.attack:ToolOutputIPIAttack"
     ),
-    "crescendo": "hackagent.attacks.techniques.crescendo.attack:CrescendoAttack",
+    "crescendo": "hackagent.attacks.techniques.multi_turn.crescendo.attack:CrescendoAttack",
 }
 
 # Typed configs used for JSON-schema planning. Techniques without one are
 # still runnable; the planner just has no parameters to propose.
 CONFIG_REGISTRY: Dict[str, str] = {
     "static_template": (
-        "hackagent.attacks.techniques.static_template.config:TemplateAttackConfig"
+        "hackagent.attacks.techniques.static.static_template.config:TemplateAttackConfig"
     ),
-    "flipattack": "hackagent.attacks.techniques.flipattack.config:FlipAttackConfig",
-    "cipherchat": "hackagent.attacks.techniques.cipherchat.config:CipherChatConfig",
-    "h4rm3l": "hackagent.attacks.techniques.h4rm3l.config:H4rm3lConfig",
-    "mml": "hackagent.attacks.techniques.mml.config:MMLConfig",
-    "fc": "hackagent.attacks.techniques.fc.config:FCConfig",
-    "tfc": "hackagent.attacks.techniques.fc.config:tFCConfig",
-    "rag": "hackagent.attacks.techniques.rag.config:RagConfig",
-    "pair": "hackagent.attacks.techniques.pair.config:PairConfig",
-    "tap": "hackagent.attacks.techniques.tap.config:TapConfig",
-    "pap": "hackagent.attacks.techniques.pap.config:PAPConfig",
-    "bon": "hackagent.attacks.techniques.bon.config:BoNConfig",
+    "flipattack": "hackagent.attacks.techniques.static.flipattack.config:FlipAttackConfig",
+    "cipherchat": "hackagent.attacks.techniques.static.cipherchat.config:CipherChatConfig",
+    "h4rm3l": "hackagent.attacks.techniques.static.h4rm3l.config:H4rm3lConfig",
+    "mml": "hackagent.attacks.techniques.static.mml.config:MMLConfig",
+    "fc": "hackagent.attacks.techniques.static.fc.config:FCConfig",
+    "tfc": "hackagent.attacks.techniques.static.fc.config:tFCConfig",
+    "rag": "hackagent.attacks.techniques.indirect.rag.config:RagConfig",
+    "pair": "hackagent.attacks.techniques.adaptive.pair.config:PairConfig",
+    "tap": "hackagent.attacks.techniques.adaptive.tap.config:TapConfig",
+    "pap": "hackagent.attacks.techniques.adaptive.pap.config:PAPConfig",
+    "bon": "hackagent.attacks.techniques.adaptive.bon.config:BoNConfig",
     "autodan_turbo": (
-        "hackagent.attacks.techniques.autodan_turbo.config:AutoDANTurboConfig"
+        "hackagent.attacks.techniques.adaptive.autodan_turbo.config:AutoDANTurboConfig"
     ),
     "tool_output_ipi": (
-        "hackagent.attacks.techniques.tool_output_ipi.config:ToolOutputIPIConfig"
+        "hackagent.attacks.techniques.indirect.tool_output_ipi.config:ToolOutputIPIConfig"
     ),
-    "crescendo": "hackagent.attacks.techniques.crescendo.config:CrescendoConfig",
+    "crescendo": "hackagent.attacks.techniques.multi_turn.crescendo.config:CrescendoConfig",
 }
 
 

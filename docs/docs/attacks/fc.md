@@ -100,7 +100,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `FCAttack(config, ctx)` ([Attack seam](./seam.md)). On that path the flowchart cache is `ctx.workspace` (`_wire_workspace_cache`). Graphviz is bootstrapped with `hackagent.attacks._lib.graphviz.ensure_graphviz`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.fc import FCAttack
+from hackagent.attacks.techniques.static.fc import FCAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

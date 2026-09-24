@@ -74,7 +74,7 @@ Each step is an `attack_config` dict executed with `agent.hack`. `attacks` defau
 
 ## Deferred
 
-Technique-local `eval_*` writers and `_sync_evaluation_to_server` stay in the techniques, including `hackagent.attacks.techniques.static_template.static_eval`. They are not a public evaluation API and they are not part of this package.
+Technique-local `eval_*` writers and `_sync_evaluation_to_server` stay in the techniques, including `hackagent.attacks.techniques.static.static_template.static_eval`. They are not a public evaluation API and they are not part of this package.
 
 Import-linter enforces this layout: `core`, then the depth-0 packages (mutually independent), then `orchestrator`, then `client`, then `interfaces`. `storage._http` stays private to `storage.remote`. Optional libraries ship as extras (`tui`, `web`, `browser`, `rag`, `vision`, `hf`); see [Installation](../getting-started/installation.mdx). Click stays a base dependency.
 

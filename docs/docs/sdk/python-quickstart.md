@@ -227,7 +227,7 @@ The SDK includes comprehensive default configuration:
 
 ```python
 # Default AdvPrefix configuration (DEFAULT_PREFIX_GENERATION_CONFIG in
-# hackagent/attacks/techniques/advprefix/config.py — not the top-level hackagent/config.py)
+# hackagent/attacks/techniques/adaptive/advprefix/config.py — not the top-level hackagent/config.py)
 DEFAULT_CONFIG = {
     "output_dir": "./logs/runs",
     "attacker": {

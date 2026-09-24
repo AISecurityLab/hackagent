@@ -14,6 +14,8 @@ from typing import Optional
 
 def ensure_graphviz(allow_download: Optional[bool] = None) -> Optional[str]:
     """Ensure Graphviz ``dot`` is available and return its resolved path."""
-    from hackagent.attacks.techniques.fc.flowchart_renderer import ensure_graphviz
+    from hackagent.attacks.techniques.static.fc.flowchart_renderer import (
+        ensure_graphviz,
+    )
 
     return ensure_graphviz(allow_download=allow_download)

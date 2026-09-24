@@ -1,0 +1,127 @@
+import unittest
+from unittest.mock import MagicMock, patch
+
+from hackagent.attacks.techniques.adaptive.pap.attack import (
+    PAPAttack,
+    _recursive_update,
+)
+from tests.fakes import RecordingCoordinator, RecordingStepTracker
+
+
+class TestRecursiveUpdate(unittest.TestCase):
+    def test_nested_merge(self):
+        dst = {"a": {"b": 1}, "x": 0}
+        src = {"a": {"c": 2}, "y": 3}
+        _recursive_update(dst, src)
+        self.assertEqual(dst["a"]["b"], 1)
+        self.assertEqual(dst["a"]["c"], 2)
+        self.assertEqual(dst["y"], 3)
+
+    def test_internal_keys_by_reference(self):
+        obj = MagicMock()
+        dst = {"_tracker": None}
+        _recursive_update(dst, {"_tracker": obj})
+        self.assertIs(dst["_tracker"], obj)
+
+    def test_deep_copy_non_internal(self):
+        src_list = [1, 2, 3]
+        dst = {"data": []}
+        _recursive_update(dst, {"data": src_list})
+        self.assertEqual(dst["data"], [1, 2, 3])
+        self.assertIsNot(dst["data"], src_list)
+
+
+class TestPAPAttack(unittest.TestCase):
+    def test_requires_client(self):
+        with self.assertRaises(ValueError):
+            PAPAttack(config={}, client=None, agent_router=MagicMock())
+
+    def test_requires_agent_router(self):
+        with self.assertRaises(ValueError):
+            PAPAttack(config={}, client=MagicMock(), agent_router=None)
+
+    def test_default_config_merge(self):
+        attack = PAPAttack(
+            config={"output_dir": "./logs/runs"},
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        self.assertIn("pap_params", attack.config)
+        self.assertEqual(attack.config["attack_type"], "pap")
+
+    def test_user_config_overrides(self):
+        attack = PAPAttack(
+            config={
+                "output_dir": "./logs/runs",
+                "pap_params": {"techniques": "all", "attacker_temperature": 0.5},
+            },
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        self.assertEqual(attack.config["pap_params"]["techniques"], "all")
+        self.assertAlmostEqual(attack.config["pap_params"]["attacker_temperature"], 0.5)
+        # Defaults for non-overridden keys should remain
+        self.assertEqual(attack.config["pap_params"]["attacker_max_tokens"], 4096)
+
+    def test_run_empty_goals(self):
+        attack = PAPAttack(
+            config={"output_dir": "./logs/runs"},
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        self.assertEqual(attack.run([]), [])
+
+    def test_validate_config_missing_attack_type(self):
+        """Config without attack_type should fail after merge removes it."""
+        # Default config always has attack_type, so we test an invalid techniques value
+        with self.assertRaises(ValueError):
+            PAPAttack(
+                config={
+                    "output_dir": "./logs/runs",
+                    "pap_params": {"techniques": "invalid_value"},
+                },
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+
+    @patch("hackagent.attacks.techniques.adaptive.pap.attack.generation.execute")
+    def test_run_pipeline(self, mock_gen):
+        client = MagicMock()
+        agent_router = MagicMock()
+        attack = PAPAttack(
+            config={"output_dir": "./logs/runs"},
+            client=client,
+            agent_router=agent_router,
+        )
+
+        coordinator = RecordingCoordinator()
+
+        def _init_coord(*_args, **_kwargs):
+            attack.tracker = RecordingStepTracker()
+            return coordinator
+
+        mock_gen.return_value = [
+            {
+                "goal": "test goal",
+                "persuasive_prompt": "persuasive test",
+                "response": "target response",
+                "error": None,
+                "technique": "Logical Appeal",
+                "technique_index": 0,
+                "best_score": 1.0,
+                "success": True,
+            }
+        ]
+        with patch.object(attack, "_initialize_coordinator", side_effect=_init_coord):
+            results = attack.run(["test goal"])
+
+        mock_gen.assert_called_once()
+        self.assertEqual(len(results), 1)
+        from hackagent.attacks.types import AttackResult
+
+        self.assertIsInstance(results[0], AttackResult)
+        self.assertEqual(results[0].goal, "test goal")
+
+
+if __name__ == "__main__":
+    unittest.main()

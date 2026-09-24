@@ -123,7 +123,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `BoNAttack(config, ctx)` ([Attack seam](./seam.md)). On that path each candidate is scored with `ctx.judge.score` through `CtxJudgeAdapter`, which replaces `InlineStepJudge`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.bon import BoNAttack
+from hackagent.attacks.techniques.adaptive.bon import BoNAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

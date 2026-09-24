@@ -97,7 +97,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `TAPAttack(config, ctx)` ([Attack seam](./seam.md)). Search scoring uses `CtxTapEvaluator` (`ctx.judge.score`) instead of `TapEvaluation`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.tap import TAPAttack
+from hackagent.attacks.techniques.adaptive.tap import TAPAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

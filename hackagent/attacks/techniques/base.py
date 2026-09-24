@@ -40,10 +40,11 @@ obsolete for new technique code. Shared helpers live in
 ``hackagent.attacks._lib``; compatibility shims remain at
 ``attacks.shared``, ``attacks.generator``, and ``attacks.objectives``.
 
-Attack techniques are organized in:
-    techniques/advprefix/attack.py    - AdvPrefixAttack
-    techniques/static_template/attack.py - StaticTemplateAttack
-    techniques/pair/attack.py         - PAIRAttack
+Attack techniques are grouped by category, as in the docs:
+    techniques/static/static_template/attack.py - StaticTemplateAttack
+    techniques/adaptive/pair/attack.py          - PAIRAttack
+    techniques/multi_turn/crescendo/attack.py   - CrescendoAttack
+    techniques/indirect/rag/attack.py           - RagAttack
 
 Each technique:
 - Extends BaseAttack

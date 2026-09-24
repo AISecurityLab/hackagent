@@ -113,7 +113,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `tFCAttack(config, ctx)` ([Attack seam](./seam.md)). Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.fc import tFCAttack
+from hackagent.attacks.techniques.static.fc import tFCAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

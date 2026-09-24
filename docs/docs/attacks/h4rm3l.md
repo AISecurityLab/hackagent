@@ -305,7 +305,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `H4rm3lAttack(config, ctx)` ([Attack seam](./seam.md)). Decoration traces go to `ctx.events.trace`. Generation can take an explicit `decorator_llm_router`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.h4rm3l import H4rm3lAttack
+from hackagent.attacks.techniques.static.h4rm3l import H4rm3lAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

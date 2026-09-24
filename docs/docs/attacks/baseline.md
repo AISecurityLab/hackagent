@@ -76,7 +76,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `BaselineAttack(config, ctx)` ([Attack seam](./seam.md)). `config` is an `AttackConfig` or a dict merged into the baseline defaults. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.baseline import BaselineAttack
+from hackagent.attacks.techniques.static.baseline import BaselineAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()
