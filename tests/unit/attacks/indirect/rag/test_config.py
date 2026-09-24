@@ -3,8 +3,8 @@
 
 import unittest
 
-from hackagent.attacks.objectives import OBJECTIVES
-from hackagent.attacks.objectives.rag import RAG
+from hackagent.attacks._lib.objectives import OBJECTIVES
+from hackagent.attacks._lib.objectives.rag import RAG
 from hackagent.attacks.techniques.indirect.rag.config import (
     DEFAULT_RAG_CONFIG,
     RagConfig,

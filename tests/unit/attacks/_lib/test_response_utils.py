@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks._lib.response import extract_response_content
 
 
 @pytest.fixture

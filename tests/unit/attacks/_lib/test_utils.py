@@ -5,7 +5,7 @@
 
 import unittest
 
-from hackagent.attacks.shared.utils import (
+from hackagent.attacks._lib.transforms import (
     deduplicate_by_content,
     deduplicate_by_hash,
     encode_base64,

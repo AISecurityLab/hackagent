@@ -118,7 +118,7 @@ class StaticTemplateAttack(BaseAttack):
 
         Checks presence of all required top-level keys and verifies that
         the configured ``objective`` exists in the
-        :data:`~hackagent.attacks.objectives.OBJECTIVES` registry.
+        :data:`~hackagent.attacks._lib.objectives.OBJECTIVES` registry.
 
         Raises:
             ValueError: If any required key is missing or the ``objective``

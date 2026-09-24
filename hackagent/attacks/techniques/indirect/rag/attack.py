@@ -234,7 +234,7 @@ def get_embeddings(
 ) -> np.ndarray:
     """Get embeddings using OpenAI-compatible API."""
     import openai
-    from hackagent.attacks.shared.embedding_utils import embedding_request_kwargs
+    from hackagent.attacks._lib.embedding_utils import embedding_request_kwargs
 
     kwargs = embedding_request_kwargs({"identifier": "embeddinggemma", **config})
     model = kwargs["model"]

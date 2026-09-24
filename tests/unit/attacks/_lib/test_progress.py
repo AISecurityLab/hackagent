@@ -7,7 +7,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from hackagent.attacks.shared.progress import (
+from hackagent.attacks._lib.progress import (
     create_progress_bar,
     NullProgress,
 )

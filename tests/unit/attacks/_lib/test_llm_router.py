@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hackagent.attacks.shared.llm_router import LLMRouter, connect_role
+from hackagent.attacks._lib.llm_router import LLMRouter, connect_role
 from hackagent.core.contracts import AgentType
 from tests.fakes import FakeLLM, in_memory_store
 

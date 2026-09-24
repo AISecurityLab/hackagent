@@ -6,14 +6,14 @@
 import unittest
 
 from hackagent.evaluation.patterns import PatternEvaluator
-from hackagent.attacks.objectives import (
+from hackagent.attacks._lib.objectives import (
     HARMFUL_BEHAVIOR,
     JAILBREAK,
     OBJECTIVES,
     POLICY_VIOLATION,
     ObjectiveConfig,
 )
-from hackagent.attacks.objectives.rag import RAG
+from hackagent.attacks._lib.objectives.rag import RAG
 
 
 class TestObjectiveConfig(unittest.TestCase):

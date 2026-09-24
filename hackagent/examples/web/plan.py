@@ -16,7 +16,7 @@ Usage:
 import json
 import sys
 
-from hackagent.router.discovery import auto_plan, build_web_target
+from hackagent.orchestrator.planning import auto_plan, build_web_target
 
 
 def main(argv):

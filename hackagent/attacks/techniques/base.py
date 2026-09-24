@@ -37,8 +37,7 @@ Every shipped technique accepts that constructor.
 ``(config, ctx)``. The legacy ``(config_dict, client, agent_router)``
 constructor, including ``client=`` as a keyword, remains supported and is
 obsolete for new technique code. Shared helpers live in
-``hackagent.attacks._lib``; compatibility shims remain at
-``attacks.shared``, ``attacks.generator``, and ``attacks.objectives``.
+``hackagent.attacks._lib``.
 
 Attack techniques are grouped by category, as in the docs:
     techniques/static/static_template/attack.py - StaticTemplateAttack

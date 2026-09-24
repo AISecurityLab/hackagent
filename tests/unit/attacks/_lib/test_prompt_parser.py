@@ -11,7 +11,7 @@ bare prose. These tests pin every branch of that ladder.
 
 import unittest
 
-from hackagent.attacks.shared.prompt_parser import (
+from hackagent.attacks._lib.prompt_parser import (
     extract_prompt,
     extract_prompt_and_improvement,
 )

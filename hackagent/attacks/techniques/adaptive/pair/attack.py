@@ -187,7 +187,7 @@ class PAIRAttack(BaseAttack):
         agent_router: Router for the victim model.
         attacker_router: Router for the attacker LLM.
         scorer_router: Router for the scorer LLM.
-        objective: Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
+        objective: Loaded :class:`~hackagent.attacks._lib.objectives.base.ObjectiveConfig`
             instance for the configured ``objective`` key.
         logger: Hierarchical logger at ``hackagent.attacks.pair``.
     """
@@ -440,7 +440,7 @@ class PAIRAttack(BaseAttack):
         if not bool(self.config.get("translate_prompts", False)):
             return text
         try:
-            from hackagent.attacks.shared.translation import localize_text
+            from hackagent.attacks._lib.translation import localize_text
 
             return localize_text(text, goal, self._translate_complete)
         except Exception as exc:  # pragma: no cover - defensive

@@ -5,7 +5,7 @@
 
 import unittest
 
-from hackagent.attacks.shared.translation import (
+from hackagent.attacks._lib.translation import (
     clear_cache,
     detect_language,
     localize_text,

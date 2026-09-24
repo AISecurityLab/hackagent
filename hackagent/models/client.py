@@ -23,7 +23,7 @@ class EnvelopeLLM:
     Subclasses implement :meth:`send` and :meth:`asend`, which take a request
     dict and return the envelope; ``complete`` and ``acomplete`` convert it
     into a :class:`Completion`. The techniques still call ``send`` (through
-    ``attacks.shared.llm_router``) until they move to ``complete``.
+    ``attacks._lib.llm_router``) until they move to ``complete``.
     """
 
     instance_id: str

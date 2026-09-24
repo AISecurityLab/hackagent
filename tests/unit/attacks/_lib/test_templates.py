@@ -7,7 +7,7 @@ import base64
 import codecs
 import unittest
 
-from hackagent.attacks.generator import (
+from hackagent.attacks._lib.templates import (
     AttackTemplates,
     REFUSAL_PATTERNS,
     SUCCESS_PATTERNS,

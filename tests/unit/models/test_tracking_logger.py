@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for ``hackagent/router/tracking_logger.py``."""
+"""Unit tests for ``hackagent/models/adapters/litellm_callbacks.py``."""
 
 import datetime as _dt
 import logging

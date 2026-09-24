@@ -4,7 +4,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks._lib.templates import AttackTemplates
 from hackagent.attacks.techniques.static.static_template.attack import (
     StaticTemplateAttack,
 )

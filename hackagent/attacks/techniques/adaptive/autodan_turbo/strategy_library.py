@@ -8,7 +8,7 @@ import os
 import pickle
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.attacks.shared.embedding_utils import (
+from hackagent.attacks._lib.embedding_utils import (
     embedding_request_kwargs,
     extract_embedding_vector,
     request_embedding,

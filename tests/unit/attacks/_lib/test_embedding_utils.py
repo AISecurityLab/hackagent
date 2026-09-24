@@ -18,7 +18,7 @@ try:  # openai >= 3 ships its own httpx fork and no longer uses httpx directly.
 except ImportError:  # pragma: no cover - depends on the installed openai major
     httpx2 = None
 
-from hackagent.attacks.shared.embedding_utils import (
+from hackagent.attacks._lib.embedding_utils import (
     embedding_request_kwargs,
     extract_embedding_vector,
     normalize_embedding_endpoint,
