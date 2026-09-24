@@ -1,6 +1,6 @@
 ---
-sidebar_label: utils
-title: hackagent.tracking.utils
+sidebar_label: serialize
+title: hackagent.tracking.serialize
 ---
 
 Shared serialization utilities for the tracking subsystem.

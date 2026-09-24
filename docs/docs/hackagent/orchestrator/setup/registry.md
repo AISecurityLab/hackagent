@@ -1,6 +1,6 @@
 ---
 sidebar_label: registry
-title: hackagent.orchestrator.registry
+title: hackagent.orchestrator.setup.registry
 ---
 
 Lazy `AttackId -&gt; &quot;module:Class&quot;` registry.

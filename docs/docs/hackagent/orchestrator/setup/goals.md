@@ -1,6 +1,6 @@
 ---
 sidebar_label: goals
-title: hackagent.orchestrator.goals
+title: hackagent.orchestrator.setup.goals
 ---
 
 Goal resolution and category labelling.

@@ -1,6 +1,6 @@
 ---
 sidebar_label: tracker
-title: hackagent.tracking.tracker
+title: hackagent.tracking.goals.tracker
 ---
 
 Goal-based result tracking for attack techniques.

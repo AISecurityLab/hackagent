@@ -1,6 +1,6 @@
 ---
 sidebar_label: chain
-title: hackagent.orchestrator.chain
+title: hackagent.orchestrator.execution.chain
 ---
 
 Sequential attack chains.

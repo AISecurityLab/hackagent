@@ -1,13 +1,13 @@
 ---
 sidebar_label: persistence
-title: hackagent.orchestrator.persistence
+title: hackagent.orchestrator.results.persistence
 ---
 
 `RunSink` over a :class:`~hackagent.storage.store.Store`.
 
 Tracking writes result, trace and run rows through this object. Evaluation
 metrics passed in are stored as given; `eval_*` columns are produced by
-:mod:`hackagent.orchestrator.mapping` before they reach here.
+:mod:`hackagent.orchestrator.results.mapping` before they reach here.
 
 ## StoreSink Objects
 

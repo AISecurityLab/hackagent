@@ -1,6 +1,6 @@
 ---
 sidebar_label: scheduling
-title: hackagent.orchestrator.scheduling
+title: hackagent.orchestrator.execution.scheduling
 ---
 
 Goal batching. One attack instance per worker, log labels via contextvars.

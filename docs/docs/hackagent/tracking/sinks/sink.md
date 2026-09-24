@@ -1,6 +1,6 @@
 ---
 sidebar_label: sink
-title: hackagent.tracking.sink
+title: hackagent.tracking.sinks.sink
 ---
 
 Where a tracker writes run records.

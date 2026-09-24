@@ -1,6 +1,6 @@
 ---
 sidebar_label: listeners
-title: hackagent.tracking.listeners
+title: hackagent.tracking.sinks.listeners
 ---
 
 Fan tracker events out to interfaces.

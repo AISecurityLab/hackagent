@@ -61,7 +61,7 @@ results = target.hack(attack_config, on_event=on_event)
 rows = target.hack_chain(attacks=None, goals=None, on_event=on_event)
 ```
 
-`hack` requires `attack_config["attack_type"]` and calls orchestrator [`run`](../hackagent/orchestrator/runner.md). `hack_chain` calls orchestrator [`hack_chain`](../hackagent/orchestrator/chain.md). `attacks` defaults to the jailbreak profile's primary techniques. With `escalate_only_mitigated` (the default), a goal that already succeeded is dropped from later steps.
+`hack` requires `attack_config["attack_type"]` and calls orchestrator [`run`](../hackagent/orchestrator/execution/runner.md). `hack_chain` calls orchestrator [`hack_chain`](../hackagent/orchestrator/execution/chain.md). `attacks` defaults to the jailbreak profile's primary techniques. With `escalate_only_mitigated` (the default), a goal that already succeeded is dropped from later steps.
 
 `on_event` is `(event_type, **payload)` or any object with `emit`. The TUI subscribes this way. The CLI quick scan calls `hack_chain` through the facade.
 
@@ -105,7 +105,7 @@ rows = target.hack_chain(attacks=None, goals=None, on_event=on_event)
 
 ## Deferred
 
-`hackagent.attacks._lib.legacy_seams` still holds the sibling imports technique code uses for the obsolete constructor (`Store`, tracking coordinators, role models). It is not a public API and is omitted from the generated reference. `hackagent.router` remains a shim until that package is retired. `router.discovery` re-exports `plan_attack`, `auto_plan`, and `build_web_target`.
+`hackagent.attacks._lib.legacy_seams` still holds the sibling imports technique code uses for the obsolete constructor (`Store`, tracking coordinators, role models). It is not a public API and is omitted from the generated reference.
 
 Scripts under `hackagent/examples/` may still construct `HackAgent(endpoint=...)`. Those scripts are outdated relative to this facade. The examples on this page use `Settings` and `.target()`.
 

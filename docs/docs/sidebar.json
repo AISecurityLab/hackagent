@@ -350,8 +350,19 @@
         },
         {
           "items": [
+            {
+              "items": [
+                "hackagent/core/contracts/completion",
+                "hackagent/core/contracts/enums",
+                "hackagent/core/contracts/judging",
+                "hackagent/core/contracts/messages",
+                "hackagent/core/contracts/protocols",
+                "hackagent/core/contracts/specs"
+              ],
+              "label": "hackagent.core.contracts",
+              "type": "category"
+            },
             "hackagent/core/async_utils",
-            "hackagent/core/contracts",
             "hackagent/core/errors",
             "hackagent/core/logging",
             "hackagent/core/settings"
@@ -647,18 +658,44 @@
         },
         {
           "items": [
-            "hackagent/orchestrator/chain",
-            "hackagent/orchestrator/context",
-            "hackagent/orchestrator/defaults",
-            "hackagent/orchestrator/goals",
-            "hackagent/orchestrator/mapping",
-            "hackagent/orchestrator/persistence",
-            "hackagent/orchestrator/planning",
-            "hackagent/orchestrator/preflight",
-            "hackagent/orchestrator/registry",
-            "hackagent/orchestrator/run_spec",
-            "hackagent/orchestrator/runner",
-            "hackagent/orchestrator/scheduling"
+            {
+              "items": [
+                "hackagent/orchestrator/execution/chain",
+                "hackagent/orchestrator/execution/context",
+                "hackagent/orchestrator/execution/runner",
+                "hackagent/orchestrator/execution/scheduling",
+                "hackagent/orchestrator/execution/spec"
+              ],
+              "label": "hackagent.orchestrator.execution",
+              "type": "category"
+            },
+            {
+              "items": [
+                "hackagent/orchestrator/planning/catalog",
+                "hackagent/orchestrator/planning/planner",
+                "hackagent/orchestrator/planning/web"
+              ],
+              "label": "hackagent.orchestrator.planning",
+              "type": "category"
+            },
+            {
+              "items": [
+                "hackagent/orchestrator/results/mapping",
+                "hackagent/orchestrator/results/persistence"
+              ],
+              "label": "hackagent.orchestrator.results",
+              "type": "category"
+            },
+            {
+              "items": [
+                "hackagent/orchestrator/setup/defaults",
+                "hackagent/orchestrator/setup/goals",
+                "hackagent/orchestrator/setup/preflight",
+                "hackagent/orchestrator/setup/registry"
+              ],
+              "label": "hackagent.orchestrator.setup",
+              "type": "category"
+            }
           ],
           "label": "hackagent.orchestrator",
           "type": "category"
@@ -676,15 +713,33 @@
         },
         {
           "items": [
-            "hackagent/tracking/audit",
-            "hackagent/tracking/context",
+            {
+              "items": [
+                "hackagent/tracking/goals/tracker"
+              ],
+              "label": "hackagent.tracking.goals",
+              "type": "category"
+            },
+            {
+              "items": [
+                "hackagent/tracking/sinks/audit",
+                "hackagent/tracking/sinks/listeners",
+                "hackagent/tracking/sinks/sink"
+              ],
+              "label": "hackagent.tracking.sinks",
+              "type": "category"
+            },
+            {
+              "items": [
+                "hackagent/tracking/steps/context",
+                "hackagent/tracking/steps/decorators",
+                "hackagent/tracking/steps/tracker"
+              ],
+              "label": "hackagent.tracking.steps",
+              "type": "category"
+            },
             "hackagent/tracking/coordinator",
-            "hackagent/tracking/decorators",
-            "hackagent/tracking/listeners",
-            "hackagent/tracking/sink",
-            "hackagent/tracking/step",
-            "hackagent/tracking/tracker",
-            "hackagent/tracking/utils"
+            "hackagent/tracking/serialize"
           ],
           "label": "hackagent.tracking",
           "type": "category"

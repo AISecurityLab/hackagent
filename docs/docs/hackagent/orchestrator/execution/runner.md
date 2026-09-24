@@ -1,6 +1,6 @@
 ---
 sidebar_label: runner
-title: hackagent.orchestrator.runner
+title: hackagent.orchestrator.execution.runner
 ---
 
 One attack run.
@@ -10,7 +10,7 @@ records → build context → schedule → judge unjudged results once → final
 and flush.
 
 A verdict an attack already produced is final. Re-judging every result is
-opt-in via :attr:`hackagent.orchestrator.run_spec.RunSpec.rejudge`.
+opt-in via :attr:`hackagent.orchestrator.execution.spec.RunSpec.rejudge`.
 
 #### run
 

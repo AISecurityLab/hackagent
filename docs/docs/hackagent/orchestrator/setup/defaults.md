@@ -1,6 +1,6 @@
 ---
 sidebar_label: defaults
-title: hackagent.orchestrator.defaults
+title: hackagent.orchestrator.setup.defaults
 ---
 
 Local and remote role defaults.

@@ -1,6 +1,6 @@
 ---
-sidebar_label: step
-title: hackagent.tracking.step
+sidebar_label: tracker
+title: hackagent.tracking.steps.tracker
 ---
 
 Step-level tracking functionality.

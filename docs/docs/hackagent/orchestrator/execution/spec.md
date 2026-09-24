@@ -1,6 +1,6 @@
 ---
-sidebar_label: run_spec
-title: hackagent.orchestrator.run_spec
+sidebar_label: spec
+title: hackagent.orchestrator.execution.spec
 ---
 
 Run-level options that do not belong on :class:`AttackConfig`.

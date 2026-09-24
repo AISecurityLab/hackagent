@@ -1,6 +1,6 @@
 ---
 sidebar_label: mapping
-title: hackagent.orchestrator.mapping
+title: hackagent.orchestrator.results.mapping
 ---
 
 Convert attack results to and from storage records.

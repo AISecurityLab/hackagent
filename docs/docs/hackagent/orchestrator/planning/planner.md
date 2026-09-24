@@ -1,6 +1,6 @@
 ---
-sidebar_label: planning
-title: hackagent.orchestrator.planning
+sidebar_label: planner
+title: hackagent.orchestrator.planning.planner
 ---
 
 Attack planner.
@@ -16,15 +16,6 @@ class PlannerError(Exception)
 ```
 
 Raised when the planner cannot produce a usable plan.
-
-## SchemaField Objects
-
-```python
-@dataclass
-class SchemaField()
-```
-
-One tunable parameter taken from a technique JSON schema.
 
 ## AttackPlan Objects
 
@@ -50,42 +41,6 @@ def summary() -> str
 ```
 
 Human-readable one-screen summary of the plan.
-
-#### build\_web\_target
-
-```python
-def build_web_target(
-        url: str,
-        *,
-        name: Optional[str] = None,
-        headless: bool = True,
-        input_selector: Optional[str] = None,
-        reply_selector: Optional[str] = None,
-        launcher_selector: Optional[str] = None,
-        dismiss_consent: bool = True,
-        llm_fallback_model: Optional[str] = None,
-        timeout: Optional[int] = None) -> Tuple[str, Dict[str, Any]]
-```
-
-Build the `(&quot;web&quot;, operational_config)` target for a live-browser chatbot.
-
-#### schema\_fields
-
-```python
-def schema_fields(attack_id: str) -> List[SchemaField]
-```
-
-Flatten a technique config&#x27;s JSON schema into planner fields.
-
-#### build\_attack\_catalog
-
-```python
-def build_attack_catalog(*,
-                         include_advanced: bool = False
-                         ) -> List[Dict[str, Any]]
-```
-
-Serialize registered techniques and their JSON-schema parameters.
 
 #### plan\_attack
 

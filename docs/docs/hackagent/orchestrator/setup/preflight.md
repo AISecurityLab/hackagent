@@ -1,6 +1,6 @@
 ---
 sidebar_label: preflight
-title: hackagent.orchestrator.preflight
+title: hackagent.orchestrator.setup.preflight
 ---
 
 Reachability checks before a run creates records.

@@ -4,9 +4,16 @@ sidebar_position: 1
 
 # Tracking
 
-`hackagent.tracking` is a depth-0 package. It imports only [`hackagent.core`](../hackagent/core/contracts.md). `Tracker` implements the [`Events`](../attacks/seam.md) port and writes result, trace, and run records through `RunSink`. Persistence implements that sink in the orchestrator. This package does not import storage.
+`hackagent.tracking` is a depth-0 package. It imports only [`hackagent.core`](../hackagent/core/contracts/judging.md). `Tracker` implements the [`Events`](../attacks/seam.md) port and writes result, trace, and run records through `RunSink`. Persistence implements that sink in the orchestrator. This package does not import storage.
 
-API reference is generated from the source docstrings: [`tracker`](../hackagent/tracking/tracker.md), [`sink`](../hackagent/tracking/sink.md), [`listeners`](../hackagent/tracking/listeners.md), [`step`](../hackagent/tracking/step.md), [`context`](../hackagent/tracking/context.md), [`coordinator`](../hackagent/tracking/coordinator.md), [`decorators`](../hackagent/tracking/decorators.md), [`audit`](../hackagent/tracking/audit.md), [`utils`](../hackagent/tracking/utils.md).
+API reference is generated from the source docstrings:
+
+| Where | Modules |
+|-------|---------|
+| `goals` | [`tracker`](../hackagent/tracking/goals/tracker.md) (`Tracker`, `Context`) |
+| `steps` | [`tracker`](../hackagent/tracking/steps/tracker.md) (`StepTracker`), [`context`](../hackagent/tracking/steps/context.md), [`decorators`](../hackagent/tracking/steps/decorators.md) |
+| `sinks` | [`sink`](../hackagent/tracking/sinks/sink.md), [`listeners`](../hackagent/tracking/sinks/listeners.md), [`audit`](../hackagent/tracking/sinks/audit.md) |
+| top level | [`coordinator`](../hackagent/tracking/coordinator.md), [`serialize`](../hackagent/tracking/serialize.md) |
 
 ## `Tracker`
 
@@ -64,10 +71,10 @@ The tracker builds the `Fanout`. `Fanout.add` attaches another listener after co
 
 `TrackingCoordinator` owns a `StepTracker` and a `Tracker` for technique code that still drives both. `TrackingContext` is the shared bag `StepTracker` uses (sink, `run_id`, sequence counter). `track_operation` and `track_pipeline` wrap a callable with a `StepTracker`. `record_run_audit_failure` writes a failed audit step onto the run record.
 
-`deep_clean` and `sanitize_for_json` in `utils` are the serialization helpers both writers use.
+`deep_clean` and `sanitize_for_json` in `serialize` are the serialization helpers both writers use.
 
 ## Removed from tracking
 
-`hackagent.router.tracking` is gone. `hackagent.router` remains a deferred shim: it re-exports `StepTracker`, `TrackingContext`, and `track_operation`, and `router.discovery` re-exports the planner. That package is outside the layered layout and is omitted from the generated reference.
+`hackagent.router` is gone, including `hackagent.router.tracking` and `router.discovery`. Import `StepTracker`, `TrackingContext`, and `track_operation` from `hackagent.tracking`, and the planner from `hackagent.orchestrator.planning`.
 
 `GoalCategoryClassifier` is not part of tracking, and the class is not in this package. Labels come from `preclassified_goal_labels_by_index` when the caller already has them. Otherwise the result metadata stores `UNKNOWN_CATEGORY` (`Z. Unclassified Risk`) and `UNKNOWN_SUBCATEGORY` (`Z0. Unclassified Subcategory`). The attack-config `category_classifier` block is unchanged; classification itself lives outside this package.
