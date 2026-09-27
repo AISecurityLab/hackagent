@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) is Nous Research's open-source, self-hosted agent. HackAgent treats a **locally installed** Hermes Agent as a first-class attack target through the `hermes` router provider.
 
-Hermes exposes no OpenAI-compatible HTTP endpoint, but it ships a documented one-shot headless mode (`hermes -z "prompt"`) that prints only the final response. HackAgent shells out to that CLI directly — **no HTTP endpoint or bridge** is required, and the exchange flows through the standard tracking pipeline like every other provider.
+Hermes exposes no OpenAI-compatible HTTP endpoint, but it ships a documented one-shot headless mode (`hermes -z "prompt"`) that prints only the final response. HackAgent can invoke it directly or launch it through Ollama (`ollama launch hermes`) — **no HTTP endpoint or bridge** is required, and the exchange flows through the standard tracking pipeline like every other provider.
 
 ## Isolation by default
 
@@ -20,7 +20,8 @@ To prevent that, the adapter forces isolation flags unless you explicitly opt ou
 
 - `--ignore-user-config` is always passed (the target uses defaults plus `.env` credentials only and never reads `~/.hermes/config.yaml`).
 - `-r`/`--resume` and `-c`/`--continue` are never passed, so every attack turn is a fresh session.
-- `--source hackagent` is passed so Hermes-side logs are attributable to HackAgent runs.
+- `--source <source>` is passed only when explicitly configured. Some Hermes CLI
+  versions do not accept `--source` in one-shot mode.
 - `--safe-mode` (all customizations disabled) is available as an opt-in for maximum isolation.
 
 For stronger separation still, point `cwd` at a scratch directory and/or drive the target through a dedicated `hermes profile` so your real profile, memory, and skills are never touched.
@@ -34,7 +35,10 @@ For stronger separation still, point `cwd` at a scratch directory and/or drive t
    hermes --version
    ```
 
-2. **Make sure `hermes` is on your `PATH`.** The adapter checks this at construction time and fails loudly (`HermesConfigurationError`) if it can't find the binary.
+2. **Make sure the configured launcher is on your `PATH`.** Native mode
+   requires `hermes`; Ollama-launch mode requires `ollama`. The adapter checks
+   the selected executable at construction time and fails loudly
+   (`HermesConfigurationError`) if it can't find it.
 
 3. **Configure a judge/attacker model.** The target authenticates through its own local Hermes CLI flow — HackAgent needs no credentials to launch it. The judge model is separate; for example, to route it through Anthropic:
 
@@ -71,7 +75,7 @@ agent = HackAgent(
     agent_type="hermes",
     adapter_operational_config={
         "name": "hermes-4-70b",  # passed to `hermes -m`
-        "binary": "hermes",      # path to the Hermes executable
+        "binary": "hermes",      # use "ollama" for Ollama-launch mode
         # Isolation is on by default ("ignore_user_config": True).
         # Optional knobs: "provider", "cwd", "timeout", "safe_mode", "source", "extra_args".
     },
@@ -100,18 +104,19 @@ The target is configured through `adapter_operational_config`:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `name` | required | Hermes model to drive. Passed as `-m <model>` and used as the LiteLLM model string. |
-| `binary` | `hermes` | Path to the Hermes executable, checked with `shutil.which` at construction. |
+| `name` | required | Hermes model to drive. Passed as `-m <model>` in native mode or `--model <model>` to the Ollama launcher, and used as the LiteLLM model string. |
+| `binary` | `hermes` | Launcher executable, checked with `shutil.which` at construction. Use `ollama` for `ollama launch hermes`. |
 | `provider` | unset | Per-run backend provider override (`--provider`). |
 | `cwd` | unset | Working directory Hermes operates in (skills, worktrees, file tools). |
 | `timeout` | `600` | Per-turn timeout in seconds — higher than Claude Code's default because Hermes can trigger tool and browser use. |
 | `ignore_user_config` | `True` | Pass `--ignore-user-config` so the target never reads `~/.hermes/config.yaml`. |
 | `safe_mode` | `False` | Pass `--safe-mode` to disable all customizations for maximum isolation. |
-| `source` | `hackagent` | Pass `--source <source>` so Hermes-side logs are attributable to HackAgent runs. |
+| `source` | unset | Optional `--source <source>` attribution tag. |
 | `extra_args` | `[]` | Additional raw `hermes` flags. |
 
-:::note Prompt safety
-The adversarial prompt is fed through **stdin**, never argv, so text that begins with `-` is not misread as a CLI flag, and long prompts avoid argv length limits.
+:::note Prompt transport
+The adversarial prompt is passed as the value of Hermes' `-z/--oneshot` option.
+In Ollama-launch mode it is forwarded after the launcher's `--` separator.
 :::
 
 ## Output parsing
@@ -122,13 +127,14 @@ The adversarial prompt is fed through **stdin**, never argv, so text that begins
 
 ## Troubleshooting
 
-### `hermes` not found on PATH
+### Hermes or Ollama not found on PATH
 
 ```text
-HermesConfigurationError: Hermes executable 'hermes' was not found on PATH.
+HermesConfigurationError: Executable 'hermes' was not found on PATH.
 ```
 
-Install Hermes Agent, or pass the full path via `adapter_operational_config["binary"]`.
+Install Hermes Agent or Ollama as appropriate, or pass the full path via
+`adapter_operational_config["binary"]`.
 
 ### `hermes` timed out
 

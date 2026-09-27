@@ -34,6 +34,7 @@ logging.disable(logging.CRITICAL)
 # Paths that shutil.which() will "find" so init doesn't reject the binary.
 _FAKE_BINARY = "/usr/bin/hermes"
 _FAKE_OLLAMA_BINARY = "/usr/bin/ollama"
+_FAKE_HERMES_UNDER_OLLAMA_DIR = "/home/ollama/.local/bin/hermes"
 
 
 def _make_handler(**overrides):
@@ -262,6 +263,12 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         )
         self.assertNotIn("--model", argv)
 
+    def test_build_argv_uses_basename_for_ollama_detection(self):
+        argv = _make_handler(binary=_FAKE_HERMES_UNDER_OLLAMA_DIR)._build_argv()
+
+        self.assertEqual(argv[:2], [_FAKE_HERMES_UNDER_OLLAMA_DIR, "-z"])
+        self.assertNotIn("launch", argv)
+
     def test_build_argv_isolation_flags_on_by_default(self):
         argv = _make_handler()._build_argv()
         self.assertIn("--ignore-user-config", argv)
@@ -402,6 +409,21 @@ class TestHermesAgentInit(unittest.TestCase):
             config={"name": "qwen3.5:4b", "binary": "ollama"},
         )
         mock_which.assert_called_once_with("ollama")
+
+    @patch(
+        "hackagent.router.providers.hermes.shutil.which",
+        return_value=_FAKE_HERMES_UNDER_OLLAMA_DIR,
+    )
+    def test_init_treats_hermes_path_under_ollama_directory_as_native(self, mock_which):
+        HermesAgent(
+            id="native-under-ollama-dir",
+            config={
+                "name": "hermes-4-70b",
+                "binary": _FAKE_HERMES_UNDER_OLLAMA_DIR,
+            },
+        )
+
+        mock_which.assert_called_once_with(_FAKE_HERMES_UNDER_OLLAMA_DIR)
 
     @patch("hackagent.router.providers.hermes.shutil.which", return_value=None)
     def test_init_missing_ollama_raises_ollama_error(self, _which):

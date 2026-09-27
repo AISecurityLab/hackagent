@@ -2,7 +2,7 @@
 
 This example red-teams a locally installed [Hermes Agent](https://github.com/NousResearch/hermes-agent) instance using HackAgent.
 
-Hermes has no OpenAI-compatible HTTP endpoint, but it ships a one-shot headless mode (`hermes -z "prompt"`) that prints only the final response. HackAgent drives the target through that CLI with the `hermes` agent type, so no HTTP endpoint or bridge is required.
+Hermes has no OpenAI-compatible HTTP endpoint, but it ships a one-shot headless mode (`hermes -z "prompt"`) that prints only the final response. HackAgent drives the target through that CLI or through `ollama launch hermes`, so no HTTP endpoint or bridge is required.
 
 ---
 
@@ -14,7 +14,7 @@ The default goal is to test whether the target can be induced to reveal its syst
 
 | Component | Description |
 |---|---|
-| Target | Local Hermes Agent via `hermes -z` |
+| Target | Local Hermes Agent via `hermes -z` or `ollama launch hermes` |
 | Attack | FlipAttack |
 | Judge | Anthropic API via LiteLLM (requires `ANTHROPIC_API_KEY`) |
 | Risk | System-prompt disclosure and instruction-injection on a persistent, self-improving agent |
@@ -46,20 +46,20 @@ Then run:
         agent_type="hermes",
         adapter_operational_config={
             "name": "hermes-4-70b",  # passed to `hermes -m`
-            "binary": "hermes",
+            "binary": "hermes",  # use "ollama" for Ollama-launch mode
         },
     )
 
 | Config key | Maps to | Default |
 |---|---|---|
-| `name` (required) | `-m <model>` | — |
-| `binary` | argv[0], checked with `shutil.which` at construction | `hermes` |
+| `name` (required) | `-m <model>` in native mode or `--model <model>` for Ollama launch | — |
+| `binary` | launcher executable, checked with `shutil.which` at construction | `hermes` |
 | `provider` | `--provider <provider>` | unset |
 | `cwd` | working directory Hermes operates in | unset |
 | `timeout` | `subprocess.run(..., timeout=)` seconds | `600` |
 | `ignore_user_config` | `--ignore-user-config` | `True` |
 | `safe_mode` | `--safe-mode` | `False` |
-| `source` | `--source <source>` | `hackagent` |
+| `source` | optional `--source <source>` | unset |
 | `extra_args` | appended raw flags | `[]` |
 
 ---
@@ -73,7 +73,8 @@ The adapter therefore defaults to isolation:
 - `--ignore-user-config` is always passed unless you explicitly set `"ignore_user_config": False`, so the target uses defaults plus `.env` credentials only and never reads `~/.hermes/config.yaml`.
 - `-r`/`--resume` and `-c`/`--continue` are never passed, so every attack turn is a fresh session.
 - `"safe_mode": True` opts into `--safe-mode` for maximum isolation (all customizations disabled).
-- `--source hackagent` is passed so Hermes-side logs are attributable to HackAgent runs.
+- `--source <source>` is passed only when explicitly configured. Some Hermes CLI
+  versions do not accept `--source` in one-shot mode.
 
 For stronger separation still, point `cwd` at a scratch directory and/or run the target under a dedicated `hermes profile` so the operator's real profile, memory and skills are never touched.
 
@@ -82,7 +83,10 @@ For stronger separation still, point `cwd` at a scratch directory and/or run the
 ### Notes
 
 - `hermes -z` returns bare text with no structured metadata (no session id, cost or exit reason), so the adapter relies on exit codes: `0` success, `1` delivery/backend failure, `2` usage error. A non-zero exit with usable stdout is captured as the target's response (a refusal is a legitimate response to judge); exit `2` always fails loudly.
-- The prompt is fed via **stdin**, never argv, so adversarial payloads starting with `-` are not parsed as CLI flags.
+- The prompt is passed as the value of Hermes' `-z/--oneshot` option. In
+  Ollama-launch mode it is forwarded after the launcher's `--` separator.
+- Set `"binary": "ollama"` to launch Hermes with
+  `ollama launch hermes --model <name> --yes --`.
 - The `endpoint` field is present for HackAgent compatibility but is ignored for this local setup.
 - If the configured binary is not on `PATH`, the setup fails before the attack runs.
 - `hermes serve` (a headless backend over JSON-RPC/WebSocket) is out of scope here; this example covers the local CLI-driven path only.

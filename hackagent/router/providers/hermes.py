@@ -29,6 +29,7 @@ own Hermes state. The adapter therefore forces isolation flags by default
 ``-r/--resume`` or ``-c/--continue``, so every attack turn is a fresh session.
 """
 
+import os
 import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
@@ -90,6 +91,11 @@ _DEFAULT_TIMEOUT = 600
 # Exit codes per the Hermes CLI reference: 0 success, 1 delivery/backend
 # failure, 2 usage error.
 _USAGE_ERROR_EXIT_CODE = 2
+
+
+def _is_ollama_binary(binary: str) -> bool:
+    """Return whether ``binary`` is the Ollama launcher executable."""
+    return os.path.basename(binary).lower() == "ollama"
 
 
 def _last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]:
@@ -176,7 +182,7 @@ def _get_hermes_custom_llm_class():
             ``--continue`` are deliberately never added, so each attack turn
             runs as a fresh session against untainted agent state.
             """
-            is_ollama = "ollama" in self.binary.lower()
+            is_ollama = _is_ollama_binary(self.binary)
             if is_ollama:
                 argv = [self.binary, "launch", "hermes"]
                 if self.model:
@@ -375,8 +381,8 @@ class HermesAgent(Agent):
 
         # Verify Hermes is actually installed locally — a missing binary fails
         # loudly here instead of mid-attack.
-        is_ollama_binary = "ollama" in self.binary.lower()
-        binary_to_check = "ollama" if self.binary.lower() == "ollama" else self.binary
+        is_ollama_binary = _is_ollama_binary(self.binary)
+        binary_to_check = self.binary
         if shutil.which(binary_to_check) is None:
             if is_ollama_binary:
                 raise HermesConfigurationError(

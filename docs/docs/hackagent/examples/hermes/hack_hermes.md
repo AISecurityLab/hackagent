@@ -5,10 +5,10 @@ title: hackagent.examples.hermes.hack_hermes
 
 Red-team a locally installed Hermes Agent instance.
 
-This example drives Hermes Agent (Nous Research) natively through the ``hermes``
-router provider — HackAgent shells out to the one-shot headless ``hermes -z``
-CLI, so there is no HTTP endpoint or bridge to stand up. The only prerequisite
-for the *target* is the ``hermes`` binary on PATH.
+This example drives Hermes Agent (Nous Research) through the ``hermes`` router
+provider — HackAgent shells out to the one-shot headless ``hermes -z`` CLI, so
+there is no HTTP endpoint or bridge to stand up. Set ``binary`` to ``ollama``
+to use ``ollama launch hermes`` with a local model instead.
 
 Hermes is stateful by design (long-term memory in ``~/.hermes/MEMORY.md``, a
 background skill curator, resumable sessions). The adapter therefore forces an
@@ -29,4 +29,3 @@ Prerequisites
 #### TARGET\_MODEL
 
 passed to `hermes -m` for this run only
-

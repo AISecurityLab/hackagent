@@ -14,6 +14,9 @@ a unique provider name whose ``completion`` shells out to ``hermes`` instead of
 making an HTTP call. Requests therefore still flow through
 ``litellm.completion`` and are captured by the HackAgent tracking logger.
 
+Set ``binary`` to ``ollama`` to invoke Hermes through
+``ollama launch hermes``.
+
 Isolation
 ---------
 Unlike Claude Code, Hermes is explicitly *stateful*: it keeps long-term memory
@@ -68,7 +71,8 @@ the configured default for this run only) and used as the LiteLLM
 model string.
 
 Optional config:
-- ``binary`` (default ``hermes``): path to the Hermes executable.
+- ``binary`` (default ``hermes``): path to the Hermes executable. Set this to
+  ``ollama`` to use ``ollama launch hermes``.
 - ``provider``: per-run backend provider override (``--provider``).
 - ``cwd``: working directory Hermes operates in (skills, worktrees,
 file tools).
@@ -79,8 +83,8 @@ default because Hermes can trigger tool and browser use.
 credentials only and never reads ``~/.hermes/config.yaml``.
 - ``safe_mode`` (default ``False``): pass ``--safe-mode`` to disable
 all customizations for maximum isolation.
-- ``source`` (default ``hackagent``): pass ``--source`` so Hermes-side
-logs are attributable to hackagent runs.
+- ``source`` (default unset): optional attribution tag passed as
+  ``--source <source>``.
 - ``extra_args``: list of additional raw ``hermes`` flags.
 
 Note: ``endpoint`` is accepted for interface symmetry but ignored — the
@@ -99,4 +103,3 @@ Flow mirrors :class:`ClaudeCodeAgent`::
     request_data → litellm.completion(model=&quot;hackagent_hermes_&lt;id&gt;/&lt;model&gt;&quot;,
                                       messages=…)
                   → _HermesCustomLLM.completion → ``hermes -z``
-
