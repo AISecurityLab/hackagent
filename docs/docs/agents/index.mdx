@@ -380,7 +380,7 @@ agent.hack(attack_config={
 
 ## 🤖 Hermes Agent
 
-[Hermes Agent](https://github.com/NousResearch/hermes-agent) is Nous Research's open-source, self-hosted agent. HackAgent drives a **locally installed** Hermes Agent natively via the headless `hermes -z` CLI — no HTTP endpoint or bridge required.
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) is Nous Research's open-source, self-hosted agent. HackAgent drives a **locally installed** Hermes Agent via the headless `hermes -z` CLI or the Ollama launcher — no HTTP endpoint or bridge required.
 
 Hermes is stateful (persistent memory, a background skill curator, resumable sessions), so the adapter forces an isolated session on every attack turn by default — see [Full Hermes Agent Documentation](/agents/hermes) for details.
 
@@ -421,7 +421,7 @@ agent = HackAgent(
     agent_type="hermes",
     adapter_operational_config={
         "name": "hermes-4-70b",  # passed to `hermes -m`
-        "binary": "hermes",
+        "binary": "hermes",  # use "ollama" for Ollama-launch mode
     },
 )
 

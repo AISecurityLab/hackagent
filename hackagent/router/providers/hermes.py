@@ -13,6 +13,11 @@ a unique provider name whose ``completion`` shells out to ``hermes`` instead of
 making an HTTP call. Requests therefore still flow through
 ``litellm.completion`` and are captured by the HackAgent tracking logger.
 
+The handler can also invoke Hermes through Ollama's launcher by setting
+``binary="ollama"``. In that mode the configured model is passed to
+``ollama launch hermes`` and the Hermes one-shot arguments are forwarded after
+the launcher separator.
+
 Isolation
 ---------
 Unlike Claude Code, Hermes is explicitly *stateful*: it keeps long-term memory
@@ -24,6 +29,7 @@ own Hermes state. The adapter therefore forces isolation flags by default
 ``-r/--resume`` or ``-c/--continue``, so every attack turn is a fresh session.
 """
 
+import os
 import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
@@ -85,6 +91,11 @@ _DEFAULT_TIMEOUT = 600
 # Exit codes per the Hermes CLI reference: 0 success, 1 delivery/backend
 # failure, 2 usage error.
 _USAGE_ERROR_EXIT_CODE = 2
+
+
+def _is_ollama_binary(binary: str) -> bool:
+    """Return whether ``binary`` is the Ollama launcher executable."""
+    return os.path.basename(binary).lower() == "ollama"
 
 
 def _last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]:
@@ -171,9 +182,16 @@ def _get_hermes_custom_llm_class():
             ``--continue`` are deliberately never added, so each attack turn
             runs as a fresh session against untainted agent state.
             """
-            argv = [self.binary, "-z"]
-            if self.model:
-                argv.extend(["-m", self.model])
+            is_ollama = _is_ollama_binary(self.binary)
+            if is_ollama:
+                argv = [self.binary, "launch", "hermes"]
+                if self.model:
+                    argv.extend(["--model", self.model])
+                argv.extend(["--yes", "--", "-z"])
+            else:
+                argv = [self.binary, "-z"]
+                if self.model:
+                    argv.extend(["-m", self.model])
             if self.provider:
                 argv.extend(["--provider", self.provider])
             if self.ignore_user_config:
@@ -186,15 +204,25 @@ def _get_hermes_custom_llm_class():
             return argv
 
         def _run(self, prompt_text: str) -> Dict[str, Any]:
-            """Invoke ``hermes -z`` with the prompt on stdin and read stdout."""
-            argv = self._build_argv()
-            # Prompt goes via stdin (never argv) so adversarial text that
-            # begins with ``-`` is not mistaken for a CLI flag, and we sidestep
-            # argv length limits on long prompts.
+            """Invoke ``hermes -z <prompt>`` and read stdout."""
+            base_argv = self._build_argv()
+            # Hermes defines -z/--oneshot as an option that requires the prompt
+            # as its value. Insert it immediately after -z for both native and
+            # Ollama-launch invocations; do not send it through stdin.
+            try:
+                oneshot_index = base_argv.index("-z")
+            except ValueError as e:
+                raise HermesConfigurationError(
+                    "Hermes adapter could not build a -z one-shot command."
+                ) from e
+            argv = (
+                base_argv[: oneshot_index + 1]
+                + [prompt_text]
+                + base_argv[oneshot_index + 1 :]
+            )
             try:
                 proc = subprocess.run(
                     argv,
-                    input=prompt_text,
                     capture_output=True,
                     text=True,
                     timeout=self.timeout,
@@ -305,7 +333,8 @@ class HermesAgent(Agent):
           model string.
 
     Optional config:
-        - ``binary`` (default ``hermes``): path to the Hermes executable.
+        - ``binary`` (default ``hermes``): path to the Hermes executable. Set
+          it to ``ollama`` to invoke ``ollama launch hermes``.
         - ``provider``: per-run backend provider override (``--provider``).
         - ``cwd``: working directory Hermes operates in (skills, worktrees,
           file tools).
@@ -316,8 +345,9 @@ class HermesAgent(Agent):
           credentials only and never reads ``~/.hermes/config.yaml``.
         - ``safe_mode`` (default ``False``): pass ``--safe-mode`` to disable
           all customizations for maximum isolation.
-        - ``source`` (default ``hackagent``): pass ``--source`` so Hermes-side
-          logs are attributable to hackagent runs.
+        - ``source`` (default unset): optional attribution tag passed as
+          ``--source <source>``. It is omitted by default because some Hermes
+          CLI versions do not accept ``--source`` in one-shot mode.
         - ``extra_args``: list of additional raw ``hermes`` flags.
 
     Note: ``endpoint`` is accepted for interface symmetry but ignored — the
@@ -346,12 +376,19 @@ class HermesAgent(Agent):
         # probed, nor write into the operator's real Hermes profile.
         self.ignore_user_config: bool = bool(config.get("ignore_user_config", True))
         self.safe_mode: bool = bool(config.get("safe_mode", False))
-        self.source: Optional[str] = config.get("source", "hackagent")
+        self.source: Optional[str] = config.get("source")
         self.extra_args: List[str] = list(config.get("extra_args") or [])
 
         # Verify Hermes is actually installed locally — a missing binary fails
         # loudly here instead of mid-attack.
-        if shutil.which(self.binary) is None:
+        is_ollama_binary = _is_ollama_binary(self.binary)
+        binary_to_check = self.binary
+        if shutil.which(binary_to_check) is None:
+            if is_ollama_binary:
+                raise HermesConfigurationError(
+                    f"Ollama executable '{self.binary}' was not found on PATH. "
+                    "Install Ollama or set the 'binary' config to its full path."
+                )
             raise HermesConfigurationError(
                 f"Hermes executable '{self.binary}' was not found on PATH. "
                 f"Install Hermes Agent (https://github.com/NousResearch/hermes-agent) "
