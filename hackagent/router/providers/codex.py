@@ -284,6 +284,8 @@ def _get_codex_custom_llm_class():
             if self.max_turns is not None:
                 argv.extend(["--max-turns", str(self.max_turns)])
 
+            # To skip repo checks so that codex starts on any folder.
+            argv.extend(["--skip-git-repo-check"])
             argv.extend(self.extra_args)
 
             return argv
