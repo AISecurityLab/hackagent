@@ -46,6 +46,8 @@ const config: Config = {
   projectName: 'HackAgent', // Must match the GitHub repo name exactly (case-sensitive).
 
   onBrokenLinks: 'throw',
+  // Default is warn. Throw so a broken heading anchor fails the docs build.
+  onBrokenAnchors: 'throw',
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -63,7 +65,8 @@ const config: Config = {
     // for authored pages explicitly saved as .mdx.
     format: 'detect',
     hooks: {
-      onBrokenMarkdownLinks: 'warn',
+      // Default is warn. Throw so an unresolved .md/.mdx link fails the docs build.
+      onBrokenMarkdownLinks: 'throw',
     },
   },
   themes: [
