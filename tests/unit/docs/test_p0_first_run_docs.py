@@ -43,23 +43,25 @@ def test_quickstart_splits_tui_and_ollama_example():
     assert "does not call `hackagent/examples/ollama/demo.py`" in text
 
 
-def test_bare_install_does_not_start_the_cli_and_hf_hub_stays_accurate():
+def test_bare_install_runs_version_and_help_and_hf_hub_stays_accurate():
     text = _read("getting-started", "installation.mdx")
-    assert "A bare install does not start the CLI" in text
-    assert "enough for the SDK, the CLI" not in text
-    assert "hackagent --version` and `hackagent eval --no-tui` still run" not in text
-    assert "pip install 'hackagent[rag,vision]'" in text
-    assert "pip install 'hackagent[tui,rag,vision]'" in text
+    assert "`hackagent --version` and `hackagent --help` run from that install" in text
+    assert "do not need `[rag]` or `[vision]`" in text
+    assert "A bare install does not start the CLI" not in text
+    assert "pip install 'hackagent[rag,vision]'" not in text
     assert "Hugging Face `datasets`, for presets and Hub datasets" in text
+    assert "pip install 'hackagent[tui]'" in text
 
 
-def test_quickstart_cli_extras_include_rag_and_vision():
+def test_quickstart_does_not_require_rag_and_vision_for_version():
     text = _read("getting-started", "quick-start.mdx")
-    assert "pip install 'hackagent[rag,vision]'" in text
-    assert "pip install 'hackagent[tui]'` alone does not" in text
-    assert "pip install 'hackagent[tui,rag,vision]'" in text
-    assert "pip install 'hackagent[hf,rag,vision]'" in text
-    assert "pip install 'hackagent[tui,rag,vision,hf]'" in text
+    assert "including `hackagent --version`" not in text
+    assert "pip install 'hackagent[rag,vision]'" not in text
+    assert "pip install 'hackagent[hf,rag,vision]'" not in text
+    assert "pip install 'hackagent[tui,rag,vision]'" not in text
+    assert "pip install 'hackagent[hf,rag]'" in text
+    assert "pip install 'hackagent[tui]'" in text
+    assert "pip install 'hackagent[tui,rag,hf]'" in text
 
 
 def test_verbosity_flag_comments_match_the_level_table():
