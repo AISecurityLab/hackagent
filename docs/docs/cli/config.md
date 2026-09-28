@@ -85,11 +85,19 @@ The same CLI/TUI commands work in both modes.
 
 `Settings.resolve` (`hackagent/core/settings.py`) and `CLIConfig` (`hackagent/interfaces/cli/config.py`) resolve credentials in this order, highest first:
 
-**explicit argument → environment variable → config file → default**
+**args → env → file → defaults**
 
-An empty environment variable counts as unset. A missing config file is an empty mapping. `--config-file` / `Settings.resolve(config_path=...)` chooses which file is read. The default path is `~/.config/hackagent/config.json`.
+1. **Args** — command-line flags and explicit `Settings.resolve(...)` arguments
+2. **Env** — environment variables
+3. **File** — `~/.config/hackagent/config.json`, or the path passed to `--config-file` / `config_path`
+4. **Defaults** — built-in values
 
-Not every field follows that chain. CLI verbosity is the exception.
+An empty environment variable counts as unset. A missing config file is an empty mapping.
+
+Two fields do not follow that chain:
+
+- **Verbosity.** `CLIConfig.verbose` uses args, then the file, then the default. It does not read an environment variable. `-v` / `-vv` / `-vvv` apply only when the count is greater than 0 (Click's omitted flag is `0`, which counts as unset, so a file value of `0` still applies). Otherwise the config file key `verbose` is used. Otherwise the default is `1` (WARNING). `hackagent config set --verbose` writes that file key. `HACKAGENT_VERBOSE` is set when you pass `-v` and nothing reads it back. `HACKAGENT_DEBUG` only prints CLI tracebacks. `HACKAGENT_LOG_LEVEL` sets the `hackagent` logger in `setup_package_logging`, which runs before Click parses `-v`, so the flag does not change the library log level.
+- **Ollama fields are env-only.** `ollama_base_url` is not a `Settings.resolve` argument and is not read from the config file. The value is `OLLAMA_BASE_URL`, then `OLLAMA_API_BASE`, then `OLLAMA_HOST`, otherwise `http://localhost:11434`.
 
 | Setting | Explicit argument | Environment | Config file key | Default |
 |---------|-------------------|-------------|-----------------|---------|

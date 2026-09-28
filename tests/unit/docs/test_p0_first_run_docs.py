@@ -15,8 +15,9 @@ def _read(*parts: str) -> str:
 def test_config_page_ranks_environment_above_the_file():
     text = _read("cli", "config.md")
     assert "2. **Config file**" not in text
-    assert "explicit argument → environment variable → config file → default" in text
-    assert "CLI verbosity does not read an environment variable" in text
+    assert "args → env → file → defaults" in text
+    assert "Verbosity." in text
+    assert "Ollama fields are env-only." in text
     assert "HACKAGENT_DB_PATH" in text
 
 
@@ -30,10 +31,20 @@ def test_attack_page_does_not_claim_cli_json_stdout():
 
 def test_quickstart_splits_tui_and_ollama_example():
     text = _read("getting-started", "quick-start.mdx")
-    assert "FlipAttack" not in text
+    assert "FlipAttack TUI" in text
+    assert "not a FlipAttack TUI" in text
+    assert "headless h4rm3l" in text
+    assert "Settings.resolve()" in text
     assert "hackagent tui" in text
     assert "hackagent examples ollama" in text
     assert "hackagent[hf,rag]" in text
     assert "hackagent[tui]" in text
     assert "harmbench_variant" in text
     assert "does not call `hackagent/examples/ollama/demo.py`" in text
+
+
+def test_bare_install_does_not_start_the_cli_and_hf_hub_stays_accurate():
+    text = _read("getting-started", "installation.mdx")
+    assert "A bare install does not start the CLI" in text
+    assert "enough for the SDK, the CLI" not in text
+    assert "Hugging Face `datasets`, for presets and Hub datasets" in text
