@@ -440,3 +440,43 @@ base_url: https://yaml.example.com
                     assert config.api_key == expected, f"Failed scenario: {description}"
             finally:
                 Path(config_file).unlink()
+
+
+class TestCLIVerbosityPrecedence:
+    """Verbosity skips the environment step used by credentials."""
+
+    def test_file_zero_beats_omitted_flag_and_ignores_verbose_env(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as handle:
+            json.dump({"verbose": 0}, handle)
+            config_file = handle.name
+        try:
+            with patch.dict("os.environ", {"HACKAGENT_VERBOSE": "3"}, clear=True):
+                config = CLIConfig(config_file=config_file, verbose=0)
+            assert config.verbose == 0
+            assert config.source_of("verbose").startswith("Config file")
+        finally:
+            Path(config_file).unlink()
+
+    def test_positive_flag_beats_file(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as handle:
+            json.dump({"verbose": 0}, handle)
+            config_file = handle.name
+        try:
+            config = CLIConfig(config_file=config_file, verbose=2)
+            assert config.verbose == 2
+            assert config.source_of("verbose") == "CLI argument"
+        finally:
+            Path(config_file).unlink()
+
+    def test_default_ignores_verbose_env(self):
+        with (
+            patch("pathlib.Path.exists", return_value=False),
+            patch.dict("os.environ", {"HACKAGENT_VERBOSE": "3"}, clear=True),
+        ):
+            config = CLIConfig(verbose=0)
+        assert config.verbose == 1
+        assert config.source_of("verbose") == "Default"

@@ -25,7 +25,7 @@ target = session.target(
 )
 ```
 
-`Settings.resolve()` applies argument, then environment, then config file, then default. An API key selects the remote store. No key selects the local SQLite store. `HackAgent()` with no arguments is `Settings.resolve()`.
+`Settings.resolve()` applies argument, then environment, then config file, then default. An API key selects the remote store. No key selects the local SQLite store. `HackAgent()` with no arguments is `Settings.resolve()`. CLI verbosity does not follow that order. The per-field table, including that exception, is on the [Config](../cli/config.md#settings-precedence) page.
 
 | Piece | Where it goes |
 |-------|----------------|

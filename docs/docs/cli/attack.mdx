@@ -640,41 +640,77 @@ hackagent eval pap \
 
 ## Output
 
-Attack results are:
+`hackagent eval ... --no-tui` prints Rich output: the splash banner, a configuration panel, progress lines, and a results summary (`hackagent/interfaces/cli/commands/attack/runner.py` and `display.py`). That stream is not a JSON document. Redirecting stdout does not produce a result file you can parse.
 
-1. Displayed in the terminal.
-2. Saved in `./logs/runs/`.
-3. Stored in the local backend `~/.local/share/hackagent/hackagent.db` (viewable with `hackagent results list`, TUI, or `hackagent web`).
+The same run also:
 
-## JSON Output
+1. Writes the run workspace under `./logs/runs/` (the default `output_dir`).
+2. Stores records in the local backend `~/.local/share/hackagent/hackagent.db` when no API key is set (viewable with `hackagent results list`, the TUI, or `hackagent web`).
 
-For CI/CD workflows you can redirect stdout:
+There is no CLI flag that serializes the attack result to JSON.
 
-```bash
-hackagent eval tap \
-  --agent-name "target" \
-  --agent-type "google-adk" \
-  --endpoint "http://localhost:8000" \
-  --goals "Security test" \
-  --no-tui > results.json
+## Structured results (SDK)
+
+`Target.hack` returns the list of row dicts built by `result_to_row` (`hackagent/orchestrator/results/mapping.py`): `goal`, `prompt`, `response`, `success`, `best_score`, and the `eval_*` columns for the judges that ran. Write that list yourself.
+
+```python
+import json
+
+from hackagent import HackAgent, Settings
+
+session = HackAgent(Settings.resolve())
+target = session.target(
+    "http://localhost:8000",
+    "google-adk",
+    name="target",
+)
+results = target.hack(
+    attack_config={
+        "attack_type": "tap",
+        "goals": ["Security test"],
+    }
+)
+with open("results.json", "w", encoding="utf-8") as handle:
+    json.dump(results, handle, indent=2)
+session.close()
 ```
+
+`results` is a list of plain dicts. `json.dump` accepts that list. Pass `default=str` only if a row contains a value JSON cannot encode.
 
 ## CI/CD Integration
 
-Example GitHub Actions step:
+Run the SDK export in the job, then upload the file it writes. Do not redirect `hackagent eval --no-tui` into that path.
 
 ```yaml
-- name: Run Security Tests
+- name: Export structured results
+  env:
+    AGENT_NAME: ${{ env.AGENT_NAME }}
+    AGENT_ENDPOINT: ${{ env.AGENT_ENDPOINT }}
   run: |
-    hackagent eval bon \
-      --agent-name "${{ env.AGENT_NAME }}" \
-      --agent-type "google-adk" \
-      --endpoint "${{ env.AGENT_ENDPOINT }}" \
-      --goals "Automated security validation" \
-      --no-tui > test_results.json
+    python - <<'PY'
+    import json
+    import os
+    from hackagent import HackAgent, Settings
+
+    session = HackAgent(Settings.resolve())
+    target = session.target(
+        os.environ["AGENT_ENDPOINT"],
+        "google-adk",
+        name=os.environ["AGENT_NAME"],
+    )
+    results = target.hack(
+        attack_config={
+            "attack_type": "bon",
+            "goals": ["Automated security validation"],
+        }
+    )
+    with open("test_results.json", "w", encoding="utf-8") as handle:
+        json.dump(results, handle, indent=2)
+    session.close()
+    PY
 
 - name: Upload Results
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v4
   with:
     name: security-results
     path: test_results.json

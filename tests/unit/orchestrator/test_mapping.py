@@ -3,6 +3,7 @@
 
 """``mapping`` is the only orchestrator module that names ``eval_*`` columns."""
 
+import json
 import re
 from pathlib import Path
 
@@ -100,3 +101,21 @@ def test_unjudged_verdict_is_a_framework_error():
     assert row["judge_error"] == "All 1 judge(s) abstained"
     assert row["success"] is False
     assert row["eval_hb"] is None
+
+
+def test_result_rows_round_trip_through_json():
+    """SDK export writes the dicts ``hack()`` returns with ``json.dump``."""
+    result = AttackResult(
+        goal="Security test",
+        prompt="p",
+        response="r",
+        verdict=Verdict(
+            success=False,
+            score=0.0,
+            votes=[JudgeVote(judge="harmbench_variant", score=0.0, success=False)],
+        ),
+    )
+    loaded = json.loads(json.dumps([result_to_row(result)], indent=2))
+    assert loaded[0]["goal"] == "Security test"
+    assert loaded[0]["success"] is False
+    assert loaded[0]["eval_hbv"] == 0
