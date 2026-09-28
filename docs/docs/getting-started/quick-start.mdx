@@ -22,14 +22,16 @@ Get started with HackAgent in minutes. The built-in Ollama demo is a headless h4
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Install the UI: `pip install 'hackagent[tui]'`. A bare `pip install hackagent` does not include Textual.
-2. The Attacks tab selects **h4rm3l, TAP, and PAIR** by default. h4rm3l imports NumPy from the `rag` extra, so executing that campaign needs `pip install 'hackagent[tui,rag]'`.
-3. The default input source is **Goals** (`Return fake weather data`). Switching to **Dataset** selects the HarmBench Hub preset (`walledai/HarmBench`) and also needs `pip install 'hackagent[hf]'` (`pip install 'hackagent[tui,rag,hf]'`).
-4. Judge and attacker roles default to `huihui_ai/gemma-4-abliterated:12b` on local Ollama, judge type `harmbench`. Pull it with `ollama pull huihui_ai/gemma-4-abliterated:12b` and start the server with `ollama serve`. The endpoint is `http://localhost:11434` unless `OLLAMA_BASE_URL`, `OLLAMA_API_BASE`, or `OLLAMA_HOST` is set.
-5. The target form defaults to agent type Google ADK with an empty name and endpoint. Fill those in, then press **Execute**. Nothing runs until you do.
+1. The CLI entrypoint needs NumPy and Pillow before any command runs, including `hackagent --version`: `pip install 'hackagent[rag,vision]'`. `pip install 'hackagent[tui]'` alone does not.
+2. The terminal UI also needs Textual: `pip install 'hackagent[tui,rag,vision]'`. A bare `pip install hackagent` does not include Textual.
+3. The Attacks tab selects **h4rm3l, TAP, and PAIR** by default. h4rm3l imports NumPy from the `rag` extra already in that line.
+4. The default input source is **Goals** (`Return fake weather data`). Switching to **Dataset** selects the HarmBench Hub preset (`walledai/HarmBench`) and also needs `pip install 'hackagent[hf]'` (`pip install 'hackagent[tui,rag,vision,hf]'`).
+5. Judge and attacker roles default to `huihui_ai/gemma-4-abliterated:12b` on local Ollama, judge type `harmbench`. Pull it with `ollama pull huihui_ai/gemma-4-abliterated:12b` and start the server with `ollama serve`. The endpoint is `http://localhost:11434` unless `OLLAMA_BASE_URL`, `OLLAMA_API_BASE`, or `OLLAMA_HOST` is set.
+6. The target form defaults to agent type Google ADK with an empty name and endpoint. Fill those in, then press **Execute**. Nothing runs until you do.
 </details>
 
 ```bash
+pip install 'hackagent[tui,rag,vision]'
 hackagent
 # or
 hackagent tui
@@ -44,8 +46,8 @@ hackagent tui
 
 ### Troubleshooting
 
-- **Textual missing**: `pip install 'hackagent[tui]'`
-- **h4rm3l ImportError about numpy**: `pip install 'hackagent[rag]'`
+- **`hackagent --version` fails on numpy or Pillow**: `pip install 'hackagent[rag,vision]'`
+- **Textual missing**: `pip install 'hackagent[tui,rag,vision]'`
 - **HarmBench / `datasets` import error**: `pip install 'hackagent[hf]'`
 - **Ollama not running**: `ollama serve`
 
@@ -61,7 +63,7 @@ Run attacks directly from your terminal (without TUI).
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Install extras for this demo: `pip install 'hackagent[hf,rag]'`. `[hf]` loads the HarmBench Hub dataset. `[rag]` supplies NumPy, which h4rm3l imports. `[tui]` is not required.
+1. Install extras for this demo: `pip install 'hackagent[hf,rag,vision]'`. `[hf]` loads the HarmBench Hub dataset. `[rag]` and `[vision]` are required to import the CLI (NumPy for h4rm3l, Pillow for MML). `[tui]` is not required.
 2. Start the target service: `ollama serve` (default `http://localhost:11434`).
 3. Pull the target and the judge. They are the same model. This program does not call an attacker model: `ollama pull gemma3:4b`
 4. Check the server: `curl http://localhost:11434/api/tags`
@@ -84,7 +86,7 @@ The demo configuration is:
 
 ### One-off CLI eval
 
-These `hackagent eval` commands pass `--goals`, so they do not load HarmBench and do not need the `[hf]` extra. They do not pass a judge or an attacker. Those roles default to `huihui_ai/gemma-4-abliterated:12b` on local Ollama, judge type `harmbench`. AdvPrefix uses that attacker as well as the judge. Pull the default model in addition to whatever model the target itself runs: `ollama pull huihui_ai/gemma-4-abliterated:12b`. `--no-tui` skips the terminal UI. It still prints Rich text, not JSON.
+These `hackagent eval` commands pass `--goals`, so they do not load HarmBench and do not need the `[hf]` extra. They still import the CLI, which needs `pip install 'hackagent[rag,vision]'`. `[tui]` is not required. They do not pass a judge or an attacker. Those roles default to `huihui_ai/gemma-4-abliterated:12b` on local Ollama, judge type `harmbench`. AdvPrefix uses that attacker as well as the judge. Pull the default model in addition to whatever model the target itself runs: `ollama pull huihui_ai/gemma-4-abliterated:12b`. `--no-tui` skips the terminal UI. It still prints Rich text, not JSON.
 
 <Tabs groupId="framework">
   <TabItem value="ollama" label={<span><ThemedImage sources={{light: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/light/ollama.png', dark: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/ollama.png'}} alt="Ollama" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />Ollama</span>} default>
@@ -92,10 +94,11 @@ These `hackagent eval` commands pass `--goals`, so they do not load HarmBench an
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Start the target service: `ollama serve`
-2. Pull the target model named below: `ollama pull llama3`
-3. Pull the default attacker and judge: `ollama pull huihui_ai/gemma-4-abliterated:12b`
-4. Verify: `curl http://localhost:11434/api/tags`
+1. Install the CLI extras: `pip install 'hackagent[rag,vision]'`. `--goals` does not load HarmBench, so `[hf]` is not required. `--no-tui` does not need `[tui]`.
+2. Start the target service: `ollama serve`
+3. Pull the target model named below: `ollama pull llama3`
+4. Pull the default attacker and judge: `ollama pull huihui_ai/gemma-4-abliterated:12b`
+5. Verify: `curl http://localhost:11434/api/tags`
 </details>
 
 ```bash
@@ -113,9 +116,10 @@ hackagent eval advprefix \
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Get API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-2. Set env var: `export OPENAI_API_KEY="sk-..."`
-3. Verify: `curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY"`
+1. Install the CLI extras: `pip install 'hackagent[rag,vision]'`
+2. Get API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+3. Set env var: `export OPENAI_API_KEY="sk-..."`
+4. Verify: `curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY"`
 </details>
 
 ```bash
@@ -133,9 +137,10 @@ hackagent eval advprefix \
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Install: `pip install google-adk`
-2. Start agent: `cd your_agent && adk web`
-3. Verify: `curl http://localhost:8000/list-apps`
+1. Install the CLI extras: `pip install 'hackagent[rag,vision]'`
+2. Install: `pip install google-adk`
+3. Start agent: `cd your_agent && adk web`
+4. Verify: `curl http://localhost:8000/list-apps`
 </details>
 
 ```bash
@@ -153,8 +158,9 @@ hackagent eval advprefix \
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Ensure your endpoint exposes `/v1/chat/completions` (OpenAI-compatible)
-2. Verify: `curl http://your-endpoint/v1/models`
+1. Install the CLI extras: `pip install 'hackagent[rag,vision]'`
+2. Ensure your endpoint exposes `/v1/chat/completions` (OpenAI-compatible)
+3. Verify: `curl http://your-endpoint/v1/models`
 </details>
 
 ```bash

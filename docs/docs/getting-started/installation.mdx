@@ -22,26 +22,39 @@ pip install hackagent
 
 ### Optional extras
 
-`pip install hackagent` installs the SDK and a local SQLite store. A bare install does not start the CLI: `hackagent` with no subcommand opens the terminal UI and exits until you `pip install 'hackagent[tui]'` (`hackagent/interfaces/cli/bootstrap.py`). `import hackagent` does not load Textual, Flask, or Click. Click stays in the base install because the console script is `hackagent.interfaces.cli.main`, so `hackagent --version` and `hackagent eval --no-tui` still run. That install does not include Textual, Flask, Playwright, FAISS, NumPy, Pillow, or the Hugging Face `datasets` library.
+`pip install hackagent` installs the SDK and a local SQLite store. A bare install does not start the CLI. `hackagent --version` imports `hackagent.interfaces.cli.main`, which builds the attack catalog before Click handles the flag (`catalog_by_id()` in `hackagent/interfaces/cli/commands/attack/info.py`). That import loads h4rm3l, which needs NumPy, then MML, which needs Pillow. `[tui]` alone provides neither, so `hackagent --version` still fails. Install both before any CLI command:
+
+```bash
+pip install 'hackagent[rag,vision]'
+```
+
+The terminal UI is a further extra on that base (`hackagent/interfaces/cli/bootstrap.py`):
+
+```bash
+pip install 'hackagent[tui,rag,vision]'
+```
+
+HarmBench Hub datasets also need the `hf` extra (`pip install 'hackagent[hf]'`, or combine it with the lines above). `import hackagent` does not load Textual, Flask, or Click. The base install does not include Textual, Flask, Playwright, FAISS, NumPy, Pillow, or the Hugging Face `datasets` library.
 
 | Extra | Command | Unlocks |
 | --- | --- | --- |
-| `tui` | `pip install 'hackagent[tui]'` | Full-screen terminal UI (`hackagent` / `hackagent tui`) |
+| `tui` | `pip install 'hackagent[tui]'` | Textual for `hackagent` / `hackagent tui`. Also install `rag` and `vision`; this extra alone does not start the CLI |
 | `web` | `pip install 'hackagent[web]'` | Local dashboard (`hackagent web`): Flask and the dashboard bundle |
 | `browser` | `pip install 'hackagent[browser]'` | Playwright, for `hackagent scan` and the browser adapter |
-| `rag` | `pip install 'hackagent[rag]'` | FAISS and NumPy. The RAG attack and embedding checks use both. h4rm3l imports NumPy from this extra |
-| `vision` | `pip install 'hackagent[vision]'` | Pillow, for image-encoded attacks such as MML |
+| `rag` | `pip install 'hackagent[rag]'` | FAISS and NumPy. Required to import the CLI (h4rm3l). The RAG attack and embedding checks use both |
+| `vision` | `pip install 'hackagent[vision]'` | Pillow. Required to import the CLI (MML), and used by image-encoded attacks |
 | `hf` | `pip install 'hackagent[hf]'` | Hugging Face `datasets`, for presets and Hub datasets |
 
 You can add an extra at any time. Release binaries already include these libraries.
 
-[`hackagent web`](../cli/web.md) serves the dashboard locally. The `web` extra keeps the frontend bundle out of an install that never opens it. The terminal UI needs the `tui` extra; a bare install stays free of Textual.
+[`hackagent web`](../cli/web.md) serves the dashboard locally. The `web` extra keeps the frontend bundle out of an install that never opens it. The terminal UI needs `tui` on top of `rag` and `vision`. A bare install stays free of Textual, and `hackagent[tui]` alone does not make `hackagent --version` succeed.
 
 ### Verify Installation
 
-After installation, verify everything works:
+`hackagent --version` imports the CLI, so install the catalog extras first:
 
 ```bash
+pip install 'hackagent[rag,vision]'
 hackagent --version
 ```
 

@@ -47,4 +47,25 @@ def test_bare_install_does_not_start_the_cli_and_hf_hub_stays_accurate():
     text = _read("getting-started", "installation.mdx")
     assert "A bare install does not start the CLI" in text
     assert "enough for the SDK, the CLI" not in text
+    assert "hackagent --version` and `hackagent eval --no-tui` still run" not in text
+    assert "pip install 'hackagent[rag,vision]'" in text
+    assert "pip install 'hackagent[tui,rag,vision]'" in text
     assert "Hugging Face `datasets`, for presets and Hub datasets" in text
+
+
+def test_quickstart_cli_extras_include_rag_and_vision():
+    text = _read("getting-started", "quick-start.mdx")
+    assert "pip install 'hackagent[rag,vision]'" in text
+    assert "pip install 'hackagent[tui]'` alone does not" in text
+    assert "pip install 'hackagent[tui,rag,vision]'" in text
+    assert "pip install 'hackagent[hf,rag,vision]'" in text
+    assert "pip install 'hackagent[tui,rag,vision,hf]'" in text
+
+
+def test_verbosity_flag_comments_match_the_level_table():
+    text = _read("cli", "config.md")
+    assert "# level 1, WARNING" in text
+    assert "# level 2, INFO" in text
+    assert "# level 3, DEBUG" in text
+    assert "# Verbose (INFO)" not in text
+    assert "# More verbose (DEBUG)" not in text

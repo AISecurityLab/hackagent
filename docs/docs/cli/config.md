@@ -177,9 +177,9 @@ Control the amount of logging output:
 **Command-line override:**
 
 ```bash
-hackagent -v config show          # Verbose (INFO)
-hackagent -vv config show         # More verbose (DEBUG)
-hackagent -vvv config show        # Maximum verbosity
+hackagent -v config show          # level 1, WARNING
+hackagent -vv config show         # level 2, INFO
+hackagent -vvv config show        # level 3, DEBUG
 ```
 
 ## Debug Mode
