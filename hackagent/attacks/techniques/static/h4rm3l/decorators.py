@@ -26,13 +26,6 @@ import base64
 import logging
 from typing import Callable, List, Optional, Tuple
 
-try:
-    from numpy.random import RandomState
-except ImportError as exc:
-    raise ImportError(
-        "numpy is required for h4rm3l. Install with: pip install 'hackagent[rag]'"
-    ) from exc
-
 logger = logging.getLogger(__name__)
 runtime_logger = logging.getLogger("hackagent.attacks.h4rm3l")
 
@@ -41,6 +34,23 @@ runtime_logger = logging.getLogger("hackagent.attacks.h4rm3l")
 # ---------------------------------------------------------------------------
 
 _PROMPTING_INTERFACE: Optional[Callable] = None
+
+
+def _numpy_random_state(seed: int):
+    """Return a ``numpy.random.RandomState``.
+
+    NumPy ships in the ``rag`` extra. The decorator module is imported while
+    the CLI builds its catalog (the RAG jailbreak framer reuses
+    ``compile_program``), so the import has to wait until a decorator is
+    actually constructed.
+    """
+    try:
+        from numpy.random import RandomState
+    except ImportError as exc:
+        raise ImportError(
+            "numpy is required for h4rm3l. Install with: pip install 'hackagent[rag]'"
+        ) from exc
+    return RandomState(seed=seed)
 
 
 def set_prompting_interface(fn: Callable) -> None:
@@ -104,7 +114,7 @@ class PromptDecorator:
     """
 
     def __init__(self, seed: int = 42) -> None:
-        self._random_state = RandomState(seed=seed)
+        self._random_state = _numpy_random_state(seed)
         self._last_llm_prompt: Optional[str] = None
         self._last_llm_response: Optional[str] = None
 
