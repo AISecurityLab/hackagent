@@ -5,7 +5,7 @@ sidebar_label: Overview
 
 # Overview
 
-HackAgent tests agents against injection, jailbreak, and goal hijacking.
+HackAgent tests agents against prompt injection, jailbreak, and goal hijacking.
 
 This section is for picking a path and learning the concepts. Class and function listings stay in the [SDK Reference](../sdk/python-quickstart.md).
 
