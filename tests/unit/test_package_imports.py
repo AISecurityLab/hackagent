@@ -49,6 +49,80 @@ if leaks:
     raise SystemExit("interface toolkits bound outside interfaces:\\n" + "\\n".join(leaks))
 """
 
+# Fresh interpreter with the technique extras removed from the import path.
+# A dev install has faiss, numpy, Pillow, and datasets; this probe must still
+# pass, because a bare ``pip install hackagent`` does not.
+_BARE_CLI_PROBE = r"""
+import importlib.abc
+import sys
+
+_BLOCKED = {"faiss", "numpy", "PIL", "datasets", "textual"}
+
+
+class _BlockOptional(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path, target=None):
+        root = fullname.split(".", 1)[0]
+        if root in _BLOCKED:
+            raise ModuleNotFoundError(f"No module named {fullname!r}")
+        return None
+
+
+sys.meta_path.insert(0, _BlockOptional())
+
+from click.testing import CliRunner
+
+from hackagent._version import get_version
+from hackagent.interfaces.cli.main import cli, main
+
+assert callable(main)
+loaded = sorted(name for name in _BLOCKED if name in sys.modules)
+if loaded:
+    raise SystemExit("CLI import loaded optional modules: " + ", ".join(loaded))
+
+runner = CliRunner()
+version = runner.invoke(cli, ["--version"])
+if version.exit_code != 0:
+    raise SystemExit(f"--version failed ({version.exit_code}): {version.output}")
+expected = get_version()
+if expected not in version.output:
+    raise SystemExit(f"version {expected!r} not in {version.output!r}")
+
+help_result = runner.invoke(cli, ["--help"])
+if help_result.exit_code != 0:
+    raise SystemExit(f"--help failed ({help_result.exit_code}): {help_result.output}")
+
+eval_help = runner.invoke(cli, ["eval", "--help"])
+if eval_help.exit_code != 0:
+    raise SystemExit(
+        f"eval --help failed ({eval_help.exit_code}): {eval_help.output}"
+    )
+for name in ("rag", "mml", "h4rm3l", "autodan_turbo"):
+    if name not in eval_help.output:
+        raise SystemExit(f"{name} missing from eval help:\n{eval_help.output}")
+
+from hackagent.orchestrator.setup.registry import load_attack
+
+for attack_id, extra in (("rag", "rag"), ("mml", "vision"), ("autodan_turbo", "rag")):
+    try:
+        load_attack(attack_id)
+    except ImportError as exc:
+        hint = f"hackagent[{extra}]"
+        if hint not in str(exc):
+            raise SystemExit(f"{attack_id} hint missing ({hint}): {exc}") from exc
+    else:
+        raise SystemExit(f"{attack_id} imported without its extra")
+
+from hackagent.attacks.techniques.static.h4rm3l.decorators import IdentityDecorator
+
+try:
+    IdentityDecorator()
+except ImportError as exc:
+    if "hackagent[rag]" not in str(exc):
+        raise SystemExit(f"h4rm3l hint missing: {exc}") from exc
+else:
+    raise SystemExit("h4rm3l decorator constructed without numpy")
+"""
+
 
 class TestPackageImports:
     """Test suite to verify all hackagent modules can be imported."""
@@ -84,6 +158,39 @@ class TestPackageImports:
             check=False,
         )
         assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_cli_runs_without_technique_extras(self):
+        """``hackagent --version`` and ``--help`` do not need rag, vision, or hf.
+
+        The console script imports the eval catalog, which loads every
+        technique config. That import must not pull FAISS, NumPy, Pillow,
+        or Hugging Face ``datasets``. Commands that need those libraries
+        still fail with an install hint when the technique is loaded.
+        """
+        result = subprocess.run(
+            [sys.executable, "-c", _BARE_CLI_PROBE],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_lazy_technique_packages_still_export_classes(self):
+        """Package imports keep working once the extras are installed."""
+        pytest.importorskip("faiss")
+        pytest.importorskip("numpy")
+        pytest.importorskip("PIL")
+        from hackagent.attacks.techniques.adaptive.autodan_turbo import (
+            AutoDANTurboAttack,
+        )
+        from hackagent.attacks.techniques.indirect.rag import RagAttack
+        from hackagent.attacks.techniques.static.h4rm3l import H4rm3lAttack
+        from hackagent.attacks.techniques.static.mml import MMLAttack
+
+        assert RagAttack.__name__ == "RagAttack"
+        assert MMLAttack.__name__ == "MMLAttack"
+        assert H4rm3lAttack.__name__ == "H4rm3lAttack"
+        assert AutoDANTurboAttack.__name__ == "AutoDANTurboAttack"
 
     def test_agent_import(self):
         """Test that the HackAgent class can be imported."""
