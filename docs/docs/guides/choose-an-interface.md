@@ -16,6 +16,6 @@ sidebar_label: Choose an interface
 
 - A local first run goes through the [CLI](../getting-started/quick-start.mdx#ollama-h4rm3l-example) or the [SDK](../sdk/python-quickstart.md).
 - Production automation goes through the SDK or the HTTP API.
-- Python classes are the SDK. The HTTP API is the remote service at `https://api.hackagent.dev`. A first-request guide for that service is not in these docs yet. [CLI config](../cli/config.md) documents the base URL.
+- Python classes are the SDK. The HTTP API is the remote service at `https://api.hackagent.dev`. Start with [First request](../api/first-request.md). [CLI config](../cli/config.md) documents the base URL.
 
 The hosted dashboard is [app.hackagent.dev](https://app.hackagent.dev). The same app can run on your machine with `hackagent web`. See [Web](../cli/web.md).

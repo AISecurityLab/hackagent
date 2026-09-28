@@ -36,7 +36,7 @@ const config: Config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://animated-guide-g46k62k.pages.github.io',
+  url: 'https://docs.hackagent.dev',
   // Set the /<baseUrl>/ pathname under which your site is served
   baseUrl: '/',
   trailingSlash: false,
@@ -260,9 +260,27 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          sidebarId: 'guidesSidebar',
           position: 'left',
-          label: 'Docs',
+          label: 'Guides',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'sdkSidebar',
+          position: 'left',
+          label: 'SDK',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'cliSidebar',
+          position: 'left',
+          label: 'CLI',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'apiSidebar',
+          position: 'left',
+          label: 'API',
         },
         {
           href: 'https://github.com/AISecurityLab/hackagent',
