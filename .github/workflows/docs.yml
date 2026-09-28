@@ -6,6 +6,11 @@ on:
       - 'docs/**'
       - 'hackagent/**'
       - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'hackagent/**'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 env:
@@ -46,6 +51,11 @@ jobs:
         run: |
           cd docs
           npm ci
+
+      - name: Typecheck docs site
+        run: |
+          cd docs
+          npm run typecheck
 
       - name: Generate API documentation
         run: uv run python docs/scripts/generate_docs.py --current
