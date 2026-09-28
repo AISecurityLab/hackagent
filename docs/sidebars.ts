@@ -15,6 +15,14 @@ const sidebars: SidebarsConfig = {
     'introduction',
     {
       type: 'category',
+      label: 'Guides',
+      items: [
+        'guides/overview',
+        'guides/choose-an-interface',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Getting Started',
       className: 'sidebar-icon sidebar-icon-rocket',
       items: [

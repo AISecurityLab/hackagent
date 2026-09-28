@@ -26,7 +26,7 @@ For installation instructions, see the [Installation Guide](../getting-started/i
 | `hackagent scan <url>` | Browser-driven red-teaming of a website's chat widget | [Scan](./scan.md) |
 | `hackagent claude` | Red-team a Claude Code agent | [Claude Code](../agents/claude-code.mdx) |
 | `hackagent codex` | Red-team a Codex agent | [Codex](../agents/codex.mdx) |
-| `hackagent examples ollama` | Run built-in Ollama demo | [Quick Start (TUI tab)](../getting-started/quick-start.mdx) |
+| `hackagent examples ollama` | Run the headless Ollama h4rm3l example | [Quick Start (CLI tab)](../getting-started/quick-start.mdx#ollama-h4rm3l-example) |
 | `hackagent results` | View and manage results | [Results](./results.md) |
 | `hackagent datasets` | Browse and sample dataset presets | [Datasets](./datasets.md) |
 | `hackagent web` | Launch the local dashboard | [Web](./web.md) |

@@ -8,7 +8,7 @@ import ThemedImage from '@theme/ThemedImage';
 
 # Quick Start
 
-Get started with HackAgent in minutes. Choose your preferred method below.
+Get started with HackAgent in minutes. The built-in Ollama demo is a headless h4rm3l run (`Settings.resolve()`, `.target()`, `.hack()`). It is not a FlipAttack TUI. The terminal UI is a separate path.
 
 <Tabs defaultValue="tui">
   <TabItem value="tui" label="TUI">
@@ -17,54 +17,76 @@ Get started with HackAgent in minutes. Choose your preferred method below.
 <img src="/gifs/terminal.gif" alt="HackAgent TUI Demo" style={{width: '100%', borderRadius: '8px', border: '1px solid var(--ifm-color-emphasis-300)'}} />
 
 
-The command preconfigures the demo and automatically starts the attack flow in the TUI.
+`hackagent` (no subcommand) and `hackagent tui` open the terminal UI. They do not run the Ollama example and they do not auto-start an attack. The Ollama example is a separate headless path: [Ollama h4rm3l example](#ollama-h4rm3l-example).
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Install HackAgent with the terminal UI: `pip install 'hackagent[tui]'`
-2. Install Ollama: `curl -fsSL https://ollama.com/install.sh | sh`
-3. Start server: `ollama serve`
-4. Pull model: `ollama pull gemma3:4b`
-5. Verify: `curl http://localhost:11434/api/tags`
+1. `hackagent --version` and `hackagent --help` run after `pip install hackagent`. They do not need `[rag]` or `[vision]`.
+2. The terminal UI needs Textual: `pip install 'hackagent[tui]'`. A bare `pip install hackagent` does not include Textual.
+3. The Attacks tab selects **h4rm3l, TAP, and PAIR** by default. Executing h4rm3l constructs decorators with NumPy, so that campaign also needs `pip install 'hackagent[rag]'` (`pip install 'hackagent[tui,rag]'`).
+4. The default input source is **Goals** (`Return fake weather data`). Switching to **Dataset** selects the HarmBench Hub preset (`walledai/HarmBench`) and also needs `pip install 'hackagent[hf]'` (`pip install 'hackagent[tui,rag,hf]'`).
+5. Judge and attacker roles default to `huihui_ai/gemma-4-abliterated:12b` on local Ollama, judge type `harmbench`. Pull it with `ollama pull huihui_ai/gemma-4-abliterated:12b` and start the server with `ollama serve`. The endpoint is `http://localhost:11434` unless `OLLAMA_BASE_URL`, `OLLAMA_API_BASE`, or `OLLAMA_HOST` is set.
+6. The target form defaults to agent type Google ADK with an empty name and endpoint. Fill those in, then press **Execute**. Nothing runs until you do.
 </details>
 
-Run the built-in Ollama demo directly in the TUI:
+```bash
+pip install 'hackagent[tui]'
+hackagent
+# or
+hackagent tui
+```
+
+### What this path does
+
+1. Opens the full-screen UI on the Attacks tab.
+2. Checks h4rm3l, then TAP, then PAIR (the jailbreak campaign order).
+3. Leaves Goals selected. HarmBench is the hidden Dataset preset. It is not loaded unless you switch Input Source to Dataset.
+4. Waits for Execute. It does not call `hackagent/examples/ollama/demo.py`.
+
+### Troubleshooting
+
+- **Textual missing**: `pip install 'hackagent[tui]'`
+- **h4rm3l ImportError about numpy**: `pip install 'hackagent[rag]'`
+- **HarmBench / `datasets` import error**: `pip install 'hackagent[hf]'`
+- **Ollama not running**: `ollama serve`
+
+</TabItem>
+<TabItem value="cli" label="CLI">
+
+Run attacks directly from your terminal (without TUI).
+
+### Ollama h4rm3l example
+
+`hackagent examples ollama` and `python hackagent/examples/ollama/demo.py` run the same headless demo. Neither command opens the TUI. The script binds the target with `Settings.resolve()`, `.target()`, and `.hack()` (`hackagent/examples/ollama/demo.py`).
+
+<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
+  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
+
+1. Install extras for this demo: `pip install 'hackagent[hf,rag]'`. `[hf]` loads the HarmBench Hub dataset. `[rag]` supplies NumPy when h4rm3l constructs a decorator. `[vision]` and `[tui]` are not required. `hackagent --version` does not need `[rag]`.
+2. Start the target service: `ollama serve` (default `http://localhost:11434`).
+3. Pull the target and the judge. They are the same model. This program does not call an attacker model: `ollama pull gemma3:4b`
+4. Check the server: `curl http://localhost:11434/api/tags`
+</details>
 
 ```bash
 hackagent examples ollama
 ```
 
-### What the CLI does automatically
+`hackagent examples ollama` checks that Ollama is reachable, reads model names from the demo config, and pulls any that are missing. Then it calls `run_ollama_demo()`.
 
-1. Checks that Ollama is reachable at `http://localhost:11434`
-2. Reads required models from the demo configuration
-3. Pulls missing models automatically
-4. Opens the TUI in the Attacks tab and auto-runs the demo
+The demo configuration is:
 
-### Demo configuration used
+- **Attack type**: `h4rm3l`
+- **Program**: `DANDecorator().then(RefusalSuppressionDecorator()).then(StyleInjectionShortDecorator())` (`syntax_version` 2)
+- **Target**: `gemma3:4b` at `http://localhost:11434` (`agent_type` `ollama`, name `ollama-target`)
+- **Judge**: `gemma3:4b`, type `harmbench_variant`, same Ollama endpoint
+- **Attacker**: none. Those decorators are not LLM-assisted
+- **Dataset**: HarmBench preset (`walledai/HarmBench`, config `standard`) with `limit: 5`, `shuffle: false`, `seed: 42`
 
-- **Attack type**: `flipattack`
-- **Target model (victim)**: `gemma3:4b` via Ollama
-- **Judge model**: `gemma3:4b` with judge type `harmbench_variant`
-- **Attacker model**: not used explicitly in this demo (`flipattack` is transformation-based)
-- **Dataset**: HarmBench preset with `limit: 5`, `shuffle: false`, `seed: 42`
-- **FlipAttack param `flip_mode`**: `FCS`
-- **FlipAttack param `cot`**: `false`
-- **FlipAttack param `lang_gpt`**: `false`
-- **FlipAttack param `few_shot`**: `false`
+### One-off CLI eval
 
-
-### Troubleshooting
-
-- **Ollama not running**: start it with `ollama serve`
-- **Missing model**: the CLI pulls missing models automatically
-- **TUI startup issue**: run `hackagent --version` first to confirm installation. If Textual is missing, install the extra: `pip install 'hackagent[tui]'`. A bare `pip install hackagent` does not include it.
-
-</TabItem>
-<TabItem value="cli" label="CLI">
-
-Run attacks directly from your terminal (without TUI):
+These `hackagent eval` commands pass `--goals`, so they do not load HarmBench and do not need the `[hf]` extra. AdvPrefix does not load h4rm3l, MML, or the RAG attack, so it does not need `[rag]` or `[vision]`. `[tui]` is not required. They do not pass a judge or an attacker. Those roles default to `huihui_ai/gemma-4-abliterated:12b` on local Ollama, judge type `harmbench`. AdvPrefix uses that attacker as well as the judge. Pull the default model in addition to whatever model the target itself runs: `ollama pull huihui_ai/gemma-4-abliterated:12b`. `--no-tui` skips the terminal UI. It still prints Rich text, not JSON.
 
 <Tabs groupId="framework">
   <TabItem value="ollama" label={<span><ThemedImage sources={{light: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/light/ollama.png', dark: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/ollama.png'}} alt="Ollama" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />Ollama</span>} default>
@@ -72,9 +94,9 @@ Run attacks directly from your terminal (without TUI):
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Install Ollama: `curl -fsSL https://ollama.com/install.sh | sh`
-2. Start server: `ollama serve`
-3. Pull model: `ollama pull llama3`
+1. Start the target service: `ollama serve`
+2. Pull the target model named below: `ollama pull llama3`
+3. Pull the default attacker and judge: `ollama pull huihui_ai/gemma-4-abliterated:12b`
 4. Verify: `curl http://localhost:11434/api/tags`
 </details>
 
@@ -163,24 +185,55 @@ Integrate security testing into your Python applications:
 <Tabs groupId="framework">
   <TabItem value="ollama" label={<span><ThemedImage sources={{light: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/light/ollama.png', dark: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/ollama.png'}} alt="Ollama" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />Ollama</span>} default>
 
+This is the same h4rm3l configuration as the [Ollama h4rm3l example](#ollama-h4rm3l-example). It does not open the TUI.
+
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Install Ollama: `curl -fsSL https://ollama.com/install.sh | sh`
-2. Start server: `ollama serve`
-3. Pull model: `ollama pull llama3`
+1. `pip install 'hackagent[hf,rag]'` — HarmBench Hub dataset and NumPy for h4rm3l
+2. Start the target: `ollama serve`
+3. Pull the target and judge: `ollama pull gemma3:4b` (no attacker model for this program)
 </details>
 
 ```python
 from hackagent import HackAgent, Settings
 
-# Initialize HackAgent
-agent = HackAgent(Settings.resolve()).target(
+session = HackAgent(Settings.resolve())
+target = session.target(
     "http://localhost:11434",
     "ollama",
-    name="llama3",
+    name="ollama-target",
+    adapter_operational_config={"name": "gemma3:4b"},
+)
+results = target.hack(
+    attack_config={
+        "attack_type": "h4rm3l",
+        "dataset": {
+            "preset": "harmbench",
+            "limit": 5,
+            "shuffle": False,
+            "seed": 42,
+        },
+        "h4rm3l_params": {
+            "program": (
+                "DANDecorator().then(RefusalSuppressionDecorator())"
+                ".then(StyleInjectionShortDecorator())"
+            ),
+            "syntax_version": 2,
+        },
+        "judges": [
+            {
+                "identifier": "gemma3:4b",
+                "type": "harmbench_variant",
+                "agent_type": "ollama",
+                "endpoint": "http://localhost:11434",
+            }
+        ],
+    }
 )
 ```
+
+`results` is the list of row dicts `hack()` returns. See [Structured results](../cli/attack.mdx#structured-results-sdk) to write them as JSON. The same script is `python hackagent/examples/ollama/demo.py`.
 
   </TabItem>
   <TabItem value="openai-sdk" label={<span><img src="https://openai.com/favicon.ico" alt="OpenAI" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />OpenAI SDK</span>}>
