@@ -1,7 +1,3 @@
----
-sidebar_position: 8
----
-
 # h4rm3l (Composable Prompt Decoration)
 
 h4rm3l is a **composable prompt-decoration attack** that chains multiple text transformations — encoding, obfuscation, roleplaying, persuasion — to bypass LLM safety filters. Users define a "program" of chained decorators that transform each harmful goal before sending it to the target model.

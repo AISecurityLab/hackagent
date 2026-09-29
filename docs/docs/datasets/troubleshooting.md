@@ -1,7 +1,3 @@
----
-sidebar_position: 6
----
-
 # Dataset Troubleshooting
 
 Use this page when dataset loading fails, returns zero goals, or behaves unexpectedly.

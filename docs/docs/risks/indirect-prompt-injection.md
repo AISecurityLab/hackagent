@@ -1,10 +1,9 @@
 ---
-sidebar_position: 4
-sidebar_label: Indirect Injection
-title: Indirect Injection
+sidebar_label: Indirect Prompt Injection
+title: Indirect Prompt Injection
 ---
 
-# Indirect Injection
+# Indirect Prompt Injection
 
 This page describes a dedicated cybersecurity risk scenario where an LLM is manipulated through **untrusted content that the model ingests as context**, not through a malicious user prompt. The user can be fully benign — the compromise happens upstream, in the data the model reads.
 

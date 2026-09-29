@@ -1,7 +1,3 @@
----
-sidebar_position: 11
----
-
 # MML (Multi-Modal Linkage)
 
 MML is a multimodal jailbreak attack that **encodes harmful prompts into images** using visual transformations (word replacement, mirroring, rotation, Base64 encoding, or a combination), then constructs multimodal prompts that instruct a Vision-Language Model (VLM) to decode and act on the embedded content.
@@ -172,7 +168,7 @@ hackagent eval mml \
 }
 ```
 
-Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/eval.mdx) for a complete file per attack.
 
 ---
 

@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # Evaluation Campaigns
 
 An **evaluation campaign** is a structured security assessment that combines vulnerabilities, datasets, attack techniques, and metrics into a reproducible test plan. HackAgent's threat profiles provide recommendations for datasets and attacks, making it easy to go from "I need to test for prompt injection" to a running evaluation.

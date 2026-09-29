@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # File Provider
 
 Load goals from local files in JSON, JSONL, CSV, or plain text format — perfect for custom datasets, proprietary test cases, or quick prototyping.

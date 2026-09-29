@@ -7,7 +7,6 @@ Generates API documentation from the local source using pydoc-markdown.
 """
 
 import argparse
-import json
 import os
 import re
 import shutil
@@ -33,17 +32,6 @@ _EXCLUDE_PREFIXES = (
     "hackagent.attacks._lib.legacy_seams",
     "hackagent.examples",
 )
-
-# pydoc-markdown writes ids under reference/. The web package page is
-# __init__.md and its helpers are _*.md; _publish_interface_pages renames
-# those so the docs plugin (which drops _*.md) can publish them.
-_SIDEBAR_ID_REWRITES = {
-    "hackagent/interfaces/web/__init__": "hackagent/interfaces/web/index",
-    "hackagent/interfaces/web/_local_api": "hackagent/interfaces/web/local_api",
-    "hackagent/interfaces/web/_proxy": "hackagent/interfaces/web/proxy",
-    "hackagent/interfaces/web/_serializers": "hackagent/interfaces/web/serializers",
-    "hackagent/interfaces/web/_static": "hackagent/interfaces/web/static",
-}
 
 
 def _sanitize_mdx(text: str) -> str:
@@ -101,67 +89,13 @@ def _sanitize_mdx(text: str) -> str:
     return "\n".join(result)
 
 
-def _doc_page_exists(docs_dir: Path, doc_id: str) -> bool:
-    """True when *doc_id* is a published markdown page.
+def _remove_generated_sidebar(docs_dir: Path) -> None:
+    """Delete the ``sidebar.json`` pydoc-markdown writes.
 
-    The docs plugin drops files named ``_*.md``. Directory names such as
-    ``attacks/_lib`` stay published.
+    ``sidebars.ts`` autogenerates the SDK sidebar from ``docs/hackagent/``,
+    so the renderer's own sidebar file is never read.
     """
-    name = doc_id.rsplit("/", 1)[-1]
-    if not doc_id or name.startswith("_"):
-        return False
-    base = docs_dir / doc_id
-    return base.with_suffix(".md").is_file() or base.with_suffix(".mdx").is_file()
-
-
-def _rewrite_sidebar_id(doc_id: str) -> str:
-    if doc_id.startswith("reference/"):
-        doc_id = doc_id[len("reference/") :]
-    return _SIDEBAR_ID_REWRITES.get(doc_id, doc_id)
-
-
-def _prune_sidebar_node(node, docs_dir: Path):
-    """Rewrite generated ids onto published pages and drop the rest."""
-    if isinstance(node, str):
-        doc_id = _rewrite_sidebar_id(node)
-        if _doc_page_exists(docs_dir, doc_id):
-            return doc_id
-        return None
-    if isinstance(node, list):
-        pruned = []
-        for item in node:
-            kept = _prune_sidebar_node(item, docs_dir)
-            if kept is not None and kept != []:
-                pruned.append(kept)
-        return pruned
-    if isinstance(node, dict):
-        updated = dict(node)
-        if isinstance(updated.get("id"), str):
-            doc_id = _rewrite_sidebar_id(updated["id"])
-            if not _doc_page_exists(docs_dir, doc_id):
-                return None
-            updated["id"] = doc_id
-        if "items" in updated:
-            items = _prune_sidebar_node(updated["items"], docs_dir)
-            if not items:
-                return None
-            updated["items"] = items
-        return updated
-    return node
-
-
-def _sync_generated_sidebar(docs_dir: Path) -> None:
-    """Point ``sidebar.json`` at pages that exist after the flatten/rename."""
-    sidebar_path = docs_dir / "sidebar.json"
-    if not sidebar_path.is_file():
-        print("⚠️  No generated sidebar.json to rewrite")
-        return
-    sidebar = json.loads(sidebar_path.read_text(encoding="utf-8"))
-    pruned = _prune_sidebar_node(sidebar, docs_dir)
-    if pruned is None:
-        pruned = {"type": "category", "label": "SDK Reference", "items": []}
-    sidebar_path.write_text(json.dumps(pruned, indent=2) + "\n", encoding="utf-8")
-    print(f"🔧 Rewrote sidebar ids in {sidebar_path}")
+    (docs_dir / "sidebar.json").unlink(missing_ok=True)
 
 
 def _publish_interface_pages(docs_dir: Path) -> None:
@@ -335,7 +269,6 @@ def create_pydoc_config(output_dir: str, modules: list[str]) -> str:
         renderer:
           type: docusaurus
           docs_base_path: {output_dir}
-          sidebar_top_level_label: "🔗 SDK Reference"
         """
     ).strip()
 
@@ -422,11 +355,7 @@ def generate_docs(version: str) -> None:
             description="Generating documentation",
         )
 
-        index_content = f"""---
-sidebar_position: 1
----
-
-# Python SDK Reference
+        index_content = f"""# Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
 in the HackAgent Python SDK, auto-generated from source-code docstrings.
@@ -488,7 +417,7 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
         # after the first pass. Sanitize once the pages are in place.
         _sanitize_generated_docs(docs_dir)
         _publish_interface_pages(docs_dir)
-        _sync_generated_sidebar(docs_dir)
+        _remove_generated_sidebar(docs_dir)
 
         print(f"✅ Documentation generated in {docs_dir}")
         print("\n🔧 To view: cd docs && npm start")

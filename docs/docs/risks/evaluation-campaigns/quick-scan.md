@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Quick Security Scan
 
 A **quick security scan** focuses on the highest-impact vulnerabilities with fast Static Template attacks, typically completing in 10-15 minutes.

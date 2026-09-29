@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Evaluation
 
 `hackagent.evaluation` is a depth-0 package. It imports only [`hackagent.core`](../hackagent/core/contracts/judging.md). Attack techniques reach it through the [`Judge`](../attacks/seam.md) port on `RunContext`, not by importing this package. It ships in the base install. The FAISS index used by the RAG attack is the `rag` extra, not this package.

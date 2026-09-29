@@ -1,7 +1,3 @@
----
-sidebar_position: 6
----
-
 # AutoDAN-Turbo
 
 AutoDAN-Turbo is a lifelong jailbreak attack that **discovers, stores, and reuses attack strategies** across multiple attempts. It runs a warm-up exploration phase to seed a strategy library, then a lifelong phase that retrieves and applies the best strategies to new attempts.

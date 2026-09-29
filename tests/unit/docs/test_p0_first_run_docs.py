@@ -21,8 +21,8 @@ def test_config_page_ranks_environment_above_the_file():
     assert "HACKAGENT_DB_PATH" in text
 
 
-def test_attack_page_does_not_claim_cli_json_stdout():
-    text = _read("cli", "attack.mdx")
+def test_eval_page_does_not_claim_cli_json_stdout():
+    text = _read("cli", "eval.mdx")
     assert "> results.json" not in text
     assert "> test_results.json" not in text
     assert "json.dump" in text

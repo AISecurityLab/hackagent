@@ -1,7 +1,3 @@
----
-sidebar_position: 7
----
-
 # Sensitive Information Disclosure
 
 Tests for training-data extraction, architecture disclosure, and configuration leakage.

@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Prompt Injection
 
 Tests whether the LLM executes attacker-supplied instructions that override or bypass the system prompt.

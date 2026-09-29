@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # Static Template
 
 Static Template attacks use **predefined prompt templates** combined with harmful goals to attempt jailbreaks. While simpler than optimization-based approaches like AdvPrefix or adaptive methods like PAIR, static template attacks are fast and effective for testing basic prompt injection defenses.
@@ -123,7 +119,7 @@ hackagent eval static-template \
 }
 ```
 
-Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/eval.mdx) for a complete file per attack.
 
 ---
 

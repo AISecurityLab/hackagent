@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Dataset Providers
 
 HackAgent supports loading attack goals from external datasets, enabling standardized AI safety evaluations using **26 benchmarks** including AgentHarm, JailbreakBench, BeaverTails, SALAD-Bench, and more from leading research institutions.

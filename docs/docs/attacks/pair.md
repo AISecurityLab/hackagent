@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # PAIR
 
 PAIR (Prompt Automatic Iterative Refinement) is an LLM-driven attack technique that uses an **attacker model** to iteratively generate and refine jailbreak prompts based on target responses and judge feedback.
@@ -150,7 +146,7 @@ hackagent eval pair \
 }
 ```
 
-Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/eval.mdx) for a complete file per attack.
 
 ---
 

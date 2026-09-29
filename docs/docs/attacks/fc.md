@@ -1,7 +1,3 @@
----
-sidebar_position: 10
----
-
 # FC-Attack
 
 A jailbreak attack that converts harmful prompts into auto-generated flowchart images to exploit Vision-Language Models (VLMs).

@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Overview
 
 
@@ -22,7 +18,7 @@ For installation instructions, see the [Installation Guide](../getting-started/i
 | `hackagent config` | Manage configuration | [Config](./config.md) |
 | `hackagent agent` | Manage registered agents | [Agent](./agent.md) |
 | `hackagent eval` | Run quick 3-attack security scan | [Evaluation Campaign](../getting-started/quick-security-scan.mdx) |
-| `hackagent eval <attack_name>` | Execute one specific attack strategy | [Eval](./attack.mdx) |
+| `hackagent eval <attack_name>` | Execute one specific attack strategy | [Eval](./eval.mdx) |
 | `hackagent scan <url>` | Browser-driven red-teaming of a website's chat widget | [Scan](./scan.md) |
 | `hackagent claude` | Red-team a Claude Code agent | [Claude Code](../agents/claude-code.mdx) |
 | `hackagent codex` | Red-team a Codex agent | [Codex](../agents/codex.mdx) |

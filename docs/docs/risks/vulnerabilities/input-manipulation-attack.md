@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # Input Manipulation Attack
 
 Tests whether encoding bypasses, format string attacks, or Unicode manipulation can evade input validation and safety filters.

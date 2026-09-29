@@ -1,7 +1,3 @@
----
-sidebar_position: 11
----
-
 # tFC-Attack
 
 A jailbreak attack that encodes harmful prompts as text-based graph descriptions (DOT, Mermaid, TikZ, PlantUML, ASCII) to exploit text-only LLMs.

@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Tracking
 
 `hackagent.tracking` is a depth-0 package. It imports only [`hackagent.core`](../hackagent/core/contracts/judging.md). `Tracker` implements the [`Events`](../attacks/seam.md) port and writes result, trace, and run records through `RunSink`. Persistence implements that sink in the orchestrator. This package does not import storage.

@@ -1,7 +1,3 @@
----
-sidebar_position: 6
----
-
 # Custom Vulnerabilities
 
 When the built-in 13 vulnerability classes don't cover your specific testing needs, you can define **custom vulnerabilities** by extending the `BaseVulnerability` class. This allows you to add domain-specific threats while maintaining full compatibility with HackAgent's evaluation infrastructure.

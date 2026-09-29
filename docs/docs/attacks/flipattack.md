@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # FlipAttack
 
 FlipAttack is a character-level adversarial attack that **obfuscates harmful requests** by reversing characters or word order before sending them to the target model. The technique exploits the token-level pattern-matching used by safety classifiers, which struggle to detect reversed or rearranged text, while the target LLM is instructed to decode the obfuscated input internally.
@@ -150,7 +146,7 @@ hackagent eval flipattack \
 }
 ```
 
-Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/eval.mdx) for a complete file per attack.
 
 ---
 

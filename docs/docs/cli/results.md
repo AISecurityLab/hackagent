@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # Results
 
 The `hackagent results` command lets you browse and summarize attack results stored in your local HackAgent database (`~/.local/share/hackagent/hackagent.db` by default).
@@ -68,5 +64,5 @@ The facade stores results in SQLite at `~/.local/share/hackagent/hackagent.db` u
 
 ## See Also
 
-- [Attack](./attack.mdx) — Run security attacks
+- [Eval](./eval.mdx) — Run security attacks
 - [Config](./config.md) — Configure HackAgent settings

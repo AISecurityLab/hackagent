@@ -1,7 +1,3 @@
----
-sidebar_position: 7
----
-
 # BoN (Best-of-N Jailbreaking)
 
 BoN is a stochastic black-box attack that **generates N randomly augmented versions** of a harmful prompt — using word scrambling, random capitalization, and ASCII perturbation — and picks the best candidate that bypasses the target model's safety mechanisms. The technique exploits the observation that random text mutations can break safety classifiers while preserving semantic meaning for the LLM.

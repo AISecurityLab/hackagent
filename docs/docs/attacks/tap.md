@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # TAP
 
 TAP (Tree of Attacks with Pruning) is an efficient adversarial attack technique that uses a **tree search** to find jailbreak prompts. It combines iterative prompt refinement (like PAIR) with a bounded tree structure and on-topic pruning to dramatically reduce the number of queries needed.
@@ -140,7 +136,7 @@ hackagent eval tap \
 }
 ```
 
-Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/eval.mdx) for a complete file per attack.
 
 ---
 

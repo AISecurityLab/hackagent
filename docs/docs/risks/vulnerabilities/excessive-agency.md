@@ -1,7 +1,3 @@
----
-sidebar_position: 9
----
-
 # Excessive Agency
 
 Tests whether the LLM performs actions or grants permissions exceeding its intended scope without oversight.

@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions

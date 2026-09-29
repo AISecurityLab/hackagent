@@ -1,7 +1,3 @@
----
-sidebar_position: 11
----
-
 # Credential Exposure
 
 Tests for hardcoded credentials, token leakage, and misconfigured access controls in AI systems.

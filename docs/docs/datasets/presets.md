@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Dataset Presets
 
 Pre-configured dataset presets provide instant access to **26 popular AI safety benchmarks** from leading research institutions and safety organizations.

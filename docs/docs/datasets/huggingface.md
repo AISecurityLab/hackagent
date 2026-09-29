@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # HuggingFace Provider
 
 Load goals from any dataset on HuggingFace Hub — access thousands of datasets including safety benchmarks, question-answering datasets, and custom evaluations.

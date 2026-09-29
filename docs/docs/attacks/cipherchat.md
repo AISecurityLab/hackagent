@@ -1,7 +1,3 @@
----
-sidebar_position: 9
----
-
 # CipherChat
 
 CipherChat is a cipher-based jailbreak attack that converts the user goal into a non-natural language (cipher) before querying the target model.

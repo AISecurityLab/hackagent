@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # Config
 
 The `hackagent config` command allows you to view and manage your HackAgent configuration.

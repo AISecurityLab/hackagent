@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # AdvPrefix
 
 AdvPrefix is HackAgent's most sophisticated attack technique, implementing a multi-step pipeline for generating optimized adversarial prefixes that can bypass AI safety mechanisms. This attack type is based on cutting-edge research and provides highly effective jailbreaking capabilities.

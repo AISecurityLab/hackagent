@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # Custom Evaluation Campaigns
 
 Build **custom evaluation campaigns** tailored to your organization's security requirements, compliance needs, and threat model.

@@ -1,7 +1,3 @@
----
-sidebar_position: 10
----
-
 # Malicious Tool Invocation
 
 Tests for risks from untrusted tool execution, data exfiltration through tool interactions, and tool privilege escalation.

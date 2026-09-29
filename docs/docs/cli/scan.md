@@ -1,7 +1,3 @@
----
-sidebar_position: 8
----
-
 # Scan
 
 `hackagent scan <url>` red-teams a website's chatbot widget through a **real browser** — it drives the live page, typing each prompt into the chat widget and reading the reply from the page. Because it works at the DOM level, it works against any chat UI regardless of transport (WebSocket, SSE, plain HTTP).
@@ -51,5 +47,5 @@ hackagent scan https://www.example.com --no-attack --json
 
 ## See Also
 
-- [Attack](./attack.mdx) — Run attacks via the SDK-driven `eval` commands (for agents you already control programmatically)
+- [Eval](./eval.mdx) — Run attacks via the SDK-driven `eval` commands (for agents you already control programmatically)
 - [Agents: Guardrails](../agents/guardrails.mdx) — Add before/after guardrails to any attack

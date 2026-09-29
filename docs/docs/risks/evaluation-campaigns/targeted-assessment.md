@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # Targeted Assessment
 
 A **targeted assessment** focuses on specific vulnerabilities or attack surfaces relevant to your system's unique characteristics and use cases.

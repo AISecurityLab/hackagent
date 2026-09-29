@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # Custom Providers
 
 Extend HackAgent with custom dataset providers for proprietary data sources.

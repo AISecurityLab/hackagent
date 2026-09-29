@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Initialization
 
 The `hackagent init` command provides an interactive setup wizard to configure local HackAgent preferences for first-time use.
@@ -83,5 +79,5 @@ You can run `hackagent init` again at any time to update your configuration. It 
 After initialization:
 
 1. **Verify your setup**: `hackagent config show`
-2. **Run your first attack**: See [Attack](./attack.mdx)
+2. **Run your first attack**: See [Eval](./eval.mdx)
 3. **View results**: See [Results](./results.md)

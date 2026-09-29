@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # System Prompt Leakage
 
 Tests whether the LLM reveals sensitive details from its system prompt, such as credentials, internal instructions, or guardrails.

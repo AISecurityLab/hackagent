@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Ethical Guidelines & Security Best Practices
 
 This document outlines the ethical framework and security best practices for using HackAgent responsibly in AI security research and testing.
