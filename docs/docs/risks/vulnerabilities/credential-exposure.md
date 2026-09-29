@@ -61,7 +61,8 @@ from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
 agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="my-agent",
 )
 

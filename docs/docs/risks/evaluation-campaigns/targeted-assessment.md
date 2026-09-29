@@ -38,7 +38,8 @@ from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="rag-assessment",
 )
 
@@ -83,7 +84,8 @@ from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INV
 from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="agent-assessment",
 )
 
@@ -136,7 +138,8 @@ from hackagent.catalog.risks.sensitive_information_disclosure import (
 )
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="chatbot-assessment",
 )
 
@@ -171,7 +174,8 @@ from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="api-assessment",
 )
 
@@ -258,7 +262,8 @@ from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="progressive-test",
 )
 

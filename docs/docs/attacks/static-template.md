@@ -421,7 +421,8 @@ from hackagent import HackAgent, Settings
 models = ["gpt-4", "claude-3", "llama-3"]
 for model in models:
     agent = HackAgent(Settings.resolve()).target(
-        ...,
+        "http://localhost:8000/v1",  # OpenAI-compatible gateway
+        "openai-sdk",
         name=model,
     )
     results = agent.hack(attack_config=static_template_config)

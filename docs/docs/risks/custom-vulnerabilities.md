@@ -279,7 +279,8 @@ vuln = FinancialAdvice(types=["investment_recommendation"])
 
 # Initialize HackAgent
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="financial-compliance-test",
 )
 

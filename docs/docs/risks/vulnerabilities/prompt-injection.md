@@ -90,7 +90,8 @@ from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="my-agent",
 )
 

@@ -131,7 +131,8 @@ campaign_config = {
 from hackagent import HackAgent, Settings
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="healthcare-ai",
 )
 
@@ -233,7 +234,8 @@ def scheduled_security_scan():
     print(f"\n=== Security Scan {datetime.now()} ===")
 
     agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-        "http://localhost:8080/chat",
+        "http://localhost:8000/v1",
+        "openai-sdk",
         name="production-agent",
     )
 

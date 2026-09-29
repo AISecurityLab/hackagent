@@ -336,7 +336,8 @@ from hackagent import HackAgent, Settings
 targets = ["model-a", "model-b", "model-c"]
 for target in targets:
     agent = HackAgent(Settings.resolve()).target(
-        f"http://{target}:8000",
+        f"http://{target}:8000/v1",
+        "openai-sdk",
         name=target,
         # ...
     )

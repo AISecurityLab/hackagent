@@ -112,22 +112,28 @@ def test_adk_attack_scenario():
 ```python
 from hackagent import AgentType
 
-# Available agent types
+# Agent types .target() accepts
 AgentType.GOOGLE_ADK    # Google Agent Development Kit
-AgentType.LITELLM       # LiteLLM multi-provider interface
 AgentType.OPENAI_SDK    # OpenAI-compatible endpoints
-AgentType.LANGCHAIN     # LangChain (uses LiteLLM adapter)
-AgentType.MCP           # Model Context Protocol
-AgentType.A2A           # Agent-to-Agent protocol
-AgentType.UNKNOWN       # Unknown/fallback type
+AgentType.LITELLM       # LiteLLM multi-provider interface
+AgentType.OLLAMA        # Ollama
+AgentType.LANGCHAIN     # LangChain (uses the LiteLLM adapter)
+AgentType.CLAUDE_CODE   # Claude Code CLI
+AgentType.CODEX         # Codex CLI
+AgentType.HERMES        # Hermes Agent CLI
+AgentType.WEB           # Browser-driven web chatbot
 ```
+
+The strings `"google-adk"`, `"openai-sdk"`, `"ollama"` and so on work too.
+`AgentType.MCP` and `AgentType.A2A` are placeholders and `AgentType.UNKNOWN`
+is the fallback; `.target()` raises `ValueError` for all three.
 
 ### Google ADK Configuration
 
 For Google ADK agents, the SDK automatically handles session management:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(
     Settings.resolve(),
     # Optional parameters:
@@ -145,7 +151,7 @@ agent = HackAgent(
 For LiteLLM-based agents supporting multiple LLM providers:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
     "http://localhost:8000/v1/chat/completions",
     AgentType.LITELLM,
@@ -158,7 +164,7 @@ agent = HackAgent(Settings.resolve()).target(
 For OpenAI API compatible agents:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
     "https://api.openai.com/v1/chat/completions",
     AgentType.OPENAI_SDK,

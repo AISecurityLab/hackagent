@@ -59,7 +59,8 @@ from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROF
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="comprehensive-audit",
 )
 

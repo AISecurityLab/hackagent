@@ -92,7 +92,7 @@ results = agent.hack(attack_config=attack_config)
 If your agent uses OpenAI's function calling feature:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 # Initialize agent for function calling testing
 agent = HackAgent(Settings.resolve()).target(
     "https://api.openai.com/v1",
@@ -118,7 +118,7 @@ results = agent.hack(attack_config=attack_config)
 Test the same prompts across different agents:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agents = ["openai_gpt4", "openai_gpt4_turbo", "openai_gpt35"]
 
 for agent_name in agents:
@@ -138,7 +138,7 @@ for agent_name in agents:
 HackAgent supports Azure OpenAI Service out of the box:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
     "https://your-resource.openai.azure.com",
     AgentType.OPENAI_SDK,
@@ -172,7 +172,7 @@ attack_config = {
 
 ### Cost Management
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 # Use smaller models for initial testing
 agent = HackAgent(Settings.resolve()).target(
     "https://api.openai.com/v1",

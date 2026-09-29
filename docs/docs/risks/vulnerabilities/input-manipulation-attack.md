@@ -67,7 +67,8 @@ from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
 
 agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="my-agent",
 )
 

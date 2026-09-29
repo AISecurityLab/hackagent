@@ -68,7 +68,8 @@ from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.sensitive_information_disclosure import SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
 
 agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="my-agent",
 )
 
