@@ -40,6 +40,21 @@ The build fails on broken links, broken anchors, and unresolved `.md`/`.mdx`
 links. When you move or rename a page, add a redirect in
 `docusaurus.config.ts`.
 
+## Page components
+
+These are available in every `.mdx` page without an import (`src/theme/MDXComponents.tsx`). A `.md` page is plain CommonMark and cannot use them; rename it to `.mdx` first.
+
+| Component | Use it for |
+|---|---|
+| `<Tabs>` / `<TabItem>` | Alternatives the reader picks between: SDK / CLI / TUI, pip / uv, one goal source or another. Give related tab sets the same `groupId` so a choice carries across the page |
+| `<Term id="judge">judges</Term>` | An inline concept that opens its definition in a modal |
+| `<ConceptGrid ids={['target', 'attack']} />` | Cards for several concepts, each opening its definition |
+| `<Modal trigger="…" title="…">` | Detail that would interrupt the page: advanced flags, a full config, background |
+
+Concept definitions live in one place, `src/components/Glossary/terms.tsx`, so a concept reads the same on every page. Add a term there before using it.
+
+In `<Modal>` and `<TabItem>`, leave a blank line after the opening tag so the content is parsed as Markdown. Modal content renders only when opened, so the build cannot check the links inside it; `scripts/check_modal_links.py` does, after `npm run build`, and CI runs it.
+
 ## What the generator does
 
 `scripts/generate_docs.py`:

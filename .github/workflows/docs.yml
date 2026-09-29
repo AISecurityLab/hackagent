@@ -63,4 +63,7 @@ jobs:
       - name: Build documentation
         run: |
           cd docs
-          npm run build 
+          npm run build
+
+      - name: Check links inside modals
+        run: python docs/scripts/check_modal_links.py docs
