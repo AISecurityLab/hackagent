@@ -30,6 +30,7 @@ npm run typecheck   # tsc over the site config
 |---|---|
 | `docs/` | Hand-written pages (`.md` is CommonMark, `.mdx` is MDX) |
 | `docs/hackagent/`, `docs/api-index.md` | **Generated** SDK reference. Do not edit by hand; CI regenerates it on every build |
+| `docs/risks/vulnerabilities/` | **Generated** from `hackagent/catalog/risks` by `scripts/risk_pages.py`. Edit the catalog, not these pages |
 | `sidebars.ts` | The four navbar sidebars (Guides, SDK, CLI, API). Guides, CLI and API list their pages explicitly, so a new hand-written page must be added here. The SDK sidebar autogenerates each package from `docs/hackagent/` |
 | `docusaurus.config.ts` | Site config, including redirects for pages that moved |
 | `scripts/generate_docs.py` | The API reference generator |
@@ -52,6 +53,8 @@ links. When you move or rename a page, add a redirect in
    for MDX, and renames the web interface pages so the docs plugin
    publishes them. It deletes the `sidebar.json` pydoc-markdown writes,
    since `sidebars.ts` builds the SDK sidebar from the pages themselves.
+5. Runs `scripts/risk_pages.py`, which writes one page per risk from the
+   catalog's vulnerability classes, sub-type enums and threat profiles.
 
 ## CI
 

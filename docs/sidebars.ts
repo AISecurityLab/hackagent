@@ -25,7 +25,6 @@ const sidebars: SidebarsConfig = {
         'getting-started/quick-start',
         'getting-started/quick-security-scan',
         'getting-started/attack-tutorial',
-        'getting-started/datasets-tutorial',
       ],
     },
     {
@@ -201,6 +200,11 @@ const sidebars: SidebarsConfig = {
           type: 'doc',
           id: 'agents/hermes',
           label: 'Hermes Agent',
+        },
+        {
+          type: 'doc',
+          id: 'agents/web',
+          label: 'Web Chatbot',
         },
         {
           type: 'doc',
