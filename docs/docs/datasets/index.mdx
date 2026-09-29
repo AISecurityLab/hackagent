@@ -1,0 +1,153 @@
+# Dataset Providers
+
+A <Term id="dataset">dataset</Term> supplies an attack's goals, so you can run a standard benchmark instead of writing goals by hand. Pass it as `dataset` in place of `goals`.
+
+## Load goals
+
+Each tab shows the value to pass as `attack_config["dataset"]` (or `"intents"`).
+
+<Tabs groupId="dataset-source">
+<TabItem value="preset" label="Preset" default>
+
+One of 26 curated benchmarks, by name. All but `agenthazard` come from the Hugging Face Hub and need the `hf` extra (`pip install 'hackagent[hf]'`).
+
+```python
+dataset = {
+    "preset": "agentharm",
+    "limit": 50,
+    "shuffle": True,
+    "seed": 42,
+}
+
+results = target.hack(attack_config={
+    "attack_type": "static_template",
+    "dataset": dataset,
+})
+```
+
+Popular choices: `agentharm` (agent safety), `jailbreakbench`, `harmbench`, `strongreject`, `beavertails`, `simplesafetytests`. [Presets](./presets.md) lists all 26.
+
+</TabItem>
+<TabItem value="huggingface" label="Hugging Face">
+
+Any public or private Hub dataset. Needs the `hf` extra.
+
+```python
+dataset = {
+    "provider": "huggingface",
+    "path": "ai-safety-institute/AgentHarm",
+    "name": "harmful",
+    "split": "test_public",
+    "goal_field": "prompt",
+    "limit": 100,
+}
+```
+
+See [Hugging Face provider](./huggingface.md).
+
+</TabItem>
+<TabItem value="file" label="Local file">
+
+JSON, JSONL, CSV or TXT from your filesystem.
+
+```python
+dataset = {
+    "provider": "file",
+    "path": "./my_goals.json",
+    "goal_field": "objective",
+}
+```
+
+See [File provider](./file.md).
+
+</TabItem>
+<TabItem value="url" label="URL JSON">
+
+A JSON document fetched over HTTPS.
+
+```python
+dataset = {
+    "provider": "url_json",
+    "url": "https://yunhao-feng.github.io/AgentHazard/data/dataset.json",
+    "goal_field": "query",
+    "fallback_fields": ["prompt", "input", "text"],
+}
+```
+
+See [URL JSON provider](./url-json.md).
+
+</TabItem>
+<TabItem value="intents" label="Intent taxonomy">
+
+Category-balanced goals from the [OmniSafeBench](https://github.com/jiaxiaojunQAQ/OmniSafeBench-MM/) taxonomy. This uses `intents` instead of `dataset`, and the goals arrive labelled (`A. Ethical and Social Risks` / `A1. Bias and Discrimination`).
+
+```python
+intents = [{
+    "category": "A",
+    "subcategories": ["A1", "A2"],
+    "samples_per_subcategory": 2,
+}]
+```
+
+See [Selecting intent categories](./selecting-intent-categories.md).
+
+</TabItem>
+</Tabs>
+
+## Shape the selection
+
+Every provider takes the same four options:
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `limit` | all | Load at most this many goals |
+| `offset` | `0` | Skip the first N goals |
+| `shuffle` | `False` | Randomise the order |
+| `seed` | none | Make the shuffle reproducible |
+
+With both `shuffle` and `offset`, the goals are shuffled first and the offset is applied afterwards.
+
+## From the CLI
+
+Preview a preset before you attack with it:
+
+```bash
+hackagent datasets sample strongreject --limit 5
+```
+
+To attack with a dataset, put the `dataset` block in a config file:
+
+<Tabs groupId="dataset-cli">
+<TabItem value="command" label="Command" default>
+
+```bash
+hackagent eval static-template \
+  --agent-name my_agent \
+  --agent-type google-adk \
+  --endpoint http://localhost:8000 \
+  --config-file agentharm.json --no-tui
+```
+
+</TabItem>
+<TabItem value="config" label="agentharm.json">
+
+```json
+{
+  "dataset": {
+    "preset": "agentharm",
+    "limit": 50,
+    "shuffle": true,
+    "seed": 42
+  }
+}
+```
+
+</TabItem>
+</Tabs>
+
+The bare `hackagent eval` campaign also takes `--dataset` and `--limit`; see [Datasets CLI](../cli/datasets.md).
+
+## More
+
+- [Custom providers](./custom-providers.md): load goals from your own source.
+- [Troubleshooting](./troubleshooting.md): common loading errors.

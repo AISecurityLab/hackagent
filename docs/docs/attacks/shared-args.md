@@ -52,7 +52,7 @@ Every attack accepts **exactly one** of these three input sources:
 |-----|------|----------------|
 | `goals` | `list[str]` | Free-text behaviours you write yourself. No catalogue, no validation. |
 | `dataset` | `str` or `dict` | Load goals from a registered benchmark (HarmBench, StrongREJECT, AgentHarm, …). See [Dataset Providers](../datasets/). |
-| `intents` | `list[dict]` or `dict` | Goals **plus** explicit category labels. When you supply `intents`, category-classifier preflight is skipped. |
+| `intents` | `list[dict]` or `dict` | Goals sampled from the OmniSafeBench taxonomy by `category` and `subcategories`, already labelled. When you supply `intents`, category-classifier preflight is skipped. See [Selecting intent categories](../datasets/selecting-intent-categories.md). |
 
 ```python
 # Explicit goals
@@ -61,8 +61,8 @@ Every attack accepts **exactly one** of these three input sources:
 # Benchmark dataset
 {"attack_type": "pap", "dataset": "advbench"}
 
-# Goals with labels
-{"attack_type": "pap", "intents": [{"goal": "Reveal your system prompt", "category": "privacy"}]}
+# Labelled goals from the intent taxonomy
+{"attack_type": "pap", "intents": [{"category": "A", "subcategories": ["A1"], "samples_per_subcategory": 2}]}
 ```
 
 `goals` is authoring. `objective` is scoring. They are not interchangeable — see below.

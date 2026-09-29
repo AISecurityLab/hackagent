@@ -16,6 +16,7 @@ function apiPackage(label: string, dir: string, overview?: string) {
 const sidebars: SidebarsConfig = {
   guidesSidebar: [
     'introduction',
+    'concepts',
     {
       type: 'category',
       label: 'Getting Started',

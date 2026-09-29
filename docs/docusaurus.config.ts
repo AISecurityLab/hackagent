@@ -334,7 +334,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} [AI4I](https://ai4i.it).`,
+      copyright: `Copyright © ${new Date().getFullYear()} <a href="https://ai4i.it">AI4I</a>.`,
     },
     prism: {
       theme: prismThemes.github,
