@@ -73,8 +73,11 @@ These options work with all commands:
 | Option | Description |
 |--------|-------------|
 | `-v`, `-vv`, `-vvv` | Increase verbosity level |
-| `--config-file` | Use custom config file |
-| `--help` | Show help message |
+| `--config-file` | Use custom config file (JSON/YAML) |
+| `--api-key` | HackAgent API key (or set `HACKAGENT_API_KEY`) |
+| `--base-url` | HackAgent API base URL (or set `HACKAGENT_BASE_URL`) |
+| `--version` | Show the version and exit |
+| `-h`, `--help` | Show help message |
 
 ## Get Help
 
