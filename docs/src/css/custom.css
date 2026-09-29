@@ -244,3 +244,9 @@ table th {
   overflow: visible !important;
   white-space: nowrap !important;
 }
+
+/* The footer copyright is HTML; keep its link readable on the dark footer. */
+.footer__copyright a {
+  color: var(--ifm-footer-link-color);
+  text-decoration: underline;
+}
