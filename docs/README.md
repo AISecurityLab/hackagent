@@ -30,7 +30,7 @@ npm run typecheck   # tsc over the site config
 |---|---|
 | `docs/` | Hand-written pages (`.md` is CommonMark, `.mdx` is MDX) |
 | `docs/hackagent/`, `docs/api-index.md` | **Generated** SDK reference. Do not edit by hand; CI regenerates it on every build |
-| `sidebars.ts` | The four navbar sidebars (Guides, SDK, CLI, API). Pages are listed explicitly, so a new page must be added here |
+| `sidebars.ts` | The four navbar sidebars (Guides, SDK, CLI, API). Guides, CLI and API list their pages explicitly, so a new hand-written page must be added here. The SDK sidebar autogenerates each package from `docs/hackagent/` |
 | `docusaurus.config.ts` | Site config, including redirects for pages that moved |
 | `scripts/generate_docs.py` | The API reference generator |
 | `static/` | Images and other files served as-is |
@@ -50,7 +50,8 @@ links. When you move or rename a page, add a redirect in
    script for the pydoc-markdown 4.8.2 bugs it works around).
 4. Writes `docs/hackagent/` and `docs/api-index.md`, makes the output safe
    for MDX, and renames the web interface pages so the docs plugin
-   publishes them.
+   publishes them. It deletes the `sidebar.json` pydoc-markdown writes,
+   since `sidebars.ts` builds the SDK sidebar from the pages themselves.
 
 ## CI
 
