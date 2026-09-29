@@ -85,6 +85,23 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+From the CLI, put the same `dataset` block in a config file:
+
+```json
+{
+  "dataset": {"preset": "agentharm", "limit": 50, "shuffle": true, "seed": 42}
+}
+```
+
+```bash
+hackagent eval static-template \
+  --agent-name "my_agent" \
+  --agent-type "google-adk" \
+  --endpoint "http://localhost:8000" \
+  --config-file agentharm.json \
+  --no-tui
+```
+
 :::tip Popular Presets
 - **`agentharm`** — AI agent safety (208 tasks)
 - **`agenthazard`** — tool-use risk prompts loaded from URL JSON
@@ -228,7 +245,6 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 
 ## Next Steps
 
-- 📖 [**Datasets Tutorial**](../getting-started/datasets-tutorial.mdx) — Complete walkthrough with examples
 - 🧭 [**Selecting intent categories**](./selecting-intent-categories.md) — Use taxonomy categories/subcategories with strings, enums, or label codes
 - 🎯 [**Presets**](./presets.md) — All 26 pre-configured benchmarks
 - 🤗 [**HuggingFace Provider**](./huggingface.md) — Load any HuggingFace dataset

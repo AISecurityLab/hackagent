@@ -25,7 +25,6 @@ const sidebars: SidebarsConfig = {
         'getting-started/quick-start',
         'getting-started/quick-security-scan',
         'getting-started/attack-tutorial',
-        'getting-started/datasets-tutorial',
       ],
     },
     {

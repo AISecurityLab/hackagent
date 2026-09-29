@@ -210,6 +210,11 @@ const config: Config = {
             (page) => ({from: `/api/${page}`, to: `/api#${page}`}),
           ),
           {
+            // Folded into the Dataset Providers overview.
+            from: '/getting-started/datasets-tutorial',
+            to: '/datasets',
+          },
+          {
             // The page documents `hackagent eval`; there is no `attack` command.
             from: '/cli/attack',
             to: '/cli/eval',
