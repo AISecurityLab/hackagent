@@ -497,24 +497,6 @@ quality_config = {
 4. **Temperature Tuning**: Adjust attacker creativity
 5. **Goal Specificity**: Make goals more targeted and specific
 
-## Quick Local Test (same LLMs as FlipAttack)
-
-A minimal runnable example is available at:
-
-- `tests/test_advprefix.py`
-
-It uses:
-
-- target agent: local `corpbot_rag` (`http://localhost:8000/v1`)
-- attacker: `google/gemma-3n-e4b-it` via OpenRouter
-- judge: `google/gemma-3n-e4b-it` via OpenRouter (`harmbench`)
-
-Run it with:
-
-```bash
-python tests/test_advprefix.py
-```
-
 ## Defense Considerations
 
 ### Detection Patterns

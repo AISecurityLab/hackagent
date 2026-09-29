@@ -174,9 +174,9 @@ agent = HackAgent(Settings.resolve()).target(
 
 ## Attack Types & Configurations
 
-### AdvPrefix Attack (Primary Implementation)
+### Example: AdvPrefix
 
-The main attack type currently implemented is `advprefix`, which performs sophisticated prefix generation attacks:
+HackAgent ships 17 attacks (see [Attack Techniques](../attacks/index.mdx)). This example configures `advprefix`, which generates adversarial prefixes:
 
 ```python
 attack_config = {
@@ -279,20 +279,23 @@ DEFAULT_CONFIG = {
 
 ### Exception Hierarchy
 
-The SDK provides a comprehensive exception hierarchy:
+`hack()` raises only `HackAgentError` and its subclasses. `ApiError` (a
+failed call to the HackAgent backend) passes through unchanged; every other
+failure, such as a bad config or an adapter error, is wrapped in
+`HackAgentError` with the original exception as `__cause__`:
 
 ```python
-from hackagent.core.errors import HackAgentError, ApiError, UnexpectedStatusError
+from hackagent.core.errors import ApiError, HackAgentError
 
 try:
     results = agent.hack(attack_config=attack_config)
-except UnexpectedStatusError as e:
-    print(f"HTTP Error: {e.status_code} - {e.content}")
 except ApiError as e:
-    print(f"API Error: {e}")
+    print(f"API Error ({e.status_code}): {e.message}")
 except HackAgentError as e:
-    print(f"HackAgent Error: {e}")
+    print(f"HackAgent Error: {e} (cause: {e.__cause__!r})")
 ```
+
+`.target()` itself raises `ValueError` for an unsupported agent type.
 
 ### Debugging and Logging
 
@@ -369,7 +372,7 @@ uv sync --group dev
 uv run pytest tests/
 
 # Run specific test
-uv run pytest tests/unit/router/test_adk_agent.py -v
+uv run pytest tests/unit/models/test_adk_agent.py -v
 
 # Run with coverage
 uv run pytest --cov=hackagent tests/

@@ -31,9 +31,9 @@ target = session.target(
 |-------|----------------|
 | `api_key`, `base_url`, `db_path` | `Settings.resolve(...)` |
 | `timeout`, `raise_on_unexpected_status`, `backend` | `HackAgent(...)` |
-| `endpoint`, `agent_type`, `name`, `guardrails`, `metadata`, `target_config`, `thinking` | `.target(...)` |
+| `endpoint`, `agent_type`, `name`, `guardrails`, `metadata`, `target_config`, `adapter_operational_config`, `thinking` | `.target(...)` |
 
-`guardrails` is `{"before": {...}, "after": {...}}`. Either side may be omitted. `target_config` holds victim generation knobs (`max_tokens`, `temperature`, `timeout`).
+`guardrails` is `{"before": {...}, "after": {...}}`. Either side may be omitted. `target_config` holds victim generation knobs (`max_tokens`, `temperature`, `timeout`). `adapter_operational_config` is merged over `target_config` and handed to the adapter (for example `name` and `binary` for Claude Code or Codex, `headless` for the web adapter).
 
 ```python
 session = HackAgent(

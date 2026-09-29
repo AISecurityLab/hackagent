@@ -4,13 +4,13 @@ sidebar_position: 1
 
 # Dataset Providers
 
-HackAgent supports loading attack goals from external datasets, enabling standardized AI safety evaluations using **30+ benchmarks** including AgentHarm, JailbreakBench, BeaverTails, SALAD-Bench, and more from leading research institutions.
+HackAgent supports loading attack goals from external datasets, enabling standardized AI safety evaluations using **26 benchmarks** including AgentHarm, JailbreakBench, BeaverTails, SALAD-Bench, and more from leading research institutions.
 
 ## Overview
 
 Instead of manually specifying `goals`, use the `dataset` parameter to load goals from multiple sources:
 
-- 🎯 **Presets** — 30+ ready-to-use AI safety benchmarks (AgentHarm, JailbreakBench, BeaverTails, etc.)
+- 🎯 **Presets** — 26 ready-to-use AI safety benchmarks (AgentHarm, JailbreakBench, BeaverTails, etc.)
 - 🤗 **HuggingFace Hub** — Any public or private dataset from HuggingFace
 - 🌐 **URL JSON** — Load remote JSON datasets directly from HTTPS URLs
 - 📁 **Local files** — JSON, JSONL, CSV, or TXT files from your filesystem
@@ -19,7 +19,7 @@ Instead of manually specifying `goals`, use the `dataset` parameter to load goal
 ```mermaid
 graph LR
     subgraph "Dataset Sources"
-        P[🎯 Presets<br/>30+ Benchmarks] --> L[Dataset Loader]
+        P[🎯 Presets<br/>26 Benchmarks] --> L[Dataset Loader]
         H[🤗 HuggingFace Hub<br/>Any Dataset] --> L
         U[🌐 URL JSON<br/>Remote JSON Feeds] --> L
         F[📁 Local Files<br/>JSON/CSV/TXT] --> L
@@ -96,7 +96,7 @@ results = agent.hack(attack_config=attack_config)
 - **`beavertails`** — Multi-category safety (330K+ samples)
 - **`simplesafetytests`** — Quick safety check (100 prompts)
 
-[See all 30+ presets →](./presets.md)
+[See all 26 presets →](./presets.md)
 :::
 
 ### 2. Using HuggingFace
@@ -223,7 +223,7 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 
 | Provider | Available Datasets | Total Samples |
 |----------|-------------------|---------------|
-| **Presets** | 30+ benchmarks | 500K+ goals |
+| **Presets** | 26 benchmarks | 500K+ goals |
 | **HuggingFace** | Unlimited | Custom |
 | **URL JSON** | Any reachable JSON endpoint | Custom |
 | **Local Files** | Your data | Custom |
@@ -234,7 +234,7 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 
 - 📖 [**Datasets Tutorial**](../getting-started/datasets-tutorial.mdx) — Complete walkthrough with examples
 - 🧭 [**Selecting intent categories**](./selecting-intent-categories.md) — Use taxonomy categories/subcategories with strings, enums, or label codes
-- 🎯 [**Presets**](./presets.md) — All 30+ pre-configured benchmarks
+- 🎯 [**Presets**](./presets.md) — All 26 pre-configured benchmarks
 - 🤗 [**HuggingFace Provider**](./huggingface.md) — Load any HuggingFace dataset
 - 🌐 [**URL JSON Provider**](./url-json.md) — Load JSON datasets from remote URLs
 - 📁 [**File Provider**](./file.md) — Load from local JSON, CSV, or TXT files

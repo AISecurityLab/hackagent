@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Dataset Presets
 
-Pre-configured dataset presets provide instant access to **30+ popular AI safety benchmarks** from leading research institutions and safety organizations.
+Pre-configured dataset presets provide instant access to **26 popular AI safety benchmarks** from leading research institutions and safety organizations.
 
 ## Basic Usage
 
@@ -437,7 +437,7 @@ for name, description in sorted(presets.items()):
 
 ### Quick Reference
 
-Run this to see all 30+ available presets with descriptions:
+Run this to see all 26 available presets with descriptions:
 
 ```python
 from hackagent.datasets import PRESETS
