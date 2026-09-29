@@ -408,7 +408,7 @@ for target in targets:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**, since
+`agent.hack()` returns a list of row dicts — **one entry per goal**, since
 FlipAttack makes a single deterministic attempt per goal.
 
 ### Result Structure
@@ -442,8 +442,8 @@ FlipAttack makes a single deterministic attempt per goal.
   rate directly.
 
 ```python
-asr = sum(1 for r in results if r.metadata["success"]) / len(results)
-print(f"{results[0].metadata['flip_mode']} ASR: {asr:.0%}")
+asr = sum(1 for r in results if r.get("success")) / len(results)
+print(f"{results[0]['flip_mode']} ASR: {asr:.0%}")
 ```
 
 See [Interpreting Results](./index.mdx#interpreting-results) for the fields

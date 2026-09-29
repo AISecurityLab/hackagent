@@ -170,7 +170,7 @@ FC-Attack implements a two-stage pipeline:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**.
+`agent.hack()` returns a list of row dicts — **one entry per goal**.
 
 ### Result Structure
 
@@ -205,8 +205,8 @@ FC-Attack implements a two-stage pipeline:
 import base64
 import pathlib
 for r in results:
-    if r.metadata["success"]:
-        header, _, data = r.metadata["image_data_url"].partition(",")
+    if r.get("success"):
+        header, _, data = r["image_data_url"].partition(",")
         pathlib.Path("success.png").write_bytes(base64.b64decode(data))
         break
 ```

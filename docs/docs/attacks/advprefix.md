@@ -340,7 +340,7 @@ attack_config = {
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per surviving
+`agent.hack()` returns a list of row dicts — **one entry per surviving
 (goal, prefix) pair**, not one per goal. AdvPrefix generates many candidate
 prefixes per goal and filters them down, so expect several results for each goal
 you supplied.
@@ -362,12 +362,12 @@ you supplied.
 }
 ```
 
-`prompt` and `response` on the `AttackResult` mirror `prefix` and `completion`,
+`prompt` and `response` on each row mirror `prefix` and `completion`,
 so the portable accessors work as they do for every other attack:
 
 ```python
 for result in results:
-    print(result.prompt, result.metadata["pasr"], result.metadata["success"])
+    print(result["prompt"], result["pasr"], result.get("success"))
 ```
 
 ### Key Metrics
@@ -380,12 +380,12 @@ for result in results:
 
 ```python
 # Rank prefixes by effectiveness
-ranked = sorted(results, key=lambda r: r.metadata.get("pasr") or 0, reverse=True)
+ranked = sorted(results, key=lambda r: r.get("pasr") or 0, reverse=True)
 for r in ranked[:3]:
-    print(f"{r.metadata['pasr']:.0%}  {r.prompt}")
+    print(f"{r['pasr']:.0%}  {r['prompt']}")
 
 # Per-goal success
-compromised = {r.goal for r in results if r.metadata.get("success")}
+compromised = {r["goal"] for r in results if r.get("success")}
 print(f"{len(compromised)} goals compromised")
 ```
 

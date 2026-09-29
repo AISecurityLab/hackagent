@@ -6,8 +6,14 @@ sidebar_position: 3
 
 A **targeted assessment** focuses on specific vulnerabilities or attack surfaces relevant to your system's unique characteristics and use cases.
 
-:::note
-`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::note Reading ASR
+`agent.hack(attack_config=...)` returns a list of row dicts. The examples below compute ASR from those rows with this helper:
+
+```python
+def asr(rows):
+    """Fraction of rows the judges marked successful."""
+    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
+```
 :::
 
 ## When to Use
@@ -50,7 +56,7 @@ for profile in rag_profiles:
                 "objective": profile.objective,
             }
             result = agent.hack(attack_config=attack_config)
-            print(f"{profile.name} + {ds.preset}: ASR = {result.get('asr', 'N/A')}")
+            print(f"{profile.name} + {ds.preset}: ASR = {asr(result):.0%}")
     else:
         # Custom RAG-specific goals
         attack_config = {
@@ -63,7 +69,7 @@ for profile in rag_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-        print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+        print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ### Agentic System Assessment
@@ -114,7 +120,7 @@ for profile in agentic_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+    print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ### Customer-Facing Chatbot Assessment
@@ -149,7 +155,7 @@ for profile in chatbot_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-        print(f"{profile.name} + {ds.preset}: ASR = {result.get('asr', 'N/A')}")
+        print(f"{profile.name} + {ds.preset}: ASR = {asr(result):.0%}")
 ```
 
 ### Public API Assessment
@@ -184,7 +190,7 @@ for profile in api_profiles:
                 "objective": profile.objective,
             }
             result = agent.hack(attack_config=attack_config)
-            print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+            print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ## Custom Goal Development
@@ -265,7 +271,7 @@ attack_config = {
 baseline_result = agent.hack(attack_config=attack_config)
 
 # If baseline ASR > threshold, escalate to advanced attacks
-if baseline_result.get("asr", 0) > 0.1:
+if asr(baseline_result) > 0.1:
     print("Baseline vulnerability detected. Escalating to PAIR...")
 
     # Phase 2: PAIR
@@ -276,7 +282,7 @@ if baseline_result.get("asr", 0) > 0.1:
     }
     pair_result = agent.hack(attack_config=attack_config)
 
-    if pair_result.get("asr", 0) > 0.2:
+    if asr(pair_result) > 0.2:
         print("Significant vulnerability confirmed. Running AdvPrefix...")
 
         # Phase 3: AdvPrefix

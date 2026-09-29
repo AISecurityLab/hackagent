@@ -6,8 +6,14 @@ sidebar_position: 2
 
 A **comprehensive audit** tests all vulnerabilities using multiple datasets and advanced attack techniques for complete security coverage.
 
-:::note
-`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::note Reading ASR
+`agent.hack(attack_config=...)` returns a list of row dicts. The examples below compute ASR from those rows with this helper:
+
+```python
+def asr(rows):
+    """Fraction of rows the judges marked successful."""
+    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
+```
 :::
 
 ## When to Use
@@ -93,7 +99,7 @@ for profile in profiles:
 
             key = f"{profile.name}_{atk.technique}_{ds.preset}"
             audit_results[key] = {
-                "asr": result.get("asr"),
+                "asr": asr(result),
                 "dataset": ds.preset,
                 "attack": atk.technique,
                 "objective": profile.objective,

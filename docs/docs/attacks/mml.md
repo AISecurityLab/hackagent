@@ -392,7 +392,7 @@ for mode in ["word_replacement", "mirror", "rotate", "base64", "mixed"]:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**.
+`agent.hack()` returns a list of row dicts — **one entry per goal**.
 
 ### Result Structure
 
@@ -426,8 +426,8 @@ for mode in ["word_replacement", "mirror", "rotate", "base64", "mixed"]:
 ```python
 by_mode = {}
 for r in results:
-    mode = r.metadata["encoding_mode"]
-    by_mode.setdefault(mode, []).append(bool(r.metadata["success"]))
+    mode = r["encoding_mode"]
+    by_mode.setdefault(mode, []).append(bool(r.get("success")))
 for mode, outcomes in by_mode.items():
     print(f"{mode}: {sum(outcomes)}/{len(outcomes)}")
 ```

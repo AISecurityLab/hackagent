@@ -317,7 +317,7 @@ AutoDAN-Turbo currently supports **goal-level batching** only. Full shared seman
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**,
+`agent.hack()` returns a list of row dicts — **one entry per goal**,
 describing the best attempt found across the warm-up and lifelong phases.
 
 ### Result Structure
@@ -352,10 +352,10 @@ may overwrite `best_score` with a judge's verdict, so `autodan_score` and
 ```python
 # Where do the internal scorer and the judges disagree?
 for r in results:
-    internal = r.metadata.get("autodan_score")
-    judged = r.metadata.get("best_score")
+    internal = r.get("autodan_score")
+    judged = r.get("best_score")
     if internal is not None and abs(internal - judged) > 2:
-        print(f"disagreement ({internal} vs {judged}): {r.goal}")
+        print(f"disagreement ({internal} vs {judged}): {r['goal']}")
 ```
 
 See [Interpreting Results](./index.mdx#interpreting-results) for the fields

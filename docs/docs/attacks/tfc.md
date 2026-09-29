@@ -183,7 +183,7 @@ tFC-Attack implements a two-stage pipeline:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**.
+`agent.hack()` returns a list of row dicts — **one entry per goal**.
 
 ### Result Structure
 
@@ -218,7 +218,7 @@ alone.
 ```python
 from collections import Counter
 by_format = Counter(
-    r.metadata["text_format"] for r in results if r.metadata["success"]
+    r["text_format"] for r in results if r.get("success")
 )
 print(by_format.most_common())
 ```

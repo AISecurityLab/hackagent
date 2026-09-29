@@ -230,7 +230,7 @@ The full taxonomy includes 40 techniques spanning evidence-based, social influen
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**. PAP
+`agent.hack()` returns a list of row dicts — **one entry per goal**. PAP
 tries persuasion techniques in order and stops at the first confirmed
 jailbreak, so the result describes the winning (or best-scoring) technique.
 
@@ -262,7 +262,7 @@ jailbreak, so the result describes the winning (or best-scoring) technique.
 ```python
 from collections import Counter
 effective = Counter(
-    r.metadata["technique"] for r in results if r.metadata["success"]
+    r["technique"] for r in results if r.get("success")
 )
 print(effective.most_common())
 ```

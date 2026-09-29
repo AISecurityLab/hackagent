@@ -367,7 +367,7 @@ for target in targets:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**. TAP
+`agent.hack()` returns a list of row dicts — **one entry per goal**. TAP
 explores many branches per goal but reports only the best one it found.
 
 ### Result Structure
@@ -396,8 +396,7 @@ explores many branches per goal but reports only the best one it found.
 
 ```python
 for r in results:
-    m = r.metadata
-    print(f"{m['iterations_completed']}/{m['depth']} rounds — {m['best_score']}/10 — {r.goal}")
+    print(f"{r['iterations_completed']}/{r['depth']} rounds — {r['best_score']}/10 — {r['goal']}")
 ```
 
 See [Interpreting Results](./index.mdx#interpreting-results) for the fields

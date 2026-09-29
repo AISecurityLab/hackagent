@@ -241,7 +241,7 @@ BoN is **highly parallelizable** within each search step:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**. BoN
+`agent.hack()` returns a list of row dicts — **one entry per goal**. BoN
 tries many augmented candidates per goal but keeps only the best-scoring one,
 so the result describes the winning candidate.
 
@@ -279,8 +279,8 @@ so the result describes the winning candidate.
 ```python
 # How much search did each success take?
 for r in results:
-    if r.metadata["success"]:
-        print(f"step {r.metadata['step']}, candidate {r.metadata['candidate']}: {r.goal}")
+    if r.get("success"):
+        print(f"step {r['step']}, candidate {r['candidate']}: {r['goal']}")
 ```
 
 See [Interpreting Results](./index.mdx#interpreting-results) for the fields

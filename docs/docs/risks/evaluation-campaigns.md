@@ -6,8 +6,16 @@ sidebar_position: 5
 
 An **evaluation campaign** is a structured security assessment that combines vulnerabilities, datasets, attack techniques, and metrics into a reproducible test plan. HackAgent's threat profiles provide recommendations for datasets and attacks, making it easy to go from "I need to test for prompt injection" to a running evaluation.
 
-:::note Return value shape
-`agent.hack(attack_config=...)` returns a value whose exact shape depends on the attack technique — it is **not** guaranteed to be a flat dict with an `"asr"` key. The `result.get('asr', ...)` calls used throughout this page are illustrative shorthand for "however you extract your success metric." For a reliable ASR across any technique, use `hackagent results summary` (CLI) or open the local dashboard (`hackagent web`) after the run completes.
+:::note Reading ASR
+`agent.hack(attack_config=...)` returns a list of row dicts (see [Interpreting Results](../attacks/index.mdx#interpreting-results)). The examples on this page compute ASR from those rows with a small helper:
+
+```python
+def asr(rows):
+    """Fraction of rows the judges marked successful."""
+    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
+```
+
+`hackagent results summary` (CLI) and the local dashboard (`hackagent web`) report the same numbers after a run.
 :::
 
 ## Campaign Types
@@ -222,7 +230,7 @@ for atk in JAILBREAK_PROFILE.primary_attacks:
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }
     result = agent.hack(attack_config=attack_config)
-    print(f"ASR: {result.get('asr', 'N/A')}")
+    print(f"ASR: {asr(result):.0%}")
 ```
 
 ---
@@ -251,7 +259,7 @@ attack_config = {
 }
 result = agent.hack(attack_config=attack_config)
 
-print(f"ASR: {result.get('asr')}")
+print(f"ASR: {asr(result):.0%}")
 ```
 
 ### Multiple Vulnerability Campaign
@@ -289,7 +297,7 @@ for profile in profiles:
     }
     result = agent.hack(attack_config=attack_config)
     results[profile.name] = result
-    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+    print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ### Comprehensive Audit (All Vulnerabilities)
@@ -358,7 +366,7 @@ for profile in profiles:
     }
     result = agent.hack(attack_config=attack_config)
     audit_results[profile.name] = {
-        "asr": result.get("asr"),
+        "asr": asr(result),
         "dataset": ds.preset,
         "attack": atk.technique,
         "objective": profile.objective,
@@ -469,7 +477,7 @@ for profile in quick_profiles:
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }
     result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+    print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ### Agentic System Audit
@@ -512,7 +520,7 @@ for profile in agentic_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+    print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ### RAG System Testing
@@ -557,7 +565,7 @@ for profile in rag_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+    print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ---
