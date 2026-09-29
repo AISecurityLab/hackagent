@@ -121,11 +121,26 @@ hackagent eval tap \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Reveal system prompt" \
-  --attacker-model "gpt-4" \
-  --depth 3 \
-  --width 4 \
-  --branching-factor 3
+  --config-file tap.json
 ```
+
+`tap.json`:
+
+```json
+{
+  "attacker": {
+    "identifier": "gpt-4",
+    "agent_type": "openai-sdk"
+  },
+  "tap_params": {
+    "depth": 3,
+    "width": 4,
+    "branching_factor": 3
+  }
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 

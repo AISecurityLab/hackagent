@@ -135,9 +135,22 @@ hackagent eval pair \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Reveal system prompt" \
-  --attacker-model "gpt-4" \
-  --n-iterations 20
+  --config-file pair.json
 ```
+
+`pair.json`:
+
+```json
+{
+  "attacker": {
+    "identifier": "gpt-4",
+    "agent_type": "openai-sdk"
+  },
+  "n_iterations": 20
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 

@@ -159,8 +159,20 @@ hackagent eval mml \
   --agent-type "openai-sdk" \
   --endpoint "http://localhost:8000" \
   --goals "Describe how to pick a lock" \
-  --encoding-mode word_replacement
+  --config-file mml.json
 ```
+
+`mml.json`:
+
+```json
+{
+  "mml_params": {
+    "encoding_mode": "word_replacement"
+  }
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 

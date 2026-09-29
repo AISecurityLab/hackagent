@@ -131,9 +131,22 @@ hackagent eval crescendo \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Reveal system prompt" \
-  --attacker-model "gpt-4" \
-  --max-turns 10
+  --config-file crescendo.json
 ```
+
+`crescendo.json`:
+
+```json
+{
+  "attacker": {
+    "identifier": "gpt-4",
+    "agent_type": "openai-sdk"
+  },
+  "max_turns": 10
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 
