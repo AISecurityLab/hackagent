@@ -41,10 +41,10 @@ each stream maintains its own conversation history with the attacker.
 
 The attack requires three separate model roles:
 
-* **Attacker** (`config[&quot;attacker&quot;]`) — an LLM that proposes prompt
+* **Attacker** (`config["attacker"]`) — an LLM that proposes prompt
 improvements based on feedback.
 * **Target** — the victim model reached via `agent_router`.
-* **Scorer** (`config[&quot;scorer&quot;]`) — dedicated scorer model using
+* **Scorer** (`config["scorer"]`) — dedicated scorer model using
 the AutoDAN-Turbo scorer+wrapper protocol.
 
 **Attributes**:

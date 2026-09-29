@@ -49,9 +49,9 @@ goal in parallel, query the target model.
 The decorator program is specified via `h4rm3l_params.program`.
 It can be:
 - A preset name from :data:`PRESET_PROGRAMS` (e.g.
-`&quot;base64_refusal_suppression&quot;`)
+`"base64_refusal_suppression"`)
 - A raw program string in v1 or v2 syntax (e.g.
-`&quot;Base64Decorator().then(RefusalSuppressionDecorator())&quot;`).
+`"Base64Decorator().then(RefusalSuppressionDecorator())"`).
 
 **Attributes**:
 

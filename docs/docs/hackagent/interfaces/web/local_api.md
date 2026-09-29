@@ -10,7 +10,7 @@ answers the same routes `api.hackagent.dev` exposes, reading from the
 `LocalBackend` the SDK writes its runs into. The bundled SPA therefore works
 unchanged offline.
 
-Reads go through the facade. `DELETE /run/&lt;id&gt;` is the one explicit write
+Reads go through the facade. `DELETE /run/<id>` is the one explicit write
 (`delete_run`). Launching an attack needs a generator, a judge and credits,
 none of which exist offline, so the other write routes answer 501.
 

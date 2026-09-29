@@ -60,12 +60,12 @@ and target queries) and
 The attack expects three collaborating models configured via
 `config`:
 
-* **Attacker** (`config[&quot;attacker&quot;]`) — LLM that proposes prompt
+* **Attacker** (`config["attacker"]`) — LLM that proposes prompt
 refinements from conversation history.
 * **Target** — the victim model reached via `agent_router`.
-* **Judge** (`config[&quot;judge&quot;]`) — LLM that rates jailbreak success
+* **Judge** (`config["judge"]`) — LLM that rates jailbreak success
 0–10 (or 0/1 for binary judges such as HarmBench).
-* **On-topic judge** (`config[&quot;on_topic_judge&quot;]`, optional) —
+* **On-topic judge** (`config["on_topic_judge"]`, optional) —
 separate evaluator that checks whether a prompt stays on-topic.
 When `None`, the configured judge is reused with the on-topic
 evaluation type.

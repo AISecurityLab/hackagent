@@ -48,7 +48,7 @@ class ADKAgent(Agent)
 Adapter for a deployed Google ADK agent server.
 
 Each instance registers its own :class:`litellm.CustomLLM` handler
-under a unique provider name (`hackagent_adk_&lt;id&gt;`) so the call
+under a unique provider name (`hackagent_adk_<id>`) so the call
 goes through `litellm.completion` like every other LiteLLM
 provider — even though LiteLLM has no built-in knowledge of the
 ADK `POST /run` + sessions + events protocol.

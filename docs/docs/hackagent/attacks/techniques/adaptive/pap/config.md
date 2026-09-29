@@ -32,8 +32,8 @@ Hyperparameters controlling the PAP attack.
 
 **Attributes**:
 
-- `techniques` - Which persuasion techniques to use.  `&quot;top5&quot;` selects
-  the five most effective techniques from the paper.  `&quot;all&quot;`
+- `techniques` - Which persuasion techniques to use.  `"top5"` selects
+  the five most effective techniques from the paper.  `"all"`
   uses all 40.  A list of strings selects specific techniques.
 - `max_techniques_per_goal` - Upper bound on the number of techniques to
   try per goal.  `0` means try all selected techniques.

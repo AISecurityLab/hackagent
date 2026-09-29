@@ -271,8 +271,14 @@ import pydoc_markdown.contrib.renderers.markdown as _md
 
 def escape_except_blockquotes(string):
     single_quote_pattern = r"`[^`]*`"
+    # RST ``code`` spans; without this, `[^`]*` reads them as two empty spans
+    # and escapes the code between them (``'x'`` -> &#x27;x&#x27;).
+    double_quote_pattern = r"``[^`]+``"
     triple_quote_pattern = r"```[\\s\\S]*?```"
-    matches = re.findall(f"({triple_quote_pattern}|{single_quote_pattern})", string)
+    matches = re.findall(
+        f"({triple_quote_pattern}|{double_quote_pattern}|{single_quote_pattern})",
+        string,
+    )
     for i, match in enumerate(matches):
         string = string.replace(match, f"\\x00BQ{i}\\x00", 1)
     string = html.escape(string)

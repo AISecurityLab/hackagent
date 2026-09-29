@@ -65,7 +65,7 @@ by the attack pipeline.
 
 **Attributes**:
 
-- `attack_type` - Always `&quot;bon&quot;` (required by the orchestrator).
+- `attack_type` - Always `"bon"` (required by the orchestrator).
 - `bon_params` - Augmentation hyperparameters (:class:`BoNParams`).
 - `batch_size` - Concurrent target-model requests within a search step.
 - `goal_batch_size` - Goals processed per macro-batch.

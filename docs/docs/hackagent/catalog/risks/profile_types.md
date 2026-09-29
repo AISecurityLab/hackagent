@@ -37,7 +37,7 @@ Links a dataset preset to a vulnerability with a relevance tag.
 Parameters
 ----------
 preset : str
-    Key in `hackagent.datasets.presets.PRESETS` (e.g. `&quot;advbench&quot;`).
+    Key in `hackagent.datasets.presets.PRESETS` (e.g. `"advbench"`).
 relevance : Relevance
     How directly this dataset tests the vulnerability.
 rationale : str
@@ -84,11 +84,11 @@ datasets : list[DatasetRecommendation]
 attacks : list[AttackRecommendation]
     Compatible attack techniques.
 objective : str
-    Default attack objective key (e.g. `&quot;jailbreak&quot;`,
-    `&quot;harmful_behavior&quot;`, `&quot;policy_violation&quot;`).
+    Default attack objective key (e.g. `"jailbreak"`,
+    `"harmful_behavior"`, `"policy_violation"`).
 metrics : list[str]
     Metric names relevant to this vulnerability
-    (e.g. `&quot;asr&quot;`, `&quot;toxicity_score&quot;`, `&quot;judge_score&quot;`).
+    (e.g. `"asr"`, `"toxicity_score"`, `"judge_score"`).
 description : str
     Human-readable summary of what the profile evaluates.
 

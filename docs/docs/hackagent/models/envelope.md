@@ -22,7 +22,7 @@ The functions here are intentionally:
 def strip_think_prefix(text: str) -> str
 ```
 
-Strip hidden reasoning prefix up to and including `&lt;/think&gt;` if present.
+Strip hidden reasoning prefix up to and including `</think>` if present.
 
 #### extract\_text\_from\_response
 
@@ -80,7 +80,7 @@ def build_litellm_kwargs(
 Build the kwargs dict for `litellm.completion`.
 
 `thinking_payload` is the *already-translated* per-provider dict
-(e.g. `{&quot;reasoning_effort&quot;: &quot;medium&quot;}` or `{&quot;think&quot;: True}`);
+(e.g. `{"reasoning_effort": "medium"}` or `{"think": True}`);
 the caller is responsible for converting the unified `thinking`
 knob into the provider-specific shape before passing it in here.
 Anything in `extra_kwargs` is splat-merged last and wins on

@@ -21,5 +21,5 @@ def build_web_target(
         timeout: Optional[int] = None) -> Tuple[str, Dict[str, Any]]
 ```
 
-Build the `(&quot;web&quot;, operational_config)` target for a live-browser chatbot.
+Build the `("web", operational_config)` target for a live-browser chatbot.
 

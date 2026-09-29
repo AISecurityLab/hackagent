@@ -56,11 +56,11 @@ once `jailbreak_threshold` is reached or `max_turns` is exhausted.
 
 The attack requires two separate model roles:
 
-* **Attacker** (`config[&quot;attacker&quot;]`) — an LLM that proposes the next
+* **Attacker** (`config["attacker"]`) — an LLM that proposes the next
 escalating question based on the conversation so far.
 * **Target** — the victim model reached via `agent_router`, addressed
 with the full, growing conversation history on every turn.
-* **Judge** (`config[&quot;judge&quot;]`) — rates each target turn and detects
+* **Judge** (`config["judge"]`) — rates each target turn and detects
 refusals, driving both scoring and the backtrack mechanism.
 
 **Attributes**:

@@ -10,7 +10,7 @@ often use a charmap encoding such as cp1252. Rich and Click then raise
 `UnicodeEncodeError` when printing emoji (`❌`, `🌐`) or box-drawing
 used by the splash banner.
 
-This module reconfigures stdio to UTF-8 with `errors=&quot;replace&quot;` and
+This module reconfigures stdio to UTF-8 with `errors="replace"` and
 installs a write fallback so unencodable glyphs never crash the process.
 
 #### configure\_safe\_stdio

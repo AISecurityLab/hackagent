@@ -3,7 +3,7 @@ sidebar_label: registry
 title: hackagent.orchestrator.setup.registry
 ---
 
-Lazy `AttackId -&gt; &quot;module:Class&quot;` registry.
+Lazy `AttackId -> "module:Class"` registry.
 
 Importing this module does not import technique classes. :func:`load_attack`
 resolves an entry the first time a run needs it.

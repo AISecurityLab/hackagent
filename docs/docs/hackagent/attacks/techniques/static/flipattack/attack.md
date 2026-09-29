@@ -38,7 +38,7 @@ This class serves as both the **HackAgent pipeline orchestrator**
 methods (`flip_word_order`, `flip_char_in_word`, `flip_char_in_sentence`,
 `generate`, etc.) live directly on the class.
 
-Flip modes (set via `config[&quot;flipattack_params&quot;][&quot;flip_mode&quot;]`):
+Flip modes (set via `config["flipattack_params"]["flip_mode"]`):
 FWO  Reverses the word order of the input sentence.
 FCW  Reverses characters inside each individual word.
 FCS  Reverses all characters of the entire sentence (default).
@@ -55,7 +55,7 @@ Construct with `(config, ctx)`. `config` is a dict deep-merged into
 `ctx` is a :class:`~hackagent.attacks.ports.RunContext`, passed
 positionally or as `ctx=`. Tests build it with `make_ctx()`
 (`tests.fakes.context`). Generation receives this instance as
-`attack=`. Do not store it on `config[&quot;_self&quot;]`.
+`attack=`. Do not store it on `config["_self"]`.
 
 The pipeline is generation-only. `run()` returns rows without a
 verdict.
@@ -182,7 +182,7 @@ Used internally to build few-shot demonstration examples.
 **Arguments**:
 
 - `input_str` - Short example phrase to transform.
-- `mode` - One of `&quot;FWO&quot;`, `&quot;FCW&quot;`, `&quot;FCS&quot;`, or `&quot;FMM&quot;`.
+- `mode` - One of `"FWO"`, `"FCW"`, `"FCS"`, or `"FMM"`.
   
 
 **Returns**:
@@ -225,9 +225,9 @@ method is safe to call for multiple goals in sequence.
 **Returns**:
 
   Tuple of:
-  - `log` (str): Debug string, e.g. `&quot;TASK is &#x27;...&#x27;&quot;`.
+  - `log` (str): Debug string, e.g. `"TASK is '...'"`.
   - `attack` (list[dict]): OpenAI chat-format message list
-  with `&quot;system&quot;` and `&quot;user&quot;` entries.
+  with `"system"` and `"user"` entries.
   
 
 **Raises**:

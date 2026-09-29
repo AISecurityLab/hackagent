@@ -60,7 +60,7 @@ def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
 
 Introspect role fields from a plain config mapping.
 
-Each item is `{&quot;role&quot;: str, &quot;config&quot;: dict, &quot;required&quot;: bool}`.
+Each item is `{"role": str, "config": dict, "required": bool}`.
 List fields (`judges`) emit one entry per element. Empty/missing
 values are skipped.
 

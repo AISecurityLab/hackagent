@@ -13,7 +13,7 @@ Architecture:
     HackAgent.hack() → hackagent.orchestrator.run → BaseAttack → Pipeline stages
 
 Forward construction is `BaseAttack(config, ctx)` with
-`run(goals) -&gt; list[AttackResult]`. `config` is an
+`run(goals) -> list[AttackResult]`. `config` is an
 :class:`~hackagent.attacks.config.AttackConfig` (or a plain dict). `ctx`
 is a :class:`~hackagent.attacks.ports.RunContext`. Pipeline stages may be
 typed :class:`~hackagent.attacks.ports.Step` values or legacy dicts.
@@ -24,7 +24,7 @@ Every shipped technique accepts that constructor.
   flipattack, h4rm3l, mml): generation-only pipelines. `run()` returns
   rows without a verdict, except advprefix selection, which calls
   `ctx.judge.evaluate`. FlipAttack generation takes `attack=` and
-  does not store the instance on `config[&quot;_self&quot;]`.
+  does not store the instance on `config["_self"]`.
 * Inline-judge (bon, pap, tool_output_ipi, tap): loop scores go through
   `ctx.judge.score` via :mod:`hackagent.attacks._lib.inline_judge`
   (`CtxJudgeAdapter` / `CtxTapEvaluator`). That replaces

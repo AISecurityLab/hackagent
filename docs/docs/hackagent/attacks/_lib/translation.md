@@ -11,7 +11,7 @@ prompts are translated into that language so the attack operates natively
 are cached per `(prompt, language)` so a batch of same-language goals — and
 every iteration within a goal — translates each prompt at most once.
 
-The caller supplies a `complete(prompt) -&gt; str` callable (an LLM completion),
+The caller supplies a `complete(prompt) -> str` callable (an LLM completion),
 so this module is provider-agnostic and unit-testable without a live model.
 Translation is always best-effort: any failure falls back to the original
 English text so the attack never breaks.

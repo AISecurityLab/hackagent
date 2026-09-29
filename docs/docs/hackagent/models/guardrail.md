@@ -77,7 +77,7 @@ Classify `text`; fails open when the classifier is unavailable.
 def parse_verdict(raw: str) -> GuardrailResult
 ```
 
-Parse `{&quot;safe&quot;: ..., &quot;categories&quot;: [...], &quot;reasoning&quot;: ...}`.
+Parse `{"safe": ..., "categories": [...], "reasoning": ...}`.
 
 Falls back to keyword detection when the text is not JSON.
 

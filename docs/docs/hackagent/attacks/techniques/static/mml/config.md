@@ -34,18 +34,18 @@ Hyperparameters controlling the MML encoding strategy.
 
 **Attributes**:
 
-- `encoding_mode` - Visual encoding mode. One of `&quot;word_replacement&quot;`
-  (replace key words and provide dictionary), `&quot;mirror&quot;` (flip
-  image horizontally), `&quot;rotate&quot;` (rotate image 180 degrees),
-  or `&quot;base64&quot;` (encode text in Base64 in image).
+- `encoding_mode` - Visual encoding mode. One of `"word_replacement"`
+  (replace key words and provide dictionary), `"mirror"` (flip
+  image horizontally), `"rotate"` (rotate image 180 degrees),
+  or `"base64"` (encode text in Base64 in image).
 - `image_width` - Width of the generated image in pixels.
 - `image_height` - Height of the generated image in pixels.
 - `font_size` - Font size for rendered text.
 - `background_color` - Background color of the generated image.
 - `text_color` - Text color in the generated image.
 - `num_replacements` - Number of words to replace in word_replacement mode.
-- `prompt_style` - Prompt framing style. `&quot;game&quot;` uses the villain&#x27;s
-  lair scenario; `&quot;control&quot;` uses a neutral list-filling prompt.
+- `prompt_style` - Prompt framing style. `"game"` uses the villain&#x27;s
+  lair scenario; `"control"` uses a neutral list-filling prompt.
 
 ## MMLConfig Objects
 
@@ -61,7 +61,7 @@ expected by the attack pipeline.
 
 **Attributes**:
 
-- `attack_type` - Always `&quot;mml&quot;` (required by the orchestrator).
+- `attack_type` - Always `"mml"` (required by the orchestrator).
 - `mml_params` - Encoding hyperparameters (:class:`MMLParams`).
 
 #### from\_dict
