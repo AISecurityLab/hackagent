@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Comprehensive Security Audit
 
 A **comprehensive audit** tests all vulnerabilities using multiple datasets and advanced attack techniques for complete security coverage.

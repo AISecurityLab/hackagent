@@ -1,5 +1,4 @@
 ---
-sidebar_position: 4
 sidebar_label: Indirect Prompt Injection
 title: Indirect Prompt Injection
 ---

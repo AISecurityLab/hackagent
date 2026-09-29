@@ -1,7 +1,3 @@
----
-sidebar_position: 7
----
-
 # Agent
 
 The `hackagent agent` command manages agents registered with HackAgent (target endpoints you've configured for testing).

@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Python SDK Quickstart
 
 The HackAgent SDK provides a powerful interface for conducting AI security testing programmatically.

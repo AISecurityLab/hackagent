@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # URL JSON Provider
 
 Load attack goals from remote JSON endpoints directly into memory.

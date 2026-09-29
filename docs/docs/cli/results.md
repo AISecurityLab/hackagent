@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # Results
 
 The `hackagent results` command lets you browse and summarize attack results stored in your local HackAgent database (`~/.local/share/hackagent/hackagent.db` by default).

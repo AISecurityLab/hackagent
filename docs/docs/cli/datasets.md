@@ -1,7 +1,3 @@
----
-sidebar_position: 6
----
-
 # Datasets
 
 The `hackagent datasets` command lets you discover built-in dataset presets and preview sample goals before running an evaluation.

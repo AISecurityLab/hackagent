@@ -1,7 +1,3 @@
----
-sidebar_position: 6
----
-
 # Craft Adversarial Data
 
 Tests whether adversarially crafted data — perturbations, poisoned examples, or augmentation abuse — can compromise model behaviour.

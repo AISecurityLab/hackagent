@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # PAIR
 
 PAIR (Prompt Automatic Iterative Refinement) is an LLM-driven attack technique that uses an **attacker model** to iteratively generate and refine jailbreak prompts based on target responses and judge feedback.

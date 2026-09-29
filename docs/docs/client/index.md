@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Client
 
 `hackagent.client` is a depth-2 facade. [`HackAgent`](../hackagent/client.md) is constructed from [`Settings`](../hackagent/core/settings.md) and does not take a target. [`.target()`](../hackagent/client.md) binds an endpoint and returns a [`Target`](../hackagent/client.md). `Target.hack` and `Target.hack_chain` both take `on_event`. The [orchestrator](../orchestrator/index.md) stays the composition root. CLI, TUI, and web talk only to this module and the public types re-exported from `hackagent`.

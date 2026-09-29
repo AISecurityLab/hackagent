@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Orchestrator
 
 `hackagent.orchestrator` is a depth-1 composition root. It is the only place that wires catalog, attacks, models, storage, evaluation, datasets, and tracking into one attack run. Techniques do not import this package. They receive a [`RunContext`](../attacks/seam.md).

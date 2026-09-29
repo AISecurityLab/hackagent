@@ -1,7 +1,3 @@
----
-sidebar_position: 0
----
-
 # Shared Attack Config
 
 Most keys in `attack_config` are **shared** across attacks. Technique-specific options live in a nested `*_params` block (or, for a few older attacks, at the top level). This page is the source of truth for the shared layer that `HackAgent.hack`, the CLI, and shipped techniques still read. Individual attack pages document only their own keys and point here for the rest.

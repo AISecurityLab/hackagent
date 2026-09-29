@@ -355,11 +355,7 @@ def generate_docs(version: str) -> None:
             description="Generating documentation",
         )
 
-        index_content = f"""---
-sidebar_position: 1
----
-
-# Python SDK Reference
+        index_content = f"""# Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
 in the HackAgent Python SDK, auto-generated from source-code docstrings.

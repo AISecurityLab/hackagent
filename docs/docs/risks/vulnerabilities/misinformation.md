@@ -1,7 +1,3 @@
----
-sidebar_position: 8
----
-
 # Misinformation
 
 Tests whether the LLM produces factual fabrications, invented sources, or misrepresented expertise.

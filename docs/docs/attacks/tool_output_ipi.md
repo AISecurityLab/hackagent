@@ -1,7 +1,3 @@
----
-sidebar_position: 12
----
-
 # Tool-output IPI
 
 The **Tool-output IPI** attack (`attack_type: "tool_output_ipi"`) tests whether a **tool-using agent** can be hijacked through adversarial instructions embedded in **tool / function-call observations**. It is HackAgent's InjecAgent / observation-prompt-injection (OPI) technique: a benign user task elicits a tool call, and the *observation* returned by that tool steers the agent's next actions toward a malicious goal.

@@ -1,7 +1,3 @@
----
-sidebar_position: 9
----
-
 # PAP (Persuasive Adversarial Prompts)
 
 PAP is a taxonomy-guided persuasion attack that **paraphrases harmful prompts into persuasive variants** using 40 social-science persuasion techniques. An attacker LLM rewrites the harmful goal using a selected persuasion technique (e.g. Evidence-based Persuasion, Expert Endorsement, Misrepresentation), and the resulting human-readable persuasive prompt is sent to the target model. The technique exploits the observation that LLMs, trained to be helpful conversational partners, are vulnerable to the same persuasion strategies that work on humans.

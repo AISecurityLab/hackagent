@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # Crescendo
 
 Crescendo is a multi-turn jailbreak attack that gradually escalates a single, **persistent conversation** with the target model until it produces the harmful content described in the goal.

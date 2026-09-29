@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # Model Evasion
 
 Tests whether adversarial examples, feature manipulation, or boundary exploitation can evade the model's safety mechanisms.

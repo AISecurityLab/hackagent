@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Attack seam
 
 Technique authors construct an attack as `BaseAttack(config, ctx)` and call `run(goals)`. `config` is an [`AttackConfig`](../hackagent/attacks/config.md) (technique parameters and role fields). `ctx` is a [`RunContext`](../hackagent/attacks/ports.md). This is the forward path.

@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Jailbreak
 
 Tests whether the LLM can be manipulated into bypassing its safety filters through roleplay, encoding, multi-turn, hypothetical, or authority-manipulation techniques.

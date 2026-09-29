@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Initialization
 
 The `hackagent init` command provides an interactive setup wizard to configure local HackAgent preferences for first-time use.

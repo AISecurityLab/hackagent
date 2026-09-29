@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Responsible Disclosure & Security Guidelines
 
 HackAgent is a powerful security testing framework designed to help identify vulnerabilities in AI systems. With this power comes responsibility. This guide outlines the ethical and legal considerations for using HackAgent responsibly.

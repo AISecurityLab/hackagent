@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # Static Template
 
 Static Template attacks use **predefined prompt templates** combined with harmful goals to attempt jailbreaks. While simpler than optimization-based approaches like AdvPrefix or adaptive methods like PAIR, static template attacks are fast and effective for testing basic prompt injection defenses.
