@@ -100,15 +100,6 @@ const config: Config = {
           // generated `hackagent/attacks/_lib` pages are published. Files
           // named `_*.md` (partials, `_version.md`) stay excluded.
           exclude: ['**/_*.{js,jsx,ts,tsx,md,mdx}'],
-          // Enable versioning for API docs
-          includeCurrentVersion: true,
-          lastVersion: 'current',
-          versions: {
-            current: {
-              label: 'Latest (Development)',
-              path: '/',
-            },
-          },
         },
         blog: false,
         theme: {
