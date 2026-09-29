@@ -204,6 +204,11 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'doc',
+          id: 'agents/web',
+          label: 'Web Chatbot',
+        },
+        {
+          type: 'doc',
           id: 'agents/guardrails',
           label: 'Guardrails',
         },
