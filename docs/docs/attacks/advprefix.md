@@ -133,8 +133,8 @@ advanced_config = {
         },
         {
             "identifier": "gpt-4",
-            "endpoint": "https://api.openai.com/v1/chat/completions",
-            "type": "openai",
+            "endpoint": "https://api.openai.com/v1",
+            "type": "harmbench",
         },
     ],
     "output_dir": "./logs/advprefix_runs",

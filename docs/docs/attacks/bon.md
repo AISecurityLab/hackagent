@@ -163,7 +163,7 @@ advanced_config = {
     ],
 
     # Dataset (optional alternative to explicit goals)
-    "dataset": None,  # e.g., "advbench", "advbench_subset"
+    "dataset": None,  # e.g., "advbench", "harmbench"
 
     # Batching / parallelization
     "batch_size": 5,           # Concurrent requests to target per step

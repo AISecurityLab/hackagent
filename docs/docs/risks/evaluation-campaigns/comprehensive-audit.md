@@ -170,9 +170,9 @@ Use multiple judges for validation:
 attack_config = {
     "attack_type": "pair",
     "dataset": {"preset": "advbench"},
-    judges=[
+    "judges": [
         {"identifier": "ollama/llama3", "type": "harmbench"},
-        {"identifier": "gpt-4", "type": "openai"},
+        {"identifier": "gpt-4", "type": "nuanced", "endpoint": "https://api.openai.com/v1"},
     ],
 }
 result = agent.hack(attack_config=attack_config)

@@ -153,7 +153,7 @@ For LiteLLM-based agents supporting multiple LLM providers:
 ```python
 from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8000/v1/chat/completions",
+    "http://localhost:8000/v1",
     AgentType.LITELLM,
     name="litellm_agent",
 )
@@ -166,7 +166,7 @@ For OpenAI API compatible agents:
 ```python
 from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
-    "https://api.openai.com/v1/chat/completions",
+    "https://api.openai.com/v1",
     AgentType.OPENAI_SDK,
     name="openai_agent",
 )

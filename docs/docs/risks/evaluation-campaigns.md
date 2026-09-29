@@ -111,7 +111,7 @@ print(JAILBREAK_PROFILE.dataset_presets)
 
 # What attacks to run
 print(JAILBREAK_PROFILE.attack_techniques)
-# ['StaticTemplate', 'PAIR', 'AdvPrefix']
+# ['h4rm3l', 'tap', 'pair']
 
 # What objective to evaluate against
 print(JAILBREAK_PROFILE.objective)  # 'jailbreak'

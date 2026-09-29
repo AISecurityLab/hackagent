@@ -228,7 +228,7 @@ A simpler but effective approach using **predefined prompt templates** combined 
 
 <div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
 
-Predefined prompt templates (roleplay, encoding, context-switch, etc.) are combined with the test goals and sent directly to the target. No attacker model, iteration, or optimization is involved. Best for fast initial vulnerability scans and establishing a security baseline before running deeper attacks.
+Predefined prompt templates (role play, encoding, instruction override, etc.) are combined with the test goals and sent directly to the target. No attacker model, iteration, or optimization is involved. Best for fast initial vulnerability scans and establishing a security baseline before running deeper attacks.
 
 </div>
 
@@ -236,7 +236,7 @@ Predefined prompt templates (roleplay, encoding, context-switch, etc.) are combi
 attack_config = {
     "attack_type": "static_template",
     "goals": ["Ignore previous instructions"],
-    "template_categories": ["roleplay", "encoding", "context_switch"]
+    "template_categories": ["role_play", "encoding", "instruction_override"]
 }
 ```
 

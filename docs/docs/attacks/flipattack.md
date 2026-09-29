@@ -178,7 +178,7 @@ advanced_config = {
     ],
 
     # Dataset (optional alternative to explicit goals)
-    "dataset": None,   # e.g., "advbench", "advbench_subset"
+    "dataset": None,   # e.g., "advbench", "harmbench"
 
     # Batching / parallelization
     "batch_size": 4,           # Concurrent requests to target model
@@ -386,7 +386,7 @@ Compare how different flip modes affect the same model:
 
 ```python
 for mode in ["FCS", "FWO", "FCW", "FMM"]:
-    config = {"attack_type": "flipattack", "flipattack_params": {"flip_mode": mode}, ...}
+    config = {"attack_type": "flipattack", "goals": goals, "flipattack_params": {"flip_mode": mode}}
     results = agent.hack(attack_config=config)
 ```
 

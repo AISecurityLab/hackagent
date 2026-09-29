@@ -204,7 +204,7 @@ advanced_config = {
     ],
 
     # Dataset (optional alternative to explicit goals)
-    "dataset": None,   # e.g., "advbench", "advbench_subset"
+    "dataset": None,   # e.g., "advbench", "harmbench"
 
     # Batching / parallelization
     "batch_size": 4,           # Concurrent requests to target model
@@ -384,7 +384,7 @@ Identify which encoding mode a specific VLM is most vulnerable to:
 ```python
 results_by_mode = {}
 for mode in ["word_replacement", "mirror", "rotate", "base64", "mixed"]:
-    config = {"attack_type": "mml", "mml_params": {"encoding_mode": mode}, ...}
+    config = {"attack_type": "mml", "goals": goals, "mml_params": {"encoding_mode": mode}}
     results_by_mode[mode] = agent.hack(attack_config=config)
 ```
 
