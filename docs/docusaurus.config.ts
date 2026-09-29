@@ -205,6 +205,11 @@ const config: Config = {
             from: '/hackagent/agent',
             to: '/hackagent/client',
           },
+          {
+            // Folded into the introduction, which now opens the Guides tab.
+            from: ['/guides/overview', '/guides/choose-an-interface'],
+            to: '/',
+          },
         ],
       },
     ],

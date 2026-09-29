@@ -11,7 +11,7 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
  */
 const sidebars: SidebarsConfig = {
   guidesSidebar: [
-    'guides/overview',
+    'introduction',
     {
       type: 'category',
       label: 'Getting Started',
@@ -24,7 +24,6 @@ const sidebars: SidebarsConfig = {
         'getting-started/datasets-tutorial',
       ],
     },
-    'guides/choose-an-interface',
     {
       type: 'category',
       label: 'AI Risks',
@@ -241,7 +240,6 @@ const sidebars: SidebarsConfig = {
         'security/ethical-guidelines',
       ],
     },
-    'introduction',
   ],
   sdkSidebar: [
     {

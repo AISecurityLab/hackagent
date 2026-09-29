@@ -90,7 +90,7 @@ HackAgent automates testing for these vulnerabilities using **research-backed at
     <a href="./getting-started/installation" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Installation</a>
     <a href="./cli/overview" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>CLI Reference</a>
     <a href="./attacks" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Attack Techniques</a>
-    <a href="./agents/google-adk" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Integrations</a>
+    <a href="./agents" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Integrations</a>
   </div>
 </div>
 
@@ -100,6 +100,19 @@ HackAgent automates testing for these vulnerabilities using **research-backed at
 
 </div>
 
+
+---
+
+## Choose an interface
+
+| Need | Use | Start here |
+| --- | --- | --- |
+| Script, notebook, or CI in Python | SDK | [Python SDK quickstart](./sdk/python-quickstart.md) |
+| Interactive runs, recipes, TUI | CLI | [Quick Start: Ollama h4rm3l example](./getting-started/quick-start.mdx#ollama-h4rm3l-example) |
+| Remote automation, or a language other than Python | HTTP API (`https://api.hackagent.dev`) | [First request](./api/first-request.md) |
+| Browse runs and team workflows | Dashboard | [app.hackagent.dev](https://app.hackagent.dev), or locally with [`hackagent web`](./cli/web.md) |
+
+Production automation goes through the SDK or the HTTP API. [CLI config](./cli/config.md) documents `HACKAGENT_BASE_URL`, the HTTP API base URL.
 
 ---
 
