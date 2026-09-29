@@ -51,5 +51,5 @@ hackagent scan https://www.example.com --no-attack --json
 
 ## See Also
 
-- [Attack](./attack.mdx) — Run attacks via the SDK-driven `eval` commands (for agents you already control programmatically)
+- [Eval](./eval.mdx) — Run attacks via the SDK-driven `eval` commands (for agents you already control programmatically)
 - [Agents: Guardrails](../agents/guardrails.mdx) — Add before/after guardrails to any attack

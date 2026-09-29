@@ -30,5 +30,5 @@ hackagent agent test <agent_name>
 
 ## See Also
 
-- [Attack](./attack.mdx) — Run security attacks against a configured agent
+- [Eval](./eval.mdx) — Run security attacks against a configured agent
 - [Web](./web.md) — Launch the local dashboard directly

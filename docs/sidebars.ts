@@ -253,7 +253,7 @@ const sidebars: SidebarsConfig = {
     'cli/initialization',
     'cli/config',
     'cli/agent',
-    'cli/attack',
+    'cli/eval',
     'cli/scan',
     'cli/results',
     'cli/datasets',

@@ -68,5 +68,5 @@ The facade stores results in SQLite at `~/.local/share/hackagent/hackagent.db` u
 
 ## See Also
 
-- [Attack](./attack.mdx) — Run security attacks
+- [Eval](./eval.mdx) — Run security attacks
 - [Config](./config.md) — Configure HackAgent settings

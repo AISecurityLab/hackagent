@@ -206,6 +206,11 @@ const config: Config = {
             to: '/hackagent/client',
           },
           {
+            // The page documents `hackagent eval`; there is no `attack` command.
+            from: '/cli/attack',
+            to: '/cli/eval',
+          },
+          {
             // Folded into the introduction, which now opens the Guides tab.
             from: ['/guides/overview', '/guides/choose-an-interface'],
             to: '/',
