@@ -49,7 +49,7 @@ def test_bare_install_runs_version_and_help_and_hf_hub_stays_accurate():
     assert "do not need `[rag]` or `[vision]`" in text
     assert "A bare install does not start the CLI" not in text
     assert "pip install 'hackagent[rag,vision]'" not in text
-    assert "Hugging Face `datasets`, for presets and Hub datasets" in text
+    assert "| `hf` | Hugging Face `datasets` | 25 of the 26 dataset presets" in text
     assert "pip install 'hackagent[tui]'" in text
 
 
