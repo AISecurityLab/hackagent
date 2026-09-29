@@ -205,6 +205,10 @@ const config: Config = {
             from: '/hackagent/agent',
             to: '/hackagent/client',
           },
+          // The six HTTP API pages became sections of /api.
+          ...['first-request', 'authentication', 'runs', 'results', 'errors'].map(
+            (page) => ({from: `/api/${page}`, to: `/api#${page}`}),
+          ),
           {
             // The page documents `hackagent eval`; there is no `attack` command.
             from: '/cli/attack',

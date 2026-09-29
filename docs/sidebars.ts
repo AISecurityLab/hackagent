@@ -259,14 +259,7 @@ const sidebars: SidebarsConfig = {
     'cli/datasets',
     'cli/web',
   ],
-  apiSidebar: [
-    'api/index',
-    'api/first-request',
-    'api/authentication',
-    'api/runs',
-    'api/results',
-    'api/errors',
-  ],
+  apiSidebar: ['api/index'],
 };
 
 export default sidebars;
