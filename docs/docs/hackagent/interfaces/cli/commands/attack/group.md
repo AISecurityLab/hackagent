@@ -16,7 +16,7 @@ The `hackagent eval` command group.
     default="other",
     show_default=True,
     help=
-    "Agent type (e.g., google-adk, litellm, langchain, openai-sdk, mcp, a2a, or other)",
+    "Agent type: google-adk, openai-sdk, litellm, ollama, langchain, claude-code, codex, hermes, or web",
 )
 @click.option(
     "--endpoint",

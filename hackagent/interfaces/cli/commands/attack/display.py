@@ -37,7 +37,7 @@ def _display_generic_attack_info(strategy: str) -> None:
 {meta["description"]}
 
 [cyan]CLI Usage:[/cyan]
-hackagent eval {strategy} --agent-name <name> --endpoint <url> --goals "<goal>" --no-tui
+hackagent eval {strategy} --agent-name <name> --agent-type <type> --endpoint <url> --goals "<goal>" --no-tui
 
 [cyan]Advanced Configuration:[/cyan]
 Use --config-file with JSON/YAML to provide full attack-specific configuration.
