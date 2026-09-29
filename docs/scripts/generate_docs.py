@@ -418,6 +418,11 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
         _sanitize_generated_docs(docs_dir)
         _publish_interface_pages(docs_dir)
         _remove_generated_sidebar(docs_dir)
+        run_command(
+            ["uv", "run", "python", str(script_dir / "risk_pages.py"), str(docs_dir)],
+            cwd=project_root,
+            description="Writing risk pages from the catalog",
+        )
 
         print(f"✅ Documentation generated in {docs_dir}")
         print("\n🔧 To view: cd docs && npm start")
