@@ -4,22 +4,23 @@ sidebar_label: Risks
 
 # AI Risks
 
-HackAgent structures evaluation with three elements:
-
-- **Risk Profile**: the set of one or more risk macro-categories (or micro-categories) to be tested.
-- **Evaluation Campaign**: the executable evaluation plan (datasets, attacks, objective, metrics).
-- **Results**: measured outcomes (for example ASR and judge score) used for tracking and comparison.
-
-## Security Workflow
+Start here when you know **what** you are worried about rather than **which attack** to run. A <Term id="risk">risk</Term> names one way an AI system can fail. Its threat profile picks the datasets, attacks, objective and metrics for testing it, and a <Term id="campaign">campaign</Term> runs them.
 
 ```mermaid
 flowchart LR
-    RISK["Risk Profile"] --> E["Evaluation Campaign"] --> R["Results"]
+    R["Risk<br/>e.g. Jailbreak"] --> P["Threat profile<br/>datasets · attacks · objective · metrics"]
+    P --> C["Campaign"] --> O["Results<br/>ASR per attack"]
 ```
 
-## Reference Risk Macro-Categories
+## Built-in risks
 
-The current taxonomy includes the following risk macro-categories:
+[Jailbreak](./vulnerabilities/jailbreak.md) · [Prompt Injection](./vulnerabilities/prompt-injection.md) · [System Prompt Leakage](./vulnerabilities/system-prompt-leakage.md) · [Input Manipulation Attack](./vulnerabilities/input-manipulation-attack.md) · [Model Evasion](./vulnerabilities/model-evasion.md) · [Craft Adversarial Data](./vulnerabilities/craft-adversarial-data.md) · [Sensitive Information Disclosure](./vulnerabilities/sensitive-information-disclosure.md) · [Misinformation](./vulnerabilities/misinformation.md) · [Excessive Agency](./vulnerabilities/excessive-agency.md) · [Malicious Tool Invocation](./vulnerabilities/malicious-tool-invocation.md) · [Credential Exposure](./vulnerabilities/credential-exposure.md) · [Public-Facing Application Exploitation](./vulnerabilities/public-facing-application-exploitation.md) · [Vector and Embedding Weaknesses Exploit](./vulnerabilities/vector-embedding-weaknesses-exploit.md)
+
+[Vulnerabilities](./vulnerabilities.md) describes each in one line. Retrieval-based systems also have a dedicated [indirect prompt injection](./indirect-prompt-injection.md) scenario, and you can [define your own risks](./custom-vulnerabilities.md).
+
+<Modal trigger="How these fit the wider risk taxonomy" title="Risk macro-categories">
+
+HackAgent's taxonomy has 12 macro-categories. The 13 built-in risks all sit in the first one, **Cybersecurity**, which is the only category implemented today.
 
 1. Cybersecurity
 2. Accountability & Transparency
@@ -34,48 +35,49 @@ The current taxonomy includes the following risk macro-categories:
 11. Maintainability & AI Infrastructure
 12. Third Party Management
 
-## Micro-Category Example
+The categories are neither exclusive nor exhaustive: one risk can span several.
 
-- Jailbreak, Prompt Injection, and System Prompt Leakage are risk micro-categories under **Cybersecurity**.
-- Indirect Injection is documented as a dedicated risk scenario under **Cybersecurity** for RAG systems.
+</Modal>
 
-## What Is a Risk Profile
+## Test a risk
 
-A risk profile is a set of one or more risk macro-categories (or micro-categories) that you want to test.
+<Tabs groupId="interface">
+<TabItem value="sdk" label="SDK" default>
 
-:::note
-The defined categories are not intended to be mutually exclusive, nor to form an exhaustive partition of the risk space. Individual risks may span multiple categories, and overlaps are inherent to the taxonomy.
-:::
+Every profile lists its recommended attacks and datasets; loop over the primary ones:
 
-## What Is Implemented Today
+```python
+from hackagent import HackAgent, Settings
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
-- **Implemented Risk Macro-Category**: Cybersecurity
-- **Implemented Risk Micro-Categories**: 13 built-in vulnerabilities, each with a ready-to-run threat profile — see [Vulnerabilities](./vulnerabilities.md) for the full reference and per-category datasets/attacks/metrics.
-- **Documented Dedicated Scenario**: Indirect Injection (RAG context poisoning)
-- **Extensible**: define your own vulnerability categories — see [Custom Vulnerabilities](./custom-vulnerabilities.md)
-- Current quick flow: [Evaluation Campaign](./evaluation-campaigns.md)
+target = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000/v1", "openai-sdk", name="my-agent"
+)
+preset = JAILBREAK_PROFILE.primary_datasets[0].preset
+for attack in JAILBREAK_PROFILE.primary_attacks:
+    results = target.hack(attack_config={
+        "attack_type": attack.technique,
+        "objective": JAILBREAK_PROFILE.objective,
+        "dataset": {"preset": preset, "limit": 20},
+    })
+```
 
-## Core Concepts
+</TabItem>
+<TabItem value="cli" label="CLI">
 
-| Concept | Meaning |
-|---|---|
-| **Risk Profile** | Defines the scope of the assessment as one or more macro-categories (or micro-categories). |
-| **Evaluation Campaign** | Operationalizes the risk profile into an executable plan: datasets, attacks, objective, and metrics. |
+`hackagent eval` with no attack name runs the Jailbreak profile's primary attacks (h4rm3l, TAP and PAIR) on its first dataset:
 
-For the currently implemented configuration, see [Vulnerabilities](./vulnerabilities.md) and [Indirect Injection](./indirect-prompt-injection.md).
+```bash
+hackagent eval \
+  --agent-name my-agent \
+  --agent-type openai-sdk \
+  --endpoint http://localhost:8000/v1 \
+  --limit 20
+```
 
-## Documentation Guide
+For other risks, use the SDK or pass the profile's attacks to `hackagent eval <attack>` one at a time.
 
-| Page | Description |
-|------|-------------|
-| [Vulnerabilities](./vulnerabilities.md) | Per-vulnerability reference, each with its threat profile — recommended datasets, attack techniques, objective, and metrics |
-| [Custom Vulnerabilities](./custom-vulnerabilities.md) | Extend `BaseVulnerability` to define your own categories |
-| [Indirect Injection](./indirect-prompt-injection.md) | Dedicated risk scenario for poisoned retrieved context in RAG pipelines |
-| [Evaluation Campaigns](./evaluation-campaigns.md) | Quick scans, comprehensive audits, targeted assessments, and custom campaigns |
+</TabItem>
+</Tabs>
 
-## Related Resources
-
-- [Evaluation Tutorial](../getting-started/attack-tutorial) - Deep dive into PAIR attack configuration
-- [Attacks](../attacks) - Full catalog of available attack techniques
-- [CLI Reference](../cli/overview) - Command-line workflows for automated testing
-- [SDK Reference](../api-index) - Programmatic API documentation
+Each risk's page lists its datasets, attacks and metrics. [Evaluation campaigns](./evaluation-campaigns.md) covers larger runs: quick scans, full audits and targeted assessments.
