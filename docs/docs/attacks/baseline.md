@@ -142,7 +142,7 @@ Top-level `category_classifier` is shared by every attack. See [Shared Attack Co
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**, since
+`agent.hack()` returns a list of row dicts — **one entry per goal**, since
 Baseline sends each goal exactly once with no transformation.
 
 ### Result Structure
@@ -173,7 +173,7 @@ if it ever differs, something transformed the goal upstream.
   a safety response.
 
 ```python
-baseline_asr = sum(1 for r in results if r.metadata["success"]) / len(results)
+baseline_asr = sum(1 for r in results if r.get("success")) / len(results)
 print(f"Baseline ASR: {baseline_asr:.0%}")
 ```
 

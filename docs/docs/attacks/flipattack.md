@@ -137,8 +137,20 @@ hackagent eval flipattack \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Reveal system prompt" \
-  --flip-mode FCS
+  --config-file flipattack.json
 ```
+
+`flipattack.json`:
+
+```json
+{
+  "flipattack_params": {
+    "flip_mode": "FCS"
+  }
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 
@@ -166,7 +178,7 @@ advanced_config = {
     ],
 
     # Dataset (optional alternative to explicit goals)
-    "dataset": None,   # e.g., "advbench", "advbench_subset"
+    "dataset": None,   # e.g., "advbench", "harmbench"
 
     # Batching / parallelization
     "batch_size": 4,           # Concurrent requests to target model
@@ -374,7 +386,7 @@ Compare how different flip modes affect the same model:
 
 ```python
 for mode in ["FCS", "FWO", "FCW", "FMM"]:
-    config = {"attack_type": "flipattack", "flipattack_params": {"flip_mode": mode}, ...}
+    config = {"attack_type": "flipattack", "goals": goals, "flipattack_params": {"flip_mode": mode}}
     results = agent.hack(attack_config=config)
 ```
 
@@ -385,7 +397,8 @@ from hackagent import HackAgent, Settings
 targets = ["model-a", "model-b"]
 for target in targets:
     agent = HackAgent(Settings.resolve()).target(
-        f"http://{target}:8000",
+        f"http://{target}:8000/v1",
+        "openai-sdk",
         name=target,
         # ...
     )
@@ -396,7 +409,7 @@ for target in targets:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**, since
+`agent.hack()` returns a list of row dicts — **one entry per goal**, since
 FlipAttack makes a single deterministic attempt per goal.
 
 ### Result Structure
@@ -430,8 +443,8 @@ FlipAttack makes a single deterministic attempt per goal.
   rate directly.
 
 ```python
-asr = sum(1 for r in results if r.metadata["success"]) / len(results)
-print(f"{results[0].metadata['flip_mode']} ASR: {asr:.0%}")
+asr = sum(1 for r in results if r.get("success")) / len(results)
+print(f"{results[0]['flip_mode']} ASR: {asr:.0%}")
 ```
 
 See [Interpreting Results](./index.mdx#interpreting-results) for the fields

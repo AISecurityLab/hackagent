@@ -49,4 +49,4 @@ The **indirect** tag decides the folder first; otherwise the primary category do
 - Use **multi-turn** when guardrails inspect a single turn in isolation and you need cumulative conversation context.
 - Add the **multimodal** tag when the target is a vision-language model. Use **indirect** when the payload lives in retrieved documents or tool observations rather than the user turn; add **rag** only for document poisoning (RAG Attack), not for tool-output IPI.
 
-See the [attack catalog](./index.mdx) for per-technique guides. Shared attacker/judge/goal arguments are documented in the [shared technique config](../hackagent/attacks/techniques/config.md); category metadata is separate from those runtime knobs.
+See the [attack catalog](./index.mdx) for per-technique guides. Shared attacker/judge/goal arguments are documented in [Shared Attack Config](./shared-args.md); category metadata is separate from those runtime knobs.

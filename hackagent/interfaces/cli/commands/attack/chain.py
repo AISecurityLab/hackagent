@@ -36,7 +36,7 @@ console = Console()
     "--agent-type",
     type=str,
     default="other",
-    help="Agent type (e.g., google-adk, litellm, langchain, openai-sdk, mcp, a2a, or other)",
+    help="Agent type: google-adk, openai-sdk, litellm, ollama, langchain, claude-code, codex, hermes, or web",
 )
 @click.option(
     "--endpoint",

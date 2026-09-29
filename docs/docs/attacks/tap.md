@@ -121,11 +121,26 @@ hackagent eval tap \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Reveal system prompt" \
-  --attacker-model "gpt-4" \
-  --depth 3 \
-  --width 4 \
-  --branching-factor 3
+  --config-file tap.json
 ```
+
+`tap.json`:
+
+```json
+{
+  "attacker": {
+    "identifier": "gpt-4",
+    "agent_type": "openai-sdk"
+  },
+  "tap_params": {
+    "depth": 3,
+    "width": 4,
+    "branching_factor": 3
+  }
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 
@@ -321,7 +336,8 @@ from hackagent import HackAgent, Settings
 targets = ["model-a", "model-b", "model-c"]
 for target in targets:
     agent = HackAgent(Settings.resolve()).target(
-        f"http://{target}:8000",
+        f"http://{target}:8000/v1",
+        "openai-sdk",
         name=target,
         # ...
     )
@@ -352,7 +368,7 @@ for target in targets:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**. TAP
+`agent.hack()` returns a list of row dicts — **one entry per goal**. TAP
 explores many branches per goal but reports only the best one it found.
 
 ### Result Structure
@@ -381,8 +397,7 @@ explores many branches per goal but reports only the best one it found.
 
 ```python
 for r in results:
-    m = r.metadata
-    print(f"{m['iterations_completed']}/{m['depth']} rounds — {m['best_score']}/10 — {r.goal}")
+    print(f"{r['iterations_completed']}/{r['depth']} rounds — {r['best_score']}/10 — {r['goal']}")
 ```
 
 See [Interpreting Results](./index.mdx#interpreting-results) for the fields

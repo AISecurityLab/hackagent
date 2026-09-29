@@ -159,8 +159,20 @@ hackagent eval mml \
   --agent-type "openai-sdk" \
   --endpoint "http://localhost:8000" \
   --goals "Describe how to pick a lock" \
-  --encoding-mode word_replacement
+  --config-file mml.json
 ```
+
+`mml.json`:
+
+```json
+{
+  "mml_params": {
+    "encoding_mode": "word_replacement"
+  }
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 
@@ -192,7 +204,7 @@ advanced_config = {
     ],
 
     # Dataset (optional alternative to explicit goals)
-    "dataset": None,   # e.g., "advbench", "advbench_subset"
+    "dataset": None,   # e.g., "advbench", "harmbench"
 
     # Batching / parallelization
     "batch_size": 4,           # Concurrent requests to target model
@@ -372,7 +384,7 @@ Identify which encoding mode a specific VLM is most vulnerable to:
 ```python
 results_by_mode = {}
 for mode in ["word_replacement", "mirror", "rotate", "base64", "mixed"]:
-    config = {"attack_type": "mml", "mml_params": {"encoding_mode": mode}, ...}
+    config = {"attack_type": "mml", "goals": goals, "mml_params": {"encoding_mode": mode}}
     results_by_mode[mode] = agent.hack(attack_config=config)
 ```
 
@@ -380,7 +392,7 @@ for mode in ["word_replacement", "mirror", "rotate", "base64", "mixed"]:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**.
+`agent.hack()` returns a list of row dicts — **one entry per goal**.
 
 ### Result Structure
 
@@ -414,8 +426,8 @@ for mode in ["word_replacement", "mirror", "rotate", "base64", "mixed"]:
 ```python
 by_mode = {}
 for r in results:
-    mode = r.metadata["encoding_mode"]
-    by_mode.setdefault(mode, []).append(bool(r.metadata["success"]))
+    mode = r["encoding_mode"]
+    by_mode.setdefault(mode, []).append(bool(r.get("success")))
 for mode, outcomes in by_mode.items():
     print(f"{mode}: {sum(outcomes)}/{len(outcomes)}")
 ```

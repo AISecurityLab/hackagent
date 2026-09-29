@@ -112,22 +112,28 @@ def test_adk_attack_scenario():
 ```python
 from hackagent import AgentType
 
-# Available agent types
+# Agent types .target() accepts
 AgentType.GOOGLE_ADK    # Google Agent Development Kit
-AgentType.LITELLM       # LiteLLM multi-provider interface
 AgentType.OPENAI_SDK    # OpenAI-compatible endpoints
-AgentType.LANGCHAIN     # LangChain (uses LiteLLM adapter)
-AgentType.MCP           # Model Context Protocol
-AgentType.A2A           # Agent-to-Agent protocol
-AgentType.UNKNOWN       # Unknown/fallback type
+AgentType.LITELLM       # LiteLLM multi-provider interface
+AgentType.OLLAMA        # Ollama
+AgentType.LANGCHAIN     # LangChain (uses the LiteLLM adapter)
+AgentType.CLAUDE_CODE   # Claude Code CLI
+AgentType.CODEX         # Codex CLI
+AgentType.HERMES        # Hermes Agent CLI
+AgentType.WEB           # Browser-driven web chatbot
 ```
+
+The strings `"google-adk"`, `"openai-sdk"`, `"ollama"` and so on work too.
+`AgentType.MCP` and `AgentType.A2A` are placeholders and `AgentType.UNKNOWN`
+is the fallback; `.target()` raises `ValueError` for all three.
 
 ### Google ADK Configuration
 
 For Google ADK agents, the SDK automatically handles session management:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(
     Settings.resolve(),
     # Optional parameters:
@@ -145,9 +151,9 @@ agent = HackAgent(
 For LiteLLM-based agents supporting multiple LLM providers:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8000/v1/chat/completions",
+    "http://localhost:8000/v1",
     AgentType.LITELLM,
     name="litellm_agent",
 )
@@ -158,9 +164,9 @@ agent = HackAgent(Settings.resolve()).target(
 For OpenAI API compatible agents:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
-    "https://api.openai.com/v1/chat/completions",
+    "https://api.openai.com/v1",
     AgentType.OPENAI_SDK,
     name="openai_agent",
 )
@@ -168,9 +174,9 @@ agent = HackAgent(Settings.resolve()).target(
 
 ## Attack Types & Configurations
 
-### AdvPrefix Attack (Primary Implementation)
+### Example: AdvPrefix
 
-The main attack type currently implemented is `advprefix`, which performs sophisticated prefix generation attacks:
+HackAgent ships 17 attacks (see [Attack Techniques](../attacks/index.mdx)). This example configures `advprefix`, which generates adversarial prefixes:
 
 ```python
 attack_config = {
@@ -273,20 +279,23 @@ DEFAULT_CONFIG = {
 
 ### Exception Hierarchy
 
-The SDK provides a comprehensive exception hierarchy:
+`hack()` raises only `HackAgentError` and its subclasses. `ApiError` (a
+failed call to the HackAgent backend) passes through unchanged; every other
+failure, such as a bad config or an adapter error, is wrapped in
+`HackAgentError` with the original exception as `__cause__`:
 
 ```python
-from hackagent.core.errors import HackAgentError, ApiError, UnexpectedStatusError
+from hackagent.core.errors import ApiError, HackAgentError
 
 try:
     results = agent.hack(attack_config=attack_config)
-except UnexpectedStatusError as e:
-    print(f"HTTP Error: {e.status_code} - {e.content}")
 except ApiError as e:
-    print(f"API Error: {e}")
+    print(f"API Error ({e.status_code}): {e.message}")
 except HackAgentError as e:
-    print(f"HackAgent Error: {e}")
+    print(f"HackAgent Error: {e} (cause: {e.__cause__!r})")
 ```
+
+`.target()` itself raises `ValueError` for an unsupported agent type.
 
 ### Debugging and Logging
 
@@ -363,7 +372,7 @@ uv sync --group dev
 uv run pytest tests/
 
 # Run specific test
-uv run pytest tests/unit/router/test_adk_agent.py -v
+uv run pytest tests/unit/models/test_adk_agent.py -v
 
 # Run with coverage
 uv run pytest --cov=hackagent tests/

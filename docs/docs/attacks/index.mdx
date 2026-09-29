@@ -228,7 +228,7 @@ A simpler but effective approach using **predefined prompt templates** combined 
 
 <div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
 
-Predefined prompt templates (roleplay, encoding, context-switch, etc.) are combined with the test goals and sent directly to the target. No attacker model, iteration, or optimization is involved. Best for fast initial vulnerability scans and establishing a security baseline before running deeper attacks.
+Predefined prompt templates (role play, encoding, instruction override, etc.) are combined with the test goals and sent directly to the target. No attacker model, iteration, or optimization is involved. Best for fast initial vulnerability scans and establishing a security baseline before running deeper attacks.
 
 </div>
 
@@ -236,7 +236,7 @@ Predefined prompt templates (roleplay, encoding, context-switch, etc.) are combi
 attack_config = {
     "attack_type": "static_template",
     "goals": ["Ignore previous instructions"],
-    "template_categories": ["roleplay", "encoding", "context_switch"]
+    "template_categories": ["role_play", "encoding", "instruction_override"]
 }
 ```
 
@@ -534,43 +534,36 @@ graph TD
 
 ## Interpreting Results
 
-Every attack returns the **same result type**, so the code you write to read
-one attack's output works for all of them. `agent.hack()` returns a
-`list[AttackResult]` — one entry per prompt that was actually sent to the
-target, not per goal. An attack that tries eight prompts for one goal returns
-eight results.
+Every attack returns the **same result shape**, so the code you write to read
+one attack's output works for all of them. `agent.hack()` returns a list of
+plain **row dicts**, built by `result_to_row`
+(`hackagent/orchestrator/results/mapping.py`). Most attacks return one row per
+goal, describing the best attempt; some return several per goal (AdvPrefix
+returns one per surviving prefix). Each attack page says which.
 
-### Shared result structure
+### Shared row keys
 
-```python
-class AttackResult:
-    goal: str                       # The goal this attempt was derived from
-    prompt: str                     # The prompt actually sent to the target
-    response: str                   # The target's raw reply
-    evaluations: list[Evaluation]   # Populated only by some attacks — see below
-    metadata: dict                  # The full result row, including judge outcomes
-```
+| Key | Meaning |
+|-----|---------|
+| `goal` | The goal this row was derived from |
+| `prompt` | The prompt actually sent to the target |
+| `response` | The target's raw reply |
+| `success` | Whether the judges consider this a successful attack |
+| `best_score` | The aggregate judge score, normalised to a **0–10** scale |
+| `verdict` | The full verdict (votes, score, explanation) as a dict |
+| `evaluations` | Per-evaluation records; present only for attacks that fill them (e.g. RAG) |
+| `eval_*` | One column per judge that ran; see below |
 
-`AttackResult` is immutable (a frozen Pydantic model), so results can be safely
-passed around and cached.
+The technique's own fields are top-level keys of the same dict.
 
-### Where the verdict lives
+### Where the verdict comes from
 
-This is the part that trips people up. **`evaluations` is not the general way to
-read success.** The RAG Attack still fills it from its own loop. Post-hoc
-techniques return rows from `run()` without a verdict, except AdvPrefix
-selection, which calls `ctx.judge.evaluate`. Inline-judge techniques (BoN,
-PAP, Tool-output IPI, TAP) score inside the loop with `ctx.judge.score`.
+Post-hoc techniques return rows from `run()` without a verdict, except
+AdvPrefix selection, which calls `ctx.judge.evaluate`. Inline-judge techniques
+(BoN, PAP, Tool-output IPI, TAP) score inside the loop with `ctx.judge.score`.
 Custom-loop techniques (Crescendo, PAIR, AutoDAN-Turbo, RAG) score with
-`ctx.judge` as well. `HackAgent.hack` then runs the shared evaluator and
-writes `success` / `best_score` into `metadata`.
-
-Two keys are attached to **every** evaluated row, whatever the attack:
-
-| Key | Type | Meaning |
-|-----|------|---------|
-| `success` | `bool` | Whether this attempt is considered a successful attack |
-| `best_score` | `float` | The strongest judge score, normalised to a **0–10** scale |
+`ctx.judge` as well. `hack()` then judges any row still without a verdict and
+writes `success` and `best_score` onto every judged row.
 
 `best_score` is normalised, so it is comparable across attacks even though
 judges differ natively — binary judges (HarmBench and friends) map to `0` or
@@ -584,20 +577,16 @@ So the portable way to read any attack's results is:
 results = agent.hack(attack_config=attack_config)
 
 # Which goals were compromised at least once?
-compromised = {
-    r.goal for r in results
-    if r.metadata.get("success")
-}
+compromised = {r["goal"] for r in results if r.get("success")}
 
-# Attack success rate over all attempts
-attempts = len(results)
-successes = sum(1 for r in results if r.metadata.get("success"))
-print(f"ASR: {successes}/{attempts} = {successes / attempts:.0%}")
+# Attack success rate over all rows
+successes = sum(1 for r in results if r.get("success"))
+print(f"ASR: {successes}/{len(results)} = {successes / len(results):.0%}")
 ```
 
 ### Per-judge scores
 
-When judges run, each one also writes its own raw column into `metadata`:
+When judges run, each one also writes its own column into the row:
 
 | Column | Judge type |
 |--------|------------|
@@ -607,6 +596,9 @@ When judges run, each one also writes its own raw column into `metadata`:
 | `eval_nj` | `nuanced` |
 | `eval_scorer` | `scorer` |
 | `eval_on_topic` | `on_topic` |
+| `eval_rag` | `rag_outcome` |
+
+A judge type not in this table gets an `eval_<name>` column.
 
 With more than one judge configured, `success` follows the majority of the
 votes cast (a tie is not a success) unless `judge_aggregation` says otherwise.
@@ -615,20 +607,24 @@ A judge that failed or gave an unparseable reply abstains: its column is
 `judge_error`, and evaluation status `ERROR_TEST_FRAMEWORK`. See
 [Combining several judges](./shared-args.md#combining-several-judges).
 
-Rows that failed to execute at all are marked `is_error: True`, with
-`success: False`, `best_score: 0.0`, and a reason in `evaluation_notes`. Filter
-these out before computing rates if you want to distinguish "the target refused"
-from "the request never completed":
+Techniques that record a failed target call put the reason on the row:
+`error` for Baseline and Static Template, `error_message` for AdvPrefix. Filter
+those rows out before computing rates if you want to distinguish "the target
+refused" from "the request never completed":
 
 ```python
-scored = [r for r in results if not r.metadata.get("is_error")]
+scored = [
+    r for r in results
+    if not (r.get("error") or r.get("error_message") or r.get("judge_error"))
+]
 ```
 
 ### Technique-specific fields
 
 Everything else an attack records — `turns_completed`, `flip_mode`,
-`depth_reached`, `encoded_goal`, and so on — also lives in `metadata`. Each
-attack page documents its own keys in its **Interpreting Results** section.
+`iterations_completed`, `encoded_goal`, and so on — is a top-level key of the row.
+Each attack page documents its own keys in its **Interpreting Results**
+section.
 
 ### Where results are stored
 

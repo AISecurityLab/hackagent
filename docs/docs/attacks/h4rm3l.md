@@ -554,7 +554,7 @@ Decorated progression:
 
 ## Interpreting Results
 
-`agent.hack()` returns a list of `AttackResult` — **one entry per goal**, each
+`agent.hack()` returns a list of row dicts — **one entry per goal**, each
 describing the decorator program that was applied to it.
 
 ### Result Structure
@@ -594,7 +594,7 @@ describing the decorator program that was applied to it.
 ```python
 # Which programs actually work?
 from collections import Counter
-wins = Counter(r.metadata["program"] for r in results if r.metadata["success"])
+wins = Counter(r["program"] for r in results if r.get("success"))
 print(wins.most_common())
 ```
 

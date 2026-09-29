@@ -186,7 +186,7 @@ multi_turn_goals = [
 ### Custom ADK Adapter Settings
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 # Advanced ADK configuration
 agent = HackAgent(
     Settings.resolve(),
@@ -251,7 +251,7 @@ curl http://localhost:8000/list-apps
 Then check the endpoint configuration:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 agent = HackAgent(Settings.resolve()).target(
     "http://localhost:8000",  # Ensure correct port
     AgentType.GOOGLE_ADK,
@@ -278,7 +278,7 @@ cat ~/.config/hackagent/config.json
 Enable detailed logging for troubleshooting:
 
 ```python
-from hackagent import HackAgent, Settings
+from hackagent import AgentType, HackAgent, Settings
 import os
 import logging
 

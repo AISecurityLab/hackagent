@@ -48,8 +48,9 @@ hackagent eval \
 | AutoDAN-Turbo | Adaptive | `hackagent eval autodan_turbo` |
 | Crescendo | Multi-turn | `hackagent eval crescendo` |
 | RAG | Static (tags: indirect, rag) | `hackagent eval rag` |
+| Tool-output IPI | Adaptive (tag: indirect) | `hackagent eval tool-output-ipi` |
 
-Additionally, `hackagent eval chain` runs a fallback-ladder sequence of multiple attacks against a shared pool of goals (own `--config-file`/`--goals`/`--timeout`/`--dry-run`/guardrail options; see `hackagent eval chain --help`). The quick scan (`hackagent eval` with no attack name) calls `hack_chain` through the facade. Strategy commands are generated from that catalog, so crescendo and rag are included: `hackagent eval rag` runs the indirect-injection technique (primary category **Static**, tags **indirect** / **rag** — see [RAG Attack](../attacks/rag.md)). Categories are defined in [Attack taxonomy](../attacks/taxonomy.mdx); `hackagent eval list` prints the same assignments.
+Additionally, `hackagent eval chain` runs a fallback-ladder sequence of multiple attacks against a shared pool of goals (own `--config-file`/`--goals`/`--timeout`/`--dry-run`/guardrail options; see `hackagent eval chain --help`). The quick scan (`hackagent eval` with no attack name) calls `hack_chain` through the facade. Strategy commands are generated from that catalog, so crescendo and rag are included: `hackagent eval rag` runs the indirect-injection technique (primary category **Static**, tags **indirect** / **rag** — see [RAG Attack](../attacks/rag.md)). Categories are defined in [Attack taxonomy](../attacks/taxonomy.mdx); `hackagent eval list` prints the same assignments, and `hackagent eval info <strategy>` shows one attack's category, tags, and description.
 
 ## Common CLI Options (All Attacks)
 
@@ -59,14 +60,20 @@ These options are shared across all attack subcommands.
 |--------|----------|-------------|
 | `--agent-name` | ✅ | Target agent name |
 | `--endpoint` | ✅ | Target agent endpoint |
-| `--agent-type` | ❌ | Agent type (`google-adk`, `openai-sdk`, `ollama`, `litellm`, etc.) |
+| `--agent-type` | ✅† | Agent type: `google-adk`, `openai-sdk`, `litellm`, `ollama`, `langchain`, `claude-code`, `codex`, `hermes`, or `web` |
 | `--goals` | ✅* | Attack goals. Repeat the option or pass comma-separated values |
 | `--config-file` | ✅* | Attack config file (JSON/YAML) |
 | `--timeout` | ❌ | Run timeout in seconds (default `300`) |
 | `--dry-run` | ❌ | Validate config without running |
 | `--no-tui` | ❌ | Run directly without opening TUI |
+| `--before-guardrail-name`, `--before-guardrail-type`, `--before-guardrail-endpoint` | ❌ | Guardrail model screening prompts before they reach the target |
+| `--after-guardrail-name`, `--after-guardrail-type`, `--after-guardrail-endpoint` | ❌ | Guardrail model screening the target's replies |
 
 `*` You must provide at least one of: `--goals`, or `--config-file` containing `goals`/`dataset`.
+
+`†` The default, `other`, is not a supported type. With `--no-tui` the run fails without a real `--agent-type`; the TUI lets you pick one in the form.
+
+See [Guardrails](../agents/guardrails.mdx) for the guardrail options.
 
 ## Per-Attack Tabs
 

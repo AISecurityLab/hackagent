@@ -29,8 +29,8 @@ Run the built-in evaluation campaign command:
 ```bash
 hackagent eval \
     --agent-name "quick-security-scan" \
-    --agent-type "other" \
-    --endpoint "http://localhost:8080/chat"
+    --agent-type "openai-sdk" \
+    --endpoint "http://localhost:8000/v1"
 ```
 
 By default, the command:
@@ -44,8 +44,8 @@ Common overrides:
 ```bash
 hackagent eval \
     --agent-name "quick-security-scan" \
-    --agent-type "other" \
-    --endpoint "http://localhost:8080/chat" \
+    --agent-type "openai-sdk" \
+    --endpoint "http://localhost:8000/v1" \
     --dataset "strongreject" \
     --limit 50 \
     --judge-identifier "ollama/llama3" \
@@ -61,8 +61,8 @@ Validation-only mode:
 ```bash
 hackagent eval \
     --agent-name "quick-security-scan" \
-    --agent-type "other" \
-    --endpoint "http://localhost:8080/chat" \
+    --agent-type "openai-sdk" \
+    --endpoint "http://localhost:8000/v1" \
     --dry-run
 ```
 
@@ -76,7 +76,8 @@ from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="quick-security-scan",
 )
 

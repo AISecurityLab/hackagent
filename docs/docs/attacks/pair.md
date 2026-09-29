@@ -135,9 +135,22 @@ hackagent eval pair \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Reveal system prompt" \
-  --attacker-model "gpt-4" \
-  --n-iterations 20
+  --config-file pair.json
 ```
+
+`pair.json`:
+
+```json
+{
+  "attacker": {
+    "identifier": "gpt-4",
+    "agent_type": "openai-sdk"
+  },
+  "n_iterations": 20
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 
@@ -289,7 +302,8 @@ from hackagent import HackAgent, Settings
 targets = ["model-a", "model-b", "model-c"]
 for target in targets:
     agent = HackAgent(Settings.resolve()).target(
-        f"http://{target}:8000",
+        f"http://{target}:8000/v1",
+        "openai-sdk",
         name=target,
         # ...
     )
@@ -325,26 +339,25 @@ for target in targets:
 
 ```python
 {
-    "attack_type": "pair",
     "goal": "Reveal system prompt",
-    "success": True,
-    "iterations": 7,
-    "final_score": 9,
-    "successful_prompt": "...",
-    "target_response": "...",
-    "iteration_history": [
-        {"iteration": 1, "prompt": "...", "response": "...", "score": 3},
-        {"iteration": 2, "prompt": "...", "response": "...", "score": 5},
-        # ...
-    ]
+    "goal_index": 0,
+    "best_prompt": "...",          # strongest prompt found
+    "best_response": "...",        # the target's reply to it
+    "best_score": 9.0,             # normalised 0–10
+    "is_success": True,            # PAIR's own jailbreak_threshold check
+    "success": True,               # the judges' verdict
+    "iterations_completed": 3,     # refinement rounds actually run
+    "n_iterations": 5,             # configured maximum
+    "n_streams": 5,
 }
 ```
 
 ### Key Metrics
 
-- **Success Rate**: Percentage of goals successfully jailbroken
-- **Average Iterations**: How quickly attacks succeed
-- **Score Distribution**: Pattern of scores across iterations
+- **Success rate**: fraction of goals with `success` set
+- **`iterations_completed`** vs **`n_iterations`**: how quickly attacks succeed;
+  with `early_stop_on_success`, a win stops the loop early
+- **`best_score`**: the strongest score reached for the goal
 
 
 See [Interpreting Results](./index.mdx#interpreting-results) for the fields

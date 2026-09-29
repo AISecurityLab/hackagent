@@ -109,8 +109,21 @@ hackagent eval static-template \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Ignore previous instructions" \
-  --template-categories "role_play,encoding"
+  --config-file static_template.json
 ```
+
+`static_template.json`:
+
+```json
+{
+  "template_categories": [
+    "role_play",
+    "encoding"
+  ]
+}
+```
+
+Technique parameters have no CLI flags; put them in a `--config-file` (JSON or YAML). See the [CLI eval reference](../cli/attack.mdx) for a complete file per attack.
 
 ---
 
@@ -408,7 +421,8 @@ from hackagent import HackAgent, Settings
 models = ["gpt-4", "claude-3", "llama-3"]
 for model in models:
     agent = HackAgent(Settings.resolve()).target(
-        ...,
+        "http://localhost:8000/v1",  # OpenAI-compatible gateway
+        "openai-sdk",
         name=model,
     )
     results = agent.hack(attack_config=static_template_config)

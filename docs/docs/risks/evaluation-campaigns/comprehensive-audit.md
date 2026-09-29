@@ -6,8 +6,14 @@ sidebar_position: 2
 
 A **comprehensive audit** tests all vulnerabilities using multiple datasets and advanced attack techniques for complete security coverage.
 
-:::note
-`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::note Reading ASR
+`agent.hack(attack_config=...)` returns a list of row dicts. The examples below compute ASR from those rows with this helper:
+
+```python
+def asr(rows):
+    """Fraction of rows the judges marked successful."""
+    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
+```
 :::
 
 ## When to Use
@@ -53,7 +59,8 @@ from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROF
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai-sdk",
     name="comprehensive-audit",
 )
 
@@ -93,7 +100,7 @@ for profile in profiles:
 
             key = f"{profile.name}_{atk.technique}_{ds.preset}"
             audit_results[key] = {
-                "asr": result.get("asr"),
+                "asr": asr(result),
                 "dataset": ds.preset,
                 "attack": atk.technique,
                 "objective": profile.objective,
@@ -163,9 +170,9 @@ Use multiple judges for validation:
 attack_config = {
     "attack_type": "pair",
     "dataset": {"preset": "advbench"},
-    judges=[
+    "judges": [
         {"identifier": "ollama/llama3", "type": "harmbench"},
-        {"identifier": "gpt-4", "type": "openai"},
+        {"identifier": "gpt-4", "type": "nuanced", "endpoint": "https://api.openai.com/v1"},
     ],
 }
 result = agent.hack(attack_config=attack_config)
