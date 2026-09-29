@@ -33,7 +33,7 @@ Generate flipped prompts and execute them against target model.
 - `config` - Configuration dictionary with flipattack_params
 - `logger` - Logger instance
 - `attack` - FlipAttack instance. Required for new callers. A leftover
-  `config[&quot;_self&quot;]` is still read if `attack` is omitted;
+  `config["_self"]` is still read if `attack` is omitted;
   the pipeline no longer writes that key.
   
 

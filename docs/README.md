@@ -1,56 +1,59 @@
 # HackAgent Documentation
 
-This directory contains the documentation generation tools for HackAgent.
-
-## Quick Start
-
-```bash
-# Generate docs for current local project version (default)
-poetry run python docs/scripts/generate_docs.py
-
-# Generate docs with a custom version label
-poetry run python docs/scripts/generate_docs.py --version 0.2.4
-
-# Generate docs for current local version
-poetry run python docs/scripts/generate_docs.py --current
-```
-
-## NPM Scripts
-
-```bash
-# From docs/ directory
-npm run generate-docs
-npm run build
-npm run start
-```
-
-## View Documentation
-
-After generation, the SDK reference will be available directly in `docs/docs/` and integrated into the main documentation site.
-
-```bash
-# View documentation locally
-cd docs && npm start
-```
+The Docusaurus site served at https://docs.hackagent.dev.
 
 ## Requirements
 
-- Poetry: `curl -sSL https://install.python-poetry.org | python3 -`
-- Node.js 18+ and npm
+- [uv](https://docs.astral.sh/uv/) for the Python side (API reference generation)
+- Node.js 20+ and npm
 
-## What the Script Does
+## Quick start
 
-The script automatically handles:
-- Installing documentation dependencies via Poetry
-- Reading the project version from local `pyproject.toml` (or a custom `--version` label)
-- Generating Markdown files from Python docstrings using pydoc-markdown
-- Creating proper Docusaurus-compatible output
-- Copying generated files to the correct locations for the documentation site
+```bash
+# From the repository root: generate the SDK reference from docstrings
+uv run python docs/scripts/generate_docs.py            # label with the pyproject version
+uv run python docs/scripts/generate_docs.py -v 0.2.4   # or a custom version label
 
-## Deployment
+# From docs/
+npm ci
+npm start           # dev server with live reload
+npm run build       # production build into build/
+npm run serve       # serve the production build
+npm run typecheck   # tsc over the site config
+```
 
-The documentation is automatically deployed to Cloudflare Pages via GitHub Actions when changes are pushed to the main branch. The workflow:
+`npm run generate-docs` runs the generator from `docs/`.
 
-1. Generates API documentation from the hackagent package
-2. Builds the complete Docusaurus site
-3. Deploys to Cloudflare Pages
+## Layout
+
+| Path | What it is |
+|---|---|
+| `docs/` | Hand-written pages (`.md` is CommonMark, `.mdx` is MDX) |
+| `docs/hackagent/`, `docs/api-index.md` | **Generated** SDK reference. Do not edit by hand; CI regenerates it on every build |
+| `sidebars.ts` | The four navbar sidebars (Guides, SDK, CLI, API). Pages are listed explicitly, so a new page must be added here |
+| `docusaurus.config.ts` | Site config, including redirects for pages that moved |
+| `scripts/generate_docs.py` | The API reference generator |
+| `static/` | Images and other files served as-is |
+
+The build fails on broken links, broken anchors, and unresolved `.md`/`.mdx`
+links. When you move or rename a page, add a redirect in
+`docusaurus.config.ts`.
+
+## What the generator does
+
+`scripts/generate_docs.py`:
+
+1. Installs the `docs` dependency group (`uv sync --group docs`).
+2. Discovers every module under `hackagent/`, skipping private modules and
+   the runnable scripts in `hackagent.examples`.
+3. Runs pydoc-markdown with a patched escaper (see the comments in the
+   script for the pydoc-markdown 4.8.2 bugs it works around).
+4. Writes `docs/hackagent/` and `docs/api-index.md`, makes the output safe
+   for MDX, and renames the web interface pages so the docs plugin
+   publishes them.
+
+## CI
+
+`.github/workflows/docs.yml` runs on pushes and pull requests that touch
+`docs/` or `hackagent/`: it typechecks the site, regenerates the SDK
+reference, and builds. It does not deploy.

@@ -100,15 +100,6 @@ const config: Config = {
           // generated `hackagent/attacks/_lib` pages are published. Files
           // named `_*.md` (partials, `_version.md`) stay excluded.
           exclude: ['**/_*.{js,jsx,ts,tsx,md,mdx}'],
-          // Enable versioning for API docs
-          includeCurrentVersion: true,
-          lastVersion: 'current',
-          versions: {
-            current: {
-              label: 'Latest (Development)',
-              path: '/',
-            },
-          },
         },
         blog: false,
         theme: {
@@ -248,8 +239,8 @@ const config: Config = {
       textColor: '#000000', // Adjust text color for contrast if needed (e.g., black)
       isCloseable: true, // Defaults to `true`
     },
-    // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    // Social card for link previews (og:image / twitter:image), 1200x630.
+    image: 'img/social-card.png',
     navbar: {
       title: 'HackAgent',
       logo: {

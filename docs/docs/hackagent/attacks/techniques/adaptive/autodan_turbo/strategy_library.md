@@ -129,7 +129,7 @@ Return full in-memory strategy dictionary.
 
 **Returns**:
 
-  Mapping `strategy_name -&gt; strategy_record`.
+  Mapping `strategy_name -> strategy_record`.
 
 #### size
 

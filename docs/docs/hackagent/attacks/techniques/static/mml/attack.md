@@ -38,7 +38,7 @@ This attack encodes harmful prompts into images using visual
 transformations and pairs them with carefully crafted text prompts
 that guide the VLM to decode and follow the hidden instructions.
 
-Encoding modes (set via `config[&quot;mml_params&quot;][&quot;encoding_mode&quot;]`):
+Encoding modes (set via `config["mml_params"]["encoding_mode"]`):
 word_replacement
 Replaces key words in the prompt with innocuous substitutes,
 renders to image, and provides a replacement dictionary in
@@ -60,7 +60,7 @@ Combines word replacement, horizontal mirroring, and 180-degree
 rotation. Renders the replaced text to an image, then applies
 both spatial transformations.
 
-Prompt styles (set via `config[&quot;mml_params&quot;][&quot;prompt_style&quot;]`):
+Prompt styles (set via `config["mml_params"]["prompt_style"]`):
 game
 Uses a villain&#x27;s lair game scenario to frame the request.
 control

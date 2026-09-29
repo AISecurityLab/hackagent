@@ -30,7 +30,7 @@ Set the global LLM prompting function.
 
 **Arguments**:
 
-- `fn` - Callable with signature `fn(prompt, maxtokens=500, temperature=1.0) -&gt; str`.
+- `fn` - Callable with signature `fn(prompt, maxtokens=500, temperature=1.0) -> str`.
 
 #### get\_prompting\_interface
 
@@ -182,7 +182,7 @@ Inserts random colour names.
 class HexStringMixInDecorator(WordMixInDecorator)
 ```
 
-Inserts random hex strings like `{&lt;A1B2C3&gt;}`.
+Inserts random hex strings like `{<A1B2C3>}`.
 
 ## MilitaryWordsMixInDecorator Objects
 
@@ -463,7 +463,7 @@ Based on: https://arxiv.org/pdf/2307.15043
 
 **Arguments**:
 
-- `uta_type` - One of `&quot;chatgpt&quot;`, `&quot;bard&quot;`, `&quot;llama&quot;` for the
+- `uta_type` - One of `"chatgpt"`, `"bard"`, `"llama"` for the
   appropriate adversarial suffix.
 
 ## TemplateDecorator Objects
@@ -540,7 +540,7 @@ Compile a decorator program string into a callable.
 
 **Returns**:
 
-  A function `(prompt: str) -&gt; str` that applies the decorator chain.
+  A function `(prompt: str) -> str` that applies the decorator chain.
   
 
 **Raises**:

@@ -106,8 +106,8 @@ release unless `HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD=0` is set.
 
 - `steps` - List of step description strings.
 - `goal_text` - The original goal/prompt displayed as the first node.
-- `layout` - One of `&quot;vertical&quot;`, `&quot;horizontal&quot;`, `&quot;tortuous&quot;`
-  (or `&quot;s_shaped&quot;` as alias).
+- `layout` - One of `"vertical"`, `"horizontal"`, `"tortuous"`
+  (or `"s_shaped"` as alias).
 - `dpi` - Resolution for Graphviz rendering.
 - `**kwargs` - Additional params (ignored, for backwards compat).
   

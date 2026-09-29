@@ -72,8 +72,8 @@ duck-typing helper. Accepts:
 
 - `None` -&gt; `[]`
 - a list of rows (dicts or :class:`AttackResult`) -&gt; converted list
-- a dict with an `&quot;evaluated&quot;` key (legacy baseline/static_template
-  shape) -&gt; the `&quot;evaluated&quot;` rows, converted
+- a dict with an `"evaluated"` key (legacy baseline/static_template
+  shape) -&gt; the `"evaluated"` rows, converted
 - a dict with any of `rows`/`results`/`data`/`items` keys -&gt;
   those rows, converted
 
@@ -100,7 +100,7 @@ Flatten a technique&#x27;s raw `run()` output into a list of rows.
 
 Unlike :func:`rows_to_attack_results`, this does **not** force every row
 into an :class:`AttackResult` — it only extracts the row list from
-legacy whole-batch dict shapes (`{&quot;evaluated&quot;: [...], &quot;summary&quot;: [...]}`
+legacy whole-batch dict shapes (`{"evaluated": [...], "summary": [...]}`
 etc.), preserving each row&#x27;s original type. This is used internally by
 the orchestrator when aggregating per-batch/per-goal `run()` calls,
 where individual rows may already be :class:`AttackResult` instances or

@@ -37,7 +37,7 @@ renders them as flowchart images in various layouts, then sends
 the images to a VLM with a carefully crafted text prompt that
 induces the model to analyze and complete the harmful content.
 
-Layout modes (set via `config[&quot;fc_params&quot;][&quot;layout&quot;]`):
+Layout modes (set via `config["fc_params"]["layout"]`):
 vertical
 Steps flow top-to-bottom in a single vertical column.
 horizontal

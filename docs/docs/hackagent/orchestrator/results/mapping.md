@@ -21,7 +21,7 @@ Build the `eval_*` / `explanation_*` columns for one result.
 
 A verdict&#x27;s votes become one binary column per known judge type. The
 aggregate score is also stored as `best_score`. Unknown judge names
-are kept as `eval_&lt;name&gt;` so a new judge type still lands a column.
+are kept as `eval_<name>` so a new judge type still lands a column.
 An abstaining judge&#x27;s column is `None`, not 0. A verdict no judge could
 give also carries `judge_error`.
 

@@ -46,7 +46,7 @@ def resolve_inline_step_judge(config: Mapping[str, Any],
 
 Return a step-judge for generation loops.
 
-Prefers `config[&quot;_judge&quot;]` (a :class:`~hackagent.attacks.ports.Judge`)
+Prefers `config["_judge"]` (a :class:`~hackagent.attacks.ports.Judge`)
 when present; otherwise builds the legacy `InlineStepJudge`.
 
 #### postprocess\_inline\_results

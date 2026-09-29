@@ -27,9 +27,11 @@ except ImportError:
 # storage._http is private to storage.remote. legacy_seams is the ignored
 # sibling-import pocket. router and attacks.{shared,generator,objectives}
 # remain import shims and are deferred, not documented here.
+# examples are runnable scripts, not API; the agent guides link them.
 _EXCLUDE_PREFIXES = (
     "hackagent.storage._http",
     "hackagent.attacks._lib.legacy_seams",
+    "hackagent.examples",
 )
 
 # pydoc-markdown writes ids under reference/. The web package page is
@@ -175,7 +177,14 @@ def _publish_interface_pages(docs_dir: Path) -> None:
     if init.exists():
         init.replace(web / "index.md")
     for path in sorted(web.glob("_*.md")):
-        path.replace(web / path.name[1:])
+        target = web / path.name[1:]
+        path.replace(target)
+        # The sidebar shows sidebar_label; drop the underscore there too.
+        text = target.read_text(encoding="utf-8")
+        target.write_text(
+            re.sub(r"^sidebar_label: _", "sidebar_label: ", text, count=1, flags=re.M),
+            encoding="utf-8",
+        )
 
 
 def _sanitize_generated_docs(docs_dir: Path) -> None:
@@ -269,8 +278,14 @@ import pydoc_markdown.contrib.renderers.markdown as _md
 
 def escape_except_blockquotes(string):
     single_quote_pattern = r"`[^`]*`"
+    # RST ``code`` spans; without this, `[^`]*` reads them as two empty spans
+    # and escapes the code between them (``'x'`` -> &#x27;x&#x27;).
+    double_quote_pattern = r"``[^`]+``"
     triple_quote_pattern = r"```[\\s\\S]*?```"
-    matches = re.findall(f"({triple_quote_pattern}|{single_quote_pattern})", string)
+    matches = re.findall(
+        f"({triple_quote_pattern}|{double_quote_pattern}|{single_quote_pattern})",
+        string,
+    )
     for i, match in enumerate(matches):
         string = string.replace(match, f"\\x00BQ{i}\\x00", 1)
     string = html.escape(string)

@@ -40,9 +40,9 @@ Hyperparameters controlling the FlipAttack obfuscation strategy.
 
 **Attributes**:
 
-- `flip_mode` - Obfuscation mode.  One of `&quot;FWO&quot;` (flip word order),
-  `&quot;FCW&quot;` (flip chars in word), `&quot;FCS&quot;` (flip chars in sentence,
-  default), or `&quot;FMM&quot;` (fool model mode — FCS transform with
+- `flip_mode` - Obfuscation mode.  One of `"FWO"` (flip word order),
+  `"FCW"` (flip chars in word), `"FCS"` (flip chars in sentence,
+  default), or `"FMM"` (fool model mode — FCS transform with
   FWO decoding instruction).
 - `cot` - When `True`, adds a chain-of-thought suffix to the decoding
   instruction so the model answers step by step.
@@ -65,7 +65,7 @@ by the attack pipeline.
 
 **Attributes**:
 
-- `attack_type` - Always `&quot;flipattack&quot;` (required by the orchestrator).
+- `attack_type` - Always `"flipattack"` (required by the orchestrator).
 - `flipattack_params` - Obfuscation hyperparameters (:class:`FlipAttackParams`).
 
 #### from\_dict

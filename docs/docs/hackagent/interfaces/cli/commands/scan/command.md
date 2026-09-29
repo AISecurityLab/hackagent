@@ -3,7 +3,7 @@ sidebar_label: command
 title: hackagent.interfaces.cli.commands.scan.command
 ---
 
-The `hackagent scan &lt;url&gt;` command.
+The `hackagent scan <url>` command.
 
 #### scan
 

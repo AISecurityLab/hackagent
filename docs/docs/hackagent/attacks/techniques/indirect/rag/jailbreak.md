@@ -21,7 +21,7 @@ Applies a jailbreak transformation to a goal string.
 **Arguments**:
 
 - `technique` - Name of the jailbreak technique used.
-- `transform` - Callable `(goal, variant_index) -&gt; (framed_goal, details)`.
+- `transform` - Callable `(goal, variant_index) -> (framed_goal, details)`.
 
 #### apply
 

@@ -13,7 +13,7 @@ class AutoDANTurboEvaluation()
 
 Finalize AutoDAN-Turbo outputs.
 
-When `config[&quot;_judge&quot;]` is set, scores come from that judge. Otherwise
+When `config["_judge"]` is set, scores come from that judge. Otherwise
 success follows the internal AutoDAN score against `break_score`.
 
 #### execute
