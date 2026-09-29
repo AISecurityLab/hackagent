@@ -1,5 +1,5 @@
 ---
-sidebar_label: _static
+sidebar_label: static
 title: hackagent.interfaces.web._static
 ---
 

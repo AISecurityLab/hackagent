@@ -177,7 +177,14 @@ def _publish_interface_pages(docs_dir: Path) -> None:
     if init.exists():
         init.replace(web / "index.md")
     for path in sorted(web.glob("_*.md")):
-        path.replace(web / path.name[1:])
+        target = web / path.name[1:]
+        path.replace(target)
+        # The sidebar shows sidebar_label; drop the underscore there too.
+        text = target.read_text(encoding="utf-8")
+        target.write_text(
+            re.sub(r"^sidebar_label: _", "sidebar_label: ", text, count=1, flags=re.M),
+            encoding="utf-8",
+        )
 
 
 def _sanitize_generated_docs(docs_dir: Path) -> None:

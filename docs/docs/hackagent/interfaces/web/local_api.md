@@ -1,5 +1,5 @@
 ---
-sidebar_label: _local_api
+sidebar_label: local_api
 title: hackagent.interfaces.web._local_api
 ---
 
