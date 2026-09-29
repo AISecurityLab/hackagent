@@ -27,9 +27,11 @@ except ImportError:
 # storage._http is private to storage.remote. legacy_seams is the ignored
 # sibling-import pocket. router and attacks.{shared,generator,objectives}
 # remain import shims and are deferred, not documented here.
+# examples are runnable scripts, not API; the agent guides link them.
 _EXCLUDE_PREFIXES = (
     "hackagent.storage._http",
     "hackagent.attacks._lib.legacy_seams",
+    "hackagent.examples",
 )
 
 # pydoc-markdown writes ids under reference/. The web package page is
