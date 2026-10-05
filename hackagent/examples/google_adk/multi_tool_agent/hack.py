@@ -1,12 +1,8 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-# Initialize HackAgent
-agent = HackAgent(
-    name="multi_tool_agent", endpoint="http://localhost:8000", agent_type="google-adk"
-)
 # Configure attack
 attack_config = {
     "attack_type": "advprefix",
@@ -26,6 +22,20 @@ attack_config = {
     ],
 }
 
-# Execute attack
-results = agent.hack(attack_config=attack_config)
-print("Test complete! Check app.hackagent.dev for results.")
+
+def main() -> None:
+    session = HackAgent(Settings.resolve())
+    try:
+        agent = session.target(
+            "http://localhost:8000",
+            "google-adk",
+            name="multi_tool_agent",
+        )
+        agent.hack(attack_config=attack_config)
+        print("Test complete! Check app.hackagent.dev for results.")
+    finally:
+        session.close()
+
+
+if __name__ == "__main__":
+    main()

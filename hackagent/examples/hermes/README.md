@@ -40,10 +40,10 @@ Then run:
 
 ### How the target is wired
 
-    agent = HackAgent(
+    agent = HackAgent(Settings.resolve()).target(
+        "http://localhost",  # ignored
+        "hermes",
         name="hermes",
-        endpoint="http://localhost",  # ignored
-        agent_type="hermes",
         adapter_operational_config={
             "name": "hermes-4-70b",  # passed to `hermes -m`
             "binary": "hermes",

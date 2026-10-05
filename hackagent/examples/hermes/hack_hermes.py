@@ -26,25 +26,31 @@ Prerequisites
 3. Run:  ``python hack_hermes.py``
 """
 
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # ---------------------------------------------------------------------------
 # Target: local Hermes Agent (driven via `hermes -z`, no endpoint)
 # ---------------------------------------------------------------------------
 TARGET_MODEL = "hermes-4-70b"  # passed to `hermes -m` for this run only
 JUDGE_MODEL = "claude-opus-4-8"
-agent = HackAgent(
-    name="hermes",
-    endpoint="http://localhost",  # ignored, but remote mode needs it
-    agent_type="hermes",
-    adapter_operational_config={
-        "name": TARGET_MODEL,
-        "binary": "hermes",  # path to the Hermes executable
-        # Isolation is on by default ("ignore_user_config": True). Set
-        # "safe_mode": True to also disable all customizations.
-        # Optional knobs: "provider", "cwd", "timeout", "source", "extra_args".
-    },
-)
+
+
+def bind_target():
+    session = HackAgent(Settings.resolve())
+    # endpoint is ignored; remote mode used to require a placeholder.
+    return session.target(
+        "http://localhost",
+        "hermes",
+        name="hermes",
+        adapter_operational_config={
+            "name": TARGET_MODEL,
+            "binary": "hermes",  # path to the Hermes executable
+            # Isolation is on by default ("ignore_user_config": True). Set
+            # "safe_mode": True to also disable all customizations.
+            # Optional knobs: "provider", "cwd", "timeout", "source", "extra_args".
+        },
+    )
+
 
 # ---------------------------------------------------------------------------
 # Goals — what we want the target to do that it shouldn't
@@ -77,7 +83,11 @@ if __name__ == "__main__":
     print(f"  Red-teaming local Hermes Agent — model: {TARGET_MODEL}")
     print(f"{'=' * 60}")
 
-    results = agent.hack(attack_config=flipattack_config)
+    agent = bind_target()
+    try:
+        results = agent.hack(attack_config=flipattack_config)
+    finally:
+        agent.session.close()
 
     total = len(results) if results else 0
 

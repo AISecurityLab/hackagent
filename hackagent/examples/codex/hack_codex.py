@@ -10,8 +10,8 @@ provider. HackAgent shells out directly to the non-interactive Codex CLI
 or bridge process to run. The target only needs the ``codex`` binary available
 on PATH, plus whatever authentication the Codex CLI normally requires.
 
-The ``endpoint`` value passed to ``HackAgent`` is only a placeholder required by
-the remote-agent configuration shape; it is not used to contact Codex.
+The ``endpoint`` value passed to ``.target()`` is only a placeholder; it is
+not used to contact Codex.
 
 This script runs a small h4rm3l campaign against the local Codex target. The
 judge is configured through LiteLLM, so make sure the environment contains the
@@ -25,24 +25,30 @@ Prerequisites
 4. Run:  ``python hack_codex.py``  (or ``hackagent codex`` for the interactive TUI preset)
 """
 
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # ---------------------------------------------------------------------------
 # Target: local Codex (driven via `codex -p`, no endpoint)
 # ---------------------------------------------------------------------------
 TARGET_MODEL = "gpt-5.5"  # passed to Codex CLI via -m
 JUDGE_MODEL = "gpt-5.5"
-agent = HackAgent(
-    name="codex",
-    endpoint="",  # ignored, but remote mode needs it
-    agent_type="codex",
-    adapter_operational_config={
-        "name": TARGET_MODEL,
-        "binary": "codex",  # path to the Codex executable
-        # Optional knobs: "system_prompt", "append_system_prompt",
-        # "max_turns", "cwd", "timeout", "extra_args".
-    },
-)
+
+
+def bind_target():
+    session = HackAgent(Settings.resolve())
+    # endpoint is ignored; it is not used to contact Codex.
+    return session.target(
+        "",
+        "codex",
+        name="codex",
+        adapter_operational_config={
+            "name": TARGET_MODEL,
+            "binary": "codex",  # path to the Codex executable
+            # Optional knobs: "system_prompt", "append_system_prompt",
+            # "max_turns", "cwd", "timeout", "extra_args".
+        },
+    )
+
 
 # ---------------------------------------------------------------------------
 # Goals — what we want the target to do that it shouldn't
@@ -74,7 +80,11 @@ if __name__ == "__main__":
     print(f"  Red-teaming local Codex — model: {TARGET_MODEL}")
     print(f"{'=' * 60}")
 
-    results = agent.hack(attack_config=h4rm3l_config)
+    agent = bind_target()
+    try:
+        results = agent.hack(attack_config=h4rm3l_config)
+    finally:
+        agent.session.close()
 
     total = len(results) if results else 0
 
