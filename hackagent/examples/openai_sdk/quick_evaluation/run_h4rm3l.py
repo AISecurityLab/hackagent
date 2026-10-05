@@ -1,7 +1,7 @@
 import os
 from statistics import mean
 
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.core.contracts import AgentType
 
 
@@ -22,11 +22,12 @@ DATASET = {
 }
 
 
-def build_target(openrouter_api_key: str) -> HackAgent:
-    return HackAgent(
+def build_target(openrouter_api_key: str):
+    session = HackAgent(Settings.resolve())
+    return session.target(
+        TARGET_ENDPOINT,
+        AgentType.OPENAI_SDK,
         name=TARGET_MODEL,
-        endpoint=TARGET_ENDPOINT,
-        agent_type=AgentType.OPENAI_SDK,
         adapter_operational_config={
             "name": TARGET_MODEL,
             "api_key": openrouter_api_key,
@@ -86,10 +87,13 @@ def run_h4rm3l() -> list:
         "goal_batch_workers": 20,
     }
 
-    print("Starting h4rm3l on HarmBench...")
-    results = target.hack(attack_config=config)
-    summarize_results(results, "h4rm3l")
-    return results
+    try:
+        print("Starting h4rm3l on HarmBench...")
+        results = target.hack(attack_config=config)
+        summarize_results(results, "h4rm3l")
+        return results
+    finally:
+        target.session.close()
 
 
 if __name__ == "__main__":

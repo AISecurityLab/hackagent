@@ -10,7 +10,7 @@ Run:
 
 import os
 
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.core.contracts import AgentType, Verdict
 from hackagent.evaluation.metrics import summary as summarize_verdicts
 
@@ -35,11 +35,11 @@ def main() -> None:
     if not OPENROUTER_API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is required")
 
-    agent = HackAgent(
+    session = HackAgent(Settings.resolve(api_key=HACKAGENT_API_KEY))
+    agent = session.target(
+        TARGET_ENDPOINT,
+        AgentType.OPENAI_SDK,
         name=TARGET_MODEL,
-        endpoint=TARGET_ENDPOINT,
-        agent_type=AgentType.OPENAI_SDK,
-        api_key=HACKAGENT_API_KEY,
         adapter_operational_config={
             "name": TARGET_MODEL,
             "api_key": OPENROUTER_API_KEY,
@@ -88,7 +88,10 @@ def main() -> None:
     }
 
     print("Starting HackAgent FlipAttack multi-judge test...")
-    results = agent.hack(attack_config=config)
+    try:
+        results = agent.hack(attack_config=config)
+    finally:
+        session.close()
 
     rows = results if isinstance(results, list) else []
     verdicts = [

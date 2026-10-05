@@ -63,12 +63,12 @@ python hack.py
 Wiring it by hand:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "https://host/chat",
+    "web",
     name="site-chatbot",
-    endpoint="https://host/chat",
-    agent_type="web",
     adapter_operational_config={
         "url": "https://host/chat",
         "headless": True,                       # False to watch the browser
