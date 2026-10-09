@@ -70,7 +70,7 @@ DEFAULT_CLI_ATTACK_TYPE = "flipattack"
 # ---------------------------------------------------------------------------
 
 DEFAULT_REMOTE_ROLE_ENDPOINT = resolve_remote_role_endpoint()
-DEFAULT_REMOTE_AGENT_TYPE = "OPENAI_SDK"
+DEFAULT_REMOTE_AGENT_TYPE = "OPENAI"
 DEFAULT_REMOTE_ATTACKER_IDENTIFIER = "hackagent-attacker"
 DEFAULT_REMOTE_JUDGE_IDENTIFIER = "hackagent-judge"
 

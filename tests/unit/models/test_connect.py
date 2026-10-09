@@ -21,7 +21,7 @@ from hackagent.models.model import Model
 class TestCheckSupported(unittest.TestCase):
     def test_accepts_providers_and_native_types(self):
         for agent_type in (
-            AgentType.OPENAI_SDK,
+            AgentType.OPENAI,
             AgentType.OLLAMA,
             AgentType.CLAUDE_CODE,
             AgentType.GOOGLE_ADK,
@@ -39,7 +39,7 @@ class TestConnectProvider(unittest.TestCase):
         model = connect(
             ModelSpec(
                 identifier="gpt-4",
-                agent_type=AgentType.OPENAI_SDK,
+                agent_type=AgentType.OPENAI,
                 endpoint="http://localhost:8000/v1",
             )
         )
@@ -51,7 +51,7 @@ class TestConnectProvider(unittest.TestCase):
             connect(
                 ModelSpec(
                     identifier="gpt-4",
-                    agent_type=AgentType.OPENAI_SDK,
+                    agent_type=AgentType.OPENAI,
                     max_tokens=128,
                     temperature=0.5,
                     extra={"seed": 7, "unknown_knob": "dropped"},
@@ -64,7 +64,7 @@ class TestConnectProvider(unittest.TestCase):
 
     def test_instance_id_is_accepted_and_ignored(self):
         model = connect(
-            ModelSpec(identifier="gpt-4", agent_type=AgentType.OPENAI_SDK),
+            ModelSpec(identifier="gpt-4", agent_type=AgentType.OPENAI),
             instance_id="abc",
         )
         self.assertIsInstance(model, LiteLLMModel)

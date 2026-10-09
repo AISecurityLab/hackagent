@@ -51,7 +51,7 @@ class ConnectionSpec(BaseModel):
     type: AgentType = Field(
         description=(
             "Which client talks to the model. This is the field that matters: it "
-            "decides whether HackAgent calls a chat API (``OPENAI_SDK``, "
+            "decides whether HackAgent calls a chat API (``OPENAI``, "
             "``OLLAMA``, ``LITELLM``…) or drives an agent directly "
             "(``CLAUDE_CODE``, ``GOOGLE_ADK``, ``WEB``…)."
         )

@@ -22,7 +22,7 @@ REPO_CAMPAIGN = Path(__file__).resolve().parents[3] / "campaign.yaml"
 def test_repository_campaign_loads():
     """The campaign in the repository stays loadable, whatever it enables."""
     spec = load_campaign(REPO_CAMPAIGN)
-    assert spec.target.connection.type is AgentType.OPENAI_SDK
+    assert spec.target.connection.type is AgentType.OPENAI
     assert spec.evaluation.judges
     for attack in spec.attacks:
         # Every attack it names exists, and names only roles that attack has.
@@ -82,4 +82,4 @@ def test_agent_type_is_case_insensitive():
     values = campaign(
         target={**model("t"), "connection": {"provider": "vllm", "type": "openai_sdk"}}
     )
-    assert load_campaign(values).target.connection.type is AgentType.OPENAI_SDK
+    assert load_campaign(values).target.connection.type is AgentType.OPENAI

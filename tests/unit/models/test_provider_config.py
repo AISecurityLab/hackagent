@@ -129,7 +129,7 @@ class TestOllamaThinkingTranslator(unittest.TestCase):
 
 class TestProviderConfigsTable(unittest.TestCase):
     def test_openai_config_present_and_correct(self):
-        cfg = get_provider_config(AgentType.OPENAI_SDK)
+        cfg = get_provider_config(AgentType.OPENAI)
         self.assertIsNotNone(cfg)
         self.assertEqual(cfg.provider_prefix, "openai")
         self.assertEqual(cfg.adapter_label, "OpenAIAgent")
@@ -166,7 +166,7 @@ class TestProviderConfigsTable(unittest.TestCase):
         """All chat-completion agent types appear in the table."""
         expected = {
             AgentType.LITELLM,
-            AgentType.OPENAI_SDK,
+            AgentType.OPENAI,
             AgentType.OLLAMA,
             AgentType.LANGCHAIN,
         }

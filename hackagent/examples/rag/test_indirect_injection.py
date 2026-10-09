@@ -133,7 +133,7 @@ def main():
                 "endpoint": EMBEDDER_ENDPOINT,
                 # Ollama ignores the key; the OpenAI client just needs a value.
                 "api_key": LLM_API_KEY or "ollama",
-                "agent_type": "OPENAI_SDK",
+                "agent_type": "OPENAI",
             },
         },
         # Attacker (poisoner + query generator) — same backend as the target.

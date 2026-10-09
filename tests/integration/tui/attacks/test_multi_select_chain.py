@@ -210,7 +210,7 @@ class TestAssembledSpec:
 
             campaign = tab._build_campaign_spec(
                 agent_name="my-agent",
-                agent_type="openai-sdk",
+                agent_type="openai",
                 endpoint="http://localhost:8000",
                 timeout=300,
                 attack_rows=list(tab.query(AttackRow)),
@@ -254,7 +254,7 @@ class TestWizard:
 
             # Filled target → Next advances.
             _fill_required_fields(tab)
-            tab.query_one("#agent-type", Select).value = "openai-sdk"
+            tab.query_one("#agent-type", Select).value = "openai"
             tab._next_step()
             await pilot.pause()
             assert switcher.current == "step-attacks"
@@ -266,7 +266,7 @@ class TestWizard:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
             _fill_required_fields(tab)
-            tab.query_one("#agent-type", Select).value = "openai-sdk"
+            tab.query_one("#agent-type", Select).value = "openai"
             tab._go_to_step(3)
             await pilot.pause()
             summary = str(tab.query_one("#run-summary", Static).render())

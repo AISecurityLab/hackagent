@@ -39,7 +39,7 @@ class TestSpecFromConfig:
         spec = spec_from_config(basic_config)
         assert spec.identifier == "test-model"
         assert spec.endpoint == "https://api.example.com/v1"
-        assert spec.agent_type is AgentType.OPENAI_SDK
+        assert spec.agent_type is AgentType.OPENAI
         assert spec.max_tokens == 500
         assert spec.temperature == 0.7
         assert spec.api_key is None
@@ -74,7 +74,7 @@ class TestSpecFromConfig:
 
     def test_invalid_agent_type_defaults_to_openai_sdk(self, basic_config):
         basic_config["agent_type"] = "INVALID_TYPE"
-        assert spec_from_config(basic_config).agent_type is AgentType.OPENAI_SDK
+        assert spec_from_config(basic_config).agent_type is AgentType.OPENAI
 
     def test_default_agent_type_is_configurable(self):
         spec = spec_from_config(
@@ -84,7 +84,7 @@ class TestSpecFromConfig:
 
     def test_agent_type_aliases(self, basic_config):
         basic_config["agent_type"] = "openai"
-        assert spec_from_config(basic_config).agent_type is AgentType.OPENAI_SDK
+        assert spec_from_config(basic_config).agent_type is AgentType.OPENAI
 
     def test_metadata_merged_into_extra(self, basic_config):
         basic_config["agent_metadata"] = {"custom_param": "value123"}

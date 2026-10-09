@@ -25,6 +25,8 @@ from typing import Any, Iterator, Optional
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
+from hackagent.core.contracts import AgentType
+
 
 @dataclass(frozen=True)
 class EndpointOverrides:
@@ -145,9 +147,9 @@ def apply_endpoint_overrides(
     target_endpoint = values["target"]["connection"]["endpoint"]
     for kind, model in models:
         connection = model["connection"]
-        if connection["type"].upper() != "OPENAI_SDK":
+        if AgentType.parse(connection["type"]) is not AgentType.OPENAI:
             raise ValueError(
-                "OpenAI-compatible endpoint overrides require OPENAI_SDK connections"
+                "OpenAI-compatible endpoint overrides require OPENAI connections"
             )
         if kind == "role":
             if overrides.attacker:
@@ -171,10 +173,11 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
     kinds: dict[str, str] = {}
     for kind, model in campaign_models(values):
         connection = model["connection"]
-        wire = connection["type"].lower()
-        if wire == "ollama" or (
-            wire == "openai_sdk" and connection["provider"] == "vllm"
+        wire = AgentType.parse(connection["type"])
+        if wire is AgentType.OLLAMA or (
+            wire is AgentType.OPENAI and connection["provider"] == "vllm"
         ):
+            wire = "ollama" if wire is AgentType.OLLAMA else "openai"
             endpoint = connection["endpoint"]
             if not endpoint:
                 raise ValueError("local model servers require an explicit endpoint")

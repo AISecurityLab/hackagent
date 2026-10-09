@@ -99,7 +99,7 @@ def spec_from_config(
     config: Mapping[str, Any],
     *,
     spec_type: Type[SpecT] = ModelSpec,  # type: ignore[assignment]
-    default_agent_type: AgentType = AgentType.OPENAI_SDK,
+    default_agent_type: AgentType = AgentType.OPENAI,
 ) -> SpecT:
     """Build a spec from a role-model config dict.
 

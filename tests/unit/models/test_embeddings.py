@@ -78,6 +78,19 @@ def test_compatible_endpoint_normalization(endpoint, expected):
     assert normalize_embedding_endpoint(endpoint) == expected
 
 
+@pytest.mark.parametrize("agent_type", ["OPENAI", "OPENAI_SDK", "openai", "openai-sdk"])
+def test_every_openai_spelling_selects_the_openai_transport(agent_type):
+    kwargs = embedding_request_kwargs(
+        {
+            "identifier": "text-embedding-3-small",
+            "agent_type": agent_type,
+            "endpoint": "http://localhost:8000/v1",
+        }
+    )
+    assert kwargs["custom_llm_provider"] == "openai"
+    assert kwargs["api_base"] == "http://localhost:8000/v1"
+
+
 @pytest.mark.parametrize(
     ("configured", "expected"),
     [

@@ -204,7 +204,7 @@ EXAMPLES: dict[str, list[tuple[str, Any]]] = {
                     "name": "gpt-4o-mini",
                     "connection": {
                         "provider": "openai",
-                        "type": "OPENAI_SDK",
+                        "type": "OPENAI",
                         "endpoint": "https://api.openai.com/v1",
                         "api_key_env": "OPENAI_API_KEY",
                     },

@@ -126,7 +126,7 @@ PROVIDER_CONFIGS: Dict[AgentType, ProviderConfig] = {
         thinking_translator=default_thinking_translator,
         adapter_label="LiteLLMAgent",
     ),
-    AgentType.OPENAI_SDK: ProviderConfig(
+    AgentType.OPENAI: ProviderConfig(
         provider_prefix="openai",
         thinking_translator=openai_thinking_translator,
         adapter_label="OpenAIAgent",

@@ -38,7 +38,7 @@ def main() -> None:
     agent = HackAgent(
         name=TARGET_MODEL,
         endpoint=TARGET_ENDPOINT,
-        agent_type=AgentType.OPENAI_SDK,
+        agent_type=AgentType.OPENAI,
         api_key=HACKAGENT_API_KEY,
         adapter_operational_config={
             "name": TARGET_MODEL,
@@ -64,21 +64,21 @@ def main() -> None:
             {
                 "identifier": JUDGE_MODEL,
                 "type": "harmbench_variant",
-                "agent_type": AgentType.OPENAI_SDK,
+                "agent_type": AgentType.OPENAI,
                 "api_key": OPENROUTER_API_KEY,
                 "endpoint": JUDGE_ENDPOINT,
             },
             {
                 "identifier": JUDGE_MODEL,
                 "type": "harmbench",
-                "agent_type": AgentType.OPENAI_SDK,
+                "agent_type": AgentType.OPENAI,
                 "api_key": OPENROUTER_API_KEY,
                 "endpoint": JUDGE_ENDPOINT,
             },
             {
                 "identifier": JUDGE_MODEL,
                 "type": "jailbreakbench",
-                "agent_type": AgentType.OPENAI_SDK,
+                "agent_type": AgentType.OPENAI,
                 "api_key": OPENROUTER_API_KEY,
                 "endpoint": JUDGE_ENDPOINT,
             },

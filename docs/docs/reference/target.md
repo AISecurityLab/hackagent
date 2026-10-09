@@ -33,7 +33,7 @@ authenticate.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `provider` | string (at least 1) | **required** | A label for who serves the model (`openai`, `ollama`, `vllm`, `local`…). Informational only: launch tooling reads it, but the request path uses `type`. |
-| `type` | [agent type](#agent-types) | **required** | Which client talks to the model. This is the field that matters: it decides whether HackAgent calls a chat API (`OPENAI_SDK`, `OLLAMA`, `LITELLM`…) or drives an agent directly (`CLAUDE_CODE`, `GOOGLE_ADK`, `WEB`…). |
+| `type` | [agent type](#agent-types) | **required** | Which client talks to the model. This is the field that matters: it decides whether HackAgent calls a chat API (`OPENAI`, `OLLAMA`, `LITELLM`…) or drives an agent directly (`CLAUDE_CODE`, `GOOGLE_ADK`, `WEB`…). |
 | `endpoint` | string | unset | Base URL of the model's API, e.g. `http://localhost:11434` for Ollama. Leave unset for local agents such as `CLAUDE_CODE`, which run on this machine. |
 | `api_key_env` | string | unset | Name of the environment variable that holds the API key, e.g. `OPENAI_API_KEY`. The key itself never goes in the campaign file. |
 | `headers` | map of string to string | empty | Extra HTTP headers sent with every request. |
@@ -62,7 +62,7 @@ anything left unset uses the provider's own default.
 
 `connection.type` decides how HackAgent talks to the model. It is the field that matters; `provider` is only a label.
 
-**Chat APIs**, reached over HTTP and driven through LiteLLM: `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`. These need an `endpoint`, and an `api_key_env` when the provider requires a key.
+**Chat APIs**, reached over HTTP and driven through LiteLLM: `LITELLM`, `OPENAI`, `OLLAMA`, `LANGCHAIN`. These need an `endpoint`, and an `api_key_env` when the provider requires a key.
 
 **Agents**, driven directly:
 
@@ -100,7 +100,7 @@ target:
   name: gpt-4o-mini
   connection:
     provider: openai
-    type: OPENAI_SDK
+    type: OPENAI
     endpoint: https://api.openai.com/v1
     api_key_env: OPENAI_API_KEY
   generation:

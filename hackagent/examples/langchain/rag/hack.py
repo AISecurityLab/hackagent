@@ -15,7 +15,7 @@ Usage (all-in-one script):
 Usage (TUI — two terminals):
   Terminal 1:  python agent.py          # start the RAG agent
   Terminal 2:  hackagent                # launch the TUI
-    → Agents tab:  name=corpbot_rag  type=openai-sdk  endpoint=http://localhost:5000/v1
+    → Agents tab:  name=corpbot_rag  type=openai  endpoint=http://localhost:5000/v1
     → Attacks tab:  pick attack, set goals and generator, then run
 """
 
@@ -39,14 +39,14 @@ GOALS = [
 ATTACKER = {
     "identifier": "nidum-gemma-2b-uncensored",
     "endpoint": ENDPOINT_LMSTUDIO,
-    "agent_type": AgentType.OPENAI_SDK,
+    "agent_type": AgentType.OPENAI,
 }
 
 
 agent = HackAgent(
     name="corpbot_rag",
     endpoint="http://localhost:8000/v1",
-    agent_type=AgentType.OPENAI_SDK,
+    agent_type=AgentType.OPENAI,
     api_key=HACKAGENT_API_KEY,
 )
 

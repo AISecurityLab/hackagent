@@ -26,7 +26,7 @@ def build_target(openrouter_api_key: str) -> HackAgent:
     return HackAgent(
         name=TARGET_MODEL,
         endpoint=TARGET_ENDPOINT,
-        agent_type=AgentType.OPENAI_SDK,
+        agent_type=AgentType.OPENAI,
         adapter_operational_config={
             "name": TARGET_MODEL,
             "api_key": openrouter_api_key,
@@ -60,7 +60,7 @@ def run_h4rm3l() -> list:
         "decorator_llm": {
             "identifier": ATTACKER_MODEL,
             "endpoint": ATTACKER_ENDPOINT,
-            "agent_type": AgentType.OPENAI_SDK,
+            "agent_type": AgentType.OPENAI,
             "api_key": openrouter_api_key,
         },
         "max_tokens": 1000,
@@ -68,14 +68,14 @@ def run_h4rm3l() -> list:
             {
                 "identifier": JUDGE_MODEL,
                 "type": "harmbench_variant",
-                "agent_type": AgentType.OPENAI_SDK,
+                "agent_type": AgentType.OPENAI,
                 "api_key": openrouter_api_key,
                 "endpoint": JUDGE_ENDPOINT,
             }
         ],
         "category_classifier": {
             "identifier": JUDGE_MODEL,
-            "agent_type": AgentType.OPENAI_SDK,
+            "agent_type": AgentType.OPENAI,
             "api_key": openrouter_api_key,
             "endpoint": JUDGE_ENDPOINT,
             "max_tokens": 100,

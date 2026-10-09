@@ -42,7 +42,7 @@ _AGENT_TYPE_CHOICES = [
     ("Web (live browser)", "web"),
     ("LiteLLM", "litellm"),
     ("LangChain", "langchain"),
-    ("OpenAI SDK", "openai-sdk"),
+    ("OpenAI", "openai"),
     ("Ollama", "ollama"),
 ]
 
