@@ -27,7 +27,7 @@ Native backend for a locally-installed Codex CLI.
 
 Drives Codex in non-interactive mode (`codex exec`) through a per-instance
 :class:`litellm.CustomLLM` handler registered under a unique provider name
-(`hackagent_codex_&lt;id&gt;`), so requests flow through `litellm.completion`
+(`hackagent_codex_<id>`), so requests flow through `litellm.completion`
 like every other backend — even though Codex is driven locally through a
 CLI.
 

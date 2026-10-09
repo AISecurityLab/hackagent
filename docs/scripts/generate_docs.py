@@ -7,7 +7,6 @@ Generates API documentation from the local source using pydoc-markdown.
 """
 
 import argparse
-import json
 import os
 import re
 import shutil
@@ -25,23 +24,14 @@ except ImportError:
 # Private modules and compatibility shims are not public API pages.
 # hackagent.client and hackagent.interfaces (cli, tui, web) are documented.
 # storage._http is private to storage.remote. legacy_seams is the ignored
-# sibling-import pocket. router and attacks.{shared,generator,objectives}
-# remain import shims and are deferred, not documented here.
+# sibling-import pocket. router and attacks.{shared,generator} remain
+# import shims and are deferred, not documented here.
+# examples are runnable scripts, not API; the agent guides link them.
 _EXCLUDE_PREFIXES = (
     "hackagent.storage._http",
     "hackagent.attacks._lib.legacy_seams",
+    "hackagent.examples",
 )
-
-# pydoc-markdown writes ids under reference/. The web package page is
-# __init__.md and its helpers are _*.md; _publish_interface_pages renames
-# those so the docs plugin (which drops _*.md) can publish them.
-_SIDEBAR_ID_REWRITES = {
-    "hackagent/interfaces/web/__init__": "hackagent/interfaces/web/index",
-    "hackagent/interfaces/web/_local_api": "hackagent/interfaces/web/local_api",
-    "hackagent/interfaces/web/_proxy": "hackagent/interfaces/web/proxy",
-    "hackagent/interfaces/web/_serializers": "hackagent/interfaces/web/serializers",
-    "hackagent/interfaces/web/_static": "hackagent/interfaces/web/static",
-}
 
 
 def _sanitize_mdx(text: str) -> str:
@@ -99,67 +89,13 @@ def _sanitize_mdx(text: str) -> str:
     return "\n".join(result)
 
 
-def _doc_page_exists(docs_dir: Path, doc_id: str) -> bool:
-    """True when *doc_id* is a published markdown page.
+def _remove_generated_sidebar(docs_dir: Path) -> None:
+    """Delete the ``sidebar.json`` pydoc-markdown writes.
 
-    The docs plugin drops files named ``_*.md``. Directory names such as
-    ``attacks/_lib`` stay published.
+    ``sidebars.ts`` autogenerates the SDK sidebar from ``docs/hackagent/``,
+    so the renderer's own sidebar file is never read.
     """
-    name = doc_id.rsplit("/", 1)[-1]
-    if not doc_id or name.startswith("_"):
-        return False
-    base = docs_dir / doc_id
-    return base.with_suffix(".md").is_file() or base.with_suffix(".mdx").is_file()
-
-
-def _rewrite_sidebar_id(doc_id: str) -> str:
-    if doc_id.startswith("reference/"):
-        doc_id = doc_id[len("reference/") :]
-    return _SIDEBAR_ID_REWRITES.get(doc_id, doc_id)
-
-
-def _prune_sidebar_node(node, docs_dir: Path):
-    """Rewrite generated ids onto published pages and drop the rest."""
-    if isinstance(node, str):
-        doc_id = _rewrite_sidebar_id(node)
-        if _doc_page_exists(docs_dir, doc_id):
-            return doc_id
-        return None
-    if isinstance(node, list):
-        pruned = []
-        for item in node:
-            kept = _prune_sidebar_node(item, docs_dir)
-            if kept is not None and kept != []:
-                pruned.append(kept)
-        return pruned
-    if isinstance(node, dict):
-        updated = dict(node)
-        if isinstance(updated.get("id"), str):
-            doc_id = _rewrite_sidebar_id(updated["id"])
-            if not _doc_page_exists(docs_dir, doc_id):
-                return None
-            updated["id"] = doc_id
-        if "items" in updated:
-            items = _prune_sidebar_node(updated["items"], docs_dir)
-            if not items:
-                return None
-            updated["items"] = items
-        return updated
-    return node
-
-
-def _sync_generated_sidebar(docs_dir: Path) -> None:
-    """Point ``sidebar.json`` at pages that exist after the flatten/rename."""
-    sidebar_path = docs_dir / "sidebar.json"
-    if not sidebar_path.is_file():
-        print("⚠️  No generated sidebar.json to rewrite")
-        return
-    sidebar = json.loads(sidebar_path.read_text(encoding="utf-8"))
-    pruned = _prune_sidebar_node(sidebar, docs_dir)
-    if pruned is None:
-        pruned = {"type": "category", "label": "SDK Reference", "items": []}
-    sidebar_path.write_text(json.dumps(pruned, indent=2) + "\n", encoding="utf-8")
-    print(f"🔧 Rewrote sidebar ids in {sidebar_path}")
+    (docs_dir / "sidebar.json").unlink(missing_ok=True)
 
 
 def _publish_interface_pages(docs_dir: Path) -> None:
@@ -175,7 +111,14 @@ def _publish_interface_pages(docs_dir: Path) -> None:
     if init.exists():
         init.replace(web / "index.md")
     for path in sorted(web.glob("_*.md")):
-        path.replace(web / path.name[1:])
+        target = web / path.name[1:]
+        path.replace(target)
+        # The sidebar shows sidebar_label; drop the underscore there too.
+        text = target.read_text(encoding="utf-8")
+        target.write_text(
+            re.sub(r"^sidebar_label: _", "sidebar_label: ", text, count=1, flags=re.M),
+            encoding="utf-8",
+        )
 
 
 def _sanitize_generated_docs(docs_dir: Path) -> None:
@@ -269,8 +212,14 @@ import pydoc_markdown.contrib.renderers.markdown as _md
 
 def escape_except_blockquotes(string):
     single_quote_pattern = r"`[^`]*`"
+    # RST ``code`` spans; without this, `[^`]*` reads them as two empty spans
+    # and escapes the code between them (``'x'`` -> &#x27;x&#x27;).
+    double_quote_pattern = r"``[^`]+``"
     triple_quote_pattern = r"```[\\s\\S]*?```"
-    matches = re.findall(f"({triple_quote_pattern}|{single_quote_pattern})", string)
+    matches = re.findall(
+        f"({triple_quote_pattern}|{double_quote_pattern}|{single_quote_pattern})",
+        string,
+    )
     for i, match in enumerate(matches):
         string = string.replace(match, f"\\x00BQ{i}\\x00", 1)
     string = html.escape(string)
@@ -300,6 +249,10 @@ def create_pydoc_wrapper() -> str:
         return f.name
 
 
+# Where pydoc-markdown writes before the pages are moved into docs/docs/.
+SDK_STAGING = "_sdk_staging"
+
+
 def create_pydoc_config(output_dir: str, modules: list[str]) -> str:
     """Write a pydoc-markdown YAML config to a temp file and return its path."""
     module_lines = "\n".join(f"              - {m}" for m in modules)
@@ -320,7 +273,7 @@ def create_pydoc_config(output_dir: str, modules: list[str]) -> str:
         renderer:
           type: docusaurus
           docs_base_path: {output_dir}
-          sidebar_top_level_label: "🔗 SDK Reference"
+          relative_output_path: {SDK_STAGING}
         """
     ).strip()
 
@@ -407,11 +360,7 @@ def generate_docs(version: str) -> None:
             description="Generating documentation",
         )
 
-        index_content = f"""---
-sidebar_position: 1
----
-
-# Python SDK Reference
+        index_content = f"""# Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
 in the HackAgent Python SDK, auto-generated from source-code docstrings.
@@ -434,12 +383,12 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   `hack_chain` compose one attack. `mapping` owns record `eval_*` columns.
   `AttackOrchestrator` and `hackagent.attacks.registry` are gone; there is
   no import shim.
-- **Attack Framework**: Base classes, objectives, and techniques
+- **Attack Framework**: Base classes and techniques
   (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline).
   The attack seam (`hackagent.attacks.ports`, `AttackConfig`, `BaseAttack`)
   is documented alongside `RunSpec` and `TargetParams`.
   Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
-  templates, objectives, progress, inline-judge adapters, `ensure_graphviz`).
+  templates, progress, inline-judge adapters, `ensure_graphviz`).
   Every shipped technique constructs as `BaseAttack(config, ctx)`.
   Private modules are omitted from these pages: `storage._http` and
   `attacks._lib.legacy_seams`.
@@ -454,8 +403,9 @@ For a worked example, see [Your first campaign](./getting-started/first-campaign
 """
         (docs_dir / "api-index.md").write_text(index_content, encoding="utf-8")
 
-        # Flatten pydoc-markdown's reference/ subdirectory when present
-        reference_dir = docs_dir / "reference"
+        # Move pydoc-markdown's output up from its staging folder. It is not
+        # reference/, which holds the generated campaign reference.
+        reference_dir = docs_dir / SDK_STAGING
         if reference_dir.exists():
             for item in reference_dir.iterdir():
                 target = docs_dir / item.name
@@ -469,11 +419,16 @@ For a worked example, see [Your first campaign](./getting-started/first-campaign
                     shutil.copy2(item, target)
             shutil.rmtree(reference_dir)
 
-        # pydoc-markdown may write under reference/ and the copy above lands
+        # pydoc-markdown writes under its staging folder and the copy above lands
         # after the first pass. Sanitize once the pages are in place.
         _sanitize_generated_docs(docs_dir)
         _publish_interface_pages(docs_dir)
-        _sync_generated_sidebar(docs_dir)
+        _remove_generated_sidebar(docs_dir)
+        run_command(
+            ["uv", "run", "python", str(script_dir / "risk_pages.py"), str(docs_dir)],
+            cwd=project_root,
+            description="Writing risk pages from the catalog",
+        )
 
         print(f"✅ Documentation generated in {docs_dir}")
         print("\n🔧 To view: cd docs && npm start")
