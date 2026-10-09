@@ -1,14 +1,12 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tool-output indirect prompt injection (InjecAgent / OPI family).
+"""Tool-output indirect prompt injection: poison what a tool returns.
 
-Injects adversarial instructions into simulated (or live) tool observations
-so a tool-using agent may follow a malicious goal after a benign user task.
+Based on InjecAgent: https://arxiv.org/abs/2403.02691
 """
 
-from __future__ import annotations
-
 from .attack import ToolOutputIPIAttack
+from .config import ToolOutputIPIParams
 
-__all__ = ["ToolOutputIPIAttack"]
+__all__ = ["ToolOutputIPIAttack", "ToolOutputIPIParams"]

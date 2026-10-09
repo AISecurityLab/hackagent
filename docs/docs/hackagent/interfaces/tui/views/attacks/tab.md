@@ -12,7 +12,7 @@ class AttacksTab(AttacksLayoutMixin, AttacksFormMixin, AttacksRunnerMixin,
                  AttacksExecutorMixin, Container)
 ```
 
-Execute and manage security attacks with strategy-aware configuration.
+Execute and manage security attacks with a declarative campaign form.
 
 #### \_\_init\_\_
 
@@ -42,47 +42,6 @@ def on_radio_set_changed(event: RadioSet.Changed) -> None
 ```
 
 Toggle between Goals and Dataset input panels.
-
-#### on\_select\_changed
-
-```python
-def on_select_changed(event: Select.Changed) -> None
-```
-
-React to the &#x27;Configuring&#x27; strategy selector changes.
-
-#### on\_selection\_list\_selected\_changed
-
-```python
-def on_selection_list_selected_changed(
-        event: SelectionList.SelectedChanged) -> None
-```
-
-React to attack multi-selection changes (which attacks will run).
-
-#### on\_checkbox\_changed
-
-```python
-def on_checkbox_changed(event: Checkbox.Changed) -> None
-```
-
-React to the advanced toggle.
-
-#### on\_focus
-
-```python
-def on_focus(_: events.Focus) -> None
-```
-
-Preview advanced settings when keyboard focus reaches advanced-toggle.
-
-#### on\_blur
-
-```python
-def on_blur(_: events.Blur) -> None
-```
-
-Hide focus-based preview once advanced-toggle is no longer focused.
 
 #### on\_button\_pressed
 

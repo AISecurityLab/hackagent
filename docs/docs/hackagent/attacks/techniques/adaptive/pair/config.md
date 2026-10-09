@@ -3,42 +3,22 @@ sidebar_label: config
 title: hackagent.attacks.techniques.adaptive.pair.config
 ---
 
-Configuration for PAIR attacks.
+Configuration for PAIR.
 
-## PairConfig Objects
-
-```python
-class PairConfig(ConfigBase)
-```
-
-Complete typed configuration for the PAIR attack.
-
-Pydantic defaults are the single source of truth (Phase 4). Attacker
-`max_tokens` is 500 to preserve the prior live PAIR runtime default
-that `DEFAULT_PAIR_CONFIG` historically encoded via fallbacks / TUI.
-
-#### from\_dict
+## PairParams Objects
 
 ```python
-@classmethod
-def from_dict(cls, config_dict: Dict[str, Any]) -> "PairConfig"
+class PairParams(AttackParams)
 ```
 
-Create a :class:`PairConfig` from a plain dictionary.
+How wide and how long the search runs, and who rates what comes back.
 
-#### to\_dict
+`attacker` is a role: the model that writes and refines the adversarial
+prompts, so PAIR cannot run without it.
 
-```python
-def to_dict() -> Dict[str, Any]
-```
-
-Convert to dictionary suitable for :meth:`HackAgent.hack`.
-
-#### default\_pair\_config
-
-```python
-def default_pair_config() -> Dict[str, Any]
-```
-
-Return a fresh PAIR defaults dict from :class:`PairConfig`.
+`scorer` is an optional second role, the 1-10 rater the paper gives the
+loop. Configure it and it rates every reply, its score is what the
+attacker sees and what :attr:`jailbreak_threshold` stops on, and the
+panel is asked only about the best attempt. Leave it out and the panel
+does both jobs: it rates every reply and its verdict decides.
 

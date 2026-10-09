@@ -1,15 +1,12 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-PAIR (Prompt Automatic Iterative Refinement) attack technique.
+"""PAIR: let an attacker model rewrite its own prompt until one lands.
 
-An LLM-driven attack that uses an attacker LLM to iteratively refine
-prompts based on target model responses.
-
-Reference: Chao et al., "Jailbreaking Black Box Large Language Models in Twenty Queries"
+Based on: https://arxiv.org/abs/2310.08419
 """
 
 from .attack import PAIRAttack
+from .config import PairParams
 
-__all__ = ["PAIRAttack"]
+__all__ = ["PAIRAttack", "PairParams"]

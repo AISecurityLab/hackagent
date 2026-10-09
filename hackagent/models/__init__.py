@@ -1,36 +1,36 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Model access: connect to a model or agent and call it.
+"""Unified model execution."""
 
-``connect(spec)`` returns an :class:`~hackagent.core.contracts.LLM`. It
-needs no storage backend and registers nothing. :class:`Guarded` adds
-guardrails, and :class:`ModelFactory` builds role models with credentials
-from :class:`~hackagent.core.settings.Settings`.
-"""
+from .build import ModelCallError, as_completion, build_embedder, build_model
+from .config import (
+    ConnectionSpec,
+    GenerationSpec,
+    ModelConfig,
+    ModelConnection,
+    ModelGeneration,
+)
+from .connect import check_supported, connect
+from .factory import ModelFactory
+from .guardrail import GuardedModel
+from .model import Model
+from .response import ModelResponse
 
-from importlib import import_module
-from typing import Any
-
-_EXPORTS = {
-    "connect": "hackagent.models.client",
-    "EnvelopeLLM": "hackagent.models.client",
-    "ModelClient": "hackagent.models.client",
-    "ModelFactory": "hackagent.models.factory",
-    "spec_from_config": "hackagent.models.factory",
-    "Guarded": "hackagent.models.guardrail",
-    "GuardrailResult": "hackagent.models.guardrail",
-    "GuardrailSpec": "hackagent.models.guardrail",
-    "LLMGuardrail": "hackagent.models.guardrail",
-}
-
-__all__ = sorted(_EXPORTS)
-
-
-def __getattr__(name: str) -> Any:
-    # Lazy, so importing a leaf such as ``models.envelope`` does not load
-    # every adapter.
-    module = _EXPORTS.get(name)
-    if module is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    return getattr(import_module(module), name)
+__all__ = [
+    "ConnectionSpec",
+    "GenerationSpec",
+    "GuardedModel",
+    "Model",
+    "ModelCallError",
+    "ModelConfig",
+    "ModelConnection",
+    "ModelFactory",
+    "ModelGeneration",
+    "ModelResponse",
+    "as_completion",
+    "build_embedder",
+    "build_model",
+    "check_supported",
+    "connect",
+]

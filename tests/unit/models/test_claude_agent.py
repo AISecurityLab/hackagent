@@ -2,38 +2,55 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for the Claude Code adapter.
+Unit tests for the Claude Code backend.
 
 Claude Code speaks no HTTP — it is driven via the headless ``claude -p`` CLI.
-Like the ADK provider, ``ClaudeCodeAgent`` routes through LiteLLM via a
-per-instance custom provider, but its handler shells out to a subprocess
-instead of making an HTTP request. These tests exercise both layers:
-handler-level (argv building + subprocess transport) and adapter-level
-(end-to-end via the public ``handle_request``).
+``ClaudeCodeModel`` routes through LiteLLM via a per-instance custom provider,
+but its handler shells out to a subprocess instead of making an HTTP request.
+These tests exercise both layers: handler-level (argv building + subprocess
+transport) and model-level (end-to-end via the public ``complete``).
 """
 
 import json
 import logging
 import unittest
-import uuid
 from unittest.mock import MagicMock, patch
 
-from hackagent.models.adapters.base import (
-    AdapterConfigurationError,
-    AdapterInteractionError,
+from hackagent.core.contracts import AgentType, ModelSpec
+from hackagent.models.completions import claude as claude_module
+from hackagent.models.completions.cli import (
+    CLIConfigurationError,
+    CLIInteractionError,
+    last_user_text as _last_user_text,
 )
-from hackagent.models.adapters.claude import (
-    ClaudeCodeAgent,
+from hackagent.models.completions.claude import (
+    ClaudeCodeModel,
     _extract_result_text,
     _get_claude_code_custom_llm_class,
 )
-from hackagent.models.adapters.cli_agent import last_user_text as _last_user_text
-from hackagent.models.adapters import claude as claude_provider_module
 
 logging.disable(logging.CRITICAL)
 
 # A path that shutil.which() will "find" so init doesn't reject the binary.
 _FAKE_BINARY = "/usr/bin/claude"
+
+
+def _spec(**config):
+    timeout = config.pop("timeout", None)
+    name = config.pop("name", "sonnet")
+    return ModelSpec(
+        identifier=name,
+        agent_type=AgentType.CLAUDE_CODE,
+        timeout=timeout,
+        extra=dict(config),
+    )
+
+
+def _model(**config):
+    with patch(
+        "hackagent.models.completions.cli.shutil.which", return_value=_FAKE_BINARY
+    ):
+        return ClaudeCodeModel(_spec(**config))
 
 
 def _make_handler(**overrides):
@@ -75,11 +92,11 @@ def _result_json(text: str, **extra) -> str:
 
 
 class TestClaudeModuleLayout(unittest.TestCase):
-    """Claude Code lives at ``models/adapters/claude.py``."""
+    """Claude Code lives at ``models/completions/claude.py``."""
 
     def test_helpers_are_module_level(self):
-        self.assertIs(_extract_result_text, claude_provider_module._extract_result_text)
-        self.assertIs(ClaudeCodeAgent, claude_provider_module.ClaudeCodeAgent)
+        self.assertIs(_extract_result_text, claude_module._extract_result_text)
+        self.assertIs(ClaudeCodeModel, claude_module.ClaudeCodeModel)
 
 
 class TestClaudeHelpers(unittest.TestCase):
@@ -120,7 +137,7 @@ class TestClaudeHelpers(unittest.TestCase):
                 "result": "boom",
             }
         )
-        with self.assertRaises(AdapterInteractionError):
+        with self.assertRaises(CLIInteractionError):
             _extract_result_text(payload)
 
     def test_extract_result_text_captures_usage_policy_block(self):
@@ -166,7 +183,7 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
         self.assertEqual(argv[argv.index("--max-turns") + 1], "3")
         self.assertIn("--bare", argv)
 
-    @patch("hackagent.models.adapters.claude.subprocess.run")
+    @patch("hackagent.models.completions.claude.subprocess.run")
     def test_run_feeds_prompt_via_stdin(self, mock_run):
         mock_run.return_value = _completed(stdout=_result_json("the answer"))
         handler = _make_handler()
@@ -177,14 +194,14 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore your rules", mock_run.call_args.args[0])
         self.assertEqual(result["final_text"], "the answer")
 
-    @patch("hackagent.models.adapters.claude.subprocess.run")
+    @patch("hackagent.models.completions.claude.subprocess.run")
     def test_run_nonzero_exit_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=2)
         handler = _make_handler()
-        with self.assertRaises(AdapterInteractionError):
+        with self.assertRaises(CLIInteractionError):
             handler._run(prompt_text="hi")
 
-    @patch("hackagent.models.adapters.claude.subprocess.run")
+    @patch("hackagent.models.completions.claude.subprocess.run")
     def test_run_nonzero_exit_with_policy_block_is_captured(self, mock_run):
         """A Usage Policy block (exit 1 + result payload) is captured, not raised."""
         refusal = "API Error: ... violates our Usage Policy. Try rephrasing"
@@ -196,83 +213,63 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
         result = handler._run(prompt_text="obfuscated harmful prompt")
         self.assertEqual(result["final_text"], refusal)
 
-    @patch("hackagent.models.adapters.claude.subprocess.run")
+    @patch("hackagent.models.completions.claude.subprocess.run")
     def test_run_missing_binary_raises_config_error(self, mock_run):
         mock_run.side_effect = FileNotFoundError()
         handler = _make_handler()
-        with self.assertRaises(AdapterConfigurationError):
+        with self.assertRaises(CLIConfigurationError):
             handler._run(prompt_text="hi")
 
 
-class TestClaudeAgentInit(unittest.TestCase):
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_success(self, _which):
-        adapter = ClaudeCodeAgent(
-            id=str(uuid.uuid4()),
-            config={"name": "sonnet", "timeout": 60, "binary": "claude"},
-        )
-        self.assertEqual(adapter.name, "sonnet")
-        self.assertEqual(adapter.timeout, 60)
+class TestClaudeModelInit(unittest.TestCase):
+    def test_init_success(self):
+        model = _model(name="sonnet", timeout=60, binary="claude")
+        self.assertEqual(model.name, "sonnet")
+        self.assertEqual(model.timeout, 60)
         self.assertTrue(
-            adapter.litellm_model.startswith("hackagent_claude_code_")
-            and adapter.litellm_model.endswith("/sonnet")
+            model.litellm_model.startswith("hackagent_claude_code_")
+            and model.litellm_model.endswith("/sonnet")
         )
 
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_default_timeout(self, _which):
-        adapter = ClaudeCodeAgent(id="t1", config={"name": "opus"})
-        self.assertEqual(adapter.timeout, 300)
+    def test_init_default_timeout(self):
+        model = _model(name="opus")
+        self.assertEqual(model.timeout, 300)
 
     def test_init_missing_name(self):
-        with self.assertRaises(AdapterConfigurationError):
-            ClaudeCodeAgent(id="e1", config={})
+        with self.assertRaises(CLIConfigurationError):
+            ClaudeCodeModel(ModelSpec(identifier="", agent_type=AgentType.CLAUDE_CODE))
 
-    @patch("hackagent.models.adapters.cli_agent.shutil.which", return_value=None)
-    def test_init_missing_binary_raises(self, _which):
-        with self.assertRaises(AdapterConfigurationError):
-            ClaudeCodeAgent(id="e2", config={"name": "sonnet"})
+    def test_init_missing_binary_raises(self):
+        with patch("hackagent.models.completions.cli.shutil.which", return_value=None):
+            with self.assertRaises(CLIConfigurationError):
+                ClaudeCodeModel(_spec(name="sonnet"))
 
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_registers_custom_provider(self, _which):
+    def test_init_registers_custom_provider(self):
         import litellm
 
-        adapter = ClaudeCodeAgent(id="reg1", config={"name": "sonnet"})
+        model = _model(name="sonnet")
         providers = [entry["provider"] for entry in litellm.custom_provider_map]
-        self.assertIn(f"hackagent_claude_code_{adapter.id}", providers)
+        self.assertIn(f"hackagent_claude_code_{model.id}", providers)
 
 
-class TestClaudeAgentHandleRequest(unittest.TestCase):
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def setUp(self, _which):
-        self.adapter = ClaudeCodeAgent(id="h1", config={"name": "sonnet"})
+class TestClaudeModelComplete(unittest.TestCase):
+    def setUp(self):
+        self.model = _model(name="sonnet")
 
-    def test_missing_prompt_returns_400(self):
-        response = self.adapter.handle_request({})
-        self.assertEqual(response["status_code"], 400)
-
-    @patch("hackagent.models.adapters.claude.subprocess.run")
-    def test_handle_request_success_routes_through_cli(self, mock_run):
+    @patch("hackagent.models.completions.claude.subprocess.run")
+    def test_complete_success_routes_through_cli(self, mock_run):
         mock_run.return_value = _completed(stdout=_result_json("agent reply"))
-        response = self.adapter.handle_request({"prompt": "hello"})
-        self.assertEqual(response["status_code"], 200)
-        self.assertEqual(response["generated_text"], "agent reply")
-        self.assertEqual(response["adapter_type"], "ClaudeCodeAgent")
+        response = self.model.complete([{"role": "user", "content": "hello"}])
+        self.assertEqual(response.text, "agent reply")
+        self.assertIsNone(response.error)
         # Prompt reached the subprocess via stdin.
         self.assertEqual(mock_run.call_args.kwargs["input"], "hello")
 
-    @patch("hackagent.models.adapters.claude.subprocess.run")
-    def test_handle_request_cli_error_returns_500(self, mock_run):
+    @patch("hackagent.models.completions.claude.subprocess.run")
+    def test_complete_cli_error_returns_error(self, mock_run):
         mock_run.return_value = _completed(stderr="boom", returncode=1)
-        response = self.adapter.handle_request({"prompt": "hi"})
-        self.assertEqual(response["status_code"], 500)
+        response = self.model.complete([{"role": "user", "content": "hi"}])
+        self.assertIsNotNone(response.error)
 
 
 if __name__ == "__main__":

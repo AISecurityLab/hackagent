@@ -46,15 +46,15 @@ Applies the following rules recursively:
 
 - `None` → `None`
 - `dict`:
-- Keys in `_SKIP_KEYS` (`_client`, `client`) → `"<TypeName>"`
+- Keys in `_SKIP_KEYS` (`_client`, `client`) → `&quot;&lt;TypeName&gt;&quot;`
 - Keys whose lowercase form contains a sensitive substring
-(`key`, `token`, `secret`, `password`) → `"***REDACTED***"`
+(`key`, `token`, `secret`, `password`) → `&quot;***REDACTED***&quot;`
 - All other values recurse.
 - `list` / `tuple` → recurse element-wise, preserving type.
-- `float`: `inf`/`-inf` → `"Infinity"`/`"-Infinity"`,
-`nan` → `"NaN"`, finite float returned as-is.
+- `float`: `inf`/`-inf` → `&quot;Infinity&quot;`/`&quot;-Infinity&quot;`,
+`nan` → `&quot;NaN&quot;`, finite float returned as-is.
 - `str`, `int`, `bool` → returned as-is.
-- Anything else: attempt `json.dumps`; if that fails, return `"<TypeName>"`.
+- Anything else: attempt `json.dumps`; if that fails, return `&quot;&lt;TypeName&gt;&quot;`.
 
 **Arguments**:
 

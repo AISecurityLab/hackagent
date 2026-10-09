@@ -6,7 +6,7 @@ title: hackagent.catalog.risks.base
 Base vulnerability class for all hackagent risk assessments.
 
 Architecture (mirrors the attack layer):
-    HackAgent.hack() → hackagent.orchestrator.run → BaseAttack (technique)
+    HackAgent.hack() → campaign runner → a technique
                                               ↕
                      BaseVulnerability ← vulnerability.assess()
 

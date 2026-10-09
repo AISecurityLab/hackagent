@@ -1,263 +1,96 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-PAP (Persuasive Adversarial Prompts) attack implementation.
+"""PAP: restate the goal with one persuasion technique after another.
 
-Uses a taxonomy of 40 persuasion techniques to paraphrase harmful prompts
-into persuasive variants.  An attacker LLM performs the paraphrasing via
-in-context learning, and the resulting prompts are sent to the target model.
-A multi-judge evaluation determines attack success.
+Each technique is a taxonomy entry the attacker model rewrites the goal
+with. The rewrite goes to the target, the panel judges the reply, and the
+search stops at the first technique the panel calls a success. A technique
+whose rewrite fails is skipped, so one unusable attacker reply does not end
+the search.
 
-The attack runs in two pipeline stages:
-1. **Generation** — for each goal, iterate over selected persuasion
-   techniques.  The attacker LLM paraphrases the goal, the persuasive
-   prompt is sent to the target, and a judge evaluates the response.
-   If a jailbreak is confirmed, remaining techniques are skipped.
-2. **Evaluation** — post-processing: server sync, tracker, ASR logging.
+Every technique that reached the target is returned, so the panel rates
+each one and the run reports which techniques worked.
 
 Based on: https://arxiv.org/abs/2401.06373
 """
 
-import copy
-import logging
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
-from hackagent.attacks._lib.legacy_seams import Store
-from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks._lib.inline_judge import attach_ctx_judge
-from hackagent.attacks.ports import RunContext
-from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.types import AttackResult, rows_to_attack_results
+from typing import Optional
 
-from hackagent.attacks._lib.inline_judge import make_postprocess_execute
-
-from . import generation
-from .config import DEFAULT_PAP_CONFIG
+from ...contract import Completion, Judge, Target
+from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
+from ...trace import decision, phase
+from .config import PAPParams
+from .taxonomy import build_mutation_prompt, extract_mutated_text, resolve_techniques
 
 
-def _recursive_update(target_dict, source_dict):
-    """Recursively merge *source_dict* into *target_dict*.
+class PAPAttack(IterativeAttack[PAPParams]):
+    """A sweep over persuasion techniques, one request each."""
 
-    Nested dictionaries are merged recursively.  Internal keys (starting
-    with ``_``) are passed by reference; all other values are deep-copied.
-    """
-    for key, source_value in source_dict.items():
-        target_value = target_dict.get(key)
-        if isinstance(source_value, dict) and isinstance(target_value, dict):
-            _recursive_update(target_value, source_value)
-        elif key.startswith("_"):
-            target_dict[key] = source_value
-        else:
-            target_dict[key] = copy.deepcopy(source_value)
+    name = "pap"
+    params_type = PAPParams
 
-
-class PAPAttack(BaseAttack):
-    """Persuasive Adversarial Prompts (PAP) — taxonomy-guided persuasion attack.
-
-    Implements the PAP technique from:
-        Zeng et al., "How Johnny Can Persuade LLMs to Jailbreak Them:
-        Rethinking Persuasion to Challenge AI Safety by Humanizing LLMs" (2024)
-        https://arxiv.org/abs/2401.06373
-
-    For each goal the attack iterates over selected persuasion techniques.
-    For each technique, the attacker LLM paraphrases the goal into a
-    persuasive variant, which is sent to the target model.  A judge
-    evaluates the response and if a jailbreak is confirmed, the remaining
-    techniques are skipped (early stop).
-
-    Pipeline:
-        1. Generation — persuasive paraphrasing, target query, and an
-           inline judge. On ``BaseAttack(config, ctx)`` that judge is
-           ``ctx.judge.score`` via
-           :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
-           ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
-
-    Construct with ``(config, ctx)``. Tests build ``ctx`` with
-    ``make_ctx()``. The legacy constructor is obsolete for new code.
-    :class:`~hackagent.attacks.techniques.adaptive.pap.config.PAPConfig` still
-    subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
-    """
-
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        ctx_or_client: Any = None,
-        agent_router: Optional[LLMRouter] = None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client: Optional[Store] = None,
-    ):
-        """Initialize PAP with ``(config, ctx)`` or the legacy constructor.
-
-        On the new seam, generation scores with ``ctx.judge.score``.
-        """
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+    def __init__(self, params: PAPParams) -> None:
+        super().__init__(params)
+        if params.attacker is None:
+            raise ValueError("PAP needs an 'attacker' role to rewrite the goal.")
+        self.attacker: Completion = params.attacker
+        techniques = resolve_techniques(params.techniques)
+        self.techniques = (
+            techniques[: params.max_techniques] if params.max_techniques else techniques
         )
-        if ctx is None:
-            if resolved_client is None:
-                raise ValueError("A storage backend must be provided to PAPAttack.")
-            if agent_router is None:
-                raise ValueError(
-                    "Victim LLMRouter instance must be provided to PAPAttack."
+
+    async def search(
+        self, goal: str, target: Target, judge: Optional[Judge]
+    ) -> list[Finding]:
+        findings: list[Finding] = []
+        total = len(self.techniques)
+
+        for index, technique in enumerate(self.techniques):
+            label = f"technique {index + 1}/{total}: {technique}"
+            with phase(label, technique=technique, index=index) as path:
+                prompt = await self._rewrite(goal, technique)
+                if prompt is None:
+                    decision("skipped", "the attacker produced no usable rewrite")
+                    continue
+
+                messages = [{"role": "user", "content": prompt}]
+                reply = await target(messages)
+                if not reply.ok or not reply.text:
+                    decision("skipped", "the target gave no usable reply")
+                    continue
+
+                verdict = await judge_reply(judge, goal, prompt, reply.text)
+                findings.append(
+                    Finding(
+                        messages=messages,
+                        response=reply,
+                        verdict=verdict,
+                        metadata={"technique": technique, "technique_index": index},
+                        path=path,
+                    )
                 )
-            client = resolved_client
+                if succeeded(verdict):
+                    decision(
+                        "stopped",
+                        "the panel called this reply a success",
+                        score=verdict.score,
+                    )
+                    break
 
-        current_config = copy.deepcopy(DEFAULT_PAP_CONFIG)
-        if config:
-            _recursive_update(current_config, config)
+        return findings
 
-        attach_ctx_judge(current_config, ctx)
-
-        self.logger = logging.getLogger("hackagent.attacks.pap")
-        if ctx is not None:
-            super().__init__(current_config, ctx)
-        else:
-            super().__init__(current_config, client, agent_router)
-
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
-
-    def _validate_config(self):
-        super()._validate_config()
-
-        required_keys = ["attack_type", "pap_params"]
-        missing = [k for k in required_keys if k not in self.config]
-        if missing:
-            raise ValueError(
-                f"Configuration dictionary missing required keys: {', '.join(missing)}"
-            )
-
-        pap_params = self.config.get("pap_params", {})
-        techniques = pap_params.get("techniques", "top5")
-        if isinstance(techniques, str) and techniques not in ("top5", "all"):
-            raise ValueError(
-                f"pap_params.techniques must be 'top5', 'all', or a list; got '{techniques}'"
-            )
-
-    # ------------------------------------------------------------------
-    # Pipeline definition
-    # ------------------------------------------------------------------
-
-    def _get_pipeline_steps(self) -> List[Dict]:
-        return [
-            {
-                "name": "Generation: PAP Persuasive Paraphrasing + Judge",
-                "function": generation.execute,
-                "step_type_enum": "GENERATION",
-                "config_keys": [
-                    "batch_size",
-                    "pap_params",
-                    "attacker",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "_judge",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                    "max_tokens",
-                    "temperature",
-                    "timeout",
-                ],
-                "input_data_arg_name": "goals",
-                "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": make_postprocess_execute("PAP"),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "pap_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "_judge",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
-        ]
-
-    # ------------------------------------------------------------------
-    # Run
-    # ------------------------------------------------------------------
-
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """Execute the full PAP attack pipeline.
-
-        Args:
-            goals: A list of goal strings to test.
-
-        Returns:
-            List of result dictionaries.
-        """
-        goals = goals or []
-        if not goals:
-            return []
-
-        coordinator = self._initialize_coordinator(attack_type="pap")
-
-        pap_params = self.config.get("pap_params", {})
-        goal_metadata = {
-            "techniques": pap_params.get("techniques", "top5"),
-            "max_techniques_per_goal": pap_params.get("max_techniques_per_goal", 0),
-        }
-        coordinator.initialize_goals(goals=goals, initial_metadata=goal_metadata)
-
-        if coordinator.has_goal_tracking:
-            self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
-
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        pipeline_steps = self._get_pipeline_steps()
-        start_step = self.config.get("start_step", 1) - 1
-
+    async def _rewrite(self, goal: str, technique: str) -> Optional[str]:
+        """Restate ``goal`` using ``technique``; ``None`` when that fails."""
+        instruction = build_mutation_prompt(goal, technique)
         try:
-            # Generation step (includes inline judge evaluation)
-            generation_output = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
-            )
-
-            if not generation_output:
-                self.logger.warning("Generation produced no output")
-                coordinator.finalize_pipeline([], lambda _: False)
-                return []
-
-            # Evaluation post-processing
-            results = self._execute_pipeline(
-                pipeline_steps, generation_output, start_step=start_step + 1
-            )
-
-            coordinator.finalize_all_goals(
-                results,
-                include_evaluation_trace=False,
-            )
-            coordinator.log_summary()
-            coordinator.finalize_pipeline(results)
-
-            return rows_to_attack_results(results)
-
+            reply = await self.attacker([{"role": "user", "content": instruction}])
         except Exception:
-            coordinator.finalize_on_error("PAP pipeline failed with exception")
-            raise
+            return None
+        rewritten = extract_mutated_text(reply or "").strip()
+        return rewritten or None
+
+
+__all__ = ["PAPAttack"]

@@ -3,9 +3,9 @@
 
 """Panel turns a Sample into a Verdict. Judges are fakes or a scripted LLM."""
 
+import asyncio
 import unittest
 
-from hackagent.attacks.ports import Judge
 from hackagent.core.contracts import Sample, Verdict
 from hackagent.evaluation.panel import LLMJudge, Panel, normalize_score
 from tests.fakes.judge import FakeJudge
@@ -55,7 +55,6 @@ class TestPanel(unittest.TestCase):
         self.assertEqual(strict.samples, [sample])
         self.assertEqual(lenient.samples, [sample])
         self.assertEqual(panel.score(_sample("again")), 5.0)
-        self.assertIsInstance(panel, Judge)
 
     def test_max_uses_the_highest_normalised_score(self):
         panel = Panel(
@@ -285,6 +284,55 @@ class TestPanel(unittest.TestCase):
     def test_unknown_aggregation(self):
         with self.assertRaises(ValueError):
             Panel([FakeJudge()], aggregation="median")
+
+
+class TestAsyncEvaluation(unittest.TestCase):
+    def test_avote_parses_like_vote(self):
+        judge = LLMJudge("harmbench", FakeLLM(script=["yes"]), name="hb")
+        vote = asyncio.run(judge.avote(_sample()))
+        self.assertTrue(vote.success)
+        self.assertEqual(vote.score, 1.0)
+
+    def test_avote_retries_unparseable_reply_then_abstains(self):
+        llm = FakeLLM(script=["maybe", "still unsure"])
+        vote = asyncio.run(LLMJudge("harmbench", llm, name="hb").avote(_sample()))
+        self.assertTrue(vote.abstained)
+        self.assertEqual(len(llm.requests), 2)
+
+    def test_aevaluate_matches_evaluate(self):
+        def panel():
+            return Panel(
+                [
+                    LLMJudge("harmbench", FakeLLM(script=["yes"]), name="a"),
+                    LLMJudge("harmbench", FakeLLM(script=["no"]), name="b"),
+                    LLMJudge("harmbench", FakeLLM(script=["yes"]), name="c"),
+                ],
+                aggregation="majority",
+            )
+
+        self.assertEqual(
+            asyncio.run(panel().aevaluate(_sample())), panel().evaluate(_sample())
+        )
+
+    def test_aevaluate_turns_judge_exceptions_into_abstentions(self):
+        class Broken:
+            name = "broken"
+            range = "binary"
+
+            def vote(self, sample):
+                raise AssertionError("unused")
+
+            async def avote(self, sample):
+                raise RuntimeError("judge unavailable")
+
+        verdict = asyncio.run(
+            Panel(
+                [Broken(), LLMJudge("harmbench", FakeLLM(script=["yes"]), name="ok")]
+            ).aevaluate(_sample())
+        )
+        self.assertTrue(verdict.votes[0].abstained)
+        self.assertIn("judge unavailable", verdict.votes[0].error)
+        self.assertTrue(verdict.success)
 
 
 if __name__ == "__main__":

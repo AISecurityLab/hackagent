@@ -23,7 +23,6 @@ class ConfigTab(VerticalScroll):
 
     BINDINGS = [
         Binding("s", "save_config", "Save"),
-        Binding("t", "test_connection", "Test Connection"),
         Binding("r", "reset_config", "Reset"),
     ]
 
@@ -91,8 +90,6 @@ class ConfigTab(VerticalScroll):
         """Handle button press events."""
         if event.button.id == "save-config":
             self._save_config()
-        elif event.button.id == "test-connection":
-            self._test_connection()
         elif event.button.id == "reset-config":
             self._reset_config()
         elif event.button.id == "validate-config":
@@ -132,32 +129,49 @@ class ConfigTab(VerticalScroll):
             pass
 
     def _save_config(self) -> None:
-        """Save configuration to file."""
+        """Save configuration to file, reporting the outcome."""
         try:
             self.cli_config.save()
-            self._update_status()
-            self._update_mode_indicator()
-        except Exception:
-            pass
+        except Exception as exc:
+            self.notify(str(exc), title="Save failed", severity="error")
+            return
+        self._update_status()
+        self._update_mode_indicator()
+        self.notify(
+            f"Saved to {self.cli_config.default_config_path}",
+            title="Configuration saved",
+            severity="information",
+        )
 
     def _validate_config(self) -> None:
-        """Validate current configuration."""
+        """Validate the current configuration, reporting the outcome."""
         try:
             self.cli_config.validate()
-        except ValueError:
-            pass
+        except ValueError as exc:
+            self.notify(str(exc), title="Configuration invalid", severity="error")
+            return
+        self.notify(
+            "Configuration is valid.", title="Valid", severity="information"
+        )
 
     def _reset_config(self) -> None:
-        """Reset configuration to defaults."""
+        """Reset configuration to defaults, reporting the outcome."""
         try:
-            if self.cli_config.default_config_path.exists():
+            existed = self.cli_config.default_config_path.exists()
+            if existed:
                 self.cli_config.default_config_path.unlink()
-
             self._load_config()
             self._update_status()
-
-        except Exception:
-            pass
+        except Exception as exc:
+            self.notify(str(exc), title="Reset failed", severity="error")
+            return
+        self.notify(
+            "Configuration reset to defaults."
+            if existed
+            else "No configuration file to reset.",
+            title="Reset",
+            severity="information",
+        )
 
     def _get_python_version(self) -> str:
         """Get Python version string."""

@@ -1,15 +1,13 @@
+---
+sidebar_position: 3
+---
+
 # Targeted Assessment
 
 A **targeted assessment** focuses on specific vulnerabilities or attack surfaces relevant to your system's unique characteristics and use cases.
 
-:::note Reading ASR
-`agent.hack(attack_config=...)` returns a list of row dicts. The examples below compute ASR from those rows with this helper:
-
-```python
-def asr(rows):
-    """Fraction of rows the judges marked successful."""
-    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
-```
+:::note
+`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
 :::
 
 ## When to Use
@@ -34,8 +32,7 @@ from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="rag-assessment",
 )
 
@@ -53,7 +50,7 @@ for profile in rag_profiles:
                 "objective": profile.objective,
             }
             result = agent.hack(attack_config=attack_config)
-            print(f"{profile.name} + {ds.preset}: ASR = {asr(result):.0%}")
+            print(f"{profile.name} + {ds.preset}: ASR = {result.get('asr', 'N/A')}")
     else:
         # Custom RAG-specific goals
         attack_config = {
@@ -66,7 +63,7 @@ for profile in rag_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-        print(f"{profile.name}: ASR = {asr(result):.0%}")
+        print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
 ```
 
 ### Agentic System Assessment
@@ -80,8 +77,7 @@ from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INV
 from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="agent-assessment",
 )
 
@@ -118,7 +114,7 @@ for profile in agentic_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {asr(result):.0%}")
+    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
 ```
 
 ### Customer-Facing Chatbot Assessment
@@ -134,8 +130,7 @@ from hackagent.catalog.risks.sensitive_information_disclosure import (
 )
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="chatbot-assessment",
 )
 
@@ -154,7 +149,7 @@ for profile in chatbot_profiles:
             "objective": profile.objective,
         }
         result = agent.hack(attack_config=attack_config)
-        print(f"{profile.name} + {ds.preset}: ASR = {asr(result):.0%}")
+        print(f"{profile.name} + {ds.preset}: ASR = {result.get('asr', 'N/A')}")
 ```
 
 ### Public API Assessment
@@ -170,8 +165,7 @@ from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="api-assessment",
 )
 
@@ -190,7 +184,7 @@ for profile in api_profiles:
                 "objective": profile.objective,
             }
             result = agent.hack(attack_config=attack_config)
-            print(f"{profile.name}: ASR = {asr(result):.0%}")
+            print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
 ```
 
 ## Custom Goal Development
@@ -258,8 +252,7 @@ from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="progressive-test",
 )
 
@@ -272,7 +265,7 @@ attack_config = {
 baseline_result = agent.hack(attack_config=attack_config)
 
 # If baseline ASR > threshold, escalate to advanced attacks
-if asr(baseline_result) > 0.1:
+if baseline_result.get("asr", 0) > 0.1:
     print("Baseline vulnerability detected. Escalating to PAIR...")
 
     # Phase 2: PAIR
@@ -283,7 +276,7 @@ if asr(baseline_result) > 0.1:
     }
     pair_result = agent.hack(attack_config=attack_config)
 
-    if asr(pair_result) > 0.2:
+    if pair_result.get("asr", 0) > 0.2:
         print("Significant vulnerability confirmed. Running AdvPrefix...")
 
         # Phase 3: AdvPrefix

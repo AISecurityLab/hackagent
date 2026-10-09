@@ -1,13 +1,9 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Baseline attack technique.
-
-Sends goals directly to the target model without any transformation.
-Used as a control condition to measure the model's default refusal rate.
-"""
+"""Baseline attack: the goal, unmodified."""
 
 from .attack import BaselineAttack
+from .config import BaselineParams
 
-__all__ = ["BaselineAttack"]
+__all__ = ["BaselineAttack", "BaselineParams"]

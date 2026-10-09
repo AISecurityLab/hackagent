@@ -4,42 +4,41 @@
 """The ``AttacksTab`` widget: layout wiring, lifecycle and event handlers."""
 
 import copy
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from textual import events, on
 from textual.binding import Binding
-from textual.containers import Container
+from textual.containers import Container, Vertical
 from textual.widgets import (
     Button,
     Checkbox,
+    ContentSwitcher,
     Input,
     ProgressBar,
     RadioButton,
     RadioSet,
     RichLog,
     Select,
-    SelectionList,
     Static,
     Switch,
     TextArea,
 )
-from textual.widgets._select import NoSelection
 
 
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.tui.forms import AttackConfigSpec
 from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
 from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
 
 
-from hackagent.interfaces.tui.views.attacks.helpers import (
-    _default_campaign_attack_keys,
-    _selected_technique_keys,
-)
+from textual.widgets._select import NoSelection
 
+from hackagent.interfaces.tui.views.attacks.helpers import (
+    _ENDPOINT_OPTIONAL_AGENT_TYPES,
+    _default_campaign_attack_keys,
+)
 from hackagent.interfaces.tui.views.attacks.executor import AttacksExecutorMixin
 from hackagent.interfaces.tui.views.attacks.form import AttacksFormMixin
 from hackagent.interfaces.tui.views.attacks.layout import AttacksLayoutMixin
+from hackagent.interfaces.tui.views.attacks.rows import AttackRow, JudgeRow
 from hackagent.interfaces.tui.views.attacks.runner import AttacksRunnerMixin
 
 
@@ -50,7 +49,7 @@ class AttacksTab(
     AttacksExecutorMixin,
     Container,
 ):
-    """Execute and manage security attacks with strategy-aware configuration."""
+    """Execute and manage security attacks with a declarative campaign form."""
 
     DEFAULT_CSS = """
     AttacksTab {
@@ -58,13 +57,58 @@ class AttacksTab(
     }
 
     AttacksTab #attack-form-container {
-        width: 35%;
+        width: 42%;
+        layout: vertical;
         border-right: solid $primary;
         padding: 1 2;
     }
 
     AttacksTab #attack-monitor-container {
-        width: 65%;
+        width: 58%;
+    }
+
+    /* The wizard column: a fixed progress line + error line on top, the
+       active step filling the middle (and scrolling), and the Back/Next bar
+       pinned at the bottom. */
+    AttacksTab #wizard-progress {
+        height: auto;
+        text-align: center;
+        margin-bottom: 1;
+    }
+
+    AttacksTab #wizard-steps {
+        height: 1fr;
+    }
+
+    AttacksTab #wizard-steps > VerticalScroll {
+        height: 1fr;
+    }
+
+    AttacksTab #wizard-nav {
+        height: auto;
+        margin-top: 1;
+    }
+
+    AttacksTab #wizard-nav Button {
+        width: 1fr;
+        margin: 0 1;
+    }
+
+    AttacksTab #run-buttons,
+    AttacksTab #run-buttons-secondary {
+        height: auto;
+    }
+
+    AttacksTab #run-buttons Button,
+    AttacksTab #run-buttons-secondary Button {
+        width: 1fr;
+        margin: 0 1;
+    }
+
+    AttacksTab #run-summary {
+        height: auto;
+        border: round $primary;
+        padding: 0 1;
     }
 
     AttacksTab .section-title {
@@ -111,15 +155,6 @@ class AttacksTab(
         margin-bottom: 1;
     }
 
-    AttacksTab #strategy-description {
-        color: $text-muted;
-        margin-bottom: 1;
-    }
-
-    AttacksTab .advanced-toggle {
-        margin-top: 1;
-    }
-
     AttacksTab .validation-errors {
         color: $error;
         margin-top: 1;
@@ -134,9 +169,39 @@ class AttacksTab(
         height: auto;
     }
 
-    AttacksTab #attack-strategies {
+    AttacksTab #attack-rows,
+    AttacksTab #judge-rows {
         height: auto;
-        border: solid $primary;
+    }
+
+    AttacksTab .attack-row,
+    AttacksTab .judge-row {
+        height: auto;
+        border: round $primary;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+
+    /* A bare Vertical defaults to height: 1fr, so the Parameters container
+       ballooned to fill the viewport when expanded — the oversized rows then
+       overlapped. Size the row boxes to their content instead. */
+    AttacksTab .row-head,
+    AttacksTab .row-params {
+        height: auto;
+    }
+
+    AttacksTab .row-attack-type,
+    AttacksTab .row-judge-id {
+        width: 1fr;
+    }
+
+    AttacksTab .remove-row {
+        width: 5;
+        min-width: 5;
+    }
+
+    AttacksTab .row-attack-desc {
+        color: $text-muted;
     }
 
     AttacksTab #escalate-only-mitigated-help {
@@ -150,6 +215,10 @@ class AttacksTab(
         Binding("c", "clear_form", "Clear Form"),
     ]
 
+    #: Wizard steps: ContentSwitcher child id → short label.
+    _STEPS = ("step-target", "step-attacks", "step-judges", "step-run")
+    _STEP_LABELS = ("Target", "Attacks", "Judges", "Run")
+
     def __init__(self, cli_config: CLIConfig, initial_data: Optional[dict] = None):
         """Initialize attacks tab.
 
@@ -160,61 +229,115 @@ class AttacksTab(
         super().__init__()
         self.cli_config = cli_config
         self.initial_data = initial_data or {}
-        self._attack_config_overrides: Dict[str, Any] = copy.deepcopy(
-            self.initial_data.get("attack_config_overrides", {})
-        )
         self._agent_adapter_operational_config: Optional[Dict[str, Any]] = (
             copy.deepcopy(self.initial_data.get("agent_adapter_operational_config"))
         )
         self._reduced_tui_logs = bool(self.initial_data.get("reduced_tui_logs", False))
-        self._show_advanced = False
-        self._advanced_hover_preview = False
-        self._advanced_focus_preview = False
-        self._current_spec: Optional[AttackConfigSpec] = None
-        # Multi-attack (hack_chain) support: values collected for a strategy
-        # are cached here when the user switches to configure a different
-        # one, so switching back and forth doesn't lose edits. The strategy
-        # whose config form is currently rendered is tracked separately from
-        # which strategies are actually selected to run.
-        self._strategy_value_cache: Dict[str, Dict[str, Any]] = {}
-        self._focused_strategy: Optional[str] = None
-        # Last selection applied to the "Configuring" dropdown — lets
-        # `_sync_configuring_options` skip redundant `set_options()` calls
-        # (see that method's docstring for why this matters).
-        self._configuring_options_keys: Optional[List[str]] = None
+        self._step_index = 0
 
     def on_mount(self) -> None:
         """Called when the tab is mounted."""
-        # Default to the Jailbreak evaluation campaign's primary attacks
-        # (h4rm3l → TAP → PAIR), matching HackAgent.hack_chain's default,
-        # so Execute runs a chain out of the box. `_prefill_form()` below
-        # overrides this with a single explicit attack when re-running one
-        # specific attack (e.g. from the Results tab).
-        self._select_default_campaign_attacks()
-
         if self.initial_data:
             self._prefill_form()
 
+        self.call_after_refresh(lambda: self._go_to_step(0))
+        self.call_after_refresh(self._sync_escalate_visibility)
         self.call_after_refresh(self._add_initial_messages)
 
         if self.initial_data.get("auto_execute_attack", False):
             self.call_after_refresh(lambda: self._execute_attack(dry_run=False))
 
-    def _select_default_campaign_attacks(self) -> None:
-        """Select the default hack_chain attack set (the Jailbreak
-        evaluation campaign's primary attacks, in campaign order) and
-        render/focus the first one's config form."""
-        keys = _default_campaign_attack_keys()
-        if not keys:
+    # ------------------------------------------------------------------
+    # Wizard navigation
+    # ------------------------------------------------------------------
+
+    def _render_step_indicator(self) -> None:
+        parts = []
+        for index, label in enumerate(self._STEP_LABELS):
+            marker = f"{index + 1} {label}"
+            if index == self._step_index:
+                parts.append(f"[reverse bold] {marker} [/]")
+            else:
+                parts.append(f"[dim]{marker}[/dim]")
+        try:
+            self.query_one("#wizard-progress", Static).update("  →  ".join(parts))
+        except Exception:
+            pass
+
+    def _go_to_step(self, index: int) -> None:
+        """Show wizard step *index* and sync the indicator and nav buttons."""
+        index = max(0, min(index, len(self._STEPS) - 1))
+        self._step_index = index
+        try:
+            switcher = self.query_one("#wizard-steps", ContentSwitcher)
+            switcher.current = self._STEPS[index]
+            self.query_one("#wizard-back", Button).disabled = index == 0
+            self.query_one("#wizard-next", Button).disabled = (
+                index == len(self._STEPS) - 1
+            )
+        except Exception:
+            pass
+        self._render_step_indicator()
+        if self._STEPS[index] == "step-run":
+            self._render_run_summary()
+
+    def _next_step(self) -> None:
+        error = self._validate_step(self._step_index)
+        errors_widget = self.query_one("#validation-errors", Static)
+        if error:
+            errors_widget.update(f"[bold red]{error}[/bold red]")
             return
+        errors_widget.update("")
+        self._go_to_step(self._step_index + 1)
 
-        strategies = self.query_one("#attack-strategies", SelectionList)
-        strategies.deselect_all()
-        for key in keys:
-            strategies.select(key)
+    def _validate_step(self, index: int) -> Optional[str]:
+        """A light check gating the Next button for step *index*."""
+        step = self._STEPS[index]
+        if step == "step-target":
+            if not self.query_one("#agent-name", Input).value.strip():
+                return "Target: an agent name is required."
+            agent_type = self.query_one("#agent-type", Select).value
+            if isinstance(agent_type, NoSelection) or not agent_type:
+                return "Target: select an agent type."
+            endpoint = self.query_one("#endpoint-url", Input).value.strip()
+            if not endpoint and str(agent_type) not in _ENDPOINT_OPTIONAL_AGENT_TYPES:
+                return "Target: an endpoint URL is required for this agent type."
+        elif step == "step-attacks":
+            rows = list(self.query(AttackRow))
+            if not rows or any(row.attack_type() is None for row in rows):
+                return "Attacks: give every attack row a technique."
+        return None
 
-        self._sync_configuring_options(keys)
-        self._sync_chain_mode_visibility(keys)
+    def _render_run_summary(self) -> None:
+        """A plain-language recap of the configured campaign for the Run step."""
+        try:
+            name = self.query_one("#agent-name", Input).value.strip() or "—"
+            agent_type = self.query_one("#agent-type", Select).value
+            type_label = "—" if isinstance(agent_type, NoSelection) else str(agent_type)
+            attacks = [row.attack_type() or "—" for row in self.query(AttackRow)]
+            judges = len(list(self.query(JudgeRow)))
+            using_dataset = self.query_one("#radio-dataset", RadioButton).value
+            if using_dataset:
+                preset = self.query_one("#dataset-preset", Select).value
+                source = f"dataset '{preset}'"
+            else:
+                goals = [
+                    line
+                    for line in self.query_one(
+                        "#attack-goals", TextArea
+                    ).text.splitlines()
+                    if line.strip()
+                ]
+                source = f"{len(goals)} inline goal(s)"
+            summary = (
+                f"[bold]Target:[/bold] {name}  [dim]({type_label})[/dim]\n"
+                f"[bold]Input:[/bold] {source}\n"
+                f"[bold]Attacks:[/bold] {' → '.join(attacks)}\n"
+                f"[bold]Judges:[/bold] {judges}"
+            )
+            self.query_one("#run-summary", Static).update(summary)
+        except Exception:
+            pass
 
     def _add_initial_messages(self) -> None:
         """Add initial welcome messages to the viewers."""
@@ -246,8 +369,51 @@ class AttacksTab(
             pass
 
     # ------------------------------------------------------------------
-    # Dynamic strategy config rendering
+    # Dynamic rows
     # ------------------------------------------------------------------
+
+    def _sync_escalate_visibility(self) -> None:
+        """Show the escalate toggle only when 2+ attacks are configured."""
+        try:
+            is_chain = len(list(self.query(AttackRow))) > 1
+            self.query_one("#escalate-only-mitigated", Checkbox).display = is_chain
+            self.query_one("#escalate-only-mitigated-help", Static).display = is_chain
+        except Exception:
+            pass
+
+    def _mutate_rows(self, awaitable: Any) -> None:
+        """Await a row mount/remove, then recompute escalate visibility.
+
+        Textual's ``mount``/``remove`` complete on the next message cycle, so
+        the row count is only reliable once the returned awaitable resolves.
+        """
+
+        async def _finish() -> None:
+            await awaitable
+            self._sync_escalate_visibility()
+
+        self.run_worker(_finish(), name="attack-rows", exclusive=False)
+
+    def _add_attack_row(self) -> None:
+        self._mutate_rows(self.query_one("#attack-rows", Vertical).mount(AttackRow()))
+
+    def _add_judge_row(self) -> None:
+        self.query_one("#judge-rows", Vertical).mount(JudgeRow())
+
+    def _remove_row(self, button: Button) -> None:
+        """Remove the attack/judge row that owns *button*."""
+        for ancestor in button.ancestors:
+            if isinstance(ancestor, AttackRow):
+                if len(list(self.query(AttackRow))) <= 1:
+                    self.query_one("#validation-errors", Static).update(
+                        "[bold red]At least one attack is required.[/bold red]"
+                    )
+                    return
+                self._mutate_rows(ancestor.remove())
+                return
+            if isinstance(ancestor, JudgeRow):
+                ancestor.remove()
+                return
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         """Toggle between Goals and Dataset input panels."""
@@ -261,98 +427,51 @@ class AttacksTab(
                 goals_container.display = False
                 dataset_container.display = True
 
-    def on_select_changed(self, event: Select.Changed) -> None:
-        """React to the 'Configuring' strategy selector changes."""
-        if event.select.id == "attack-strategy-focus":
-            value = event.value
-            if value and not isinstance(value, NoSelection):
-                self._switch_focused_strategy(str(value))
-
-    def on_selection_list_selected_changed(
-        self, event: SelectionList.SelectedChanged
-    ) -> None:
-        """React to attack multi-selection changes (which attacks will run)."""
-        if event.selection_list.id != "attack-strategies":
-            return
-        selected = _selected_technique_keys(event.selection_list.selected)
-        self._sync_configuring_options(selected)
-        self._sync_chain_mode_visibility(selected)
-
-    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        """React to the advanced toggle."""
-        if event.checkbox.id == "advanced-toggle":
-            self._sync_advanced_visibility()
-
-    @on(Checkbox.Changed, "#advanced-toggle")
-    def _on_advanced_toggle(self, event: Checkbox.Changed) -> None:
-        """Handle advanced-toggle changes reliably across Textual versions."""
-        self._sync_advanced_visibility()
-
-    @on(events.Enter, "#advanced-toggle")
-    def _on_advanced_toggle_hover_enter(self, _: events.Enter) -> None:
-        """Preview advanced settings while hovering the advanced-toggle control."""
-        self._advanced_hover_preview = True
-        self._sync_advanced_visibility()
-
-    @on(events.Leave, "#advanced-toggle")
-    def _on_advanced_toggle_hover_leave(self, _: events.Leave) -> None:
-        """Hide hover-based advanced settings preview when pointer leaves control."""
-        self._advanced_hover_preview = False
-        self._sync_advanced_visibility()
-
-    def on_focus(self, _: events.Focus) -> None:
-        """Preview advanced settings when keyboard focus reaches advanced-toggle."""
-        focused = self.app.focused
-        self._advanced_focus_preview = bool(
-            focused is not None and getattr(focused, "id", None) == "advanced-toggle"
-        )
-        self._sync_advanced_visibility()
-
-    def on_blur(self, _: events.Blur) -> None:
-        """Hide focus-based preview once advanced-toggle is no longer focused."""
-        focused = self.app.focused
-        self._advanced_focus_preview = bool(
-            focused is not None and getattr(focused, "id", None) == "advanced-toggle"
-        )
-        self._sync_advanced_visibility()
-
-    def _sync_advanced_visibility(self) -> None:
-        """Recompute advanced visibility from toggle state and hover preview state."""
-        try:
-            pinned = bool(self.query_one("#advanced-toggle", Checkbox).value)
-        except Exception:
-            pinned = self._show_advanced
-
-        should_show = (
-            pinned or self._advanced_hover_preview or self._advanced_focus_preview
-        )
-        if self._show_advanced == should_show:
-            return
-
-        self._show_advanced = should_show
-        if self._current_spec:
-            self._render_strategy_config(self._current_spec.technique_key)
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
-        if event.button.id == "execute-attack":
+        button = event.button
+        if button.id == "wizard-back":
+            self._go_to_step(self._step_index - 1)
+        elif button.id == "wizard-next":
+            self._next_step()
+        elif button.id == "execute-attack":
             self._execute_attack(dry_run=False)
-        elif event.button.id == "dry-run":
+        elif button.id == "dry-run":
             self._execute_attack(dry_run=True)
-        elif event.button.id == "clear-form":
+        elif button.id == "add-attack":
+            self._add_attack_row()
+        elif button.id == "add-judge":
+            self._add_judge_row()
+        elif button.has_class("remove-row"):
+            self._remove_row(button)
+        elif button.id == "clear-form":
             self._clear_form()
-        elif event.button.id == "reset-defaults":
-            self._reset_defaults()
+        elif button.id == "reset-defaults":
+            self._reset_rows()
 
-    def _reset_defaults(self) -> None:
-        """Reset strategy-specific fields to their defaults."""
-        if self._current_spec:
-            self._render_strategy_config(self._current_spec.technique_key)
+    def _reset_rows(self) -> None:
+        """Restore the default attack campaign and a single judge."""
+        attack_container = self.query_one("#attack-rows", Vertical)
+        attack_container.remove_children()
+        for key in _default_campaign_attack_keys():
+            attack_container.mount(AttackRow(key))
+
+        judge_container = self.query_one("#judge-rows", Vertical)
+        judge_container.remove_children()
+        judge_container.mount(JudgeRow())
+
+        try:
+            self.query_one("#judge-aggregation", Select).value = "majority"
+            self.query_one("#escalate-only-mitigated", Checkbox).value = True
+        except Exception:
+            pass
+        self.call_after_refresh(self._sync_escalate_visibility)
 
     def _clear_form(self) -> None:
-        """Clear all form fields."""
+        """Clear all form fields and restore the default rows."""
         self.query_one("#agent-name", Input).value = ""
         self.query_one("#endpoint-url", Input).value = ""
+        self.query_one("#agent-type", Select).value = "google-adk"
         self.query_one("#attack-goals", TextArea).text = "Return fake weather data"
         self.query_one("#timeout", Input).value = "300"
 
@@ -365,9 +484,7 @@ class AttacksTab(
         self.query_one("#dataset-shuffle", Switch).value = True
         self.query_one("#dataset-seed", Input).value = "42"
 
-        # Reset strategy selection back to the default evaluation campaign.
-        self.query_one("#escalate-only-mitigated", Checkbox).value = True
-        self._select_default_campaign_attacks()
+        self._reset_rows()
 
         status_widget = self.query_one("#execution-status", Static)
         progress_bar = self.query_one("#attack-progress", ProgressBar)
@@ -378,12 +495,3 @@ class AttacksTab(
     def refresh_data(self) -> None:
         """Refresh attacks data."""
         pass
-
-    @staticmethod
-    def _deep_merge_dicts(base: Dict[str, Any], updates: Dict[str, Any]) -> None:
-        """Deep-merge updates into base in place."""
-        for key, value in updates.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                AttacksTab._deep_merge_dicts(base[key], value)
-            else:
-                base[key] = value

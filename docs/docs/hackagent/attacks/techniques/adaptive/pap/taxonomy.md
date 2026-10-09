@@ -30,6 +30,24 @@ def get_technique_by_name(name: str) -> Dict[str, str]
 
 Lookup a technique entry by name (case-insensitive).
 
+#### ALL\_TECHNIQUES
+
+Every technique in the taxonomy, in taxonomy order.
+
+#### TOP\_5\_TECHNIQUES
+
+The five techniques the paper&#x27;s broad scan found most effective.
+
+#### resolve\_techniques
+
+```python
+def resolve_techniques(selection: Union[str, Sequence[str]]) -> List[str]
+```
+
+Resolve `&quot;top5&quot;`, `&quot;all&quot;`, or explicit names to technique names.
+
+Raises `ValueError` for a name the taxonomy does not define.
+
 #### build\_mutation\_prompt
 
 ```python

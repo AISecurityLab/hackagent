@@ -1,15 +1,19 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for the shared CLI-agent base (``models/adapters/cli_agent.py``)."""
+"""Tests for the shared CLI backend base (``models/completions/cli.py``)."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hackagent.models.adapters.base import AdapterConfigurationError
-from hackagent.models.adapters.cli_agent import SubprocessCLIAgent, last_user_text
+from hackagent.core.contracts import AgentType, ModelSpec
+from hackagent.models.completions.cli import (
+    CLIConfigurationError,
+    SubprocessCLIModel,
+    last_user_text,
+)
 
 
 def _response(text):
@@ -25,8 +29,7 @@ class _FakeLiteLLM:
         self.completion = completion or MagicMock(return_value=_response("hello"))
 
 
-class _EchoCLI(SubprocessCLIAgent):
-    ADAPTER_TYPE = "EchoCLIAgent"
+class _EchoCLI(SubprocessCLIModel):
     LABEL = "Echo"
     PROVIDER_PREFIX = "hackagent_echo"
     DEFAULT_BINARY = "echo-cli"
@@ -39,67 +42,74 @@ class _EchoCLI(SubprocessCLIAgent):
         return SimpleNamespace(flavour=self.flavour, timeout=self.timeout)
 
 
+def _spec(**config):
+    timeout = config.pop("timeout", None)
+    name = config.pop("name", "m")
+    return ModelSpec(
+        identifier=name,
+        agent_type=AgentType.CLAUDE_CODE,
+        timeout=timeout,
+        extra=dict(config),
+    )
+
+
 def _make(config=None, litellm=None, binary="/usr/bin/echo-cli"):
     litellm = litellm or _FakeLiteLLM()
     with (
-        patch(
-            "hackagent.models.adapters.cli_agent.get_litellm",
-            return_value=(litellm, True),
-        ),
-        patch("hackagent.models.adapters.cli_agent.shutil.which", return_value=binary),
+        patch("hackagent.models.completions.cli._litellm", return_value=litellm),
+        patch("hackagent.models.completions.cli.shutil.which", return_value=binary),
     ):
-        agent = _EchoCLI("a1", {"name": "m", **(config or {})})
-    return agent, litellm
+        model = _EchoCLI(_spec(**(config or {})))
+    return model, litellm
 
 
 def test_requires_model_name():
-    with pytest.raises(AdapterConfigurationError, match="'name'"):
-        _EchoCLI("a1", {})
+    with pytest.raises(CLIConfigurationError, match="'name'"):
+        _EchoCLI(ModelSpec(identifier="", agent_type=AgentType.CLAUDE_CODE))
 
 
 def test_missing_binary_names_the_install_hint():
-    with pytest.raises(AdapterConfigurationError, match="Install echo-cli"):
+    with pytest.raises(CLIConfigurationError, match="Install echo-cli"):
         _make(binary=None)
 
 
 def test_registers_one_custom_provider_per_instance():
-    agent, litellm = _make({"flavour": "spicy", "timeout": 5})
+    model, litellm = _make({"flavour": "spicy", "timeout": 5})
 
-    assert agent.litellm_model == "hackagent_echo_a1/m"
-    assert litellm._custom_providers == ["hackagent_echo_a1"]
+    provider = model._provider_name
+    assert model.litellm_model == f"{provider}/m"
+    assert provider.startswith("hackagent_echo_")
+    assert litellm._custom_providers == [provider]
     [entry] = litellm.custom_provider_map
-    assert entry["provider"] == "hackagent_echo_a1"
+    assert entry["provider"] == provider
     assert entry["custom_handler"].flavour == "spicy"
     assert entry["custom_handler"].timeout == 5
 
 
-def test_handle_request_wraps_the_cli_reply():
-    agent, litellm = _make()
+def test_complete_wraps_the_cli_reply():
+    model, litellm = _make()
 
-    with patch(
-        "hackagent.models.adapters.cli_agent.get_litellm", return_value=(litellm, True)
-    ):
-        envelope = agent.handle_request({"prompt": "hi"})
+    with patch("hackagent.models.completions.cli._litellm", return_value=litellm):
+        response = model.complete([{"role": "user", "content": "hi"}])
 
-    assert envelope["processed_response"] == "hello"
-    assert envelope["error_message"] is None
+    assert response.text == "hello"
+    assert response.error is None
     litellm.completion.assert_called_once_with(
-        model="hackagent_echo_a1/m", messages=[{"role": "user", "content": "hi"}]
+        model=model.litellm_model, messages=[{"role": "user", "content": "hi"}]
     )
 
 
-def test_handle_request_turns_failures_into_error_envelopes():
-    agent, litellm = _make(
+def test_complete_turns_failures_into_error_responses():
+    model, litellm = _make(
         litellm=_FakeLiteLLM(completion=MagicMock(side_effect=RuntimeError("boom")))
     )
 
-    with patch(
-        "hackagent.models.adapters.cli_agent.get_litellm", return_value=(litellm, True)
-    ):
-        envelope = agent.handle_request({"prompt": "hi"})
+    with patch("hackagent.models.completions.cli._litellm", return_value=litellm):
+        response = model.complete([{"role": "user", "content": "hi"}])
 
-    assert "boom" in envelope["error_message"]
-    assert envelope["processed_response"] is None
+    assert response.error is not None
+    assert "boom" in response.error.message
+    assert response.text == ""
 
 
 def test_last_user_text_picks_the_last_user_turn():
@@ -113,21 +123,21 @@ def test_last_user_text_picks_the_last_user_turn():
 
 
 def test_codex_falls_back_to_the_direct_handler():
-    from hackagent.models.adapters.codex import CodexAgent
+    from hackagent.models.completions.codex import CodexModel
 
-    agent = CodexAgent.__new__(CodexAgent)
-    agent.id = "c1"
-    agent.litellm_model = "hackagent_codex_c1/m"
-    agent.actual_api_key = "not-required"
-    agent.logger = MagicMock()
-    agent._custom_handler = MagicMock()
-    agent._custom_handler.completion.return_value = _response("direct")
+    model = CodexModel.__new__(CodexModel)
+    model.id = "c1"
+    model.litellm_model = "hackagent_codex_c1/m"
+    model.actual_api_key = "not-required"
+    model.logger = MagicMock()
+    model._custom_handler = MagicMock()
+    model._custom_handler.completion.return_value = _response("direct")
     litellm = SimpleNamespace(completion=MagicMock(side_effect=ValueError("routed")))
 
-    result = agent._complete(litellm, [{"role": "user", "content": "hi"}])
+    result = model._call(litellm, [{"role": "user", "content": "hi"}])
 
     assert result.choices[0].message.content == "direct"
     litellm.completion.assert_called_once()
-    agent._custom_handler.completion.assert_called_once_with(
+    model._custom_handler.completion.assert_called_once_with(
         model="hackagent_codex_c1/m", messages=[{"role": "user", "content": "hi"}]
     )

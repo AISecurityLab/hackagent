@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Scripted :class:`~hackagent.attacks.ports.Judge` for attack-seam tests."""
+"""Scripted judge (score/evaluate) for evaluation tests."""
 
 from __future__ import annotations
 

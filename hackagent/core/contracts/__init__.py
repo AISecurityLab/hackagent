@@ -14,8 +14,9 @@ Import from here; the topic modules are an implementation detail:
   ``LLMError``, ``GuardrailInfo``, ``Completion``
 - :mod:`~hackagent.core.contracts.specs`: ``ModelSpec``, ``JudgeSpec``
 - :mod:`~hackagent.core.contracts.judging`: ``Goal``, ``Sample``,
-  ``JudgeVote``, ``Verdict``, ``NORMALIZED_SCORE_MAX``
-- :mod:`~hackagent.core.contracts.protocols`: ``LLM``, ``LLMFactory``
+  ``LabelledSample``, ``JudgeVote``, ``Verdict``, ``NORMALIZED_SCORE_MAX``
+- :mod:`~hackagent.core.contracts.protocols`: ``LLM``, ``LLMFactory``,
+  ``CompletionModel``, ``CompletionResult``
 """
 
 from hackagent.core.contracts.completion import (
@@ -30,21 +31,30 @@ from hackagent.core.contracts.judging import (
     NORMALIZED_SCORE_MAX,
     Goal,
     JudgeVote,
+    LabelledSample,
     Sample,
     Verdict,
 )
 from hackagent.core.contracts.messages import Message, ToolCall
-from hackagent.core.contracts.protocols import LLM, LLMFactory
+from hackagent.core.contracts.protocols import (
+    LLM,
+    CompletionModel,
+    CompletionResult,
+    LLMFactory,
+)
 from hackagent.core.contracts.specs import JudgeSpec, ModelSpec
 
 __all__ = [
     "AgentType",
     "Completion",
+    "CompletionModel",
+    "CompletionResult",
     "EvalStatus",
     "Goal",
     "GuardrailInfo",
     "JudgeSpec",
     "JudgeVote",
+    "LabelledSample",
     "LLM",
     "LLMError",
     "LLMFactory",

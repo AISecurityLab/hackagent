@@ -19,7 +19,7 @@ Prerequisites
 3. Run:  ``python hack_ollama.py``  (or ``hackagent codex`` for the interactive TUI preset)
 """
 
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 
 # ---------------------------------------------------------------------------
 # Target: local Codex (driven via `ollama launch codex --`, no endpoint)
@@ -28,19 +28,15 @@ TARGET_MODEL = (
     "llama3.2:3b"  # passed to `ollama launch codex --model` (alias or full id)
 )
 
-
-def bind_target():
-    session = HackAgent(Settings.resolve())
-    return session.target(
-        "",
-        "codex",
-        name="codex",
-        adapter_operational_config={
-            "name": TARGET_MODEL,
-            "binary": "ollama",  # path to the Ollama executable
-        },
-    )
-
+agent = HackAgent(
+    name="codex",
+    endpoint="",
+    agent_type="codex",
+    adapter_operational_config={
+        "name": TARGET_MODEL,
+        "binary": "ollama",  # path to the Ollama executable
+    },
+)
 
 # ---------------------------------------------------------------------------
 # Goals — what we want the target to do that it shouldn't
@@ -66,11 +62,7 @@ if __name__ == "__main__":
     print(f"  Red-teaming local Codex — model: {TARGET_MODEL}")
     print(f"{'=' * 60}")
 
-    agent = bind_target()
-    try:
-        results = agent.hack(attack_config=h4rm3l_config)
-    finally:
-        agent.session.close()
+    results = agent.hack(attack_config=h4rm3l_config)
 
     total = len(results) if results else 0
 

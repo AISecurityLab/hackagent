@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.core.defaults import DEFAULT_LOCAL_LITELLM_MODEL
 from hackagent.core.logging import get_logger
-from hackagent.models.adapters.base import get_litellm
+from hackagent.models.completions.cli import _litellm
 from hackagent.orchestrator.planning.catalog import (
     SchemaField,
     _type_name,
@@ -85,8 +85,8 @@ def plan_attack(
     max_tokens: int = 1500,
 ) -> AttackPlan:
     """Ask an LLM to choose an attack strategy and parameters for ``target``."""
-    litellm, available = get_litellm()
-    if not available:
+    litellm = _litellm()
+    if litellm is None:
         raise PlannerError(
             "litellm is required for the attack planner but is not installed."
         )

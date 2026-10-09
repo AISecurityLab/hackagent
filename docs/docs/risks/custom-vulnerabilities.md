@@ -1,3 +1,7 @@
+---
+sidebar_position: 6
+---
+
 # Custom Vulnerabilities
 
 When the built-in 13 vulnerability classes don't cover your specific testing needs, you can define **custom vulnerabilities** by extending the `BaseVulnerability` class. This allows you to add domain-specific threats while maintaining full compatibility with HackAgent's evaluation infrastructure.
@@ -275,8 +279,7 @@ vuln = FinancialAdvice(types=["investment_recommendation"])
 
 # Initialize HackAgent
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="financial-compliance-test",
 )
 
@@ -406,4 +409,4 @@ If your custom vulnerability addresses a common threat, consider contributing it
 ## Learn More
 
 - **[Vulnerabilities](./vulnerabilities)** — Study the 13 built-in vulnerability implementations and their threat profiles
-- **[Client](../client)** — Session, target, and `hack` / `hack_chain`
+- **[Campaign reference](../reference/index.md)** — every field of the campaign format

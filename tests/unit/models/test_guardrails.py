@@ -6,9 +6,8 @@ import json
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.models.envelope import prompt_text, to_completion
 from hackagent.models.guardrail import (
-    Guarded,
+    GuardedModel,
     GuardrailResult,
     GuardrailSpec,
     LLMGuardrail,
@@ -26,47 +25,7 @@ def _guardrail(is_safe: bool, explanation: str = "ok", categories=None):
 
 
 def _chat(text: str):
-    return {"messages": [{"role": "user", "content": text}]}
-
-
-# ---------------------------------------------------------------------------
-# prompt_text
-# ---------------------------------------------------------------------------
-
-
-class TestPromptText(unittest.TestCase):
-    def test_returns_last_user_message(self):
-        data = {
-            "messages": [
-                {"role": "system", "content": "You are helpful."},
-                {"role": "user", "content": "Hello"},
-                {"role": "assistant", "content": "Hi"},
-                {"role": "user", "content": "How are you?"},
-            ]
-        }
-        self.assertEqual(prompt_text(data), "How are you?")
-
-    def test_fallback_concatenation_when_no_user_role(self):
-        data = {
-            "messages": [
-                {"role": "system", "content": "sys"},
-                {"role": "assistant", "content": "resp"},
-            ]
-        }
-        result = prompt_text(data)
-        self.assertIn("sys", result)
-        self.assertIn("resp", result)
-
-    def test_fallback_to_prompt_key(self):
-        self.assertEqual(prompt_text({"prompt": "Tell me a joke"}), "Tell me a joke")
-
-    def test_returns_empty_string_when_no_data(self):
-        self.assertEqual(prompt_text({}), "")
-        self.assertEqual(prompt_text({"messages": []}), "")
-
-    def test_handles_none_content(self):
-        data = {"messages": [{"role": "user", "content": None}]}
-        self.assertEqual(prompt_text(data), "")
+    return [{"role": "user", "content": text}]
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +81,7 @@ class TestParseVerdict(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# LLMGuardrail
+# LLMGuardrail (the classifier that drives a model)
 # ---------------------------------------------------------------------------
 
 
@@ -173,103 +132,69 @@ class TestGuardrailSpec(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Guarded
+# GuardedModel (guardrails wrapped around a native Model)
 # ---------------------------------------------------------------------------
 
 
-class TestGuardedBefore(unittest.TestCase):
+class TestGuardedModelBefore(unittest.TestCase):
     def test_no_guardrail_passes_through(self):
-        inner = FakeLLM(["Hello!"])
-        result = Guarded(inner).send(_chat("Hi"))
-        self.assertEqual(result["processed_response"], "Hello!")
+        response = GuardedModel(FakeLLM(["Hello!"])).complete(_chat("Hi"))
+        self.assertEqual(response.text, "Hello!")
+        self.assertIsNone(response.guardrail)
 
-    def test_safe_prompt_passes_through(self):
+    def test_safe_prompt_reaches_the_model(self):
         before = _guardrail(True)
         inner = FakeLLM(["Answer"])
-        result = Guarded(inner, before=before).send(_chat("Legit question"))
+        response = GuardedModel(inner, before=before).complete(_chat("Legit question"))
         before.check.assert_called_once_with("Legit question")
-        self.assertEqual(result["processed_response"], "Answer")
+        self.assertEqual(response.text, "Answer")
 
     def test_unsafe_prompt_is_blocked_before_the_model(self):
         before = _guardrail(False, "Violent content", ["violence"])
-        inner = FakeLLM()
+        inner = FakeLLM(["Answer"])
 
-        result = Guarded(inner, before=before).send(_chat("Bad stuff"))
+        response = GuardedModel(inner, before=before).complete(_chat("Bad stuff"))
 
-        self.assertIsNone(result["processed_response"])
-        data = result["agent_specific_data"]
-        self.assertEqual(data["guardrail"], "before_guardrail_blocked")
-        self.assertEqual(data["side"], "before")
-        self.assertEqual(data["categories"], ["violence"])
-        self.assertEqual(data["reasoning"], "Violent content")
-        self.assertEqual(inner.requests, [])
+        self.assertEqual(response.text, "")
+        self.assertIsNotNone(response.guardrail)
+        self.assertEqual(response.guardrail.side, "before")
+        self.assertEqual(response.guardrail.categories, ["violence"])
+        self.assertEqual(response.guardrail.reasoning, "Violent content")
+        self.assertEqual(inner.requests, [])  # the model was never called
 
     def test_empty_prompt_skips_guardrail(self):
         before = _guardrail(False)
-        result = Guarded(FakeLLM(["Answer"]), before=before).send(_chat(""))
+        response = GuardedModel(FakeLLM(["Answer"]), before=before).complete(_chat(""))
         before.check.assert_not_called()
-        self.assertEqual(result["processed_response"], "Answer")
+        self.assertEqual(response.text, "Answer")
 
 
-class TestGuardedAfter(unittest.TestCase):
+class TestGuardedModelAfter(unittest.TestCase):
     def test_safe_response_passes_through(self):
         after = _guardrail(True)
-        result = Guarded(FakeLLM(["Safe answer"]), after=after).send(_chat("Q"))
+        response = GuardedModel(FakeLLM(["Safe answer"]), after=after).complete(
+            _chat("Q")
+        )
         after.check.assert_called_once_with("Safe answer")
-        self.assertEqual(result["processed_response"], "Safe answer")
+        self.assertEqual(response.text, "Safe answer")
 
     def test_unsafe_response_is_censored(self):
         after = _guardrail(False, "Contains PII", ["privacy"])
-        result = Guarded(FakeLLM(["SSN: 123-45-6789"]), after=after).send(_chat("Q"))
-        self.assertIsNone(result["processed_response"])
-        data = result["agent_specific_data"]
-        self.assertEqual(data["guardrail"], "after_guardrail_censored")
-        self.assertEqual(data["side"], "after")
-        self.assertEqual(data["categories"], ["privacy"])
-
-    def test_empty_response_skips_guardrail(self):
-        after = _guardrail(False)
-        Guarded(FakeLLM([""]), after=after).send(_chat("Hi"))
-        after.check.assert_not_called()
-
-    def test_falls_back_to_generated_text(self):
-        after = _guardrail(True)
-        inner = FakeLLM(
-            [{"processed_response": None, "generated_text": "Fallback text"}]
+        response = GuardedModel(FakeLLM(["SSN: 123-45-6789"]), after=after).complete(
+            _chat("Q")
         )
-        Guarded(inner, after=after).send(_chat("Hi"))
-        after.check.assert_called_once_with("Fallback text")
+        self.assertEqual(response.text, "")
+        self.assertEqual(response.guardrail.side, "after")
+        self.assertEqual(response.guardrail.categories, ["privacy"])
 
-
-class TestGuardedAsLLM(unittest.TestCase):
-    def test_complete_reports_a_blocked_prompt(self):
-        before = _guardrail(False, "nope", ["harm"])
-        completion = Guarded(FakeLLM(), before=before).complete("Bad stuff")
-        self.assertFalse(completion.ok)
-        self.assertEqual(completion.guardrail.side, "before")
-        self.assertEqual(completion.guardrail.categories, ["harm"])
-        self.assertIsNone(completion.text)
-
-    def test_async_send_applies_both_guardrails(self):
+    def test_async_applies_both_guardrails(self):
         after = _guardrail(False, "leak")
-        result = asyncio.run(
-            Guarded(FakeLLM(["secret"]), before=_guardrail(True), after=after).asend(
-                _chat("Q")
-            )
+        response = asyncio.run(
+            GuardedModel(
+                FakeLLM(["secret"]), before=_guardrail(True), after=after
+            ).acomplete(_chat("Q"))
         )
-        self.assertEqual(
-            result["agent_specific_data"]["guardrail"], "after_guardrail_censored"
-        )
-
-    def test_with_params_keeps_the_guardrails(self):
-        before = _guardrail(False)
-        guarded = Guarded(FakeLLM(), before=before).with_params(max_tokens=5)
-        self.assertIs(guarded.before, before)
-        result = guarded.send(_chat("x"))
-        self.assertEqual(
-            to_completion(result).guardrail.side,
-            "before",
-        )
+        self.assertEqual(response.guardrail.side, "after")
 
 
 if __name__ == "__main__":

@@ -13,13 +13,25 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.models.adapters.web import (
-    WebAgent,
+from hackagent.models.completions.web import (
+    WebModel,
     WebAgentConfigurationError,
     _last_user_text,
     _new_reply,
 )
-from hackagent.core.contracts import AgentType
+from hackagent.core.contracts import AgentType, ModelSpec
+
+
+def _web_spec(**config):
+    url = config.pop("url", None) or config.pop("endpoint", None)
+    name = config.pop("name", None)
+    return ModelSpec(
+        identifier=name or "",
+        agent_type=AgentType.WEB,
+        endpoint=url,
+        extra=dict(config),
+    )
+
 
 logging.disable(logging.CRITICAL)
 
@@ -86,68 +98,63 @@ class TestNewReply(unittest.TestCase):
         self.assertEqual(_last_user_text(msgs), "hey")
 
 
-class TestWebAgentInit(unittest.TestCase):
+class TestWebModelInit(unittest.TestCase):
     def test_requires_url(self):
         with self.assertRaises(WebAgentConfigurationError):
-            WebAgent(id="e1", config={})
+            WebModel(_web_spec())
 
     def test_accepts_endpoint_alias_and_defaults_name(self):
-        agent = WebAgent(id="t1", config={"endpoint": "https://x.it/chat"})
-        self.assertEqual(agent.url, "https://x.it/chat")
-        self.assertEqual(agent.name, "x.it")
-        self.assertTrue(agent.litellm_model.startswith("hackagent_web_"))
+        model = WebModel(_web_spec(endpoint="https://x.it/chat"))
+        self.assertEqual(model.url, "https://x.it/chat")
+        self.assertEqual(model.name, "x.it")
+        self.assertTrue(model.litellm_model.startswith("hackagent_web_"))
 
     def test_registers_custom_provider(self):
         import litellm
 
-        agent = WebAgent(id="reg1", config={"url": "https://x.it/chat"})
+        model = WebModel(_web_spec(url="https://x.it/chat"))
         providers = [e["provider"] for e in litellm.custom_provider_map]
-        self.assertIn(f"hackagent_web_{agent.id}", providers)
+        self.assertIn(f"hackagent_web_{model.id}", providers)
 
     def test_agent_type_resolves(self):
         self.assertEqual(AgentType("web"), AgentType.WEB)
         self.assertEqual(AgentType("browser"), AgentType.WEB)
 
     def test_input_selector_flows_to_session(self):
-        agent = WebAgent(
-            id="sel1",
-            config={
-                "url": "https://x.it/chat",
-                "input_selector": "textarea.prompt",
-                "reply_selector": ".bot:last-child",
-            },
+        model = WebModel(
+            _web_spec(
+                url="https://x.it/chat",
+                input_selector="textarea.prompt",
+                reply_selector=".bot:last-child",
+            )
         )
-        self.assertEqual(agent.input_selector, "textarea.prompt")
+        self.assertEqual(model.input_selector, "textarea.prompt")
         # The live session carries the override so _find_input uses it.
         self.assertEqual(
-            agent._custom_handler.session.input_selector, "textarea.prompt"
+            model._custom_handler.session.input_selector, "textarea.prompt"
         )
 
 
-class TestWebAgentHandleRequest(unittest.TestCase):
+class TestWebModelComplete(unittest.TestCase):
     def setUp(self):
-        self.agent = WebAgent(id="h1", config={"url": "https://x.it/chat"})
+        self.model = WebModel(_web_spec(url="https://x.it/chat"))
 
-    def test_missing_prompt_returns_400(self):
-        self.assertEqual(self.agent.handle_request({})["status_code"], 400)
-
-    def test_handle_request_drives_session_and_returns_reply(self):
+    def test_complete_drives_session_and_returns_reply(self):
         # Stub the persistent session's send() so no browser is launched.
-        self.agent._custom_handler.session.send = MagicMock(return_value="bot says hi")
-        response = self.agent.handle_request({"prompt": "hello bot"})
-        self.assertEqual(response["status_code"], 200)
-        self.assertEqual(response["generated_text"], "bot says hi")
-        self.assertEqual(response["adapter_type"], "WebAgent")
-        self.agent._custom_handler.session.send.assert_called_once_with("hello bot")
+        self.model._custom_handler.session.send = MagicMock(return_value="bot says hi")
+        response = self.model.complete([{"role": "user", "content": "hello bot"}])
+        self.assertEqual(response.text, "bot says hi")
+        self.assertIsNone(response.error)
+        self.model._custom_handler.session.send.assert_called_once_with("hello bot")
 
-    def test_handle_request_session_error_returns_500(self):
-        from hackagent.models.adapters.web import WebAgentInteractionError
+    def test_complete_session_error_returns_error(self):
+        from hackagent.models.completions.web import WebAgentInteractionError
 
-        self.agent._custom_handler.session.send = MagicMock(
+        self.model._custom_handler.session.send = MagicMock(
             side_effect=WebAgentInteractionError("no reply")
         )
-        response = self.agent.handle_request({"prompt": "hi"})
-        self.assertEqual(response["status_code"], 500)
+        response = self.model.complete([{"role": "user", "content": "hi"}])
+        self.assertIsNotNone(response.error)
 
 
 class TestOpenChatLauncher(unittest.TestCase):
@@ -167,14 +174,14 @@ class TestOpenChatLauncher(unittest.TestCase):
         return page, handle
 
     def test_clicks_visible_launcher(self):
-        from hackagent.models.adapters.browser import _open_chat_launcher
+        from hackagent.models.completions.browser import _open_chat_launcher
 
         page, handle = self._page_with_handle()
         self.assertTrue(_open_chat_launcher(page))
         handle.click.assert_called_once()
 
     def test_skips_navigational_link_in_heuristic_mode(self):
-        from hackagent.models.adapters.browser import _open_chat_launcher
+        from hackagent.models.completions.browser import _open_chat_launcher
 
         # A "chat" link that navigates elsewhere must not be clicked by the
         # heuristics (would leave the page).
@@ -185,7 +192,7 @@ class TestOpenChatLauncher(unittest.TestCase):
     def test_matches_widget_open_button_launcher(self):
         # A widget launcher: <div role=button class="chat-widget-open-button">.
         # The heuristics must catch widget-open-style launchers automatically.
-        from hackagent.models.adapters.browser import _open_chat_launcher
+        from hackagent.models.completions.browser import _open_chat_launcher
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -211,7 +218,7 @@ class TestOpenChatLauncher(unittest.TestCase):
     def test_falls_back_to_dom_click_when_actionable_click_fails(self):
         # A launcher covered by a cookie overlay fails the normal (actionable)
         # click; we must fall back to a direct DOM click.
-        from hackagent.models.adapters.browser import _open_chat_launcher
+        from hackagent.models.completions.browser import _open_chat_launcher
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -230,7 +237,7 @@ class TestOpenChatLauncher(unittest.TestCase):
         handle.evaluate.assert_called_once()  # DOM-click fallback fired
 
     def test_explicit_selector_clicks_even_links(self):
-        from hackagent.models.adapters.browser import _open_chat_launcher
+        from hackagent.models.completions.browser import _open_chat_launcher
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -246,7 +253,7 @@ class TestOpenChatLauncher(unittest.TestCase):
 
 
 def _make_session():
-    from hackagent.models.adapters.web import _get_web_agent_custom_llm_class
+    from hackagent.models.completions.web import _get_web_agent_custom_llm_class
 
     session_cls = _get_web_agent_custom_llm_class()._session_cls
     return session_cls(
@@ -292,7 +299,7 @@ class TestMessageTexts(unittest.TestCase):
         # Common widget markup: bot reply = chat-item-response-text-wrapper
         # (response), user turn = chat-item-request-* (request). The extractor
         # must select 'response' bubbles and treat 'request' as a user marker.
-        from hackagent.models.adapters.web import (
+        from hackagent.models.completions.web import (
             _MESSAGE_EXTRACT_JS,
             _MESSAGE_SELECTORS,
         )
@@ -321,7 +328,7 @@ class TestDismissConsent(unittest.TestCase):
     the chat launcher click."""
 
     def test_clicks_known_cmp_accept_button(self):
-        from hackagent.models.adapters.browser import _dismiss_consent
+        from hackagent.models.completions.browser import _dismiss_consent
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -336,7 +343,7 @@ class TestDismissConsent(unittest.TestCase):
         self.assertTrue(handle.click.called or handle.evaluate.called)
 
     def test_returns_false_when_no_banner(self):
-        from hackagent.models.adapters.browser import _dismiss_consent
+        from hackagent.models.completions.browser import _dismiss_consent
 
         frame = MagicMock()
         frame.query_selector_all.return_value = []
@@ -432,10 +439,10 @@ class TestBrowserSessionThreadAffinity(unittest.TestCase):
 
 
 class TestRouterRegistration(unittest.TestCase):
-    def test_web_agent_in_adapter_map(self):
-        from hackagent.models.dispatch import ADAPTER_CLASSES
+    def test_web_model_in_native_model_map(self):
+        from hackagent.models.build import _native_model_classes
 
-        self.assertIs(ADAPTER_CLASSES[AgentType.WEB], WebAgent)
+        self.assertIs(_native_model_classes()[AgentType.WEB], WebModel)
 
 
 if __name__ == "__main__":

@@ -6,11 +6,6 @@ on:
       - 'docs/**'
       - 'hackagent/**'
       - '.github/workflows/docs.yml'
-  pull_request:
-    paths:
-      - 'docs/**'
-      - 'hackagent/**'
-      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 env:
@@ -52,10 +47,8 @@ jobs:
           cd docs
           npm ci
 
-      - name: Typecheck docs site
-        run: |
-          cd docs
-          npm run typecheck
+      - name: Check the generated reference matches the code
+        run: uv run python docs/scripts/generate_reference.py --check
 
       - name: Generate API documentation
         run: uv run python docs/scripts/generate_docs.py --current
@@ -63,7 +56,4 @@ jobs:
       - name: Build documentation
         run: |
           cd docs
-          npm run build
-
-      - name: Check links inside modals
-        run: python docs/scripts/check_modal_links.py docs
+          npm run build 

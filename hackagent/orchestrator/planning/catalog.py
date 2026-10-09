@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.catalog.taxonomy import get_attack_taxonomy
-from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY, load_config_model
 
 _CREDENTIAL_SUFFIXES = ("identifier", "api_key", "endpoint", "model")
 _SKIP_KEYS = {"attack_type", "goals", "dataset", "intents", "output_dir"}
@@ -36,18 +35,21 @@ class SchemaField:
 
 def schema_fields(attack_id: str) -> List[SchemaField]:
     """Flatten a technique config's JSON schema into planner fields."""
-    model = load_config_model(attack_id)
-    if model is None or not hasattr(model, "model_json_schema"):
+    from hackagent.attacks.techniques.registry import params_schema
+
+    schema = params_schema(attack_id)
+    if schema is None:
         return []
-    schema = model.model_json_schema()
     defs = schema.get("$defs") or {}
     return list(_flatten_schema(schema, defs, prefix=""))
 
 
 def build_attack_catalog(*, include_advanced: bool = False) -> List[Dict[str, Any]]:
-    """Serialize registered techniques and their JSON-schema parameters."""
+    """Serialize every technique ``hack`` can run, with its parameters."""
+    from hackagent.attacks.techniques.registry import ATTACKS
+
     catalog: List[Dict[str, Any]] = []
-    for attack_id in ATTACK_REGISTRY:
+    for attack_id in sorted(ATTACKS):
         meta = ATTACK_CATALOG.get(attack_id, {})
         taxonomy = get_attack_taxonomy(attack_id)
         fields = []

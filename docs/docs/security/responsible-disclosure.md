@@ -1,10 +1,10 @@
+---
+sidebar_position: 1
+---
+
 # Responsible Disclosure & Security Guidelines
 
 HackAgent is a powerful security testing framework designed to help identify vulnerabilities in AI systems. With this power comes responsibility. This guide outlines the ethical and legal considerations for using HackAgent responsibly.
-
-:::info Found a vulnerability in HackAgent itself?
-Report it privately to [ais@ai4i.it](mailto:ais@ai4i.it). The [security policy](https://github.com/AISecurityLab/hackagent/blob/main/SECURITY.md) lists the scope and response times. This page covers disclosing what you find in the systems you test.
-:::
 
 ## Core Principles
 
@@ -218,7 +218,35 @@ If you're participating in bug bounty programs:
 
 ## Research Ethics
 
-Academic and industry research (IRB review, publication, client agreements) is covered in [Ethical Guidelines — Research Ethics](./ethical-guidelines.md#research-ethics).
+### Academic Research
+When using HackAgent for academic research:
+
+**Institutional Review:**
+- Obtain IRB approval when required
+- Follow institutional research policies
+- Consider ethical implications of research
+- Plan for responsible data handling
+
+**Publication Guidelines:**
+- Avoid detailed attack instructions
+- Focus on defensive measures
+- Coordinate with affected vendors
+- Consider dual-use research implications
+
+### Industry Research
+For commercial security research:
+
+**Client Agreements:**
+- Clearly define testing scope
+- Establish communication protocols
+- Define deliverable expectations
+- Include liability and indemnification clauses
+
+**Professional Standards:**
+- Follow industry ethical guidelines
+- Maintain professional certifications
+- Participate in security community standards
+- Contribute to defensive knowledge
 
 ## Emergency Procedures
 

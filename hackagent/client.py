@@ -70,24 +70,6 @@ def _as_uuid(value: Any) -> UUID:
     return UUID(str(value))
 
 
-class _CallbackBus:
-    """Adapt an ``on_event`` callback to the emitter the runner calls."""
-
-    def __init__(self, callback: EventCallback) -> None:
-        self._callback = callback
-
-    def emit(self, event_type: str, **payload: Any) -> None:
-        self._callback(event_type, **payload)
-
-
-def _as_bus(on_event: Any) -> Any:
-    if on_event is None:
-        return None
-    if hasattr(on_event, "emit"):
-        return on_event
-    return _CallbackBus(on_event)
-
-
 def _guardrail_sides(
     guardrails: Any,
 ) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
@@ -123,12 +105,21 @@ def primary_dataset() -> Optional[str]:
 
 
 def primary_attacks() -> List[str]:
-    """Jailbreak campaign technique ids, in campaign order."""
+    """Jailbreak campaign technique ids ``hack`` can execute, in order.
+
+    Both halves count: a migrated technique runs on the campaign runner and
+    the rest on the legacy pipeline. A technique neither can run is dropped,
+    so a chain built from this never fails on its first step.
+    """
+    from hackagent.attacks.techniques.registry import ATTACKS
+
+    runnable = ATTACKS
     return [
         attack_id
         for attack_id, _index in sorted(
             _primary_orders().items(), key=lambda item: item[1]
         )
+        if attack_id in runnable
     ]
 
 
@@ -233,12 +224,11 @@ def _form_fields_from_schema(
 @lru_cache(maxsize=None)
 def form_fields(attack_id: str) -> List[Dict[str, Any]]:
     """Flatten a technique's pydantic JSON schema into form fields."""
-    from hackagent.orchestrator.setup.registry import load_config_model
+    from hackagent.attacks.techniques.registry import params_schema
 
-    model = load_config_model(attack_id)
-    if model is None or not hasattr(model, "model_json_schema"):
+    schema = params_schema(attack_id)
+    if schema is None:
         return []
-    schema = model.model_json_schema()
     defs = schema.get("$defs") or {}
     return _form_fields_from_schema(schema, defs, prefix="")
 
@@ -247,17 +237,19 @@ def form_fields(attack_id: str) -> List[Dict[str, Any]]:
 def catalog_entries() -> List[Dict[str, Any]]:
     """Registered techniques, in registry order, with form fields.
 
-    Command lists and TUI forms are generated from this. It includes every
-    registry id, including techniques that are absent from older hand-written
-    catalogs.
+    Command lists and TUI forms are generated from this. It covers both
+    halves of the migration — what the legacy pipeline still runs and what
+    the campaign runner has taken over — because ``hack`` runs either.
     """
+    from hackagent.attacks.techniques.registry import ATTACKS
     from hackagent.catalog.attacks import ATTACK_CATALOG
     from hackagent.catalog.taxonomy import get_attack_taxonomy
-    from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY
 
     primary = _primary_orders()
     entries: List[Dict[str, Any]] = []
-    for attack_id in ATTACK_REGISTRY:
+    # Legacy ids keep their registry order; migrated ones follow, so a
+    # technique stays selectable for the whole of its migration.
+    for attack_id in sorted(ATTACKS):
         meta = ATTACK_CATALOG.get(attack_id, {})
         taxonomy = get_attack_taxonomy(attack_id)
         label = meta.get("label") or attack_id
@@ -345,7 +337,14 @@ def __getattr__(name: str) -> Any:
 # ---------------------------------------------------------------------------
 
 
-_TARGET_SPEC_FIELDS = ("max_tokens", "temperature", "top_p", "timeout", "thinking")
+_TARGET_SPEC_FIELDS = (
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "timeout",
+    "thinking",
+    "capabilities",
+)
 _TARGET_METADATA_KEYS = (
     "api_key",
     "max_tokens",
@@ -364,7 +363,7 @@ _TARGET_METADATA_KEYS = (
 
 
 def _resolve_target_config(target_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    from hackagent.attacks.techniques.config import default_target
+    from hackagent.models.target_params import default_target
 
     resolved = default_target()
     if not target_config:
@@ -420,11 +419,9 @@ class Target:
         adapter_operational_config: Optional[Dict[str, Any]] = None,
         thinking: Optional[bool] = None,
     ) -> None:
-        from hackagent.attacks._lib.llm_router import LLMRouter
-        from hackagent.models.client import connect
-        from hackagent.models.dispatch import check_supported
+        from hackagent.models.connect import check_supported, connect
         from hackagent.models.factory import ModelFactory, spec_from_config
-        from hackagent.models.guardrail import Guarded, GuardrailSpec, LLMGuardrail
+        from hackagent.models.guardrail import GuardedModel, GuardrailSpec, LLMGuardrail
 
         self.session = session
         self.settings = session.settings
@@ -493,12 +490,11 @@ class Target:
                 logger.info("%s guardrail active on the target.", side)
         self.target = connect(self.target_spec, instance_id=str(self.agent_record.id))
         if self.guardrails:
-            self.target = Guarded(
+            self.target = GuardedModel(
                 self.target,
                 before=self._build_guardrail("before", LLMGuardrail),
                 after=self._build_guardrail("after", LLMGuardrail),
             )
-        self.router = LLMRouter(self.target, agent=self.agent_record)
 
     def _build_guardrail(self, side: str, guardrail_cls: type) -> Any:
         spec = self.guardrails.get(side)
@@ -517,11 +513,16 @@ class Target:
     ) -> Any:
         """Run one attack. ``on_event`` receives ``(event_type, **payload)``."""
         try:
-            from hackagent.orchestrator.execution.runner import run as run_attack
+            from hackagent.orchestrator.campaign.legacy import (
+                run_as_campaign,
+                runs_as_campaign,
+            )
 
             attack_type = attack_config.get("attack_type")
             if not attack_type:
                 raise ValueError("'attack_type' must be provided in attack_config.")
+            if not runs_as_campaign(attack_type):
+                raise ValueError(f"Unsupported attack_type: {attack_type!r}.")
             logger.info(
                 "Preparing to attack agent '%s' (ID: %s, Type: %s) using strategy '%s'.",
                 self.agent_record.name,
@@ -529,12 +530,11 @@ class Target:
                 self.agent_record.agent_type,
                 attack_type,
             )
-            return run_attack(
+            return run_as_campaign(
                 self,
                 attack_config,
                 run_config_override=run_config_override,
-                fail_on_run_error=fail_on_run_error,
-                _tui_event_bus=_as_bus(on_event),
+                on_event=on_event,
             )
         except HackAgentError:
             raise
@@ -568,7 +568,7 @@ class Target:
         on_event: Optional[Any] = None,
     ) -> list:
         """Run a sequence of attacks. ``on_event`` is forwarded to each step."""
-        from hackagent.orchestrator.execution.chain import hack_chain as _hack_chain
+        from hackagent.orchestrator.chain import hack_chain as _hack_chain
 
         return _hack_chain(
             self,

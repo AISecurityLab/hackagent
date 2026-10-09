@@ -1,26 +1,43 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Scripted stand-in for a connected model (``LLM``)."""
+"""Scripted stand-in for a connected :class:`Model`."""
 
-from typing import Any, Callable, Dict, Iterable, List, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Union
 
 from hackagent.core.contracts import AgentType, ModelSpec
-from hackagent.models.client import EnvelopeLLM
-from tests.fakes.router import text_response
-
-Response = Dict[str, Any]
-Script = Union[Iterable[Union[str, Response]], Callable[[Dict[str, Any]], Response]]
+from hackagent.models.model import Model
+from hackagent.models.response import ModelResponse
 
 
-class FakeLLM(EnvelopeLLM):
+def text_response(text: str) -> Dict[str, Any]:
+    """The success envelope-shaped dict a scripted reply maps from."""
+    return {"generated_text": text, "processed_response": text, "error_message": None}
+
+
+Reply = Union[str, Dict[str, Any], ModelResponse]
+Script = Union[Iterable[Reply], Callable[[Dict[str, Any]], Any]]
+
+
+def _as_response(value: Any) -> ModelResponse:
+    """Map a scripted reply (text, envelope dict, or response) to a response."""
+    if isinstance(value, ModelResponse):
+        return value
+    if isinstance(value, str):
+        return ModelResponse(text=value)
+    return ModelResponse.from_value(value)
+
+
+class FakeLLM(Model):
     """Answers every call from a script and records each request.
 
-    ``script`` is either an iterable of responses (a plain string becomes a
-    success envelope) consumed in order, or a callable mapping the request
-    dict to an envelope. With no script every call returns ``default``.
-    ``with_params`` returns a fake that shares the script and the recorded
-    requests, and merges the parameters into each request.
+    ``script`` is either an iterable of replies (a plain string becomes a text
+    response; an envelope-shaped dict maps onto a :class:`ModelResponse`)
+    consumed in order, or a callable mapping the recorded request dict to a
+    reply (it may raise, to exercise judge/guardrail error handling). With no
+    script every call returns ``default``. ``with_params`` returns a fake that
+    shares the script and the recorded requests, merging the parameters into
+    each recorded request.
     """
 
     def __init__(
@@ -37,14 +54,13 @@ class FakeLLM(EnvelopeLLM):
             identifier="fake-model", agent_type=AgentType.OPENAI_SDK
         )
         self.instance_id = instance_id
-        self.adapter = object()
         self.params = dict(params or {})
         if _shared is None:
             responder = script if callable(script) else None
             queue = (
                 []
                 if script is None or callable(script)
-                else [text_response(r) if isinstance(r, str) else r for r in script]
+                else [_as_response(reply) for reply in script]
             )
             _shared = {
                 "responder": responder,
@@ -69,14 +85,25 @@ class FakeLLM(EnvelopeLLM):
     def describe(self) -> ModelSpec:
         return self.spec
 
-    def send(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        request = {**self.params, **request_data}
-        self.requests.append(request)
+    def _respond(self, request: Dict[str, Any]) -> ModelResponse:
         if self._shared["responder"] is not None:
-            return self._shared["responder"](request)
+            return _as_response(self._shared["responder"](request))
         if self._shared["queue"]:
             return self._shared["queue"].pop(0)
-        return text_response(self._shared["default"])
+        return ModelResponse(text=self._shared["default"])
 
-    async def asend(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        return self.send(request_data)
+    def complete(
+        self, messages: Sequence[Mapping[str, Any]], **overrides: Any
+    ) -> ModelResponse:
+        if isinstance(messages, str):
+            payload: Dict[str, Any] = {"prompt": messages}
+        else:
+            payload = {"messages": [dict(message) for message in messages]}
+        request = {**self.params, **payload, **overrides}
+        self.requests.append(request)
+        return self._respond(request)
+
+    async def acomplete(
+        self, messages: Sequence[Mapping[str, Any]], **overrides: Any
+    ) -> ModelResponse:
+        return self.complete(messages, **overrides)

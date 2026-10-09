@@ -1,382 +1,215 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""AutoDAN-Turbo orchestrator — WarmUp → Lifelong → shared LLM-judge evaluation."""
 
-import copy
-import logging
-import os
-from typing import Any, Dict, List, Optional
+"""AutoDAN-Turbo: learn jailbreak strategies, then reuse them.
 
-from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.ports import RunContext
-from hackagent.attacks.techniques.config import resolve_embedder_config
-from hackagent.attacks.types import AttackResult, rows_to_attack_results
+The other attacks search for a prompt. AutoDAN-Turbo searches for
+*strategies* — named tactics it can carry from one goal to the next — and
+that learning is the point. It runs in two phases:
 
-from . import autodan_eval as evaluation, lifelong, warm_up
-from .config import DEFAULT_AUTODAN_TURBO_CONFIG, AutoDANTurboConfig
-from .dashboard_tracing import emit_phase_trace
-from .log_styles import format_phase_message, phase_separator
+- **warm-up**, once for the whole run, before any goal is reported: the
+  attacker explores each goal freely while the panel scores, and the
+  summarizer distils the gap between each goal's weakest and strongest
+  attempt into a strategy. The strategies, indexed by the response they
+  beat, are the strategy library. This is the run-scoped :meth:`prepare`.
 
+- **lifelong**, per goal: the library is retrieved against the last
+  response, the attacker is told which strategies to reuse or avoid, and
+  every time the score improves the gap is summarized into a new strategy
+  and added back. The library grows across goals, so later goals start from
+  what earlier ones learned.
 
-def _deep_update(target, source):
-    """Recursively merge user config into defaults.
+The panel is the scorer: its 0-10 verdict drives the search and
+``break_score`` ends it. Every judged attempt of the lifelong phase is
+reported.
 
-    Args:
-        target: Destination dictionary (mutated in place).
-        source: Source dictionary whose values override destination.
+Based on: https://arxiv.org/abs/2410.05295
+"""
 
-    Returns:
-        None.
-    """
-    for k, v in source.items():
-        if isinstance(v, dict) and isinstance(target.get(k), dict):
-            _deep_update(target[k], v)
-        else:
-            target[k] = (
-                copy.deepcopy(v)
-                if not (isinstance(k, str) and k.startswith("_"))
-                else v
-            )
+from __future__ import annotations
 
+from typing import Optional
 
-def _split_internal_keys(
-    config: Dict[str, Any],
-) -> tuple[Dict[str, Any], Dict[str, Any]]:
-    """Return (user_config, internal_config) split by top-level '_' keys."""
-    user_config: Dict[str, Any] = {}
-    internal_config: Dict[str, Any] = {}
-    for key, value in config.items():
-        if isinstance(key, str) and key.startswith("_"):
-            internal_config[key] = value
-        else:
-            user_config[key] = value
-    return user_config, internal_config
+from ...contract import Completion, Embedder, Judge, Messages, Target
+from ...iterative import Finding, IterativeAttack, judge_reply
+from ...trace import decision, phase
+from . import prompts
+from .config import AutoDANTurboParams
+from .library import StrategyLibrary
+
+_REFUSAL = "Sorry, I cannot help you with that."
 
 
-class AutoDANTurboAttack(BaseAttack):
-    """AutoDAN-Turbo: Lifelong agent for strategy self-exploration in jailbreaking LLMs.
+class AutoDANTurboAttack(IterativeAttack[AutoDANTurboParams]):
+    """A lifelong strategy search over a shared, growing library."""
 
-    Three-phase pipeline:
-    1. WarmUp — free exploration to bootstrap a strategy library
-    2. Lifelong — strategy-guided attacks with retrieval + summarization
-    3. Evaluation — shared LLM-judge result finalization
-    """
+    name = "autodan_turbo"
+    params_type = AutoDANTurboParams
 
-    config_model = AutoDANTurboConfig
+    def __init__(self, params: AutoDANTurboParams) -> None:
+        super().__init__(params)
+        for role in ("attacker", "summarizer", "embedder"):
+            if getattr(params, role) is None:
+                raise ValueError(f"AutoDAN-Turbo needs a '{role}' role.")
+        self.attacker: Completion = params.attacker
+        self.summarizer: Completion = params.summarizer
+        self.embedder: Embedder = params.embedder
+        self.library = StrategyLibrary()
 
-    def __init__(
-        self,
-        config=None,
-        ctx_or_client=None,
-        agent_router=None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client=None,
-    ):
-        """Initialize AutoDAN-Turbo with ``(config, ctx)`` or legacy args.
+    # --- run scope: warm-up ---------------------------------------------------
 
-        On the new seam ``ctx.models`` and ``ctx.judge`` are stored on the
-        config for warm-up and lifelong, and the strategy library is
-        written under ``ctx.workspace``. This class does not read
-        ``_suppress_run_status_updates``. ``AutoDANTurboConfig`` still
-        subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
-        The legacy constructor is obsolete for new code.
-        """
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
-        )
-        if ctx is None:
-            if not resolved_client:
-                raise ValueError("A storage backend required")
-            if not agent_router:
-                raise ValueError("LLMRouter required")
-            client = resolved_client
+    async def prepare(
+        self, goals: list[str], target: Target, judge: Optional[Judge] = None
+    ) -> None:
+        """Explore every goal freely and build the strategy library from it."""
+        if self.params.skip_warmup:
+            decision("skipped", "warm-up disabled; starting from an empty library")
+            return
+        for index, goal in enumerate(goals):
+            with phase(f"warm-up goal {index + 1}/{len(goals)}", goal=index):
+                log = await self._explore(goal, target, judge)
+            await self._learn_from(goal, log)
+        decision("prepared", "strategy library built", strategies=self.library.size())
 
-        cfg = copy.deepcopy(DEFAULT_AUTODAN_TURBO_CONFIG)
-        internal_config: Dict[str, Any] = {}
-        if config:
-            user_config, internal_config = _split_internal_keys(config)
-            _deep_update(cfg, user_config)
-            if "embedder" in user_config:
-                cfg["embedder"] = resolve_embedder_config(user_config["embedder"])
-        cfg = AutoDANTurboConfig.from_dict(cfg).to_dict()
-        cfg.update(internal_config)
-        if ctx is not None:
-            cfg["_models"] = ctx.models
-            cfg["_judge"] = ctx.judge
-
-        self.logger = logging.getLogger("hackagent.attacks.autodan_turbo")
-        if ctx is not None:
-            super().__init__(cfg, ctx)
-        else:
-            super().__init__(cfg, client, agent_router)
-
-    def _validate_config(self):
-        """Validate AutoDAN-Turbo specific configuration constraints.
-
-        Returns:
-            None.
-
-        Raises:
-            ValueError: If required fields are invalid or missing.
-        """
-        super()._validate_config()
-        params = self.config.get("autodan_turbo_params", {})
-        if params.get("epochs", 0) < 1:
-            raise ValueError("epochs must be >= 1")
-        if not self.config.get("attacker", {}).get("identifier"):
-            raise ValueError("attacker.identifier required")
-
-    def _get_pipeline_steps(self):
-        """Disable BaseAttack static pipeline; orchestration is manual in ``run``.
-
-        Paper mapping: AutoDAN-Turbo uses iterative loops with internal scoring
-        and strategy updates, so warm-up/lifelong/evaluation are tracked
-        explicitly in ``run`` instead of declarative fixed steps.
-
-        Returns:
-            Empty list.
-        """
-        return []  # Managed manually in run() (like PAIR)
-
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """Execute full AutoDAN-Turbo pipeline.
-
-        Pipeline mapping to paper/integration:
-        1) WarmUp: free exploration + strategy library bootstrap
-        2) Lifelong: retrieval-guided attack with online strategy growth
-        3) Evaluation: shared LLM-judge normalization and success finalization
-
-        Args:
-            goals: List of malicious goals to attack.
-
-        Returns:
-            Final per-goal result list, enriched with LLM judge outputs.
-
-        Raises:
-            Exception: Re-raises any runtime failure after coordinator finalization.
-        """
-        goals = goals or []
-        if not goals:
-            return []
-
-        params = self.config.get("autodan_turbo_params", {})
-        coordinator = self._initialize_coordinator(attack_type="autodan_turbo")
-        coordinator.initialize_goals(
-            goals,
-            {
-                "attack_type": "autodan_turbo",
-                "epochs": params.get("epochs", 100),
-                "warm_up_iterations": params.get("warm_up_iterations", 1),
-                "lifelong_iterations": params.get("lifelong_iterations", 1),
-            },
-        )
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        role_models = {
-            role: (
-                (self.config.get(role, {}) or {}).get("identifier")
-                or (self.config.get(role, {}) or {}).get("model")
-                or (self.config.get(role, {}) or {}).get("name")
-                or "unknown-model"
-            )
-            for role in ("attacker", "summarizer")
-        }
-        # Accept both "judge" (new) and "scorer" (legacy).
-        _judge_cfg = self.config.get("judge") or self.config.get("scorer") or {}
-        role_models["judge"] = (
-            _judge_cfg.get("identifier")
-            or _judge_cfg.get("model")
-            or _judge_cfg.get("name")
-            or "unknown-model"
-        )
-
-        backend_agent = getattr(self.agent_router, "backend_agent", None)
-        registration_key = (
-            str(getattr(backend_agent, "id", "")) if backend_agent else ""
-        )
-        registry = getattr(self.agent_router, "_agent_registry", {})
-        adapter = registry.get(registration_key) if isinstance(registry, dict) else None
-        target_model = getattr(adapter, "model_name", None)
-        if not target_model:
-            adapter_cfg = getattr(adapter, "config", {}) if adapter else {}
-            if isinstance(adapter_cfg, dict):
-                target_model = adapter_cfg.get("name") or adapter_cfg.get("model")
-        if not target_model:
-            metadata = getattr(backend_agent, "metadata", {}) if backend_agent else {}
-            if isinstance(metadata, dict):
-                target_model = metadata.get("name") or metadata.get("model")
-        if not target_model:
-            target_model = (
-                getattr(backend_agent, "name", None) if backend_agent else None
-            )
-        target_model = target_model or "unknown-model"
-
-        self.logger.info(
-            format_phase_message(
-                "pipeline",
-                "AutoDAN-Turbo LLM map -> "
-                f"attacker:{role_models['attacker']} | "
-                f"judge:{role_models['judge']} | "
-                f"summarizer:{role_models['summarizer']} | "
-                f"target:{target_model}",
-            )
-        )
-
-        try:
-            # Step 1: WarmUp — free exploration + strategy library building
-            self.logger.info(phase_separator("warmup", "starting phase"))
-            for goal_idx, goal in enumerate(goals):
-                emit_phase_trace(
-                    self.config,
-                    phase="WARMUP",
-                    subphase="PHASE_START",
-                    step_name="Warmup - Start",
-                    goal=goal,
-                    goal_idx=goal_idx,
-                    payload={
-                        "dashboard_section": "Warmup",
-                        "dashboard_group": "Warmup",
-                        "dashboard_item": "Start",
-                        "message": "WarmUp phase started",
-                    },
+    async def _explore(
+        self, goal: str, target: Target, judge: Optional[Judge]
+    ) -> list[dict]:
+        """Free exploration: attacker proposes, target replies, panel scores."""
+        log: list[dict] = []
+        for _ in range(self.params.epochs):
+            prompt = await self._propose(prompts.warm_up_system(goal), goal)
+            reply, score = await self._try(goal, prompt, target, judge)
+            if reply is None:
+                continue
+            log.append({"prompt": prompt, "response": reply, "score": score})
+            if score >= self.params.break_score:
+                decision(
+                    "stopped", "warm-up reached a jailbreak", score=round(score, 2)
                 )
-            with self.tracker.track_step(
-                "WarmUp: Free exploration",
-                "GENERATION",
-                goals[:3],
-                {"warm_up_iterations": params.get("warm_up_iterations", 1)},
-            ):
-                strategy_lib, warm_up_log = warm_up.execute(
-                    goals,
-                    self.config,
-                    self.backend,
-                    self.agent_router,
-                    self.logger,
-                )
-            self.logger.info(
-                format_phase_message(
-                    "warmup", f"WarmUp complete: {strategy_lib.size()} strategies"
-                )
-            )
-            for goal_idx, goal in enumerate(goals):
-                emit_phase_trace(
-                    self.config,
-                    phase="WARMUP",
-                    subphase="PHASE_END",
-                    step_name="Warmup - End",
-                    goal=goal,
-                    goal_idx=goal_idx,
-                    payload={
-                        "dashboard_section": "Warmup",
-                        "dashboard_group": "Warmup",
-                        "dashboard_item": "End",
-                        "strategy_count": strategy_lib.size(),
-                    },
-                )
+                break
+        return log
 
-            # Step 2: Lifelong — strategy-guided attacks
-            self.logger.info(phase_separator("lifelong", "starting phase"))
-            for goal_idx, goal in enumerate(goals):
-                emit_phase_trace(
-                    self.config,
-                    phase="LIFELONG",
-                    subphase="PHASE_START",
-                    step_name="Lifelong - Start",
-                    goal=goal,
-                    goal_idx=goal_idx,
-                    payload={
-                        "dashboard_section": "Lifelong",
-                        "dashboard_group": "Lifelong",
-                        "dashboard_item": "Start",
-                        "message": "Lifelong phase started",
-                    },
-                )
-            with self.tracker.track_step(
-                "Lifelong: Strategy-guided attacks",
-                "GENERATION",
-                goals[:3],
-                {"lifelong_iterations": params.get("lifelong_iterations", 1)},
-            ):
-                results = lifelong.execute(
-                    goals,
-                    self.config,
-                    self.backend,
-                    self.agent_router,
-                    self.logger,
-                    strategy_lib,
-                )
-            self.logger.info(
-                format_phase_message(
-                    "lifelong", f"Lifelong complete: {len(results)} results"
-                )
-            )
-            for goal_idx, goal in enumerate(goals):
-                emit_phase_trace(
-                    self.config,
-                    phase="LIFELONG",
-                    subphase="PHASE_END",
-                    step_name="Lifelong - End",
-                    goal=goal,
-                    goal_idx=goal_idx,
-                    payload={
-                        "dashboard_section": "Lifelong",
-                        "dashboard_group": "Lifelong",
-                        "dashboard_item": "End",
-                        "num_results": len(results),
-                    },
-                )
+    async def _learn_from(self, goal: str, log: list[dict]) -> None:
+        """Summarize a goal's weakest→strongest gap into a strategy."""
+        if not log:
+            return
+        weak = min(log, key=lambda row: row["score"])
+        strong = max(log, key=lambda row: row["score"])
+        if strong["score"] <= weak["score"]:
+            weak = {"prompt": goal, "response": _REFUSAL, "score": 1.0}
+        await self._summarize(goal, weak, strong)
 
-            results = coordinator.enrich_with_result_ids(results)
+    # --- per goal: lifelong ---------------------------------------------------
 
-            # Step 3: Evaluation — shared LLM-judge finalization
-            self.logger.info(phase_separator("evaluation", "starting phase"))
-            with self.tracker.track_step(
-                "Evaluation: Shared LLM-judge finalization",
-                "EVALUATION",
-                results[:3],
-                {},
-            ):
-                results = evaluation.execute(
-                    results, self.config, self.backend, self.logger
-                )
+    async def search(
+        self, goal: str, target: Target, judge: Optional[Judge]
+    ) -> list[Finding]:
+        findings: list[Finding] = []
+        prev_score, prev_prompt, prev_response = 1.0, goal, _REFUSAL
 
-            for idx, result in enumerate(results):
-                self.logger.info(
-                    format_phase_message(
-                        "final",
-                        f"Goal {idx}: autodan_score={result.get('autodan_score', result.get('attack_score', 0.0)):.1f}/10 | "
-                        f"best_score={result.get('best_score', 0.0):.1f} | "
-                        f"success={result.get('success', False)}",
+        for iteration in range(self.params.lifelong_iterations):
+            for epoch in range(self.params.epochs):
+                label = f"round {iteration + 1}.{epoch + 1}"
+                with phase(label, iteration=iteration, epoch=epoch) as path:
+                    system = await self._guided_system(
+                        goal, prev_response, iteration, epoch
                     )
-                )
+                    prompt = await self._propose(system, goal)
+                    reply, score = await self._try(
+                        goal, prompt, target, judge, path=path, sink=findings
+                    )
+                    if reply is None:
+                        continue
+                    if score > prev_score:
+                        await self._summarize(
+                            goal,
+                            {"prompt": prev_prompt, "response": prev_response},
+                            {"prompt": prompt, "response": reply},
+                        )
+                    prev_score, prev_prompt, prev_response = score, prompt, reply
+                    if score >= self.params.break_score:
+                        decision(
+                            "stopped",
+                            "a reply reached the break score",
+                            score=round(score, 2),
+                        )
+                        return findings
+        return findings
 
-            # Finalize using shared evaluation success flag.
-            coordinator.finalize_all_goals(
-                results,
-                scorer=lambda goal_data: any(
-                    bool(row.get("success", False)) for row in goal_data
-                ),
-            )
-            coordinator.log_summary()
-            coordinator.finalize_pipeline(results)
+    async def _guided_system(
+        self, goal: str, prev_response: str, iteration: int, epoch: int
+    ) -> str:
+        """The attacker's system prompt, conditioned on retrieved strategies."""
+        if (iteration == 0 and epoch == 0) or self.library.size() == 0:
+            return prompts.warm_up_system(goal)
+        vector = await self._embed(prev_response)
+        valid, strategies = self.library.retrieve(vector)
+        return prompts.strategy_system(goal, strategies, valid if strategies else True)
 
-            # Save strategy library
-            if self.ctx is not None:
-                out_path = self.ctx.workspace.path("strategy_library")
-            else:
-                output_dir = self.config.get("output_dir", ".")
-                os.makedirs(output_dir, exist_ok=True)
-                out_path = f"{output_dir}/strategy_library"
-            strategy_lib.save(str(out_path))
+    # --- shared steps ---------------------------------------------------------
 
-            return rows_to_attack_results(results)
-
+    async def _propose(self, system: str, goal: str) -> str:
+        """Ask the attacker for a jailbreak prompt; fall back to the bare goal."""
+        try:
+            reply = await self.attacker(prompts.attacker_turns(system))
         except Exception:
-            coordinator.finalize_on_error("AutoDAN-Turbo failed")
-            raise
+            return goal
+        prompt = prompts.extract_prompt(reply, goal)
+        return goal if prompts.is_refusal(prompt) else prompt
+
+    async def _try(
+        self,
+        goal: str,
+        prompt: str,
+        target: Target,
+        judge: Optional[Judge],
+        *,
+        path=(),
+        sink: Optional[list[Finding]] = None,
+    ) -> tuple[Optional[str], float]:
+        """Send one prompt, score the reply, and (in lifelong) keep the finding."""
+        messages: Messages = [{"role": "user", "content": prompt}]
+        reply = await target(messages)
+        if not reply.ok or not reply.text:
+            decision("skipped", "the target gave no usable reply")
+            return None, 0.0
+        verdict = await judge_reply(judge, goal, prompt, reply.text)
+        score = 0.0 if verdict is None else verdict.score
+        if sink is not None:
+            sink.append(
+                Finding(
+                    messages=messages,
+                    response=reply,
+                    verdict=verdict,
+                    metadata={"score": score},
+                    path=path,
+                )
+            )
+        return reply.text, score
+
+    async def _summarize(self, goal: str, weak: dict, strong: dict) -> None:
+        """Name the strategy behind ``strong``, and add it to the library."""
+        try:
+            reply = await self.summarizer(
+                prompts.summarizer_turns(
+                    goal, weak["prompt"], strong["prompt"], self.library.all()
+                )
+            )
+        except Exception:
+            return
+        strategy = prompts.parse_strategy(reply)
+        if not strategy or not strategy.get("Strategy"):
+            return
+        delta = float(strong.get("score", 0.0)) - float(weak.get("score", 0.0))
+        vector = await self._embed(weak.get("response", ""))
+        self.library.add(strategy, example=strong["prompt"], score=delta, vector=vector)
+
+    async def _embed(self, text: str) -> Optional[list[float]]:
+        try:
+            vectors = await self.embedder([text])
+        except Exception:
+            return None
+        return vectors[0] if vectors else None
+
+
+__all__ = ["AutoDANTurboAttack"]

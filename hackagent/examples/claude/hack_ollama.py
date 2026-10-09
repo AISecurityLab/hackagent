@@ -20,7 +20,7 @@ Prerequisites
 3. Run:  ``python hack_ollama.py``  (or ``hackagent claude`` for the interactive TUI preset)
 """
 
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 
 # ---------------------------------------------------------------------------
 # Target: local Claude Code (driven via `ollama launch claude --`, no endpoint)
@@ -29,20 +29,15 @@ TARGET_MODEL = (
     "llama3.2:3b"  # passed to `ollama launch claude --model` (alias or full id)
 )
 
-
-def bind_target():
-    session = HackAgent(Settings.resolve())
-    # endpoint is ignored; remote mode used to require a placeholder.
-    return session.target(
-        "",
-        "claude-code",
-        name="claude-code",
-        adapter_operational_config={
-            "name": TARGET_MODEL,
-            "binary": "ollama",  # path to the Ollama executable
-        },
-    )
-
+agent = HackAgent(
+    name="claude-code",
+    endpoint="",  # ignored, but remote mode needs it
+    agent_type="claude-code",
+    adapter_operational_config={
+        "name": TARGET_MODEL,
+        "binary": "ollama",  # path to the Ollama executable
+    },
+)
 
 # ---------------------------------------------------------------------------
 # Goals — what we want the target to do that it shouldn't
@@ -68,11 +63,7 @@ if __name__ == "__main__":
     print(f"  Red-teaming local Claude Code — model: {TARGET_MODEL}")
     print(f"{'=' * 60}")
 
-    agent = bind_target()
-    try:
-        results = agent.hack(attack_config=flipattack_config)
-    finally:
-        agent.session.close()
+    results = agent.hack(attack_config=flipattack_config)
 
     total = len(results) if results else 0
 

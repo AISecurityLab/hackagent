@@ -1,321 +1,306 @@
-# Copyright 2025 - AI4I. All rights reserved.
+# Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-TAP (Tree of Attacks with Pruning) attack implementation.
+"""TAP: grow a tree of attacker prompts and prune it twice a round.
 
-Implements the TAP algorithm from:
-    Mehrotra et al., "Tree of Attacks with Pruning: Efficient
-    Adversarial Prompting of Large Language Models" (2023)
-    https://arxiv.org/abs/2312.02119
+PAIR refines a fixed set of conversations. TAP grows them: each surviving
+branch asks the attacker for ``branching_factor`` refinements, so a round
+multiplies the candidates and the prunes bring them back down.
 
-Algorithm overview
-------------------
-TAP performs a bounded tree search where each node represents an
-attacker-generated prompt candidate:
+There are two prunes, and the order is the point:
 
-1. **Branching** — an attacker LLM generates ``branching_factor``
-   refinements of the current prompt in parallel ``n_streams`` streams.
-2. **On-topic pruning** — a judge (or the main judge) discards branches
-   whose prompts have drifted off-topic (``min_on_topic_score`` threshold).
-3. **Target query** — surviving prompts are sent to the victim model.
-4. **Score pruning** — only the top-``width`` branches by jailbreak score
-   are kept for the next depth level.
-5. **Termination** — search stops when ``depth`` levels are exhausted or
-   a branch exceeds ``success_score_threshold``.
+- **off topic**, before the target is called. A branch whose prompt has
+  drifted away from the goal is dropped while it is still free. This needs
+  an ``on_topic`` role; without one nothing is dropped here.
+- **by score**, after. The branches are ranked by what the panel made of
+  their replies and only ``width`` survive into the next round, so the tree
+  stays the same size however wide it fans out.
 
-Key parameters (``tap_params`` in config)
------------------------------------------
-depth
-    Maximum tree depth (number of refinement rounds per stream).
-width
-    Maximum branches kept after scoring at each depth level.
-branching_factor
-    Prompt refinements generated per active branch at each step.
-n_streams
-    Number of independent root-to-leaf searches run in parallel.
-keep_last_n
-    Conversation history window per stream (controls attacker context size).
-early_stop_on_success
-    Stop all streams as soon as one branch crosses the success threshold.
-min_on_topic_score
-    Minimum on-topic score (0 or 1) to retain a branch after on-topic pruning.
-success_score_threshold
-    Judge score that signals a successful jailbreak (default 1 for binary judges).
+The best branch always survives the score prune. A round that pruned to
+nothing would end the search on one bad judging pass.
+
+Based on: https://arxiv.org/abs/2312.02119
 """
 
-import copy
-import logging
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
-from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks._lib.legacy_seams import Store
-from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks._lib.inline_judge import attach_ctx_judge
-from hackagent.attacks.ports import RunContext
+import asyncio
+import json
+import random
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
-from . import tap_evaluation as evaluation, generation
-from .config import DEFAULT_TAP_CONFIG
-from hackagent.attacks.techniques.adaptive.tap.config import TapConfig
+from hackagent.attacks._lib.prompt_parser import extract_prompt_and_improvement
+from hackagent.core.contracts import Verdict
 
-
-def _recursive_update(target_dict: Dict[str, Any], source_dict: Dict[str, Any]) -> None:
-    """
-    Recursively update a target dict with a source dict.
-
-    Args:
-        target_dict: Dictionary to be updated in-place.
-        source_dict: Dictionary providing updates.
-
-    Returns:
-        None. The target_dict is updated in-place.
-    """
-    for key, source_value in source_dict.items():
-        target_value = target_dict.get(key)
-        if isinstance(source_value, dict) and isinstance(target_value, dict):
-            _recursive_update(target_value, source_value)
-        else:
-            if isinstance(key, str) and key.startswith("_"):
-                target_dict[key] = source_value
-            else:
-                target_dict[key] = copy.deepcopy(source_value)
+from ...contract import Completion, Judge, Messages, Target
+from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
+from ...trace import Path, decision, phase
+from . import prompts
+from .config import TapParams
 
 
-class TAPAttack(BaseAttack):
-    """
-    TAP (Tree of Attacks with Pruning) attack.
+@dataclass
+class Branch:
+    """One node of the tree: its conversation, and what it last scored."""
 
-    Orchestrates the TAP tree search by delegating to
-    :mod:`~hackagent.attacks.techniques.adaptive.tap.generation` (attacker loop
-    and target queries) and
-    :mod:`~hackagent.attacks.techniques.adaptive.tap.evaluation` (judge scoring).
+    #: The attacker conversation that produced this branch, parent history
+    #: included. A child copies it, so siblings cannot overwrite each other.
+    conversation: Messages
+    #: The prompt the attacker proposed. Empty on a root, which has not
+    #: proposed anything yet.
+    prompt: str = ""
+    verdict: Optional[Verdict] = None
+    path: Path = ()
+    response: Any = None
 
-    The attack expects three collaborating models configured via
-    ``config``:
+    @property
+    def score(self) -> float:
+        return 0.0 if self.verdict is None else self.verdict.score
 
-    * **Attacker** (``config["attacker"]``) — LLM that proposes prompt
-      refinements from conversation history.
-    * **Target** — the victim model reached via ``agent_router``.
-    * **Judge** (``config["judge"]``) — LLM that rates jailbreak success
-      0–10 (or 0/1 for binary judges such as HarmBench).
-    * **On-topic judge** (``config["on_topic_judge"]``, optional) —
-      separate evaluator that checks whether a prompt stays on-topic.
-      When ``None``, the configured judge is reused with the on-topic
-      evaluation type.
+    def child(self) -> "Branch":
+        return Branch(conversation=[dict(turn) for turn in self.conversation])
 
-    The :meth:`run` method manages the full pipeline via
-    :class:`~hackagent.tracking.TrackingCoordinator`:
-    a coordinator handles per-goal :class:`~hackagent.tracking.Tracker`
-    lifecycle and pipeline-level :class:`~hackagent.tracking.StepTracker`
-    checkpointing.
 
-    Attributes:
-        config: Merged TAP configuration dictionary.
-        client: Authenticated HackAgent API client.
-        agent_router: Router for the victim model.
-        logger: Hierarchical logger at ``hackagent.attacks.tap``.
-    """
+@dataclass
+class Round:
+    """What one depth level produced, before anything is pruned."""
 
-    config_model = TapConfig
+    branches: list[Branch] = field(default_factory=list)
+    findings: list[Finding] = field(default_factory=list)
 
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        ctx_or_client: Any = None,
-        agent_router: Optional[LLMRouter] = None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client: Optional[Store] = None,
-    ):
-        """Initialize TAP with ``(config, ctx)`` or the legacy constructor.
 
-        On the new seam, search scoring uses
-        :class:`~hackagent.attacks._lib.inline_judge.CtxTapEvaluator`
-        (``ctx.judge.score``) instead of ``TapEvaluation``. ``TapConfig``
-        still subclasses
-        :class:`~hackagent.attacks.techniques.config.ConfigBase`.
-        The legacy constructor is obsolete for new code.
-        """
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+class TAPAttack(IterativeAttack[TapParams]):
+    """A pruned tree of attacker-refined prompts."""
+
+    name = "tap"
+    params_type = TapParams
+
+    def __init__(self, params: TapParams) -> None:
+        super().__init__(params)
+        if params.attacker is None:
+            raise ValueError("TAP needs an 'attacker' role to write its prompts.")
+        self.attacker: Completion = params.attacker
+        self.on_topic: Optional[Completion] = params.on_topic
+
+    async def search(
+        self, goal: str, target: Target, judge: Optional[Judge]
+    ) -> list[Finding]:
+        params = self.params
+        branches = [self._root(goal) for _ in range(params.streams)]
+        findings: list[Finding] = []
+
+        for level in range(params.depth):
+            with phase(f"depth {level + 1}/{params.depth}", depth=level):
+                grown = await self._expand(goal, branches)
+                kept = await self._keep_on_topic(goal, grown)
+                if not kept:
+                    decision("stopped", "every branch drifted off the goal")
+                    break
+
+                round_ = await self._probe(goal, kept, target, judge)
+                findings.extend(round_.findings)
+                if params.early_stop and any(
+                    succeeded(found.verdict) for found in round_.findings
+                ):
+                    decision("stopped", "a branch reached a reply the panel passed")
+                    break
+                branches = self._prune(goal, round_.branches)
+
+        return findings
+
+    def _root(self, goal: str) -> Branch:
+        """One stream's opening conversation with the attacker."""
+        target_str = self.params.target_str
+        return Branch(
+            conversation=[
+                {
+                    "role": "system",
+                    "content": prompts.system_prompt(goal, target_str),
+                },
+                {
+                    "role": "user",
+                    "content": prompts.opening_request(goal, target_str),
+                },
+            ]
         )
-        if ctx is None:
-            if resolved_client is None:
-                raise ValueError("A storage backend must be provided to TAPAttack.")
-            if agent_router is None:
-                raise ValueError(
-                    "Victim LLMRouter instance must be provided to TAPAttack."
+
+    async def _expand(self, goal: str, branches: list[Branch]) -> list[Branch]:
+        """Ask the attacker for every refinement of every surviving branch."""
+        _ = goal
+        with phase("expand", branches=len(branches)):
+            grown = await asyncio.gather(
+                *(
+                    self._refine(branch)
+                    for branch in branches
+                    for _ in range(self.params.branching_factor)
                 )
-            client = resolved_client
-
-        current_config = copy.deepcopy(DEFAULT_TAP_CONFIG)
-        if config:
-            _recursive_update(current_config, config)
-
-        attach_ctx_judge(current_config, ctx)
-
-        self.logger = logging.getLogger("hackagent.attacks.tap")
-
-        if ctx is not None:
-            super().__init__(current_config, ctx)
-        else:
-            super().__init__(current_config, client, agent_router)
-
-    def _validate_config(self) -> None:
-        """
-        Validate TAP-specific configuration.
-
-        Checks that the required top-level keys are present **and** that
-        the numeric ``tap_params`` values satisfy the algorithm constraints
-        (all of ``depth``, ``width``, ``branching_factor``, ``n_streams``
-        must be ≥ 1).
-
-        Raises:
-            ValueError: If any required key is missing or a ``tap_params``
-                integer is less than 1.
-        """
-        super()._validate_config()
-
-        required_keys = ["attack_type", "tap_params", "output_dir"]
-        missing = [k for k in required_keys if k not in self.config]
-        if missing:
-            raise ValueError(
-                f"Configuration dictionary missing required keys: {', '.join(missing)}"
             )
+        kept = [branch for branch in grown if branch is not None]
+        if len(kept) < len(grown):
+            decision(
+                "skipped",
+                "the attacker proposed no usable prompt",
+                dropped=len(grown) - len(kept),
+            )
+        return kept
 
-        tap_params = self.config.get("tap_params", {})
-        for key in ["depth", "width", "branching_factor", "n_streams"]:
-            value = tap_params.get(key)
-            if value is None or value < 1:
-                raise ValueError(f"tap_params.{key} must be >= 1")
+    async def _refine(self, parent: Branch) -> Optional[Branch]:
+        """One refinement of one branch, retried while the attacker rambles."""
+        branch = parent.child()
+        for _ in range(self.params.max_attempts):
+            try:
+                reply = await self.attacker(branch.conversation)
+            except Exception:
+                continue
+            proposal = _parse(reply)
+            if proposal is None:
+                continue
+            branch.prompt, assistant_turn = proposal
+            branch.conversation.append({"role": "assistant", "content": assistant_turn})
+            return branch
+        return None
 
-    def _get_pipeline_steps(self) -> List[Dict]:
-        """
-        Define the two TAP pipeline stages.
-
-        Stage 1 — **Generation** (:func:`~hackagent.attacks.techniques.adaptive.tap.generation.execute`):
-            Runs the full tree-of-attacks-with-pruning search and collects
-            the best adversarial prompt found per goal.
-
-        Stage 2 — **Evaluation** (:func:`~hackagent.attacks.techniques.adaptive.tap.evaluation.execute`):
-            Runs all configured judges on the generation output and computes
-            ``best_score`` / ``success`` columns.
-
-        Returns:
-            List of pipeline-step configuration dicts compatible with
-            :meth:`~hackagent.attacks.techniques.base.BaseAttack._execute_pipeline`.
-        """
-        return [
-            {
-                "name": "Generation: TAP search",
-                "function": generation.execute,
-                "step_type_enum": "GENERATION",
-                "config_keys": [
-                    "tap_params",
-                    "attacker",
-                    "judges",
-                    "_judge",
-                    "judge",
-                    "on_topic_judge",
-                    "target_str",
-                    "max_tokens",
-                    "temperature",
-                    "top_p",
-                    "timeout",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                    "organization_id",
-                    "_tracker",
-                    "_goal_index_offset",
-                ],
-                "input_data_arg_name": "goals",
-                "required_args": ["logger", "agent_router", "config", "client"],
-            },
-            {
-                "name": "Evaluation: TAP scoring",
-                "function": evaluation.execute,
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "tap_params",
-                    "judges",
-                    "_judge",
-                    "judge",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                    "organization_id",
-                    "_tracker",
-                    "_goal_index_offset",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+    async def _keep_on_topic(self, goal: str, branches: list[Branch]) -> list[Branch]:
+        """Drop branches that no longer ask for the goal, before they cost a call."""
+        if self.on_topic is None or not branches:
+            return branches
+        with phase("on topic", branches=len(branches)):
+            answers = await asyncio.gather(
+                *(self._ask_on_topic(goal, branch.prompt) for branch in branches)
+            )
+        # An unreadable answer keeps the branch: a stuttering judge should
+        # not narrow the search.
+        kept = [
+            branch
+            for branch, on_topic in zip(branches, answers)
+            if on_topic is not False
         ]
+        # The reference caps this prune at the beam width too, so a wide
+        # fan-out costs at most ``width`` target calls per round rather
+        # than one per surviving branch.
+        survivors = kept[: self.params.width]
+        if len(survivors) < len(branches):
+            decision(
+                "pruned",
+                "off the goal, then down to the beam",
+                dropped=len(branches) - len(survivors),
+                kept=len(survivors),
+            )
+        return survivors
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """
-        Run TAP end-to-end with unified tracking and pipeline steps.
-
-        Args:
-            goals: List of goal strings to attack.
-
-        Returns:
-            List of per-goal result dicts produced by the pipeline.
-        """
-        goals = goals or []
-        if not goals:
-            return []
-
-        tap_params = self.config.get("tap_params", {})
-        depth = tap_params.get("depth", 3)
-        width = tap_params.get("width", 4)
-        branching_factor = tap_params.get("branching_factor", 3)
-        n_streams = tap_params.get("n_streams", 4)
-        success_threshold = tap_params.get("success_score_threshold", 10)
-
-        coordinator = self._initialize_coordinator(
-            attack_type="tap",
-            goals=goals,
-            initial_metadata={
-                "depth": depth,
-                "width": width,
-                "branching_factor": branching_factor,
-                "n_streams": n_streams,
-            },
-        )
-
-        if coordinator.has_goal_tracking:
-            self.logger.info("Using TrackingCoordinator for per-goal tracking")
-
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        start_step = self.config.get("start_step", 1) - 1
-
+    async def _ask_on_topic(self, goal: str, prompt: str) -> Optional[bool]:
+        assert self.on_topic is not None
+        messages = [
+            {"role": "system", "content": prompts.on_topic_system_prompt(goal)},
+            {"role": "user", "content": prompts.on_topic_request(goal, prompt)},
+        ]
         try:
-            results = self._execute_pipeline(
-                self._get_pipeline_steps(), goals, start_step
+            return prompts.parse_on_topic(await self.on_topic(messages))
+        except Exception:
+            return None
+
+    async def _probe(
+        self, goal: str, branches: list[Branch], target: Target, judge: Optional[Judge]
+    ) -> Round:
+        """Send every surviving branch to the target and judge what comes back."""
+        results = await asyncio.gather(
+            *(
+                self._attempt(goal, index, len(branches), branch, target, judge)
+                for index, branch in enumerate(branches)
+            )
+        )
+        round_ = Round()
+        for branch, finding in results:
+            round_.branches.append(branch)
+            if finding is not None:
+                round_.findings.append(finding)
+        return round_
+
+    async def _attempt(
+        self,
+        goal: str,
+        index: int,
+        total: int,
+        branch: Branch,
+        target: Target,
+        judge: Optional[Judge],
+    ) -> tuple[Branch, Optional[Finding]]:
+        """One branch's turn: send, judge, and feed the result back."""
+        with phase(f"branch {index + 1}/{total}", branch=index) as path:
+            branch.path = path
+            messages = [{"role": "user", "content": branch.prompt}]
+            reply = await target(messages)
+            if not reply.ok or not reply.text:
+                decision("skipped", "the target gave no usable reply")
+                self._feed_back(goal, branch, "[no reply]")
+                return branch, None
+
+            branch.verdict = await judge_reply(judge, goal, branch.prompt, reply.text)
+            branch.response = reply
+            self._feed_back(goal, branch, reply.text)
+            return branch, Finding(
+                messages=messages,
+                response=reply,
+                verdict=branch.verdict,
+                metadata={"score": branch.verdict.score if branch.verdict else None},
+                path=path,
             )
 
-            coordinator.finalize_all_goals(results, success_threshold=success_threshold)
-            coordinator.log_summary()
-            coordinator.finalize_pipeline(results)
+    def _prune(self, goal: str, branches: list[Branch]) -> list[Branch]:
+        """Keep the best ``width`` branches, and always at least one.
 
-            return rows_to_attack_results(results)
+        Ties are broken at random rather than by position, so a branch is
+        not favoured for having been expanded first.
+        """
+        _ = goal
+        params = self.params
+        ordered = list(branches)
+        random.shuffle(ordered)
+        ordered.sort(key=lambda branch: branch.score, reverse=True)
 
-        except Exception as exc:
-            self.logger.error(f"TAP attack failed: {exc}", exc_info=True)
-            coordinator.finalize_on_error("TAP attack failed with exception")
-            raise
+        above = [branch for branch in ordered if branch.score > params.min_prune_score]
+        survivors = (above or ordered[:1])[: params.width]
+        if survivors and len(survivors) < len(branches):
+            decision(
+                "pruned",
+                "below the beam",
+                dropped=len(branches) - len(survivors),
+                kept=len(survivors),
+                best=round(survivors[0].score, 3),
+            )
+        return survivors
+
+    def _feed_back(self, goal: str, branch: Branch, reply: str) -> None:
+        """Append what came back, then trim the branch's history."""
+        branch.conversation.append(
+            {
+                "role": "user",
+                "content": prompts.feedback(
+                    goal,
+                    reply,
+                    None if branch.verdict is None else branch.verdict.score,
+                ),
+            }
+        )
+        keep = 1 + 2 * self.params.keep_last_n
+        if len(branch.conversation) > keep:
+            branch.conversation[:] = [
+                branch.conversation[0],
+                *branch.conversation[-2 * self.params.keep_last_n :],
+            ]
+
+
+def _parse(reply: Optional[str]) -> Optional[tuple[str, str]]:
+    """Read the attacker's JSON turn, as PAIR's parser does."""
+    if not reply or '"improvement"' not in reply:
+        return None
+    parsed: Optional[dict[str, Any]] = extract_prompt_and_improvement(
+        reply, allow_plaintext=False
+    )
+    if not parsed or not parsed.get("prompt"):
+        return None
+    return parsed["prompt"], json.dumps(parsed, ensure_ascii=False)
+
+
+__all__ = ["Branch", "TAPAttack"]

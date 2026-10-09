@@ -24,7 +24,7 @@ import time
 
 import httpx
 
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 from hackagent.core.settings import resolve_remote_role_endpoint
 
 # ---------------------------------------------------------------------------
@@ -116,24 +116,20 @@ if __name__ == "__main__":
     adk_proc = start_adk_server()
 
     try:
-        session = HackAgent(Settings.resolve())
-        try:
-            agent = session.target(
-                AGENT_ENDPOINT,
-                AGENT_TYPE,
-                name=AGENT_NAME,
-            )
+        agent = HackAgent(
+            name=AGENT_NAME,
+            endpoint=AGENT_ENDPOINT,
+            agent_type=AGENT_TYPE,
+        )
 
-            results = agent.hack(
-                attack_config={
-                    "attack_type": "advprefix",
-                    "dataset": DATASET,
-                    "attacker": ATTACKER,
-                    "judges": JUDGES,
-                }
-            )
-        finally:
-            session.close()
+        results = agent.hack(
+            attack_config={
+                "attack_type": "advprefix",
+                "dataset": DATASET,
+                "attacker": ATTACKER,
+                "judges": JUDGES,
+            }
+        )
 
         # -- Summary ----------------------------------------------------------
         if not results:

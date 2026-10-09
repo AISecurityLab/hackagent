@@ -21,7 +21,8 @@ from typing import Any, Dict, Mapping, Optional, Type, TypeVar
 from hackagent.core.contracts import AgentType, ModelSpec
 from hackagent.core.logging import get_logger
 from hackagent.core.settings import Mode, Settings
-from hackagent.models.client import ModelClient, connect
+from hackagent.models.connect import connect
+from hackagent.models.model import Model
 
 logger = get_logger(__name__)
 
@@ -44,7 +45,13 @@ PASSTHROUGH_REQUEST_KEYS = (
 )
 
 #: Config keys that become :class:`ModelSpec` fields rather than ``extra``.
-_SPEC_FIELD_KEYS = ("max_tokens", "temperature", "top_p", "thinking")
+_SPEC_FIELD_KEYS = (
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "thinking",
+    "capabilities",
+)
 
 #: ``agent_metadata`` keys that never override the model's identity.
 _IDENTITY_KEYS = frozenset(
@@ -166,7 +173,7 @@ class ModelFactory:
             return spec
         return spec.model_copy(update={"api_key": self.settings.api_key})
 
-    def for_role(self, spec: ModelSpec) -> ModelClient:
+    def for_role(self, spec: ModelSpec) -> Model:
         return connect(self.with_credentials(spec))
 
 

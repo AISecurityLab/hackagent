@@ -31,12 +31,10 @@ editing the `_PROVIDERS` table in [demo.py](demo.py).
 ## Why this works
 
 ```python
-from hackagent import AgentType, HackAgent, Settings
-
-HackAgent(Settings.resolve()).target(
-    "",
-    AgentType.LITELLM,
+HackAgent(
     name="my-target",
+    agent_type=AgentType.LITELLM,
+    endpoint="",
     adapter_operational_config={
         # LiteLLM's model-string convention: "<provider>/<model>"
         "name": "anthropic/claude-3-5-sonnet-20241022",

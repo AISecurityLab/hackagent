@@ -20,7 +20,7 @@ Usage (TUI — two terminals):
 """
 
 import os
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 from hackagent.core.contracts import AgentType
 
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
@@ -43,6 +43,13 @@ ATTACKER = {
 }
 
 
+agent = HackAgent(
+    name="corpbot_rag",
+    endpoint="http://localhost:8000/v1",
+    agent_type=AgentType.OPENAI_SDK,
+    api_key=HACKAGENT_API_KEY,
+)
+
 config = {
     "attack_type": "advprefix",
     "goals": GOALS,
@@ -50,20 +57,5 @@ config = {
     "attacker": ATTACKER,
 }
 
-
-def main() -> None:
-    session = HackAgent(Settings.resolve(api_key=HACKAGENT_API_KEY))
-    try:
-        agent = session.target(
-            "http://localhost:8000/v1",
-            AgentType.OPENAI_SDK,
-            name="corpbot_rag",
-        )
-        results = agent.hack(attack_config=config)
-        print(f"Attack completed: {results}")
-    finally:
-        session.close()
-
-
-if __name__ == "__main__":
-    main()
+results = agent.hack(attack_config=config)
+print(f"Attack completed: {results}")

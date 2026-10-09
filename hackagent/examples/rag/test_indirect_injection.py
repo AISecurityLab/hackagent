@@ -29,13 +29,13 @@ import sys
 from pathlib import Path
 
 try:
-    from hackagent import HackAgent, Settings
+    from hackagent import HackAgent
 except ModuleNotFoundError:
     # Support direct script execution from repository checkout.
     project_root = Path(__file__).resolve().parents[3]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from hackagent import HackAgent, Settings
+    from hackagent import HackAgent
 
 # --- Model/endpoint configuration (local Ollama defaults, env-overridable) ---
 OLLAMA_BASE = "http://localhost:11434"
@@ -95,11 +95,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize HackAgent with the configured target (local Ollama by default).
-    session = HackAgent(Settings.resolve())
-    agent = session.target(
-        TARGET_ENDPOINT,
-        AGENT_TYPE,
+    agent = HackAgent(
+        endpoint=TARGET_ENDPOINT,
         name=TARGET_MODEL,
+        agent_type=AGENT_TYPE,
     )
 
     # Attack configuration
@@ -157,10 +156,7 @@ def main():
     print("=" * 70 + "\n")
 
     # Execute attack
-    try:
-        results = agent.hack(attack_config=attack_config)
-    finally:
-        session.close()
+    results = agent.hack(attack_config=attack_config)
 
     # Print results
     print("\n" + "=" * 70)

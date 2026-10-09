@@ -94,7 +94,7 @@ Resolve every setting once, from arguments, environment and file.
 - `api_key` - Explicit API key. `None` means &quot;not given&quot;; an empty
   string explicitly selects local mode.
 - `base_url` - Explicit remote API base URL.
-- `db_path` - Explicit local database path, or `":memory:"`.
+- `db_path` - Explicit local database path, or `&quot;:memory:&quot;`.
 - `config_path` - Config file to read instead of the default one.
 - `env` - Environment mapping (defaults to `os.environ`).
   

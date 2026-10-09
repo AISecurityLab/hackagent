@@ -59,7 +59,7 @@ class TestBoundTarget(unittest.TestCase):
         self.assertEqual(target.agent_record.metadata["key"], "value")
 
     def test_target_config_is_merged_into_the_spec(self):
-        with patch("hackagent.models.client.connect") as mock_connect:
+        with patch("hackagent.models.connect.connect") as mock_connect:
             target, _store = _target(
                 target_config={"max_tokens": 321, "temperature": 0.2},
                 adapter_operational_config={"name": "demo-model", "temperature": 0.4},
@@ -72,14 +72,14 @@ class TestBoundTarget(unittest.TestCase):
         self.assertEqual(target.agent_record.metadata["label"], "demo")
 
     def test_thinking_is_forwarded_for_ollama(self):
-        with patch("hackagent.models.client.connect") as mock_connect:
+        with patch("hackagent.models.connect.connect") as mock_connect:
             _target(
                 endpoint="http://localhost:11434", agent_type="ollama", thinking=False
             )
         self.assertIs(mock_connect.call_args.args[0].thinking, False)
 
     def test_thinking_is_ignored_for_non_ollama(self):
-        with patch("hackagent.models.client.connect") as mock_connect:
+        with patch("hackagent.models.connect.connect") as mock_connect:
             _target(thinking=False)
         self.assertIsNone(mock_connect.call_args.args[0].thinking)
 
@@ -102,82 +102,74 @@ class TestHackAgentHack(unittest.TestCase):
             self.agent.hack(attack_config={"attack_type": "nonexistent"})
         self.assertIn("Unsupported", str(ctx.exception))
 
-    @patch("hackagent.orchestrator.execution.runner.run")
+    @patch("hackagent.orchestrator.campaign.legacy.run_as_campaign")
     def test_hack_delegates_to_runner(self, mock_run):
         """Test that hack delegates to the orchestrator runner."""
         mock_run.return_value = [{"result": "test"}]
 
         result = self.agent.hack(
-            attack_config={"attack_type": "baseline", "goals": ["test"]}
+            attack_config={"attack_type": "autodan_turbo", "goals": ["test"]}
         )
 
         mock_run.assert_called_once()
         self.assertEqual(result, [{"result": "test"}])
         self.assertIs(mock_run.call_args.args[0], self.agent)
 
-    @patch("hackagent.orchestrator.execution.runner.run")
+    @patch("hackagent.orchestrator.campaign.legacy.run_as_campaign")
     def test_hack_passes_run_config_override(self, mock_run):
         """Test that run_config_override is passed to the runner."""
         mock_run.return_value = []
         run_config = {"custom": "override"}
         self.agent.hack(
-            attack_config={"attack_type": "baseline"},
+            attack_config={"attack_type": "autodan_turbo"},
             run_config_override=run_config,
         )
         self.assertEqual(mock_run.call_args.kwargs["run_config_override"], run_config)
 
-    @patch("hackagent.orchestrator.execution.runner.run")
-    def test_hack_passes_fail_on_run_error(self, mock_run):
-        """Test that fail_on_run_error is passed to the runner."""
-        mock_run.return_value = []
-        self.agent.hack(
-            attack_config={"attack_type": "baseline"},
-            fail_on_run_error=False,
-        )
-        self.assertFalse(mock_run.call_args.kwargs["fail_on_run_error"])
-
-    @patch("hackagent.orchestrator.execution.runner.run")
+    @patch("hackagent.orchestrator.campaign.legacy.run_as_campaign")
     def test_hack_wraps_value_error(self, mock_run):
         """Test that ValueError is wrapped in HackAgentError."""
         mock_run.side_effect = ValueError("Bad config")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "baseline"})
+            self.agent.hack(attack_config={"attack_type": "autodan_turbo"})
         self.assertIn("Configuration error", str(ctx.exception))
 
-    @patch("hackagent.orchestrator.execution.runner.run")
+    @patch("hackagent.orchestrator.campaign.legacy.run_as_campaign")
     def test_hack_wraps_runtime_error(self, mock_run):
         """Test that RuntimeError is wrapped in HackAgentError."""
         mock_run.side_effect = RuntimeError("Something broke")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "baseline"})
+            self.agent.hack(attack_config={"attack_type": "autodan_turbo"})
         self.assertIn("unexpected runtime error", str(ctx.exception).lower())
 
-    @patch("hackagent.orchestrator.execution.runner.run")
+    @patch("hackagent.orchestrator.campaign.legacy.run_as_campaign")
     def test_hack_wraps_backend_runtime_error(self, mock_run):
         """Test backend-specific RuntimeErrors are wrapped."""
         mock_run.side_effect = RuntimeError("Failed to create backend agent")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "baseline"})
+            self.agent.hack(attack_config={"attack_type": "autodan_turbo"})
         self.assertIn("Backend agent operation failed", str(ctx.exception))
 
-    @patch("hackagent.orchestrator.execution.runner.run")
+    @patch("hackagent.orchestrator.campaign.legacy.run_as_campaign")
     def test_hack_wraps_generic_exception(self, mock_run):
         """Test that generic exceptions are wrapped in HackAgentError."""
         mock_run.side_effect = Exception("Unknown error")
         with self.assertRaises(HackAgentError):
-            self.agent.hack(attack_config={"attack_type": "baseline"})
+            self.agent.hack(attack_config={"attack_type": "autodan_turbo"})
 
-    @patch("hackagent.orchestrator.execution.runner.run")
+    @patch("hackagent.orchestrator.campaign.legacy.run_as_campaign")
     def test_hack_reraises_hackagent_error(self, mock_run):
         """Test that HackAgentError is re-raised as-is."""
         mock_run.side_effect = HackAgentError("Direct error")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "baseline"})
+            self.agent.hack(attack_config={"attack_type": "autodan_turbo"})
         self.assertEqual(str(ctx.exception), "Direct error")
 
 
 class TestHackAgentHackChain(unittest.TestCase):
-    """Test HackAgent.hack_chain method."""
+    """``hack_chain`` validates its steps and hands one escalating campaign
+    to the bridge. The escalation itself is covered against a scripted
+    campaign in ``tests/unit/campaign/test_chain.py``."""
 
     def setUp(self):
         self.agent, self.store = _target()
@@ -193,232 +185,64 @@ class TestHackAgentHackChain(unittest.TestCase):
             self.agent.hack_chain(attacks=[{}], goals=["do the bad thing"])
 
     def test_hack_chain_defaults_to_jailbreak_campaign_when_attacks_omitted(self):
-        """attacks=None (the default) resolves to the Jailbreak evaluation
-        campaign's primary attacks, in campaign order: h4rm3l -> TAP -> PAIR."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.return_value = [{"goal": "goal-a", "is_success": False}]
+        """attacks=None resolves to the Jailbreak campaign's primary attacks,
+        in campaign order: h4rm3l -> TAP -> PAIR, run as one campaign."""
+        with patch(
+            "hackagent.orchestrator.campaign.legacy.run_chain_as_campaign"
+        ) as mock_run:
+            mock_run.return_value = []
 
             self.agent.hack_chain(goals=["goal-a"])
 
-            called_attack_types = [
-                call.kwargs["attack_config"]["attack_type"]
-                for call in mock_hack.call_args_list
-            ]
-            self.assertEqual(called_attack_types, ["h4rm3l", "tap", "pair"])
+            steps = [step["attack_type"] for step in mock_run.call_args.args[1]]
+            self.assertEqual(steps, ["h4rm3l", "tap", "pair"])
+            self.assertTrue(mock_run.call_args.kwargs["escalate"])
 
     def test_hack_chain_explicit_attacks_override_default_campaign(self):
         """Passing an explicit attacks list bypasses the campaign default."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.return_value = [{"goal": "goal-a", "is_success": True}]
+        with patch(
+            "hackagent.orchestrator.campaign.legacy.run_chain_as_campaign"
+        ) as mock_run:
+            mock_run.return_value = []
 
             self.agent.hack_chain(
                 attacks=[{"attack_type": "baseline"}], goals=["goal-a"]
             )
 
-            called_attack_types = [
-                call.kwargs["attack_config"]["attack_type"]
-                for call in mock_hack.call_args_list
-            ]
-            self.assertEqual(called_attack_types, ["baseline"])
+            steps = [step["attack_type"] for step in mock_run.call_args.args[1]]
+            self.assertEqual(steps, ["baseline"])
 
-    def test_hack_chain_stops_on_first_success(self):
-        """A goal that succeeds at step 1 is never retried at step 2."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.return_value = [{"goal": "goal-a", "is_success": True}]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
-                goals=["goal-a"],
-            )
-
-            mock_hack.assert_called_once()
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0]["chain_attack_type"], "pair")
-            self.assertEqual(result[0]["chain_step"], 0)
-
-    def test_hack_chain_escalates_mitigated_goal_to_next_attack(self):
-        """A goal mitigated at step 1 is retried at step 2."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.side_effect = [
-                [{"goal": "goal-a", "is_success": False}],
-                [{"goal": "goal-a", "is_success": True}],
-            ]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
-                goals=["goal-a"],
-            )
-
-            self.assertEqual(mock_hack.call_count, 2)
-            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
-            self.assertEqual(second_call_config["goals"], ["goal-a"])
-            self.assertEqual(second_call_config["attack_type"], "tap")
-
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0]["chain_attack_type"], "tap")
-            self.assertEqual(result[0]["chain_step"], 1)
-
-    def test_hack_chain_keeps_last_attempt_for_fully_mitigated_goal(self):
-        """A goal mitigated by every attack keeps the last step's rows."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.side_effect = [
-                [{"goal": "goal-a", "is_success": False}],
-                [{"goal": "goal-a", "is_success": False}],
-            ]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
-                goals=["goal-a"],
-            )
-
-            self.assertEqual(mock_hack.call_count, 2)
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0]["chain_attack_type"], "tap")
-            self.assertFalse(result[0]["is_success"])
-
-    def test_hack_chain_skips_remaining_steps_when_all_goals_resolved(self):
-        """No further hack() calls happen once every goal has succeeded."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.return_value = [
-                {"goal": "goal-a", "is_success": True},
-                {"goal": "goal-b", "is_success": True},
-            ]
+    def test_hack_chain_forwards_escalation_and_goals_to_the_campaign(self):
+        """The escalation toggle and goal pool reach the bridge unchanged."""
+        with patch(
+            "hackagent.orchestrator.campaign.legacy.run_chain_as_campaign"
+        ) as mock_run:
+            mock_run.return_value = []
 
             self.agent.hack_chain(
-                attacks=[
-                    {"attack_type": "pair"},
-                    {"attack_type": "tap"},
-                    {"attack_type": "bon"},
-                ],
-                goals=["goal-a", "goal-b"],
-            )
-
-            mock_hack.assert_called_once()
-
-    def test_hack_chain_mixed_goals_partition_correctly(self):
-        """Only mitigated goals are forwarded; resolved ones are excluded."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.side_effect = [
-                [
-                    {"goal": "goal-a", "is_success": True},
-                    {"goal": "goal-b", "is_success": False},
-                ],
-                [{"goal": "goal-b", "is_success": True}],
-            ]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
-                goals=["goal-a", "goal-b"],
-            )
-
-            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
-            self.assertEqual(second_call_config["goals"], ["goal-b"])
-
-            by_goal = {row["goal"]: row for row in result}
-            self.assertEqual(by_goal["goal-a"]["chain_attack_type"], "pair")
-            self.assertEqual(by_goal["goal-b"]["chain_attack_type"], "tap")
-
-    def test_hack_chain_resolves_goals_from_first_step_dataset(self):
-        """When goals aren't passed explicitly, they're inferred from step 0 results."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.return_value = [{"goal": "goal-a", "is_success": True}]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair", "dataset": {"preset": "advbench"}}],
-            )
-
-            first_call_config = mock_hack.call_args_list[0].kwargs["attack_config"]
-            self.assertNotIn("goals", first_call_config)
-            self.assertEqual(first_call_config["dataset"], {"preset": "advbench"})
-            self.assertEqual(len(result), 1)
-
-    def test_hack_chain_escalate_only_mitigated_false_runs_every_attack_on_every_goal(
-        self,
-    ):
-        """With escalate_only_mitigated=False, all goals go to every attack
-        regardless of outcome, and results from every step are kept."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.side_effect = [
-                [
-                    {"goal": "goal-a", "is_success": True},
-                    {"goal": "goal-b", "is_success": False},
-                ],
-                [
-                    {"goal": "goal-a", "is_success": False},
-                    {"goal": "goal-b", "is_success": True},
-                ],
-            ]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                attacks=[{"attack_type": "baseline"}],
                 goals=["goal-a", "goal-b"],
                 escalate_only_mitigated=False,
             )
 
-            # Both steps run against both goals (no escalation-based filtering).
-            self.assertEqual(mock_hack.call_count, 2)
-            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
-            self.assertEqual(set(second_call_config["goals"]), {"goal-a", "goal-b"})
+            self.assertFalse(mock_run.call_args.kwargs["escalate"])
+            self.assertEqual(mock_run.call_args.kwargs["goals"], ["goal-a", "goal-b"])
 
-            # Rows from *both* steps are kept for *both* goals — nothing
-            # dropped or overwritten, unlike the default escalation mode.
-            self.assertEqual(len(result), 4)
-            by_goal_and_step = {(r["goal"], r["chain_attack_type"]) for r in result}
-            self.assertEqual(
-                by_goal_and_step,
-                {
-                    ("goal-a", "pair"),
-                    ("goal-a", "tap"),
-                    ("goal-b", "pair"),
-                    ("goal-b", "tap"),
-                },
-            )
+    def test_hack_chain_fail_on_run_error_stops_the_chain(self):
+        """``fail_on_run_error`` maps to the campaign's stop-on-error."""
+        with patch(
+            "hackagent.orchestrator.campaign.legacy.run_chain_as_campaign"
+        ) as mock_run:
+            mock_run.return_value = []
 
-    def test_hack_chain_escalate_only_mitigated_true_is_default(self):
-        """escalate_only_mitigated defaults to True (fallback-ladder behavior)."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.side_effect = [
-                [{"goal": "goal-a", "is_success": False}],
-                [{"goal": "goal-a", "is_success": True}],
-            ]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+            self.agent.hack_chain(
+                attacks=[{"attack_type": "baseline"}],
                 goals=["goal-a"],
+                fail_on_run_error=True,
             )
 
-            self.assertEqual(mock_hack.call_count, 2)
-            # Only the final (successful) attempt's row is kept.
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0]["chain_attack_type"], "tap")
-
-    def test_hack_chain_keeps_unmatched_goal_instead_of_dropping_it(self):
-        """A goal a step returns no row for (e.g. it errored) has no evidence
-        of success, so it stays in the chain and keeps its last known rows
-        from the previous step, rather than being dropped."""
-        with patch.object(self.agent, "hack") as mock_hack:
-            mock_hack.side_effect = [
-                [
-                    {"goal": "goal-a", "is_success": False},
-                    {"goal": "goal-b", "is_success": False},
-                ],
-                # Step 2 only returns a row for goal-a; goal-b is absent.
-                [{"goal": "goal-a", "is_success": True}],
-            ]
-
-            result = self.agent.hack_chain(
-                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
-                goals=["goal-a", "goal-b"],
-            )
-
-            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
-            self.assertEqual(set(second_call_config["goals"]), {"goal-a", "goal-b"})
-
-            by_goal = {row["goal"]: row for row in result}
-            self.assertEqual(by_goal["goal-a"]["chain_attack_type"], "tap")
-            # goal-b never got a matching row back, so it falls back to its
-            # last known (step 1) rows rather than being dropped or errored.
-            self.assertEqual(by_goal["goal-b"]["chain_attack_type"], "pair")
+            override = mock_run.call_args.kwargs["run_config_override"]
+            self.assertEqual(override["on_error"], "stop")
 
 
 class TestHackAgentTarget(unittest.TestCase):
@@ -451,11 +275,9 @@ class TestHackAgentTarget(unittest.TestCase):
 
         agents = store.list_agents().items
         self.assertEqual([a.name for a in agents], ["llama3"])
-        self.assertEqual(agent.router.registration_key, str(agent.agent_record.id))
-        self.assertIs(agent.router.backend_agent, agent.agent_record)
 
     def test_guardrails_wrap_the_target(self):
-        from hackagent.models.guardrail import Guarded, GuardrailSpec
+        from hackagent.models.guardrail import GuardedModel, GuardrailSpec
 
         agent, _ = self._agent(
             after_guardrail={
@@ -466,17 +288,19 @@ class TestHackAgentTarget(unittest.TestCase):
             }
         )
 
-        self.assertIsInstance(agent.target, Guarded)
+        self.assertIsInstance(agent.target, GuardedModel)
         self.assertIsNone(agent.target.before)
         self.assertEqual(agent.target.after.system_prompt, "be strict")
         self.assertIsInstance(agent.guardrails["after"], GuardrailSpec)
         self.assertEqual(agent.guardrails["after"].identifier, "guard")
 
     def test_no_guardrails_leaves_the_target_unwrapped(self):
-        from hackagent.models.client import ModelClient
+        from hackagent.models.guardrail import GuardedModel
+        from hackagent.models.model import Model
 
         agent, _ = self._agent()
-        self.assertIsInstance(agent.target, ModelClient)
+        self.assertIsInstance(agent.target, Model)
+        self.assertNotIsInstance(agent.target, GuardedModel)
         self.assertEqual(agent.guardrails, {})
 
     def test_unsupported_agent_type_is_rejected_before_registration(self):

@@ -1,307 +1,121 @@
 # Copyright 2026 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
-"""
-Best-of-N (BoN) Jailbreaking attack implementation.
+"""Best-of-N: resend the goal until one perturbation of it gets through.
 
-Stochastic black-box attack that generates N randomly augmented versions of a
-harmful prompt — using word scrambling, random capitalization, and ASCII
-perturbation — and picks the best candidate that elicits a harmful response
-from the target model.
+Each step sends several independently seeded augmentations of the goal at
+once. The step's longest usable reply is the one the panel judges, since a
+long reply is a cheap proxy for the target engaging rather than refusing.
+The search stops at the first step the panel calls a success.
 
-The attack runs in two pipeline stages:
-1. **Generation** — multi-step search with K parallel candidates per step.
-2. **Evaluation** — multi-judge scoring via BaseEvaluationStep.
+That one reply per step is what the panel rates: the other candidates of a
+step differ only by noise, and judging all of them would multiply the
+panel's work by the fan-out without telling the run anything more. They are
+still in the trace, under the step that sent them.
 
 Based on: https://arxiv.org/abs/2412.03556
-
-Result Tracking:
-    Uses TrackingCoordinator to manage both pipeline-level StepTracker
-    and per-goal Tracker.  The coordinator handles goal lifecycle,
-    crash-safe finalization, and data enrichment (result_id injection).
 """
 
-import copy
-import logging
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
-from hackagent.attacks._lib.legacy_seams import Store
-from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks._lib.inline_judge import attach_ctx_judge
-from hackagent.attacks.ports import RunContext
-from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.types import AttackResult, rows_to_attack_results
+import asyncio
+from typing import Optional
 
-from hackagent.attacks._lib.inline_judge import make_postprocess_execute
+from hackagent.core.contracts.protocols import CompletionResult
 
-from . import generation
-from .config import DEFAULT_BON_CONFIG
+from ...contract import Judge, Target
+from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
+from ...trace import decision, phase
+from .augment import augment_text
+from .config import BoNParams
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
+class BoNAttack(IterativeAttack[BoNParams]):
+    """A stochastic search over augmentations of the goal."""
 
+    name = "bon"
+    params_type = BoNParams
 
-def _recursive_update(target_dict, source_dict):
-    """Recursively merge *source_dict* into *target_dict*.
+    async def search(
+        self, goal: str, target: Target, judge: Optional[Judge]
+    ) -> list[Finding]:
+        params = self.params
+        findings: list[Finding] = []
 
-    Nested dictionaries are merged recursively.  Internal keys (starting
-    with ``_``) are passed by reference; all other values are deep-copied.
-    """
-    for key, source_value in source_dict.items():
-        target_value = target_dict.get(key)
-        if isinstance(source_value, dict) and isinstance(target_value, dict):
-            _recursive_update(target_value, source_value)
-        elif key.startswith("_"):
-            target_dict[key] = source_value
-        else:
-            target_dict[key] = copy.deepcopy(source_value)
-
-
-class BoNAttack(BaseAttack):
-    """Best-of-N (BoN) Jailbreaking — stochastic text augmentation attack.
-
-    Implements the Best-of-N technique from:
-        Hughes et al., "Best-of-N Jailbreaking" (2024)
-        https://arxiv.org/abs/2412.03556
-
-    For each goal the attack runs ``n_steps`` sequential search steps.
-    Within each step, ``num_concurrent_k`` independently-seeded augmented
-    candidates are generated and sent to the target model in parallel.
-    The best candidate is selected by response length (as a proxy for
-    non-refusal), and a final multi-judge evaluation scores the result.
-
-    Pipeline:
-        1. Generation — multi-step BoN search with text augmentations.
-           On ``BaseAttack(config, ctx)``, candidates are scored with
-           ``ctx.judge.score`` through
-           :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
-           ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
-
-    Construct with ``(config, ctx)``. Tests build ``ctx`` with
-    ``make_ctx()`` (``tests.fakes.context``). The legacy constructor
-    ``(config_dict, client, agent_router)`` is obsolete for new code.
-    :class:`~hackagent.attacks.techniques.adaptive.bon.config.BoNConfig` still
-    subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
-    """
-
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        ctx_or_client: Any = None,
-        agent_router: Optional[LLMRouter] = None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client: Optional[Store] = None,
-    ):
-        """Initialise BoNAttack with configuration.
-
-        Prefer ``BoNAttack(config, ctx)``. ``ctx.judge.score`` replaces
-        ``InlineStepJudge`` on that path. Legacy
-        ``(config, client, agent_router)`` remains for the orchestrator
-        and is obsolete for new code.
-        """
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
-        )
-        if ctx is None:
-            if resolved_client is None:
-                raise ValueError("A storage backend must be provided to BoNAttack.")
-            if agent_router is None:
-                raise ValueError(
-                    "Victim LLMRouter instance must be provided to BoNAttack."
+        for step in range(params.steps):
+            with phase(f"step {step + 1}/{params.steps}", step=step) as path:
+                prompts = self._candidates(goal, step)
+                replies = await asyncio.gather(
+                    *(
+                        target([{"role": "user", "content": prompt}])
+                        for prompt in prompts
+                    )
                 )
-            client = resolved_client
+                candidate = _longest_reply(prompts, replies)
+                if candidate is None:
+                    decision(
+                        "skipped",
+                        f"none of the {len(prompts)} candidates got a usable reply",
+                    )
+                    continue
 
-        # Merge user config with defaults
-        current_config = copy.deepcopy(DEFAULT_BON_CONFIG)
-        if config:
-            _recursive_update(current_config, config)
+                index, prompt, reply = candidate
+                verdict = await judge_reply(judge, goal, prompt, reply.text)
+                findings.append(
+                    Finding(
+                        messages=[{"role": "user", "content": prompt}],
+                        response=reply,
+                        verdict=verdict,
+                        metadata={
+                            "step": step,
+                            "candidate": index,
+                            "seed": _seed(params, step, index),
+                        },
+                        path=path,
+                    )
+                )
+                if succeeded(verdict):
+                    decision(
+                        "stopped",
+                        "the panel called this reply a success",
+                        score=verdict.score,
+                    )
+                    break
 
-        attach_ctx_judge(current_config, ctx)
+        return findings
 
-        self.logger = logging.getLogger("hackagent.attacks.bon")
-        if ctx is not None:
-            super().__init__(current_config, ctx)
-        else:
-            super().__init__(current_config, client, agent_router)
-
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
-
-    def _validate_config(self):
-        """Validate the provided configuration dictionary."""
-        super()._validate_config()
-
-        required_keys = ["attack_type", "bon_params"]
-        missing = [k for k in required_keys if k not in self.config]
-        if missing:
-            raise ValueError(
-                f"Configuration dictionary missing required keys: {', '.join(missing)}"
-            )
-
-        bon_params = self.config.get("bon_params", {})
-        if bon_params.get("n_steps", 0) < 1:
-            raise ValueError("bon_params.n_steps must be >= 1")
-        if bon_params.get("num_concurrent_k", 0) < 1:
-            raise ValueError("bon_params.num_concurrent_k must be >= 1")
-        sigma = bon_params.get("sigma", 0.4)
-        if not (0.0 < sigma <= 1.0):
-            raise ValueError(f"bon_params.sigma must be in (0, 1], got {sigma}")
-
-    # ------------------------------------------------------------------
-    # Pipeline definition
-    # ------------------------------------------------------------------
-
-    def _get_pipeline_steps(self) -> List[Dict]:
-        """Define the attack pipeline.
-
-        The Generation step now includes inline judge evaluation (early-stop
-        on jailbreak).  The Evaluation step is a lightweight post-processing
-        pass that syncs results to the server and logs ASR.
-        """
+    def _candidates(self, goal: str, step: int) -> list[str]:
+        """The augmented prompts of one step. The same seed is the same text."""
+        params = self.params
         return [
-            {
-                "name": "Generation: BoN Multi-Step Augmentation Search + Judge",
-                "function": generation.execute,
-                "step_type_enum": "GENERATION",
-                "config_keys": [
-                    "batch_size",
-                    "bon_params",
-                    "max_tokens",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    # Judge config keys — used by inline _StepJudge
-                    "judges",
-                    "_judge",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "goals",
-                "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": make_postprocess_execute("BoN"),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "bon_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "_judge",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            augment_text(
+                goal,
+                params.sigma,
+                _seed(params, step, index),
+                word_scrambling=params.word_scrambling,
+                random_capitalization=params.random_capitalization,
+                ascii_perturbation=params.ascii_perturbation,
+            )
+            for index in range(params.candidates)
         ]
 
-    # ------------------------------------------------------------------
-    # Run
-    # ------------------------------------------------------------------
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """Execute the full BoN attack pipeline.
+def _seed(params: BoNParams, step: int, index: int) -> int:
+    return step * params.candidates + index
 
-        The generation step performs the multi-step BoN search **and** inline
-        judge evaluation.  If a judge confirms a jailbreak at any step the
-        search terminates early.  A lightweight post-processing step then
-        syncs results to the server and logs ASR.
 
-        Args:
-            goals: A list of goal strings to test.
+def _longest_reply(
+    prompts: list[str], replies: list[CompletionResult]
+) -> Optional[tuple[int, str, CompletionResult]]:
+    """The usable candidate with the longest reply, if any."""
+    usable = [
+        (index, prompts[index], reply)
+        for index, reply in enumerate(replies)
+        if reply.ok and reply.text
+    ]
+    if not usable:
+        return None
+    return max(usable, key=lambda item: len(item[2].text or ""))
 
-        Returns:
-            List of result dictionaries, or empty list if no goals provided.
-        """
-        goals = goals or []
-        if not goals:
-            return []
 
-        # Phase 1: Create coordinator
-        coordinator = self._initialize_coordinator(attack_type="bon")
-
-        # Initialize per-goal tracking upfront so Generation can emit
-        # candidate-level traces visible in dashboard.
-        bon_params = self.config.get("bon_params", {})
-        goal_metadata = {
-            "n_steps": bon_params.get("n_steps", 4),
-            "num_concurrent_k": bon_params.get("num_concurrent_k", 5),
-            "sigma": bon_params.get("sigma", 0.4),
-            "word_scrambling": bon_params.get("word_scrambling", True),
-            "random_capitalization": bon_params.get("random_capitalization", True),
-            "ascii_perturbation": bon_params.get("ascii_perturbation", True),
-        }
-        coordinator.initialize_goals(goals=goals, initial_metadata=goal_metadata)
-
-        if coordinator.has_goal_tracking:
-            self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
-
-        # Make goal tracker available to Generation
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        pipeline_steps = self._get_pipeline_steps()
-        start_step = self.config.get("start_step", 1) - 1
-
-        try:
-            # Phase 2: Run Generation step (includes inline judge evaluation)
-            generation_output = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
-            )
-
-            if not generation_output:
-                self.logger.warning("Generation produced no output")
-                coordinator.finalize_pipeline([], lambda _: False)
-                return []
-
-            # Phase 3: Run post-processing (server sync, tracker, ASR)
-            results = self._execute_pipeline(
-                pipeline_steps, generation_output, start_step=start_step + 1
-            )
-
-            # Finalize
-            coordinator.finalize_all_goals(
-                results,
-                include_evaluation_trace=False,
-            )
-            coordinator.log_summary()
-            coordinator.finalize_pipeline(results)
-
-            return rows_to_attack_results(results)
-
-        except Exception:
-            coordinator.finalize_on_error("BoN pipeline failed with exception")
-
-            raise
+__all__ = ["BoNAttack"]

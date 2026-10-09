@@ -25,7 +25,11 @@ Preset used by the default jailbreak campaign when none is chosen.
 def primary_attacks() -> List[str]
 ```
 
-Jailbreak campaign technique ids, in campaign order.
+Jailbreak campaign technique ids `hack` can execute, in order.
+
+Both halves count: a migrated technique runs on the campaign runner and
+the rest on the legacy pipeline. A technique neither can run is dropped,
+so a chain built from this never fails on its first step.
 
 #### presets
 
@@ -73,9 +77,9 @@ def catalog_entries() -> List[Dict[str, Any]]
 
 Registered techniques, in registry order, with form fields.
 
-Command lists and TUI forms are generated from this. It includes every
-registry id, including techniques that are absent from older hand-written
-catalogs.
+Command lists and TUI forms are generated from this. It covers both
+halves of the migration — what the legacy pipeline still runs and what
+the campaign runner has taken over — because `hack` runs either.
 
 #### grouped\_catalog
 
@@ -99,7 +103,7 @@ Choose a technique, goals and parameters for `target`.
 def web_target(url: str, **kwargs: Any) -> tuple[str, Dict[str, Any]]
 ```
 
-Build the `("web", operational_config)` pair for a live-browser chatbot.
+Build the `(&quot;web&quot;, operational_config)` pair for a live-browser chatbot.
 
 #### result\_bucket
 

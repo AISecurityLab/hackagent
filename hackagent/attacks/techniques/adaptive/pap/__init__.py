@@ -1,15 +1,19 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-PAP (Persuasive Adversarial Prompts) attack technique.
-
-Uses a taxonomy of 40 persuasion techniques to paraphrase harmful prompts
-into persuasive variants that bypass LLM safety alignment.
+"""PAP: restate the goal with one persuasion technique after another.
 
 Based on: https://arxiv.org/abs/2401.06373
 """
 
 from .attack import PAPAttack
+from .config import PAPParams
+from .taxonomy import ALL_TECHNIQUES, TOP_5_TECHNIQUES, resolve_techniques
 
-__all__ = ["PAPAttack"]
+__all__ = [
+    "ALL_TECHNIQUES",
+    "PAPAttack",
+    "PAPParams",
+    "TOP_5_TECHNIQUES",
+    "resolve_techniques",
+]

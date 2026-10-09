@@ -1,271 +1,168 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Tool-output indirect prompt injection (tool_output_ipi) attack.
+"""Tool-output indirect prompt injection: poison what a tool returns.
 
-Poisons tool / function-call *observations* so a tool-using agent may follow
-a malicious goal after a benign user task (InjecAgent / OPI family).
+Every other technique here talks to the target as the user. This one does
+not say a word as the user: it stands between the agent and its tools and
+hands back a *tool result* that carries an instruction. The question is
+whether an agent that trusts its tools will carry that instruction out — a
+follow-up tool call, or compliance in its reply — as though the tool had
+told it to.
 
-This is distinct from ``rag``, which poisons
-RAG documents — not tool return values.
+So the request the target sees is a short history it did not have: the user
+asks something benign, the assistant calls a tool, and the tool returns the
+poison. The target is given the tool schemas too, so a follow-up call is
+something it *can* make. Whether it does is what the panel judges.
 
-Pipeline:
-1. Generation — craft poisoned tool observations, query target, inline judge
-2. Evaluation — post-processing (server sync, tracker, ASR)
+An optional ``attacker`` role rewrites the payload between attempts; without
+one, a single payload is tried.
 
-Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.catalog.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when #603 merges).
+Based on InjecAgent: https://arxiv.org/abs/2403.02691
 """
 
 from __future__ import annotations
 
-import copy
-import logging
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
-from hackagent.attacks._lib.legacy_seams import Store
-from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks._lib.inline_judge import (
-    attach_ctx_judge,
-    make_postprocess_execute,
-)
-from hackagent.attacks.ports import RunContext
-from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.types import AttackResult, rows_to_attack_results
-
-from . import generation
-from .config import DEFAULT_TOOL_OUTPUT_IPI_CONFIG
-from hackagent.attacks.techniques.indirect.tool_output_ipi.config import (
-    ToolOutputIPIConfig,
-)
+from ...contract import Completion, Judge, Target
+from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
+from ...trace import decision, phase
+from . import prompts
+from .config import ToolOutputIPIParams
 
 
-def _recursive_update(target_dict: Dict[str, Any], source_dict: Dict[str, Any]) -> None:
-    """Recursively merge *source_dict* into *target_dict*."""
-    for key, source_value in source_dict.items():
-        target_value = target_dict.get(key)
-        if isinstance(source_value, dict) and isinstance(target_value, dict):
-            _recursive_update(target_value, source_value)
-        elif key.startswith("_"):
-            target_dict[key] = source_value
-        else:
-            target_dict[key] = copy.deepcopy(source_value)
+class ToolOutputIPIAttack(IterativeAttack[ToolOutputIPIParams]):
+    """Hand the agent a poisoned tool result and see what it does with it."""
 
+    name = "tool_output_ipi"
+    params_type = ToolOutputIPIParams
 
-class ToolOutputIPIAttack(BaseAttack):
-    """Tool-output indirect prompt injection (InjecAgent / OPI).
+    def __init__(self, params: ToolOutputIPIParams) -> None:
+        super().__init__(params)
+        self.attacker: Optional[Completion] = params.attacker
 
-    For each malicious goal the attack:
-    1. Starts from a benign user message that would elicit a tool call.
-    2. Appends a simulated (or live) ``role=tool`` observation containing an
-       adversarial injection aimed at the goal.
-    3. Re-queries the target with the full messages history.
-    4. Judges whether the response or subsequent tool call follows the
-       injected instructions (direct harm and/or data stealing).
-
-    Construct with ``(config, ctx)``. Scoring uses ``ctx.judge.score``
-    through :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
-    ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
-    Tests build ``ctx`` with ``make_ctx()``. The legacy constructor is
-    obsolete for new code. ``ToolOutputIPIConfig`` still subclasses
-    :class:`~hackagent.attacks.techniques.config.ConfigBase`.
-    """
-
-    config_model = ToolOutputIPIConfig
-
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        ctx_or_client: Any = None,
-        agent_router: Optional[LLMRouter] = None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client: Optional[Store] = None,
-    ):
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+    async def search(
+        self, goal: str, target: Target, judge: Optional[Judge]
+    ) -> list[Finding]:
+        params = self.params
+        benign_task = self._benign_task(goal)
+        base = prompts.render_injection(
+            params.injection_template,
+            goal=goal,
+            benign_task=benign_task,
+            tool_name=params.tool_name,
         )
-        if ctx is None:
-            if resolved_client is None:
-                raise ValueError(
-                    "A storage backend must be provided to ToolOutputIPIAttack."
+        # Nothing changes between attempts without an attacker to change it,
+        # so there is no point trying the same payload twice.
+        attempts = params.max_attempts if self.attacker is not None else 1
+        findings: list[Finding] = []
+
+        for attempt in range(attempts):
+            label = f"attempt {attempt + 1}/{attempts}"
+            with phase(label, attempt=attempt) as path:
+                payload = await self._payload(goal, benign_task, base, attempt)
+                finding = await self._inject(
+                    goal, benign_task, payload, attempt, target, judge, path
                 )
-            if agent_router is None:
-                raise ValueError(
-                    "Victim LLMRouter instance must be provided to ToolOutputIPIAttack."
-                )
-            client = resolved_client
+                if finding is None:
+                    continue
+                findings.append(finding)
+                if succeeded(finding.verdict):
+                    decision("stopped", "the agent followed the injected instruction")
+                    break
 
-        current_config = copy.deepcopy(DEFAULT_TOOL_OUTPUT_IPI_CONFIG)
-        if config:
-            _recursive_update(current_config, config)
+        return findings
 
-        attach_ctx_judge(current_config, ctx)
+    def _benign_task(self, goal: str) -> str:
+        tasks = self.params.benign_tasks or prompts.DEFAULT_BENIGN_TASKS
+        return tasks[hash(goal) % len(tasks)]
 
-        self.logger = logging.getLogger("hackagent.attacks.tool_output_ipi")
-        if ctx is not None:
-            super().__init__(current_config, ctx)
-        else:
-            super().__init__(current_config, client, agent_router)
-
-    def _validate_config(self) -> None:
-        super()._validate_config()
-
-        required_keys = ["attack_type", "tool_output_ipi_params"]
-        missing = [k for k in required_keys if k not in self.config]
-        if missing:
-            raise ValueError(
-                f"Configuration dictionary missing required keys: {', '.join(missing)}"
-            )
-
-        params = self.config.get("tool_output_ipi_params", {})
-        if not isinstance(params, dict):
-            raise ValueError("tool_output_ipi_params must be a dictionary")
-
-        mode = params.get("mode", "simulated")
-        if mode not in ("simulated", "live"):
-            raise ValueError(
-                f"tool_output_ipi_params.mode must be 'simulated' or 'live'; got {mode!r}"
-            )
-
-        max_attempts = params.get("max_attempts", 3)
+    async def _payload(
+        self, goal: str, benign_task: str, base: str, attempt: int
+    ) -> str:
+        """The injection body: ``base``, or an attacker refinement of it."""
+        if self.attacker is None or attempt == 0:
+            return base
         try:
-            if int(max_attempts) < 1:
-                raise ValueError
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                "tool_output_ipi_params.max_attempts must be an integer >= 1"
-            ) from exc
-
-        if params.get("use_attacker_llm") and not (
-            isinstance(self.config.get("attacker"), dict)
-            and self.config["attacker"].get("identifier")
-        ):
-            raise ValueError(
-                "use_attacker_llm=True requires attacker.identifier in the attack config"
+            refined = await self.attacker(
+                prompts.refine_request(goal, benign_task, self.params.tool_name, base)
             )
-
-    def _get_pipeline_steps(self) -> List[Dict]:
-        return [
-            {
-                "name": "Generation: Tool-output IPI + Judge",
-                "function": generation.execute,
-                "step_type_enum": "GENERATION",
-                "config_keys": [
-                    "batch_size",
-                    "tool_output_ipi_params",
-                    "attacker",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "_goal_index_offset",
-                    "judges",
-                    "_judge",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                    "max_tokens",
-                    "temperature",
-                    "timeout",
-                ],
-                "input_data_arg_name": "goals",
-                "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": make_postprocess_execute("tool_output_ipi"),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "tool_output_ipi_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "_goal_index_offset",
-                    "judges",
-                    "_judge",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
-        ]
-
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """Execute the tool-output IPI pipeline.
-
-        Args:
-            goals: Malicious goals the poisoned tool observation should induce.
-
-        Returns:
-            List of :class:`~hackagent.attacks.types.AttackResult` rows.
-        """
-        goals = goals or []
-        if not goals:
-            return []
-
-        coordinator = self._initialize_coordinator(attack_type="tool_output_ipi")
-
-        params = self.config.get("tool_output_ipi_params", {})
-        goal_metadata = {
-            "mode": params.get("mode", "simulated"),
-            "max_attempts": params.get("max_attempts", 3),
-            "success_setting": params.get("success_setting", "both"),
-            "tool_name": params.get("tool_name"),
-            # Documented taxonomy until hackagent.catalog.taxonomy lands (#603).
-            "category": "adaptive",
-            "tags": ["indirect"],
-        }
-        coordinator.initialize_goals(goals=goals, initial_metadata=goal_metadata)
-
-        if coordinator.has_goal_tracking:
-            self.logger.info("Using TrackingCoordinator for per-goal tracking")
-
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        pipeline_steps = self._get_pipeline_steps()
-        start_step = self.config.get("start_step", 1) - 1
-
-        try:
-            generation_output = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
-            )
-
-            if not generation_output:
-                self.logger.warning("Generation produced no output")
-                coordinator.finalize_pipeline([], lambda _: False)
-                return []
-
-            results = self._execute_pipeline(
-                pipeline_steps, generation_output, start_step=start_step + 1
-            )
-
-            coordinator.finalize_all_goals(
-                results,
-                include_evaluation_trace=False,
-            )
-            coordinator.log_summary()
-            coordinator.finalize_pipeline(results)
-
-            return rows_to_attack_results(results)
-
         except Exception:
-            self.logger.exception("tool_output_ipi pipeline failed with exception")
-            coordinator.finalize_on_error(
-                "tool_output_ipi pipeline failed with exception"
-            )
-            raise
+            return base
+        return refined.strip() if refined and refined.strip() else base
+
+    async def _inject(
+        self,
+        goal: str,
+        benign_task: str,
+        payload: str,
+        attempt: int,
+        target: Target,
+        judge: Optional[Judge],
+        path,
+    ) -> Optional[Finding]:
+        params = self.params
+        observation = prompts.poisoned_observation(
+            payload, setting=params.success_setting, prefix=params.observation_prefix
+        )
+        messages = prompts.poisoned_history(
+            benign_task=benign_task,
+            tool_name=params.tool_name,
+            tool_arguments=params.tool_arguments,
+            observation=observation,
+        )
+        reply = await target(messages, tools=list(params.tools))
+        followups = list(getattr(reply, "tool_calls", None) or [])
+        if not reply.ok or (not reply.text and not followups):
+            decision("skipped", "the target gave no usable reply")
+            return None
+
+        # What the agent did: its words, plus any follow-up tool call, since
+        # the harm the injection asks for is often the call rather than prose.
+        acted = _acted(reply.text, followups)
+        verdict = await judge_reply(
+            judge, goal, prompts.judge_hint(params.success_setting), acted
+        )
+        return Finding(
+            messages=messages,
+            response=reply,
+            verdict=verdict,
+            metadata={
+                "attempt": attempt,
+                "benign_task": benign_task,
+                "followup_tool_calls": followups,
+                "success_setting": params.success_setting,
+            },
+            path=path,
+        )
+
+
+def _acted(text: str, followups: list) -> str:
+    """How the agent responded, tool calls included, for the panel.
+
+    A follow-up call reaches here in whatever shape the model layer used: a
+    flat ``ToolCall`` object, a flat dict, or a provider's nested
+    ``{"function": {...}}`` dict. All three are reduced to ``name(args)``.
+    """
+    if not followups:
+        return text or ""
+    calls = "; ".join(_describe_call(call) for call in followups)
+    return f"{text or ''}\n[follow-up tool calls: {calls}]".strip()
+
+
+def _describe_call(call: object) -> str:
+    inner = call.get("function") if isinstance(call, dict) else None
+    source = inner if isinstance(inner, dict) else call
+    name = _field(source, "name")
+    arguments = _field(source, "arguments")
+    return f"{name or '?'}({arguments or ''})"
+
+
+def _field(source: object, name: str) -> str:
+    if isinstance(source, dict):
+        return str(source.get(name) or "")
+    return str(getattr(source, name, "") or "")
+
+
+__all__ = ["ToolOutputIPIAttack"]

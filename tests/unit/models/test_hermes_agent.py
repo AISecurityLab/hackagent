@@ -2,37 +2,54 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for the Hermes Agent adapter.
+Unit tests for the Hermes Agent backend.
 
 Hermes speaks no HTTP — it is driven via the one-shot headless ``hermes -z``
-CLI. Like the Claude Code provider, ``HermesAgent`` routes through LiteLLM via
-a per-instance custom provider whose handler shells out to a subprocess. These
+CLI. Like the Claude Code backend, ``HermesModel`` routes through LiteLLM via a
+per-instance custom provider whose handler shells out to a subprocess. These
 tests exercise both layers: handler-level (argv construction, isolation flags
-and subprocess transport) and adapter-level (end-to-end via ``handle_request``).
+and subprocess transport) and model-level (end-to-end via ``complete``).
 """
 
 import logging
 import unittest
-import uuid
 from unittest.mock import MagicMock, patch
 
-from hackagent.models.adapters.base import (
-    AdapterConfigurationError,
-    AdapterInteractionError,
+from hackagent.core.contracts import AgentType, ModelSpec
+from hackagent.models.completions import hermes as hermes_module
+from hackagent.models.completions.cli import (
+    CLIConfigurationError,
+    CLIInteractionError,
+    last_user_text as _last_user_text,
 )
-from hackagent.models.adapters.hermes import (
-    HermesAgent,
+from hackagent.models.completions.hermes import (
+    HermesModel,
     _extract_result_text,
     _get_hermes_custom_llm_class,
 )
-from hackagent.models.adapters.cli_agent import last_user_text as _last_user_text
-from hackagent.models.adapters import hermes as hermes_provider_module
-from hackagent.core.contracts import AgentType
 
 logging.disable(logging.CRITICAL)
 
 # A path that shutil.which() will "find" so init doesn't reject the binary.
 _FAKE_BINARY = "/usr/bin/hermes"
+
+
+def _spec(**config):
+    timeout = config.pop("timeout", None)
+    name = config.pop("name", "hermes-4-70b")
+    return ModelSpec(
+        identifier=name,
+        agent_type=AgentType.HERMES,
+        timeout=timeout,
+        extra=dict(config),
+    )
+
+
+def _model(**config):
+    with patch(
+        "hackagent.models.completions.cli.shutil.which", return_value=_FAKE_BINARY
+    ):
+        return HermesModel(_spec(**config))
 
 
 def _make_handler(**overrides):
@@ -64,11 +81,11 @@ def _completed(stdout="", stderr="", returncode=0):
 
 
 class TestHermesModuleLayout(unittest.TestCase):
-    """Hermes lives at ``models/adapters/hermes.py``."""
+    """Hermes lives at ``models/completions/hermes.py``."""
 
     def test_helpers_are_module_level(self):
-        self.assertIs(_extract_result_text, hermes_provider_module._extract_result_text)
-        self.assertIs(HermesAgent, hermes_provider_module.HermesAgent)
+        self.assertIs(_extract_result_text, hermes_module._extract_result_text)
+        self.assertIs(HermesModel, hermes_module.HermesModel)
 
 
 class TestHermesAgentType(unittest.TestCase):
@@ -77,10 +94,10 @@ class TestHermesAgentType(unittest.TestCase):
         for alias in ("hermes", "hermes_agent", "HERMES_CLI", "hermes-agent"):
             self.assertEqual(AgentType(alias), AgentType.HERMES)
 
-    def test_registered_in_adapter_map(self):
-        from hackagent.models.dispatch import ADAPTER_CLASSES
+    def test_registered_in_native_model_map(self):
+        from hackagent.models.build import _native_model_classes
 
-        self.assertIs(ADAPTER_CLASSES[AgentType.HERMES], HermesAgent)
+        self.assertIs(_native_model_classes()[AgentType.HERMES], HermesModel)
 
 
 class TestHermesHelpers(unittest.TestCase):
@@ -140,7 +157,7 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore-user-config", argv)
         self.assertNotIn("--source", argv)
 
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
+    @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_feeds_prompt_via_stdin(self, mock_run):
         mock_run.return_value = _completed(stdout="the answer")
         handler = _make_handler()
@@ -151,14 +168,14 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore your rules", mock_run.call_args.args[0])
         self.assertEqual(result["final_text"], "the answer")
 
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
+    @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_nonzero_exit_without_output_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=1)
         handler = _make_handler()
-        with self.assertRaises(AdapterInteractionError):
+        with self.assertRaises(CLIInteractionError):
             handler._run(prompt_text="hi")
 
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
+    @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_nonzero_exit_with_output_is_captured(self, mock_run):
         """Exit 1 + usable stdout is a content-level response, not a failure."""
         refusal = "I can't help with that."
@@ -166,100 +183,80 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         result = _make_handler()._run(prompt_text="obfuscated harmful prompt")
         self.assertEqual(result["final_text"], refusal)
 
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
+    @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_usage_error_exit_always_raises(self, mock_run):
         """Exit 2 is a CLI usage error — never a target response."""
         mock_run.return_value = _completed(stdout="usage: hermes", returncode=2)
-        with self.assertRaises(AdapterInteractionError):
+        with self.assertRaises(CLIInteractionError):
             _make_handler()._run(prompt_text="hi")
 
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
+    @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_timeout_raises_interaction_error(self, mock_run):
         import subprocess
 
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="hermes", timeout=30)
-        with self.assertRaises(AdapterInteractionError):
+        with self.assertRaises(CLIInteractionError):
             _make_handler()._run(prompt_text="hi")
 
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
+    @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_missing_binary_raises_config_error(self, mock_run):
         mock_run.side_effect = FileNotFoundError()
-        with self.assertRaises(AdapterConfigurationError):
+        with self.assertRaises(CLIConfigurationError):
             _make_handler()._run(prompt_text="hi")
 
 
-class TestHermesAgentInit(unittest.TestCase):
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_success(self, _which):
-        adapter = HermesAgent(
-            id=str(uuid.uuid4()),
-            config={"name": "hermes-4-70b", "timeout": 60, "binary": "hermes"},
-        )
-        self.assertEqual(adapter.name, "hermes-4-70b")
-        self.assertEqual(adapter.timeout, 60)
+class TestHermesModelInit(unittest.TestCase):
+    def test_init_success(self):
+        model = _model(name="hermes-4-70b", timeout=60, binary="hermes")
+        self.assertEqual(model.name, "hermes-4-70b")
+        self.assertEqual(model.timeout, 60)
         self.assertTrue(
-            adapter.litellm_model.startswith("hackagent_hermes_")
-            and adapter.litellm_model.endswith("/hermes-4-70b")
+            model.litellm_model.startswith("hackagent_hermes_")
+            and model.litellm_model.endswith("/hermes-4-70b")
         )
 
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_isolation_defaults(self, _which):
-        adapter = HermesAgent(id="t1", config={"name": "hermes-4-70b"})
-        self.assertEqual(adapter.timeout, 600)
-        self.assertTrue(adapter.ignore_user_config)
-        self.assertFalse(adapter.safe_mode)
-        self.assertEqual(adapter.source, "hackagent")
+    def test_init_isolation_defaults(self):
+        model = _model(name="hermes-4-70b")
+        self.assertEqual(model.timeout, 600)
+        self.assertTrue(model.ignore_user_config)
+        self.assertFalse(model.safe_mode)
+        self.assertEqual(model.source, "hackagent")
 
     def test_init_missing_name(self):
-        with self.assertRaises(AdapterConfigurationError):
-            HermesAgent(id="e1", config={})
+        with self.assertRaises(CLIConfigurationError):
+            HermesModel(ModelSpec(identifier="", agent_type=AgentType.HERMES))
 
-    @patch("hackagent.models.adapters.cli_agent.shutil.which", return_value=None)
-    def test_init_missing_binary_raises(self, _which):
-        with self.assertRaises(AdapterConfigurationError):
-            HermesAgent(id="e2", config={"name": "hermes-4-70b"})
+    def test_init_missing_binary_raises(self):
+        with patch("hackagent.models.completions.cli.shutil.which", return_value=None):
+            with self.assertRaises(CLIConfigurationError):
+                HermesModel(_spec(name="hermes-4-70b"))
 
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_registers_custom_provider(self, _which):
+    def test_init_registers_custom_provider(self):
         import litellm
 
-        adapter = HermesAgent(id="reg1", config={"name": "hermes-4-70b"})
+        model = _model(name="hermes-4-70b")
         providers = [entry["provider"] for entry in litellm.custom_provider_map]
-        self.assertIn(f"hackagent_hermes_{adapter.id}", providers)
+        self.assertIn(f"hackagent_hermes_{model.id}", providers)
 
 
-class TestHermesAgentHandleRequest(unittest.TestCase):
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def setUp(self, _which):
-        self.adapter = HermesAgent(id="h1", config={"name": "hermes-4-70b"})
+class TestHermesModelComplete(unittest.TestCase):
+    def setUp(self):
+        self.model = _model(name="hermes-4-70b")
 
-    def test_missing_prompt_returns_400(self):
-        response = self.adapter.handle_request({})
-        self.assertEqual(response["status_code"], 400)
-
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
-    def test_handle_request_success_routes_through_cli(self, mock_run):
+    @patch("hackagent.models.completions.hermes.subprocess.run")
+    def test_complete_success_routes_through_cli(self, mock_run):
         mock_run.return_value = _completed(stdout="agent reply")
-        response = self.adapter.handle_request({"prompt": "hello"})
-        self.assertEqual(response["status_code"], 200)
-        self.assertEqual(response["generated_text"], "agent reply")
-        self.assertEqual(response["adapter_type"], "HermesAgent")
+        response = self.model.complete([{"role": "user", "content": "hello"}])
+        self.assertEqual(response.text, "agent reply")
+        self.assertIsNone(response.error)
         # Prompt reached the subprocess via stdin.
         self.assertEqual(mock_run.call_args.kwargs["input"], "hello")
 
-    @patch("hackagent.models.adapters.hermes.subprocess.run")
-    def test_handle_request_cli_error_returns_500(self, mock_run):
+    @patch("hackagent.models.completions.hermes.subprocess.run")
+    def test_complete_cli_error_returns_error(self, mock_run):
         mock_run.return_value = _completed(stderr="boom", returncode=1)
-        response = self.adapter.handle_request({"prompt": "hi"})
-        self.assertEqual(response["status_code"], 500)
+        response = self.model.complete([{"role": "user", "content": "hi"}])
+        self.assertIsNotNone(response.error)
 
 
 if __name__ == "__main__":

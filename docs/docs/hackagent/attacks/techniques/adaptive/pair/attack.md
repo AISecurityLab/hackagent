@@ -3,98 +3,46 @@ sidebar_label: attack
 title: hackagent.attacks.techniques.adaptive.pair.attack
 ---
 
-PAIR attack implementation.
+PAIR: let an attacker model rewrite its own prompt until one lands.
 
-Implements the Prompt Automatic Iterative Refinement (PAIR) attack using
-an attacker LLM to iteratively refine jailbreak prompts.
+Several streams run side by side, each an independent conversation with the
+attacker. A round gives every stream one attempt: the attacker writes a
+prompt, it goes to the target, the reply is rated, and the reply and its
+score are fed back so the next attempt can build on what happened. The
+streams never see each other, so a dead end in one does not poison the rest.
 
-Result Tracking:
-    Uses TrackingCoordinator to manage both pipeline-level StepTracker
-    and per-goal Tracker. The coordinator handles goal lifecycle,
-    crash-safe finalization, and summary logging.
+Who rates depends on the run. With a `scorer` role the paper&#x27;s own 1-10
+judge rates every reply, the search stops at the first score that reaches
+`jailbreak_threshold`, and the panel is asked only about the best attempt.
+Without one the panel rates every reply itself and its verdict decides.
+
+Every attempt that reached the target is returned, so the run shows which
+stream and which round got there.
+
+Based on: https://arxiv.org/abs/2310.08419
+
+#### Proposal
+
+One attacker turn: the prompt to send, and the JSON to append to its
+conversation so the next turn sees what it proposed.
+
+## Rating Objects
+
+```python
+@dataclass(frozen=True)
+class Rating()
+```
+
+What one attempt scored, and the verdict behind it if there was one.
+
+`verdict` is set only when the panel did the rating; a `scorer`
+gives a number and its reasoning, and the panel is consulted later.
 
 ## PAIRAttack Objects
 
 ```python
-class PAIRAttack(BaseAttack)
+class PAIRAttack(IterativeAttack[PairParams])
 ```
 
-PAIR (Prompt Automatic Iterative Refinement) attack.
-
-Implements the PAIR algorithm from:
-Chao et al., &quot;Jailbreaking Black Box Large Language Models
-in Twenty Queries&quot; (2023)
-https://arxiv.org/abs/2310.08419
-
-PAIR uses an *attacker* LLM to iteratively refine an adversarial
-prompt based on the *target* model&#x27;s responses and a scorer score:
-
-1. The attacker generates an initial or refined jailbreak prompt.
-2. The prompt is sent to the target model.
-3. A scorer rates the response on a 1–10 jailbreak success scale.
-4. The score and response are fed back to the attacker as context
-for the next refinement.
-5. Steps 1–4 repeat for `n_iterations` rounds or until early stop.
-
-Multiple independent `n_streams` are run in parallel (one per goal);
-each stream maintains its own conversation history with the attacker.
-
-The attack requires three separate model roles:
-
-* **Attacker** (`config["attacker"]`) — an LLM that proposes prompt
-improvements based on feedback.
-* **Target** — the victim model reached via `agent_router`.
-* **Scorer** (`config["scorer"]`) — dedicated scorer model using
-the AutoDAN-Turbo scorer+wrapper protocol.
-
-**Attributes**:
-
-- `config` - Merged PAIR configuration dictionary.
-- `client` - Authenticated HackAgent API client.
-- `agent_router` - Router for the victim model.
-- `attacker_router` - Router for the attacker LLM.
-- `scorer_router` - Router for the scorer LLM.
-- `objective` - Loaded :class:`~hackagent.attacks._lib.objectives.base.ObjectiveConfig`
-  instance for the configured `objective` key.
-- `logger` - Hierarchical logger at `hackagent.attacks.pair`.
-
-#### \_\_init\_\_
-
-```python
-def __init__(config: Optional[Dict[str, Any]] = None,
-             ctx_or_client: Any = None,
-             agent_router: Optional[LLMRouter] = None,
-             *,
-             ctx: Optional[RunContext] = None,
-             client: Optional[Store] = None)
-```
-
-Initialize PAIR with `(config, ctx)` or legacy args.
-
-On the new seam the attacker role comes from `ctx.models` and
-refinement scores come from `ctx.judge` (`verdict_from_judge`).
-This class does not read `_suppress_run_status_updates`.
-`PairConfig` still subclasses
-:class:`~hackagent.attacks.techniques.config.ConfigBase`.
-The legacy constructor is obsolete for new code.
-
-#### run
-
-```python
-def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
-```
-
-Execute PAIR attack on goals.
-
-Uses TrackingCoordinator to manage both pipeline-level and
-per-goal result tracking through a single unified interface.
-
-**Arguments**:
-
-- `goals` - List of harmful goals to test
-  
-
-**Returns**:
-
-  List of attack results with scores
+Parallel streams of attacker-refined prompts.
 

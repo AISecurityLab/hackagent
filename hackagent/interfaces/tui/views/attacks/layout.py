@@ -1,7 +1,13 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Widget layout (``compose``) for the Attacks tab."""
+"""Widget layout (``compose``) for the Attacks tab.
+
+The form is a guided wizard: a :class:`ContentSwitcher` shows one step at a
+time — Target, Attacks, Judges, Run — so only one focused screen is on display
+instead of one long scroll. Every step's widgets stay mounted, so the spec
+assembly in ``runner.py`` can read them all regardless of the active step.
+"""
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
@@ -9,13 +15,13 @@ from textual.widgets import (
     Button,
     Checkbox,
     Collapsible,
+    ContentSwitcher,
     Input,
     Label,
     ProgressBar,
     RadioButton,
     RadioSet,
     Select,
-    SelectionList,
     Static,
     Switch,
     TabbedContent,
@@ -24,7 +30,6 @@ from textual.widgets import (
 )
 
 from hackagent.client import presets as dataset_presets
-from hackagent.interfaces.tui.forms import get_all_attack_specs
 from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
 from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
 
@@ -32,9 +37,8 @@ from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
 from hackagent.interfaces.tui.views.attacks.helpers import (
     _AGENT_TYPE_CHOICES,
     _default_campaign_attack_keys,
-    _strategy_focus_choices,
-    _strategy_selection_choices,
 )
+from hackagent.interfaces.tui.views.attacks.rows import AttackRow, JudgeRow
 
 
 class AttacksLayoutMixin:
@@ -44,197 +48,204 @@ class AttacksLayoutMixin:
     """
 
     def compose(self) -> ComposeResult:
-        """Compose the attacks layout."""
-        # Build strategy choices from the registry, grouped by taxonomy.
-        all_specs = get_all_attack_specs()
-        strategy_choices = _strategy_selection_choices()
-        focus_choices = _strategy_focus_choices()
+        """Compose the attacks wizard."""
         campaign_keys = _default_campaign_attack_keys()
-        default_strategy = (
-            campaign_keys[0] if campaign_keys else next(iter(all_specs), "advprefix")
-        )
 
         with Horizontal():
-            # ── Left side: Attack configuration form ──
-            with VerticalScroll(id="attack-form-container"):
-                yield Static("[bold cyan]⚔️  Attack Configuration[/bold cyan]")
-                yield Static("")
-
-                # --- Before Guardrail (input filter, sits before the target) ---
-                with Collapsible(title="Before Guardrail (optional)", collapsed=True):
-                    yield Static(
-                        "[dim]Checks prompts before they reach the target model.[/dim]"
-                    )
-                    yield Label("Agent Name:")
-                    yield Input(
-                        placeholder="e.g., gpt-oss-safeguard-20b",
-                        id="before-gr-name",
-                    )
-                    yield Label("Agent Type:")
-                    yield Select(
-                        _AGENT_TYPE_CHOICES,
-                        id="before-gr-type",
-                        value="google-adk",
-                    )
-                    yield Label("Endpoint URL:")
-                    yield Input(
-                        placeholder="e.g., http://localhost:8000",
-                        id="before-gr-endpoint",
-                    )
-                yield Static("")
-                # --- Agent settings (always shown) ---
-                with Collapsible(title="Target Agent", collapsed=False):
-                    yield Label("Agent Name:")
-                    yield Input(placeholder="e.g., weather-bot", id="agent-name")
-                    yield Static("")
-
-                    yield Label("Agent Type:")
-                    yield Select(
-                        _AGENT_TYPE_CHOICES,
-                        id="agent-type",
-                        value="google-adk",
-                    )
-                    yield Static("")
-
-                    yield Label("Endpoint URL:")
-                    yield Input(
-                        placeholder="e.g., http://localhost:8000", id="endpoint-url"
-                    )
-                yield Static("")
-                # --- After Guardrail (output filter, sits after the target) ---
-                with Collapsible(title="After Guardrail (optional)", collapsed=True):
-                    yield Static(
-                        "[dim]Checks responses after the target model generates them.[/dim]"
-                    )
-                    yield Label("Agent Name:")
-                    yield Input(
-                        placeholder="e.g., gpt-oss-safeguard-20b",
-                        id="after-gr-name",
-                    )
-                    yield Label("Agent Type:")
-                    yield Select(
-                        _AGENT_TYPE_CHOICES,
-                        id="after-gr-type",
-                        value="google-adk",
-                    )
-                    yield Label("Endpoint URL:")
-                    yield Input(
-                        placeholder="e.g., http://localhost:8000",
-                        id="after-gr-endpoint",
-                    )
-                yield Static("")
-                # --- Input source: Goals vs Dataset (radio toggle) ---
-                yield Static("[bold]Input Source[/bold]", classes="section-title")
-                with RadioSet(id="input-source-radio"):
-                    yield RadioButton("Goals", value=True, id="radio-goals")
-                    yield RadioButton("Dataset", id="radio-dataset")
-                yield Static("")
-
-                # Goals container (visible by default)
-                with Vertical(id="goals-container"):
-                    yield Label("Goals (what you want the agent to do incorrectly):")
-                    goals_area = TextArea("Return fake weather data", id="attack-goals")
-                    goals_area.styles.height = 5
-                    yield goals_area
-
-                # Dataset container (hidden by default)
-                with Vertical(id="dataset-container"):
-                    yield Label("Dataset:")
-                    dataset_choices = [(k, k) for k in sorted(dataset_presets())]
-                    yield Select(
-                        dataset_choices, id="dataset-preset", value="harmbench"
-                    )
-                    yield Static("")
-                    yield Label("Limit (max samples):")
-                    yield Input(value="5", id="dataset-limit", placeholder="e.g. 5")
-                    yield Static("")
-                    yield Label("Shuffle:")
-                    yield Switch(value=True, id="dataset-shuffle")
-                    yield Static("")
-                    yield Label("Seed:")
-                    yield Input(value="42", id="dataset-seed", placeholder="e.g. 42")
-                yield Static("")
-
-                yield Label("Timeout (seconds):")
-                yield Input(value="300", id="timeout")
-                yield Static("")
-
-                # --- Strategy selector ---
-                # A SelectionList (not a single Select) so users can pick more
-                # than one attack. Selection *order* becomes the chain order:
-                # when 2+ are selected, Execute runs `HackAgent.hack_chain`
-                # instead of `HackAgent.hack`, escalating each goal through
-                # the selected attacks in the order they were checked.
-                #
-                # Attacks are listed by primary taxonomy category (static /
-                # adaptive / multi-turn). Nothing is pre-selected here via the
-                # option tuples: doing so would select in *option list* order,
-                # not the desired campaign order (h4rm3l → TAP → PAIR).
-                # `on_mount` selects the default campaign attacks explicitly,
-                # in the right order, instead.
-                yield Static("[bold]Attacks[/bold]", classes="section-title")
-                yield Static(
-                    "[dim]Select one attack, or check multiple to chain them. "
-                    "Check order sets the chain order. Defaults to the Jailbreak "
-                    "evaluation campaign (h4rm3l → TAP → PAIR).[/dim]"
-                )
-                yield SelectionList(*strategy_choices, id="attack-strategies")
-                yield Static("")
-
-                yield Checkbox(
-                    "Escalate only mitigated goals to the next attack",
-                    id="escalate-only-mitigated",
-                    value=True,
-                )
-                yield Static(
-                    "[dim]Chain mode (2+ attacks checked): a goal moves to "
-                    "the next attack only if the previous one mitigated it; "
-                    "goals that are already vulnerable are dropped. Uncheck to "
-                    "instead run every checked attack against every goal.[/dim]",
-                    id="escalate-only-mitigated-help",
-                )
-                yield Static("")
-
-                yield Label("Configuring attack:")
-                yield Select(
-                    focus_choices,
-                    id="attack-strategy-focus",
-                    value=default_strategy,
-                )
-                yield Static("", id="strategy-description")
-                yield Static("")
-
-                # --- Dynamic config container (populated on strategy change) ---
-                yield Vertical(id="strategy-config-container")
-
-                # --- Advanced toggle ---
-                yield Checkbox(
-                    "Show advanced configuration (all fields as text boxes)",
-                    id="advanced-toggle",
-                    value=False,
-                    classes="advanced-toggle",
-                )
-                yield Static(
-                    "[dim]Hover or focus this option to preview all advanced settings. "
-                    "Check it to keep them always visible.[/dim]"
-                )
-                yield Static("")
-
-                # --- Validation errors ---
+            # ── Left side: the guided wizard ──
+            with Vertical(id="attack-form-container"):
+                yield Static("", id="wizard-progress")
                 yield Static("", id="validation-errors", classes="validation-errors")
 
-                # --- Action buttons ---
-                yield Button("Execute Attack", id="execute-attack", variant="primary")
-                yield Button("Dry Run", id="dry-run", variant="default")
-                yield Button("Reset Defaults", id="reset-defaults", variant="warning")
-                yield Button("Clear", id="clear-form", variant="error")
+                with ContentSwitcher(initial="step-target", id="wizard-steps"):
+                    # ── Step 1: Target ──
+                    with VerticalScroll(id="step-target"):
+                        yield Static(
+                            "[bold cyan]Step 1 · Target[/bold cyan]  "
+                            "[dim]Who are you attacking?[/dim]"
+                        )
+                        yield Static("")
+                        with Collapsible(title="Target Agent", collapsed=False):
+                            yield Label("Agent Name:")
+                            yield Input(
+                                placeholder="e.g., weather-bot", id="agent-name"
+                            )
+                            yield Label("Agent Type:")
+                            yield Select(
+                                _AGENT_TYPE_CHOICES, id="agent-type", value="google-adk"
+                            )
+                            yield Label("Endpoint URL:")
+                            yield Input(
+                                placeholder="e.g., http://localhost:8000",
+                                id="endpoint-url",
+                            )
+                        with Collapsible(
+                            title="Before Guardrail (optional)", collapsed=True
+                        ):
+                            yield Static(
+                                "[dim]Checks prompts before they reach the "
+                                "target.[/dim]"
+                            )
+                            yield Label("Agent Name:")
+                            yield Input(
+                                placeholder="e.g., gpt-oss-safeguard-20b",
+                                id="before-gr-name",
+                            )
+                            yield Label("Agent Type:")
+                            yield Select(
+                                _AGENT_TYPE_CHOICES,
+                                id="before-gr-type",
+                                value="google-adk",
+                            )
+                            yield Label("Endpoint URL:")
+                            yield Input(
+                                placeholder="e.g., http://localhost:8000",
+                                id="before-gr-endpoint",
+                            )
+                        with Collapsible(
+                            title="After Guardrail (optional)", collapsed=True
+                        ):
+                            yield Static(
+                                "[dim]Checks responses after the target "
+                                "generates them.[/dim]"
+                            )
+                            yield Label("Agent Name:")
+                            yield Input(
+                                placeholder="e.g., gpt-oss-safeguard-20b",
+                                id="after-gr-name",
+                            )
+                            yield Label("Agent Type:")
+                            yield Select(
+                                _AGENT_TYPE_CHOICES,
+                                id="after-gr-type",
+                                value="google-adk",
+                            )
+                            yield Label("Endpoint URL:")
+                            yield Input(
+                                placeholder="e.g., http://localhost:8000",
+                                id="after-gr-endpoint",
+                            )
+                        yield Static("")
+                        yield Static("[bold]Input Source[/bold]")
+                        with RadioSet(id="input-source-radio"):
+                            yield RadioButton("Goals", value=True, id="radio-goals")
+                            yield RadioButton("Dataset", id="radio-dataset")
+                        with Vertical(id="goals-container"):
+                            yield Label("Goals (one per line):")
+                            goals_area = TextArea(
+                                "Return fake weather data", id="attack-goals"
+                            )
+                            goals_area.styles.height = 5
+                            yield goals_area
+                        with Vertical(id="dataset-container"):
+                            yield Label("Dataset:")
+                            dataset_choices = [
+                                (k, k) for k in sorted(dataset_presets())
+                            ]
+                            yield Select(
+                                dataset_choices, id="dataset-preset", value="harmbench"
+                            )
+                            yield Label("Limit (max samples):")
+                            yield Input(value="5", id="dataset-limit")
+                            yield Label("Shuffle:")
+                            yield Switch(value=True, id="dataset-shuffle")
+                            yield Label("Seed:")
+                            yield Input(value="42", id="dataset-seed")
+                        yield Static("")
+                        yield Label("Timeout (seconds):")
+                        yield Input(value="300", id="timeout")
 
-                yield Static("")
-                yield Static(
-                    "[dim]Configure attack parameters and click Execute[/dim]",
-                    id="execution-status",
-                )
-                yield ProgressBar(total=100, show_eta=True, id="attack-progress")
+                    # ── Step 2: Attacks ──
+                    with VerticalScroll(id="step-attacks"):
+                        yield Static(
+                            "[bold cyan]Step 2 · Attacks[/bold cyan]  "
+                            "[dim]Which attacks to run?[/dim]"
+                        )
+                        yield Static(
+                            "[dim]Each attack carries its own attacker model and "
+                            "parameters. Add 2+ to run them as an escalating "
+                            "campaign.[/dim]"
+                        )
+                        yield Static("")
+                        with Vertical(id="attack-rows"):
+                            for key in campaign_keys:
+                                yield AttackRow(key)
+                        yield Button(
+                            "➕ Add Attack", id="add-attack", variant="success"
+                        )
+                        yield Static("")
+                        yield Checkbox(
+                            "Escalate: drop a goal once an attack jailbreaks it",
+                            id="escalate-only-mitigated",
+                            value=True,
+                        )
+                        yield Static(
+                            "[dim]With 2+ attacks, a solved goal drops out so "
+                            "later attacks only face the goals still standing. "
+                            "Uncheck to run every attack against every goal.[/dim]",
+                            id="escalate-only-mitigated-help",
+                        )
+
+                    # ── Step 3: Judges ──
+                    with VerticalScroll(id="step-judges"):
+                        yield Static(
+                            "[bold cyan]Step 3 · Judges[/bold cyan]  "
+                            "[dim]How are replies scored?[/dim]"
+                        )
+                        yield Static(
+                            "[dim]Each reply is scored by the judge panel. Add "
+                            "judges and choose how their votes combine into one "
+                            "verdict.[/dim]"
+                        )
+                        yield Static("")
+                        with Vertical(id="judge-rows"):
+                            yield JudgeRow()
+                        yield Button("➕ Add Judge", id="add-judge", variant="success")
+                        yield Static("")
+                        yield Label("Aggregation:")
+                        yield Select(
+                            [
+                                ("Majority", "majority"),
+                                ("Mean", "mean"),
+                                ("Max", "max"),
+                                ("Any", "any"),
+                            ],
+                            id="judge-aggregation",
+                            value="majority",
+                        )
+
+                    # ── Step 4: Run ──
+                    with VerticalScroll(id="step-run"):
+                        yield Static(
+                            "[bold cyan]Step 4 · Run[/bold cyan]  "
+                            "[dim]Review and launch.[/dim]"
+                        )
+                        yield Static("")
+                        yield Static("", id="run-summary")
+                        yield Static("")
+                        with Horizontal(id="run-buttons"):
+                            yield Button(
+                                "▶ Execute", id="execute-attack", variant="primary"
+                            )
+                            yield Button("Dry Run", id="dry-run", variant="default")
+                        with Horizontal(id="run-buttons-secondary"):
+                            yield Button(
+                                "Reset", id="reset-defaults", variant="warning"
+                            )
+                            yield Button("Clear", id="clear-form", variant="error")
+                        yield Static("")
+                        yield Static(
+                            "[dim]Configure the steps and click Execute[/dim]",
+                            id="execution-status",
+                        )
+                        yield ProgressBar(
+                            total=100, show_eta=True, id="attack-progress"
+                        )
+
+                # ── Wizard navigation ──
+                with Horizontal(id="wizard-nav"):
+                    yield Button("◀ Back", id="wizard-back", variant="default")
+                    yield Button("Next ▶", id="wizard-next", variant="primary")
 
             # ── Right side: Tabbed monitor with logs and actions ──
             with Container(id="attack-monitor-container"):

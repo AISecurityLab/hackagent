@@ -3,69 +3,19 @@ sidebar_label: config
 title: hackagent.attacks.techniques.adaptive.advprefix.config
 ---
 
-Configuration settings for AdvPrefix attacks.
+Configuration for AdvPrefix.
 
-This module contains default configuration parameters and settings used throughout
-the AdvPrefix attack pipeline. These settings control various aspects of the attack
-including model parameters, generation settings, evaluation criteria, and output
-formatting.
-
-The configuration is designed to be easily customizable while providing sensible
-defaults for most use cases.
-
-## PrefixGenerationConfig Objects
+## AdvPrefixParams Objects
 
 ```python
-class PrefixGenerationConfig(BaseModel)
+class AdvPrefixParams(AttackParams)
 ```
 
-Unified configuration for the entire prefix generation pipeline.
+How many prefixes to write, how many times to try each, and who writes them.
 
-#### from\_dict
+`attacker` is a role: the uncensored model that writes the candidate
+prefixes, so AdvPrefix cannot run without it.
 
-```python
-@classmethod
-def from_dict(cls, config_dict: Dict[str, Any]) -> "PrefixGenerationConfig"
-```
-
-Create config from dictionary, extracting only known fields.
-
-## EvaluationPipelineConfig Objects
-
-```python
-class EvaluationPipelineConfig(BaseModel)
-```
-
-Unified configuration for the Evaluation stage of the AdvPrefix pipeline.
-
-#### from\_dict
-
-```python
-@classmethod
-def from_dict(cls, config_dict: Dict[str, Any]) -> "EvaluationPipelineConfig"
-```
-
-Create config from dictionary, extracting only known fields.
-
-## EvaluatorConfig Objects
-
-```python
-class EvaluatorConfig(BaseModel)
-```
-
-Configuration class for response evaluators using LLMRouter framework.
-
-#### agent\_type
-
-AgentType from hackagent.core.contracts
-
-#### coerce\_agent\_type
-
-```python
-@model_validator(mode="before")
-@classmethod
-def coerce_agent_type(cls, values: Any) -> Any
-```
-
-Coerce agent_type strings to AgentType on construction.
+The defaults follow the paper. The one knob worth reading before a big
+run is :attr:`samples_per_candidate`, which multiplies the target calls.
 

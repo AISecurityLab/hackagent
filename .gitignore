@@ -1,5 +1,6 @@
 # Custom
 logs/
+.logs/
 *.sbatch
 .ruff_cache/
 reports/

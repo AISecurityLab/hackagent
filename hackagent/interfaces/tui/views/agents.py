@@ -98,8 +98,6 @@ class AgentsTab(BaseTab):
     """
 
     BINDINGS = [
-        Binding("n", "new_agent", "New Target Agent"),
-        Binding("d", "delete_agent", "Delete Target Agent"),
         Binding("enter", "view_agent", "View Details"),
         Binding("f5", "refresh", "Refresh"),
     ]
@@ -121,7 +119,8 @@ class AgentsTab(BaseTab):
 
         # Title section
         yield Static(
-            "🎯 [bold cyan]Target Agent Management[/bold cyan]",
+            "🎯 [bold cyan]Target Agents[/bold cyan]  "
+            "[dim]— targets seen in past runs[/dim]",
             classes="section-header",
         )
 
@@ -134,11 +133,9 @@ class AgentsTab(BaseTab):
             classes="stats-bar",
         )
 
-        # Toolbar with action buttons
+        # Toolbar
         with Horizontal(classes="toolbar"):
             yield Button("🔄 Refresh", id="refresh-agents", variant="primary")
-            yield Button("➕ New Agent", id="new-agent", variant="success")
-            yield Button("🗑️  Delete", id="delete-agent", variant="error")
 
         # Agents table
         table: DataTable = DataTable(
@@ -180,15 +177,6 @@ class AgentsTab(BaseTab):
         """Handle button press events."""
         if event.button.id == "refresh-agents":
             self.action_refresh()
-        elif event.button.id == "new-agent":
-            self._show_info_message("➕ Create new target agent feature coming soon!")
-        elif event.button.id == "delete-agent":
-            if self.selected_agent:
-                self._show_info_message(
-                    f"🗑️  Delete target agent '{self.selected_agent.name}' - feature coming soon!"
-                )
-            else:
-                self._show_info_message("⚠️ Please select a target agent to delete")
 
     def action_refresh(self) -> None:
         """Action to manually refresh agents data."""
@@ -233,11 +221,15 @@ class AgentsTab(BaseTab):
 
                 details_widget = self.query_one("#agent-details", Static)
                 details_widget.update(
-                    "📭 [bold cyan]No Target Agents Found[/bold cyan]\n\n"
-                    "[yellow]Get started by creating your first target agent:[/yellow]\n\n"
-                    "• Click [bold]➕ New Agent[/bold] button above\n"
-                    "• Or use the CLI: [bold]hackagent agent create[/bold]\n\n"
-                    "[dim]Target agents are AI systems that you can test for security vulnerabilities[/dim]"
+                    "📭 [bold cyan]No Target Agents Yet[/bold cyan]\n\n"
+                    "[yellow]Targets appear here after you run a campaign "
+                    "against them.[/yellow]\n\n"
+                    "• Compose and run one on the [bold]⚔ Campaign[/bold] tab "
+                    "(press [bold]1[/bold])\n"
+                    "• Or register one via the CLI: "
+                    "[bold]hackagent agent create[/bold]\n\n"
+                    "[dim]A target agent is an AI system you test for "
+                    "vulnerabilities.[/dim]"
                 )
                 return
 

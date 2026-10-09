@@ -13,13 +13,10 @@ import os
 import threading
 import time
 
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 from hackagent.core.contracts import AgentType
 
-if __package__:
-    from .agent import PORT, TARGET_MODEL, app, ensure_confidential_seed_files
-else:
-    from agent import PORT, TARGET_MODEL, app, ensure_confidential_seed_files
+from agent import app, PORT, TARGET_MODEL, ensure_confidential_seed_files
 
 TARGET_ENDPOINT = f"http://127.0.0.1:{PORT}/v1"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -79,45 +76,41 @@ if __name__ == "__main__":
         ).start()
         time.sleep(2)
 
-    session = HackAgent(Settings.resolve())
-    try:
-        target = session.target(
-            TARGET_ENDPOINT,
-            AgentType.OPENAI_SDK,
-            name=f"vaultdesk-{TARGET_MODEL}",
-            adapter_operational_config={
-                "name": TARGET_MODEL,
-                "endpoint": TARGET_ENDPOINT,
-            },
-        )
+    target = HackAgent(
+        name=f"vaultdesk-{TARGET_MODEL}",
+        endpoint=TARGET_ENDPOINT,
+        agent_type=AgentType.OPENAI_SDK,
+        adapter_operational_config={
+            "name": TARGET_MODEL,
+            "endpoint": TARGET_ENDPOINT,
+        },
+    )
 
-        config = {
-            "attack_type": "pair",
-            "goals": GOALS,
-            "max_tokens": 800,
-            "n_iterations": 5,
-            "n_streams": 2,
-            "attacker": build_attacker(),
-            "scorer": build_scorer(),
-            "category_classifier": {
-                "identifier": JUDGE_MODEL,
-                "agent_type": AgentType.OPENAI_SDK,
-                "api_key": OPENROUTER_API_KEY,
-                "endpoint": OPENROUTER_ENDPOINT,
-                "max_tokens": 100,
-                "temperature": 0.0,
-            },
-            "goal_batch_size": 2,
-            "goal_batch_workers": 1,
-        }
+    config = {
+        "attack_type": "pair",
+        "goals": GOALS,
+        "max_tokens": 800,
+        "n_iterations": 5,
+        "n_streams": 2,
+        "attacker": build_attacker(),
+        "scorer": build_scorer(),
+        "category_classifier": {
+            "identifier": JUDGE_MODEL,
+            "agent_type": AgentType.OPENAI_SDK,
+            "api_key": OPENROUTER_API_KEY,
+            "endpoint": OPENROUTER_ENDPOINT,
+            "max_tokens": 100,
+            "temperature": 0.0,
+        },
+        "goal_batch_size": 2,
+        "goal_batch_workers": 1,
+    }
 
-        print("Running PAIR against sandbox target...")
-        print(f"Target endpoint: {TARGET_ENDPOINT}")
-        print(f"Target model: {TARGET_MODEL}")
-        print(f"Attacker: {config['attacker']}")
-        print(f"Scorer: {config['scorer']}")
+    print("Running PAIR against sandbox target...")
+    print(f"Target endpoint: {TARGET_ENDPOINT}")
+    print(f"Target model: {TARGET_MODEL}")
+    print(f"Attacker: {config['attacker']}")
+    print(f"Scorer: {config['scorer']}")
 
-        results = target.hack(attack_config=config)
-        print(f"PAIR completed: {results}")
-    finally:
-        session.close()
+    results = target.hack(attack_config=config)
+    print(f"PAIR completed: {results}")

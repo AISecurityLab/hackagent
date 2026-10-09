@@ -3,7 +3,7 @@ sidebar_label: form
 title: hackagent.interfaces.tui.views.attacks.form
 ---
 
-Strategy config form rendering, collection and prefill.
+Form prefill for the Attacks tab.
 
 ## AttacksFormMixin Objects
 
@@ -11,7 +11,8 @@ Strategy config form rendering, collection and prefill.
 class AttacksFormMixin()
 ```
 
-Strategy config form rendering, collection and prefill.
+Prefill the static target/goals/timeout fields from `initial_data`.
 
 Mixed into :class:`~hackagent.interfaces.tui.views.attacks.tab.AttacksTab`.
+The attack and judge rows carry their own state and are not prefilled here.
 

@@ -49,7 +49,8 @@ dev = [
     "pytest-asyncio>=0.23.7,<1.5.0",
     "mcp>=1.21.2",
     "vllm>=0.11.0; sys_platform != 'win32'",
-    "transformers>=4.40,<6.0; sys_platform != 'win32'",
+    "fastapi[standard]>=0.136.3,<0.137; sys_platform != 'win32'",
+    "transformers>=4.55.2,<5.0; sys_platform != 'win32'",
     "pytest-textual-snapshot>=1.1.0",
     "import-linter>=2.3",
     # Optional runtime extras, installed here so unit tests and the docs
@@ -228,10 +229,6 @@ ignore_imports = [
     # Techniques still construct trackers and accept a Store on the obsolete
     # constructor, and LLMRouter still builds role models. Those edges are
     # concentrated in legacy_seams; every other sibling import is forbidden.
-    "hackagent.attacks._lib.legacy_seams -> hackagent.tracking",
-    "hackagent.attacks._lib.legacy_seams -> hackagent.storage.store",
-    "hackagent.attacks._lib.legacy_seams -> hackagent.models.client",
-    "hackagent.attacks._lib.legacy_seams -> hackagent.models.factory",
 ]
 
 [[tool.importlinter.contracts]]
@@ -247,10 +244,6 @@ modules = [
     "hackagent.tracking",
 ]
 ignore_imports = [
-    "hackagent.attacks._lib.legacy_seams -> hackagent.tracking",
-    "hackagent.attacks._lib.legacy_seams -> hackagent.storage.store",
-    "hackagent.attacks._lib.legacy_seams -> hackagent.models.client",
-    "hackagent.attacks._lib.legacy_seams -> hackagent.models.factory",
 ]
 
 [[tool.importlinter.contracts]]

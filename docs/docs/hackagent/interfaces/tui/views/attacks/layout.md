@@ -5,6 +5,11 @@ title: hackagent.interfaces.tui.views.attacks.layout
 
 Widget layout (`compose`) for the Attacks tab.
 
+The form is a guided wizard: a :class:`ContentSwitcher` shows one step at a
+time — Target, Attacks, Judges, Run — so only one focused screen is on display
+instead of one long scroll. Every step&#x27;s widgets stay mounted, so the spec
+assembly in `runner.py` can read them all regardless of the active step.
+
 ## AttacksLayoutMixin Objects
 
 ```python
@@ -21,5 +26,5 @@ Mixed into :class:`~hackagent.interfaces.tui.views.attacks.tab.AttacksTab`.
 def compose() -> ComposeResult
 ```
 
-Compose the attacks layout.
+Compose the attacks wizard.
 

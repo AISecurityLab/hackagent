@@ -33,5 +33,5 @@ def build_attack_catalog(*,
                          ) -> List[Dict[str, Any]]
 ```
 
-Serialize registered techniques and their JSON-schema parameters.
+Serialize every technique `hack` can run, with its parameters.
 

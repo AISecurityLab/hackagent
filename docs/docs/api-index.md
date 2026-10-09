@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
@@ -33,7 +37,7 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
 - **Datasets**: Built-in providers and dataset registry
 - **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 
-For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quickstart.md).
+For a worked example, see [Your first campaign](./getting-started/first-campaign.md); for the campaign format itself, see the [Campaign reference](./reference/index.md).
 
 ---
 

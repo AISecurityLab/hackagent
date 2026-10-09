@@ -1,155 +1,77 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Configuration for static template attacks.
+"""Configuration for the static-template attack."""
 
-Static template attacks use predefined prompt patterns to attempt jailbreaks,
-combining templates with goals to generate attack prompts.
-"""
+from string import Formatter
 
-from typing import Mapping, Any, Dict, List, Optional
+from pydantic import Field, model_validator
 
-from pydantic import ConfigDict, Field, model_validator
+from ..base import AttackParams
+from .templates import TEMPLATES
 
-from hackagent.attacks._lib.templates import AttackTemplates
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CONFIG_BASE,
-    DEFAULT_STANDARD_TARGET_CONFIG,
-    ConfigBase,
+DEFAULT_TEMPLATE_CATEGORIES = (
+    "instruction_override",
+    "delimiter_bypass",
+    "role_play",
+)
+
+#: Placeholders the attack fills from the goal itself.
+BUILT_IN_PLACEHOLDERS = frozenset(
+    {"goal", "goal_encoded", "goal_base64", "goal_obfuscated"}
 )
 
 
-DEFAULT_TEMPLATE_CONFIG: Dict[str, Any] = {
-    **DEFAULT_CONFIG_BASE,
-    **DEFAULT_STANDARD_TARGET_CONFIG,
-    # --- Target Model ---
-    "agent_router": None,  # Will be set at runtime
-    # --- Template Selection ---
-    "template_categories": [
-        "instruction_override",
-        "delimiter_bypass",
-        "role_play",
-    ],
-    "templates_per_category": 3,  # Number of templates to use per category
-    "template_parameters": {},  # Explicit substitutions, including translations
-    "batch_size": 0,  # Use all selected templates unless a per-goal batch is requested
-    # --- Generation Settings ---
-    "n_samples_per_template": 1,  # Completions per template-goal combo
-    # --- Evaluation Settings ---
-    "objective": "jailbreak",  # Default objective: jailbreak, harmful_behavior, policy_violation
-    "evaluator_type": "llm_judge",  # Deprecated: static/baseline always use LLM judge
-    "judge_config": None,  # For LLM judge evaluation
-    # --- Filtering ---
-    "min_response_length": 10,
-    "deduplicate_responses": True,
-}
+class StaticTemplateParams(AttackParams):
+    """Which templates to apply and the values for their extra placeholders."""
 
-
-def validate_template_config(config: Dict[str, Any]) -> None:
-    """Validate selected categories and substitutions without calling a model."""
-    categories = config.get(
-        "template_categories", DEFAULT_TEMPLATE_CONFIG["template_categories"]
+    template_categories: tuple[str, ...] = Field(
+        default=DEFAULT_TEMPLATE_CATEGORIES,
+        min_length=1,
+        description=(
+            "Families of jailbreak templates to apply: instruction_override, "
+            "delimiter_bypass, role_play, encoding, hypothetical, authority, "
+            "multi_language."
+        ),
     )
-    if not isinstance(categories, list) or not categories:
-        raise ValueError(
-            "template_categories must be a non-empty list of category names"
-        )
-
-    parameters = config.get("template_parameters", {})
-    if not isinstance(parameters, dict) or any(
-        not isinstance(key, str) for key in parameters
-    ):
-        raise ValueError("template_parameters must be a dictionary with string keys")
-    if {"goal", "template"} & parameters.keys():
-        raise ValueError(
-            "template_parameters cannot override reserved 'goal' or 'template'"
-        )
-
-    available = AttackTemplates.get_all_categories()
-    for category in categories:
-        if not isinstance(category, str) or category not in available:
-            raise ValueError(
-                f"Unknown template category {category!r}. Available: {', '.join(available)}"
-            )
-        for template in AttackTemplates.get_by_category(category):
-            try:
-                AttackTemplates.apply_template(template, "", **parameters)
-            except ValueError as exc:
-                raise ValueError(
-                    f"Invalid static_template category '{category}': {exc} "
-                    "Check template_parameters."
-                ) from exc
-
-
-class TemplateAttackConfig(ConfigBase):
-    """Configuration for static template attack pipeline."""
-
-    model_config = ConfigDict(extra="ignore", validate_assignment=True)
-
-    # Target
-    agent_router: Any = None
-
-    # Template settings
-    template_categories: List[str] = Field(
-        default_factory=lambda: [
-            "instruction_override",
-            "delimiter_bypass",
-            "role_play",
-        ]
+    templates_per_category: int = Field(
+        default=3,
+        ge=1,
+        description=(
+            "How many templates to take from each family. Each template becomes one"
+            " prompt."
+        ),
     )
-    templates_per_category: int = 3
-    template_parameters: Dict[str, Any] = Field(default_factory=dict)
-    batch_size: int = Field(default=0, ge=0)
-
-    # Generation
-    n_samples_per_template: int = 1
-
-    # Evaluation
-    objective: str = "jailbreak"
-    evaluator_type: str = "llm_judge"  # Deprecated compatibility field
-    judge_config: Optional[Dict[str, Any]] = None
-
-    # Filtering
-    min_response_length: int = 10
-    deduplicate_responses: bool = True
+    template_parameters: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Values for extra placeholders a template uses, beyond the built-in "
+            "goal, goal_base64, goal_encoded and goal_obfuscated."
+        ),
+    )
 
     @model_validator(mode="after")
-    def validate_templates(self) -> "TemplateAttackConfig":
-        validate_template_config(
-            {
-                "template_categories": self.template_categories,
-                "template_parameters": self.template_parameters,
-            }
+    def validate_templates(self) -> "StaticTemplateParams":
+        unknown = sorted(set(self.template_categories).difference(TEMPLATES))
+        if unknown:
+            raise ValueError(f"Unknown template categories: {', '.join(unknown)}")
+        required = {
+            name
+            for template in self.selected_templates()
+            for _, name, _, _ in Formatter().parse(template)
+            if name is not None
+        }
+        missing = sorted(
+            required - BUILT_IN_PLACEHOLDERS - self.template_parameters.keys()
         )
+        if missing:
+            raise ValueError(f"Missing template parameters: {', '.join(missing)}")
         return self
 
-    @classmethod
-    def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]:
-        """Static template always needs judge models for LLM-judge evaluation."""
-        judges = data.get("judges")
-        if isinstance(judges, list) and judges:
-            return [
-                {"role": "judge", "config": j, "required": False}
-                for j in judges
-                if isinstance(j, dict)
-            ]
-        judge = data.get("judge")
-        if isinstance(judge, dict) and judge:
-            return [{"role": "judge", "config": judge, "required": False}]
-        judge_config = data.get("judge_config")
-        if isinstance(judge_config, dict) and judge_config:
-            return [{"role": "judge", "config": judge_config, "required": False}]
-        return []
-
-    def roles(self) -> List[Dict[str, Any]]:
-        return self.roles_from_mapping(self.model_dump(exclude_unset=True))
-
-    @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "TemplateAttackConfig":
-        """Create config from dictionary."""
-        return cls.model_validate(config_dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return self.model_dump()
+    def selected_templates(self) -> list[str]:
+        """Templates to apply, in stable category order."""
+        return [
+            template
+            for category in self.template_categories
+            for template in TEMPLATES[category][: self.templates_per_category]
+        ]

@@ -1,15 +1,13 @@
+---
+sidebar_position: 1
+---
+
 # Quick Security Scan
 
 A **quick security scan** focuses on the highest-impact vulnerabilities with fast Static Template attacks, typically completing in 10-15 minutes.
 
-:::note Reading ASR
-`agent.hack(attack_config=...)` returns a list of row dicts. The examples below compute ASR from those rows with this helper:
-
-```python
-def asr(rows):
-    """Fraction of rows the judges marked successful."""
-    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
-```
+:::note
+`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
 :::
 
 ## When to Use
@@ -35,8 +33,7 @@ from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="quick-scan",
 )
 
@@ -54,7 +51,7 @@ for profile in quick_profiles:
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }
     result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {asr(result):.0%}")
+    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
 ```
 
 ## Typical Coverage

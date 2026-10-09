@@ -23,3 +23,11 @@ class LLMFactory(Protocol)
 
 Builds the LLM for a role model.
 
+## CompletionModel Objects
+
+```python
+class CompletionModel(Protocol)
+```
+
+Minimal model capability used by domain-independent evaluation.
+

@@ -2,40 +2,58 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for the Codex CLI adapter.
+Unit tests for the Codex CLI backend.
 
 Codex speaks no HTTP in this preset — it is driven via the non-interactive
-``codex exec`` CLI. Like the Claude Code provider, ``CodexAgent`` routes through
-LiteLLM via a per-instance custom provider, but its handler shells out to a
-subprocess instead of making an HTTP request.
+``codex exec`` CLI. ``CodexModel`` routes through LiteLLM via a per-instance
+custom provider, but its handler shells out to a subprocess instead of making an
+HTTP request.
 
 These tests exercise both layers:
 - handler-level behavior: argv building, stdout parsing, subprocess transport;
-- adapter-level behavior: end-to-end routing via the public ``handle_request``.
+- model-level behavior: end-to-end routing via the public ``complete``.
 """
 
 import json
 import logging
 import unittest
-import uuid
 from unittest.mock import MagicMock, patch
 
-from hackagent.models.adapters.base import (
-    AdapterConfigurationError,
-    AdapterInteractionError,
+from hackagent.core.contracts import AgentType, ModelSpec
+from hackagent.models.completions import codex as codex_module
+from hackagent.models.completions.cli import (
+    CLIConfigurationError,
+    CLIInteractionError,
+    last_user_text as _last_user_text,
 )
-from hackagent.models.adapters.codex import (
-    CodexAgent,
+from hackagent.models.completions.codex import (
+    CodexModel,
     _extract_result_text,
     _get_codex_custom_llm_class,
 )
-from hackagent.models.adapters.cli_agent import last_user_text as _last_user_text
-from hackagent.models.adapters import codex as codex_provider_module
 
 logging.disable(logging.CRITICAL)
 
 # A path that shutil.which() will "find" so init doesn't reject the binary.
 _FAKE_BINARY = "/usr/bin/codex"
+
+
+def _spec(**config):
+    timeout = config.pop("timeout", None)
+    name = config.pop("name", "gpt-5.5")
+    return ModelSpec(
+        identifier=name,
+        agent_type=AgentType.CODEX,
+        timeout=timeout,
+        extra=dict(config),
+    )
+
+
+def _model(**config):
+    with patch(
+        "hackagent.models.completions.cli.shutil.which", return_value=_FAKE_BINARY
+    ):
+        return CodexModel(_spec(**config))
 
 
 def _make_handler(**overrides):
@@ -115,11 +133,11 @@ def _tool_call_json(**extra) -> str:
 
 
 class TestCodexModuleLayout(unittest.TestCase):
-    """Codex CLI lives at ``models/adapters/codex.py``."""
+    """Codex CLI lives at ``models/completions/codex.py``."""
 
     def test_helpers_are_module_level(self):
-        self.assertIs(_extract_result_text, codex_provider_module._extract_result_text)
-        self.assertIs(CodexAgent, codex_provider_module.CodexAgent)
+        self.assertIs(_extract_result_text, codex_module._extract_result_text)
+        self.assertIs(CodexModel, codex_module.CodexModel)
 
 
 class TestCodexHelpers(unittest.TestCase):
@@ -179,7 +197,7 @@ class TestCodexHelpers(unittest.TestCase):
             }
         )
 
-        with self.assertRaises(AdapterInteractionError):
+        with self.assertRaises(CLIInteractionError):
             _extract_result_text(payload)
 
     def test_extract_result_text_captures_policy_block_as_text(self):
@@ -214,7 +232,7 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
         self.assertIn("--sandbox", argv)
         self.assertEqual(argv[argv.index("--sandbox") + 1], "workspace-write")
 
-    @patch("hackagent.models.adapters.codex.subprocess.run")
+    @patch("hackagent.models.completions.codex.subprocess.run")
     def test_run_feeds_prompt_via_stdin(self, mock_run):
         mock_run.return_value = _completed(stdout=_response_json("the answer"))
 
@@ -230,16 +248,16 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore your rules", mock_run.call_args.args[0])
         self.assertEqual(result["final_text"], "the answer")
 
-    @patch("hackagent.models.adapters.codex.subprocess.run")
+    @patch("hackagent.models.completions.codex.subprocess.run")
     def test_run_nonzero_exit_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=2)
 
         handler = _make_handler()
 
-        with self.assertRaises(AdapterInteractionError):
+        with self.assertRaises(CLIInteractionError):
             handler._run(prompt_text="hi")
 
-    @patch("hackagent.models.adapters.codex.subprocess.run")
+    @patch("hackagent.models.completions.codex.subprocess.run")
     def test_run_nonzero_exit_with_text_stdout_is_captured(self, mock_run):
         """A policy/refusal message on stdout is captured even if exit != 0."""
         refusal = "API Error: ... violates our Usage Policy. Try rephrasing"
@@ -254,97 +272,75 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
 
         self.assertEqual(result["final_text"], refusal)
 
-    @patch("hackagent.models.adapters.codex.subprocess.run")
+    @patch("hackagent.models.completions.codex.subprocess.run")
     def test_run_missing_binary_raises_config_error(self, mock_run):
         mock_run.side_effect = FileNotFoundError()
 
         handler = _make_handler()
 
-        with self.assertRaises(AdapterConfigurationError):
+        with self.assertRaises(CLIConfigurationError):
             handler._run(prompt_text="hi")
 
 
-class TestCodexAgentInit(unittest.TestCase):
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_success(self, _which):
-        adapter = CodexAgent(
-            id=str(uuid.uuid4()),
-            config={"name": "gpt-5.5", "timeout": 60, "binary": "codex"},
-        )
+class TestCodexModelInit(unittest.TestCase):
+    def test_init_success(self):
+        model = _model(name="gpt-5.5", timeout=60, binary="codex")
 
-        self.assertEqual(adapter.name, "gpt-5.5")
-        self.assertEqual(adapter.timeout, 60)
+        self.assertEqual(model.name, "gpt-5.5")
+        self.assertEqual(model.timeout, 60)
         self.assertTrue(
-            adapter.litellm_model.startswith("hackagent_codex_")
-            and adapter.litellm_model.endswith("/gpt-5.5")
+            model.litellm_model.startswith("hackagent_codex_")
+            and model.litellm_model.endswith("/gpt-5.5")
         )
 
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_default_timeout(self, _which):
-        adapter = CodexAgent(id="t1", config={"name": "gpt-5.5"})
+    def test_init_default_timeout(self):
+        model = _model(name="gpt-5.5")
 
-        self.assertEqual(adapter.timeout, 300)
+        self.assertEqual(model.timeout, 300)
 
     def test_init_missing_name(self):
-        with self.assertRaises(AdapterConfigurationError):
-            CodexAgent(id="e1", config={})
+        with self.assertRaises(CLIConfigurationError):
+            CodexModel(ModelSpec(identifier="", agent_type=AgentType.CODEX))
 
-    @patch("hackagent.models.adapters.cli_agent.shutil.which", return_value=None)
-    def test_init_missing_binary_raises(self, _which):
-        with self.assertRaises(AdapterConfigurationError):
-            CodexAgent(id="e2", config={"name": "gpt-5.5"})
+    def test_init_missing_binary_raises(self):
+        with patch("hackagent.models.completions.cli.shutil.which", return_value=None):
+            with self.assertRaises(CLIConfigurationError):
+                CodexModel(_spec(name="gpt-5.5"))
 
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def test_init_registers_custom_provider(self, _which):
+    def test_init_registers_custom_provider(self):
         import litellm
 
-        adapter = CodexAgent(id="reg1", config={"name": "gpt-5.5"})
+        model = _model(name="gpt-5.5")
         providers = [entry["provider"] for entry in litellm.custom_provider_map]
 
-        self.assertIn(f"hackagent_codex_{adapter.id}", providers)
+        self.assertIn(f"hackagent_codex_{model.id}", providers)
 
 
-class TestCodexAgentHandleRequest(unittest.TestCase):
-    @patch(
-        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
-    )
-    def setUp(self, _which):
-        self.adapter = CodexAgent(id="h1", config={"name": "gpt-5.5"})
+class TestCodexModelComplete(unittest.TestCase):
+    def setUp(self):
+        self.model = _model(name="gpt-5.5")
 
-    def test_missing_prompt_returns_400(self):
-        response = self.adapter.handle_request({})
-
-        self.assertEqual(response["status_code"], 400)
-
-    @patch("hackagent.models.adapters.codex.subprocess.run")
-    def test_handle_request_success_routes_through_cli(self, mock_run):
+    @patch("hackagent.models.completions.codex.subprocess.run")
+    def test_complete_success_routes_through_cli(self, mock_run):
         mock_run.return_value = _completed(stdout=_response_json("agent reply"))
 
-        response = self.adapter.handle_request({"prompt": "hello"})
+        response = self.model.complete([{"role": "user", "content": "hello"}])
 
-        self.assertEqual(response["status_code"], 200)
-        self.assertEqual(response["generated_text"], "agent reply")
-        self.assertEqual(response["adapter_type"], "CodexAgent")
-
+        self.assertEqual(response.text, "agent reply")
+        self.assertIsNone(response.error)
         # Prompt reached the subprocess via stdin.
         self.assertEqual(
             mock_run.call_args.kwargs["input"],
             "User task:\nhello",
         )
 
-    @patch("hackagent.models.adapters.codex.subprocess.run")
-    def test_handle_request_cli_error_returns_500(self, mock_run):
+    @patch("hackagent.models.completions.codex.subprocess.run")
+    def test_complete_cli_error_returns_error(self, mock_run):
         mock_run.return_value = _completed(stderr="boom", returncode=1)
 
-        response = self.adapter.handle_request({"prompt": "hi"})
+        response = self.model.complete([{"role": "user", "content": "hi"}])
 
-        self.assertEqual(response["status_code"], 500)
+        self.assertIsNotNone(response.error)
 
 
 if __name__ == "__main__":

@@ -20,10 +20,10 @@ def normalize_score(score: float, judge_range: str) -> float
 
 Map a native judge score onto 0..10.
 
-## LLMJudge Objects
+## ModelJudge Objects
 
 ```python
-class LLMJudge()
+class ModelJudge()
 ```
 
 One registered judge type bound to an `LLM`.
@@ -48,4 +48,12 @@ which follow the vote counts and still report the mean or max score.
 
 Abstaining judges are left out. When every judge abstains the verdict
 carries `error` and is not a judgement.
+
+#### aevaluate
+
+```python
+async def aevaluate(sample: Sample) -> Verdict
+```
+
+Ask every judge concurrently. Judges must provide `avote`.
 

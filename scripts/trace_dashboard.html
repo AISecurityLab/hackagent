@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HackAgent search traces</title>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #fff; --ink: #1c2230; --muted: #667085; --line: #d9dde5;
+  --hot: #dc2626; --held: #16a34a; --sel: #2563eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1320; --card: #181d2c; --ink: #e6e9f2; --muted: #98a2b8; --line: #2c3348; }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 13px/1.45 system-ui, sans-serif; display: flex; flex-direction: column; }
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 14px; background: var(--card); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 15px; margin: 0; }
+select, input[type=search] { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font: inherit; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: var(--bg); }
+.chip b { font-weight: 600; }
+main { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px 1fr 400px; }
+aside, section { min-height: 0; overflow: auto; }
+#goals { border-right: 1px solid var(--line); background: var(--card); }
+#goals .tools { position: sticky; top: 0; background: var(--card); padding: 8px; display: flex; gap: 6px; border-bottom: 1px solid var(--line); z-index: 1; }
+#goals .tools input { flex: 1; min-width: 0; }
+.goal { padding: 7px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.goal:hover { background: var(--bg); }
+.goal.active { background: color-mix(in srgb, var(--sel) 14%, var(--card)); }
+.goal .title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.goal .meta { color: var(--muted); font-size: 11.5px; margin-top: 2px; display: flex; justify-content: space-between; gap: 6px; }
+.goal .strip { display: flex; gap: 2px; margin-top: 4px; flex-wrap: wrap; }
+.goal .strip i { width: 9px; height: 9px; border-radius: 2px; background: #64748b; }
+.goal .strip i.dec { background: #f59e0b; transform: rotate(45deg) scale(.8); }
+.goal .strip i.hot { background: var(--hot); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--held); }
+.dot.hot { background: var(--hot); }
+#stage { display: flex; flex-direction: column; }
+#bar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--card); }
+#bar .goaltext { font-weight: 600; flex-basis: 100%; }
+#bar button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: inherit; }
+#bar label { color: var(--muted); }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; color: var(--muted); margin-left: auto; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--c); margin-right: 4px; vertical-align: -1px; }
+#canvas { flex: 1; overflow: auto; }
+svg text { font-size: 12px; fill: var(--ink); pointer-events: none; }
+svg .sub { fill: var(--muted); font-size: 11px; }
+.edge { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.edge.hot { stroke: var(--hot); stroke-width: 2.5; }
+.node { cursor: pointer; }
+.node rect.box { fill: var(--card); stroke: var(--line); stroke-width: 1; }
+.node:hover rect.box { stroke: var(--muted); }
+.node.sel rect.box { stroke: var(--sel); stroke-width: 2; }
+.node .chev { pointer-events: all; }
+#detail { border-left: 1px solid var(--line); background: var(--card); padding: 12px 14px; }
+#detail h2 { font-size: 14px; margin: 0 0 4px; }
+#detail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 4px; }
+.tag { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 11px; color: #fff; background: var(--c, #64748b); margin-right: 6px; }
+.tag.hot { background: var(--hot); } .tag.held { background: var(--held); }
+table.kv { border-collapse: collapse; width: 100%; }
+.kv td { padding: 2px 6px 2px 0; vertical-align: top; border-bottom: 1px solid var(--line); }
+.kv td:first-child { color: var(--muted); white-space: nowrap; }
+pre { margin: 2px 0 6px; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow: auto; font: 12px/1.4 ui-monospace, monospace; }
+details { margin: 4px 0; }
+summary { cursor: pointer; color: var(--muted); }
+.msg { border-left: 3px solid var(--c, var(--line)); padding-left: 6px; margin: 4px 0; }
+.empty { color: var(--muted); padding: 30px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HackAgent search traces</h1>
+  <select id="runSel" title="run"></select>
+  <select id="attackSel" title="attack"></select>
+  <div class="chips" id="chips"></div>
+</header>
+<main>
+  <aside id="goals">
+    <div class="tools">
+      <input type="search" id="q" placeholder="filter goals">
+      <select id="status"><option value="">all</option><option value="hot">jailbroken</option><option value="held">held</option></select>
+    </div>
+    <div id="goalList"></div>
+  </aside>
+  <section id="stage">
+    <div id="bar"></div>
+    <div id="canvas"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  </section>
+  <aside id="detail"><div class="empty">Select a node.</div></aside>
+</main>
+
+<script type="application/json" id="data">__TRACE_DATA__</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const SVGNS = "http://www.w3.org/2000/svg";
+const $ = (selector) => document.querySelector(selector);
+
+function el(tag, props, ...kids) {
+  const node = tag.startsWith("svg:")
+    ? document.createElementNS(SVGNS, tag.slice(4))
+    : document.createElement(tag);
+  for (const [key, value] of Object.entries(props || {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") node.setAttribute("class", value);
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else if (key === "style") node.setAttribute("style", value);
+    else node.setAttribute(key, value);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    node.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return node;
+}
+
+const ROLE_COLORS = { attacker: "#a855f7", target: "#f97316", scorer: "#14b8a6", judge: "#14b8a6", panel: "#22c55e" };
+const PALETTE = ["#3b82f6", "#ec4899", "#eab308", "#06b6d4", "#8b5cf6", "#ef4444"];
+const roleColor = (role) =>
+  ROLE_COLORS[role] || PALETTE[[...role].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % PALETTE.length];
+const roleOf = (node) => (node.data && node.data.role) || node.label || "call";
+function nodeColor(node) {
+  if (node.node === "call") return roleColor(roleOf(node));
+  return { decision: "#f59e0b", artifact: "#0ea5e9", goal: "#6366f1" }[node.node] || "#64748b";
+}
+const fmtTime = (seconds) => (seconds >= 120 ? `${(seconds / 60).toFixed(1)}m` : `${seconds.toFixed(1)}s`);
+const fmtNum = (value) => value.toLocaleString("en-US");
+const clip = (text, max) => (text.length > max ? text.slice(0, max - 1) + "…" : text);
+
+// ---------------------------------------------------------------- tree model
+
+const pathKey = (scope, path) => `${scope}:${path.join(".")}`;
+const last = (path) => path[path.length - 1];
+
+function buildTree(goal) {
+  const byId = new Map();
+  const root = { id: "root", node: "goal", label: `goal ${goal.goal_index}`, path: [], scope: "goal", data: {}, children: [], depth: 0 };
+  const scopeRoots = new Map();
+
+  const create = (raw) => {
+    const node = { ...raw, data: raw.data || {}, children: [], scope: raw.scope || "goal" };
+    node.id = pathKey(node.scope, node.path);
+    byId.set(node.id, node);
+    return node;
+  };
+  const attach = (node) => {
+    let parent;
+    if (node.path.length > 1) {
+      const id = pathKey(node.scope, node.path.slice(0, -1));
+      parent = byId.get(id) || attach(create({ node: "phase", label: "…", scope: node.scope, path: node.path.slice(0, -1) }));
+    } else if (node.scope === "goal") {
+      parent = root;
+    } else {
+      if (!scopeRoots.has(node.scope)) {
+        const scopeRoot = create({ node: "phase", label: `${node.scope}-level`, scope: node.scope, path: [] });
+        scopeRoots.set(node.scope, scopeRoot);
+        root.children.push(scopeRoot);
+        scopeRoot.parent = root;
+      }
+      parent = scopeRoots.get(node.scope);
+    }
+    parent.children.push(node);
+    node.parent = parent;
+    return node;
+  };
+
+  for (const raw of goal.nodes) {
+    const id = pathKey(raw.scope || "goal", raw.path);
+    if (byId.has(id)) Object.assign(byId.get(id), raw, { children: byId.get(id).children });
+    else attach(create(raw));
+  }
+  const walk = (node) => {
+    node.children.sort((a, b) => (last(a.path) ?? 0) - (last(b.path) ?? 0));
+    node.children.forEach(walk);
+  };
+  walk(root);
+
+  const attempts = new Map(goal.attempts.map((attempt) => [attempt.request_index, attempt]));
+  const totals = (node) => {
+    node.agg = { calls: 0, latency: 0, tokens: 0, hot: false, count: 0, roles: {} };
+    if (node.attempt != null) node.verdict = attempts.get(node.attempt) || null;
+    if (node.node === "call") {
+      const role = roleOf(node);
+      const latency = node.latency_s || 0;
+      const tokens = (node.data.usage && node.data.usage.total_tokens) || 0;
+      Object.assign(node.agg, { calls: 1, latency, tokens });
+      node.agg.roles[role] = { calls: 1, latency };
+    }
+    if (node.verdict && node.verdict.success) node.agg.hot = true;
+    for (const child of node.children) {
+      const sub = totals(child);
+      node.agg.calls += sub.calls; node.agg.latency += sub.latency; node.agg.tokens += sub.tokens;
+      node.agg.count += sub.count + 1; node.agg.hot ||= sub.hot;
+      for (const [role, stat] of Object.entries(sub.roles)) {
+        const mine = (node.agg.roles[role] ||= { calls: 0, latency: 0 });
+        mine.calls += stat.calls; mine.latency += stat.latency;
+      }
+    }
+    return node.agg;
+  };
+  totals(root);
+  root.attempts = goal.attempts;
+  return root;
+}
+
+// -------------------------------------------------------------------- state
+
+const state = { run: null, attack: null, goal: null, selected: null, collapsed: new Set(), hideCalls: false };
+
+function treeOf(goal) {
+  return (goal._tree ||= buildTree(goal));
+}
+function visibleKids(node) {
+  if (state.collapsed.has(node.id)) return [];
+  return state.hideCalls ? node.children.filter((child) => child.node !== "call") : node.children;
+}
+
+// ------------------------------------------------------------------- header
+
+function renderHeader() {
+  const goals = state.attack.goals;
+  const trees = goals.map(treeOf);
+  const broken = trees.filter((tree) => tree.agg.hot).length;
+  const attempts = goals.reduce((sum, goal) => sum + goal.attempts.length, 0);
+  const sum = (key) => trees.reduce((total, tree) => total + tree.agg[key], 0);
+  const chips = [
+    ["goals", goals.length],
+    ["jailbroken", `${broken} (${goals.length ? Math.round((100 * broken) / goals.length) : 0}%)`],
+    ["attempts", attempts],
+    ["model calls", fmtNum(sum("calls"))],
+    ["tokens", fmtNum(sum("tokens"))],
+    ["call time", fmtTime(sum("latency"))],
+  ];
+  $("#chips").replaceChildren(...chips.map(([name, value]) => el("span", { class: "chip" }, `${name} `, el("b", {}, value))));
+}
+
+// ---------------------------------------------------------------- goal list
+
+function renderGoals() {
+  const text = $("#q").value.toLowerCase();
+  const status = $("#status").value;
+  const list = $("#goalList");
+  list.replaceChildren();
+  for (const goal of state.attack.goals) {
+    const tree = treeOf(goal);
+    if (status === "hot" && !tree.agg.hot) continue;
+    if (status === "held" && tree.agg.hot) continue;
+    if (text && !(goal.goal || "").toLowerCase().includes(text) && String(goal.goal_index) !== text) continue;
+    const strip = tree.children.map((child) =>
+      el("i", { class: child.node === "decision" ? "dec" : child.agg.hot ? "hot" : "", title: child.label }));
+    list.append(
+      el("div", { class: "goal" + (goal === state.goal ? " active" : ""), onclick: () => selectGoal(goal) },
+        el("div", { class: "title" }, el("span", { class: "dot" + (tree.agg.hot ? " hot" : "") }), `#${goal.goal_index} `, goal.goal || "(goal text unavailable)"),
+        el("div", { class: "strip" }, strip),
+        el("div", { class: "meta" }, el("span", {}, `${tree.agg.calls} calls · ${goal.attempts.length} attempts`), el("span", {}, fmtTime(tree.agg.latency)))));
+  }
+  if (!list.children.length) list.append(el("div", { class: "empty" }, "No goals match."));
+}
+
+function selectGoal(goal) {
+  state.goal = goal;
+  state.selected = "root";
+  state.collapsed = new Set();
+  renderGoals();
+  renderBar();
+  drawTree();
+  renderDetail(treeOf(goal));
+}
+
+// ---------------------------------------------------------------------- bar
+
+function renderBar() {
+  const tree = treeOf(state.goal);
+  const legend = Object.entries(tree.agg.roles).map(([role, stat]) =>
+    el("span", { style: `--c:${roleColor(role)}` }, `${role} ×${stat.calls} · ${fmtTime(stat.latency)}`));
+  legend.push(el("span", { style: "--c:#f59e0b" }, "decision"), el("span", { style: "--c:#64748b" }, "phase"));
+  $("#bar").replaceChildren(
+    el("div", { class: "goaltext" }, state.goal.goal || `goal ${state.goal.goal_index}`),
+    el("button", { onclick: () => { state.collapsed = new Set(); redraw(); } }, "Expand all"),
+    el("button", { onclick: () => { state.collapsed = new Set(allIds(tree).filter((id) => id !== "root")); redraw(); } }, "Collapse all"),
+    el("label", {}, el("input", { type: "checkbox", checked: state.hideCalls ? "" : null, onchange: (event) => { state.hideCalls = event.target.checked; redraw(); } }), " hide model calls"),
+    el("div", { class: "legend" }, legend));
+}
+function allIds(node, out = []) {
+  if (node.children.length) out.push(node.id);
+  node.children.forEach((child) => allIds(child, out));
+  return out;
+}
+function redraw() {
+  renderBar();
+  drawTree();
+}
+
+// --------------------------------------------------------------------- tree
+
+const COL = 192, ROW = 34, BOX_W = 160, BOX_H = 26, PAD = 18;
+
+function drawTree() {
+  const root = treeOf(state.goal);
+  const maxLatency = Math.max(0.001, ...(function collect(node) {
+    return [node.latency_s || 0, ...node.children.flatMap(collect)];
+  })(root));
+  let row = 0, maxDepth = 0;
+  const shown = [];
+  (function place(node, depth) {
+    node.depth = depth; node.x = PAD + depth * COL; maxDepth = Math.max(maxDepth, depth);
+    node.kids = visibleKids(node);
+    shown.push(node);
+    if (!node.kids.length) node.y = PAD + row++ * ROW;
+    else {
+      node.kids.forEach((kid) => place(kid, depth + 1));
+      node.y = (node.kids[0].y + node.kids[node.kids.length - 1].y) / 2;
+    }
+  })(root, 0);
+
+  const svg = $("#svg");
+  svg.replaceChildren();
+  svg.setAttribute("width", PAD * 2 + maxDepth * COL + BOX_W);
+  svg.setAttribute("height", PAD * 2 + Math.max(row, 1) * ROW);
+
+  const edges = el("svg:g");
+  const nodes = el("svg:g");
+  for (const node of shown) {
+    for (const kid of node.kids) {
+      const x1 = node.x + BOX_W, y1 = node.y + BOX_H / 2, x2 = kid.x, y2 = kid.y + BOX_H / 2;
+      edges.append(el("svg:path", { class: "edge" + (kid.agg.hot ? " hot" : ""), d: `M${x1},${y1} C${x1 + 36},${y1} ${x2 - 36},${y2} ${x2},${y2}` }));
+    }
+    nodes.append(drawNode(node, maxLatency));
+  }
+  svg.append(edges, nodes);
+}
+
+function drawNode(node, maxLatency) {
+  const color = nodeColor(node);
+  const expandable = node.node !== "call" && node.children.length > 0;
+  const collapsed = state.collapsed.has(node.id);
+  const verdict = node.verdict;
+  let right = "";
+  if (node.node === "call" && node.latency_s != null) right = fmtTime(node.latency_s);
+  else if (node.data && typeof node.data.score === "number") right = `score ${node.data.score}`;
+  else if (collapsed) right = `+${node.agg.count}`;
+  const left = expandable ? 22 : 12;
+  const label = clip(node.node === "call" ? roleOf(node) : node.label || node.node, right ? 17 : 26);
+
+  const tip = [`${node.node}: ${node.label || ""}`, node.data && node.data.reason, node.error && `error: ${node.error}`].filter(Boolean).join("\n");
+  const group = el("svg:g", {
+    class: "node" + (state.selected === node.id ? " sel" : ""),
+    transform: `translate(${node.x},${node.y})`,
+    onclick: () => select(node),
+  },
+  el("svg:title", {}, tip),
+  el("svg:rect", { class: "box", width: BOX_W, height: BOX_H, rx: 6 }),
+  el("svg:rect", { width: 5, height: BOX_H, rx: 2, fill: color }),
+  el("svg:text", { x: left, y: 17 }, label),
+  right && el("svg:text", { class: "sub", x: BOX_W - 8, y: 17, "text-anchor": "end" }, right));
+
+  if (node.node === "call" && node.latency_s) {
+    group.append(el("svg:rect", { x: 5, y: BOX_H - 3, width: Math.max(2, (BOX_W - 5) * node.latency_s / maxLatency), height: 3, fill: color, opacity: 0.55 }));
+  }
+  if (node.error) group.append(el("svg:text", { x: BOX_W - 8, y: 9, "text-anchor": "end", fill: "#dc2626", style: "fill:#dc2626" }, "!"));
+  if (verdict) {
+    group.append(el("svg:circle", { cx: BOX_W, cy: 0, r: 6, fill: { hot: "#dc2626", held: "#16a34a", none: "#94a3b8" }[verdictClass(verdict)], stroke: "#fff" },
+      el("svg:title", {}, `attempt ${verdict.request_index}: ${verdictText(verdict)}`)));
+  }
+  if (expandable) {
+    group.append(el("svg:text", { x: 11, y: 17, "text-anchor": "middle" }, collapsed ? "▸" : "▾"));
+    group.append(el("svg:rect", { class: "chev", x: 0, y: 0, width: 20, height: BOX_H, fill: "transparent", onclick: (event) => { event.stopPropagation(); toggle(node); } }));
+  }
+  return group;
+}
+
+function toggle(node) {
+  if (state.collapsed.has(node.id)) state.collapsed.delete(node.id);
+  else state.collapsed.add(node.id);
+  drawTree();
+}
+function select(node) {
+  state.selected = node.id;
+  drawTree();
+  renderDetail(node);
+}
+
+// ------------------------------------------------------------------- detail
+
+function textOf(value) {
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+function messageText(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.map((part) => (part && part.text) ?? JSON.stringify(part)).join("\n");
+  return textOf(content);
+}
+function messages(request) {
+  let value = request;
+  if (typeof value === "string") {
+    try { value = JSON.parse(value); } catch { return el("pre", {}, request); }
+  }
+  if (!Array.isArray(value) || !value.every((m) => m && typeof m === "object" && "role" in m)) {
+    return el("pre", {}, textOf(value));
+  }
+  return value.map((message, index) => {
+    const body = messageText(message.content);
+    const head = `${message.role} · ${fmtNum(body.length)} chars`;
+    const color = { system: "#64748b", user: "#3b82f6", assistant: "#f97316" }[message.role] || "#64748b";
+    return el("details", { class: "msg", style: `--c:${color}`, open: message.role !== "system" && index >= value.length - 2 ? "" : null },
+      el("summary", {}, head), el("pre", {}, body));
+  });
+}
+function facts(rows) {
+  const body = rows.filter(([, value]) => value != null && value !== "").map(([name, value]) => el("tr", {}, el("td", {}, name), el("td", {}, value)));
+  return el("table", { class: "kv" }, el("tbody", {}, body));
+}
+const heading = (text) => el("h3", {}, text);
+// Only the best finding of a goal reaches the panel; the other attempts carry no verdict.
+const judged = (attempt) => attempt.best_score != null || Boolean(attempt.explanation);
+const verdictClass = (attempt) => (attempt.success ? "hot" : judged(attempt) ? "held" : "none");
+const verdictText = (attempt) => ({ hot: "jailbreak", held: `held · score ${attempt.best_score ?? "–"}`, none: "not judged" }[verdictClass(attempt)]);
+
+function renderDetail(node) {
+  const panel = $("#detail");
+  const color = nodeColor(node);
+  const parts = [
+    el("h2", {}, el("span", { class: "tag", style: `--c:${color}` }, node.node), node.node === "call" ? roleOf(node) : node.label),
+    el("div", { style: "color:var(--muted)" }, node.path.length ? `path ${node.path.join(" → ")}` : "root of this goal's search"),
+  ];
+
+  if (node.node === "goal") {
+    parts.push(heading("Goal"), el("pre", {}, state.goal.goal || "(unavailable)"));
+  }
+  parts.push(heading("Cost of this subtree"), facts([
+    ["model calls", node.agg.calls],
+    ["call time", node.agg.calls ? fmtTime(node.agg.latency) : null],
+    ["tokens", node.agg.tokens ? fmtNum(node.agg.tokens) : null],
+    ["nodes below", node.agg.count],
+    ["by role", Object.entries(node.agg.roles).map(([role, s]) => `${role} ×${s.calls} (${fmtTime(s.latency)})`).join(", ")],
+  ]));
+  if (node.latency_s != null || node.error) {
+    parts.push(heading("This node"), facts([["latency", node.latency_s != null ? fmtTime(node.latency_s) : null], ["error", node.error]]));
+  }
+
+  if (node.verdict) {
+    const v = node.verdict;
+    parts.push(heading("Attempt verdict"),
+      el("div", {}, el("span", { class: "tag " + verdictClass(v) }, verdictText(v)), `attempt ${v.request_index}`),
+      facts([["best score", v.best_score], ["explanation", v.explanation], ["error", v.error],
+        ...Object.entries(v.judges).map(([judge, text]) => [judge, text]),
+        ...Object.entries(v.metadata).map(([key, value]) => [key, textOf(value)])]));
+  }
+  if (node.node === "goal") {
+    parts.push(heading("Attempts"), facts(node.attempts.map((a) => [`attempt ${a.request_index}`, `${verdictText(a)}${a.metadata.score != null ? ` · search score ${a.metadata.score}` : ""}`])));
+  }
+
+  const data = node.data || {};
+  if (node.node === "call") {
+    if ("request" in data) parts.push(heading("Request"), el("div", {}, messages(data.request)));
+    if ("response" in data) parts.push(heading("Response"), typeof data.response === "string" ? el("pre", {}, data.response) : el("pre", {}, textOf(data.response)));
+    const rest = Object.entries(data).filter(([key]) => !["request", "response", "role"].includes(key));
+    if (rest.length) parts.push(heading("Details"), facts(rest.map(([key, value]) => [key, textOf(value)])));
+  } else if (Object.keys(data).length) {
+    parts.push(heading("Data"), facts(Object.entries(data).map(([key, value]) => [key, textOf(value)])));
+  }
+  panel.replaceChildren(...parts);
+  panel.scrollTop = 0;
+}
+
+// --------------------------------------------------------------------- boot
+
+function selectAttack(attack) {
+  state.attack = attack;
+  renderHeader();
+  renderGoals();
+  const first = attack.goals.find((goal) => treeOf(goal).agg.hot) || attack.goals[0];
+  if (first) selectGoal(first);
+}
+function selectRun(run) {
+  state.run = run;
+  const attackSel = $("#attackSel");
+  attackSel.replaceChildren(...run.attacks.map((attack, index) => el("option", { value: index }, attack.name)));
+  attackSel.hidden = run.attacks.length < 2;
+  if (run.attacks.length) selectAttack(run.attacks[0]);
+}
+
+$("#runSel").replaceChildren(...DATA.runs.map((run, index) => el("option", { value: index }, `${run.campaign || "run"} · ${run.run_id.slice(0, 8)}`)));
+$("#runSel").hidden = DATA.runs.length < 2;
+$("#runSel").onchange = (event) => selectRun(DATA.runs[+event.target.value]);
+$("#attackSel").onchange = (event) => selectAttack(state.run.attacks[+event.target.value]);
+$("#q").oninput = renderGoals;
+$("#status").onchange = renderGoals;
+if (DATA.runs.length) selectRun(DATA.runs[0]);
+else $("#goalList").append(el("div", { class: "empty" }, "No traces found."));
+</script>
+</body>
+</html>

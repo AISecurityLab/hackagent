@@ -20,14 +20,12 @@ Techniques are grouped by category, the same grouping the docs use:
 The folder follows :mod:`hackagent.catalog.taxonomy`: the ``indirect`` tag
 decides first, otherwise the primary category does.
 
-Architecture pattern for a technique package:
-    1. attack.py - Main BaseAttack subclass
-    2. config.py - Default configuration + dataclasses
-    3. generation.py - Attack generation/execution logic
-    4. [other].py - Additional pipeline stages as needed
+Every technique package holds:
+    1. attack.py - a ``StaticAttack`` or ``IterativeAttack`` subclass
+    2. config.py - its ``AttackParams``: parameters and role fields
 
-The orchestrator loads a technique with ``load_attack`` and runs it as
-``BaseAttack(config, ctx)``.
+:mod:`.contract` holds what every attack depends on, :mod:`.registry` maps a
+campaign's attack name to its class, and :mod:`.trace` records what a run did.
 """
 
 __all__ = []

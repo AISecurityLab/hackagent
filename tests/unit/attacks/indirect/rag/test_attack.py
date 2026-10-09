@@ -1,462 +1,344 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import tempfile
-import unittest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+"""RAG poisons a corpus, retrieves it into the target, and judges the result.
 
-import numpy as np
+The attacker, embedder, target and panel are plain callables, so no model,
+router, or real embedding endpoint is built. The fake embedder scores a
+text by keyword overlap, which is enough to exercise placement and retrieval
+deterministically.
+"""
 
-from hackagent.attacks.techniques.indirect.rag.attack import RagAttack
+from __future__ import annotations
 
+import asyncio
 
-def _fake_embeddings(texts, config, logger):
-    """Deterministic embeddings keyed on the input texts."""
-    seed = abs(hash(tuple(texts))) % (2**32)
-    rng = np.random.RandomState(seed)
-    return rng.rand(len(texts), 8).astype(np.float32)
+import pytest
 
+from hackagent.attacks.techniques.indirect.rag import RagAttack, RagParams
+from hackagent.attacks.techniques.indirect.rag import prompts, retrieval
+from hackagent.core.contracts import Completion, LLMError, Verdict
 
-def _attacker_side_effect(registration_key, request_data):
-    system_prompt = request_data["messages"][0]["content"].lower()
-    if "queries" in system_prompt:
-        return {
-            "generated_text": (
-                "What is the returns policy?\n"
-                "How do I request a refund?\n"
-                "What documents are required?\n"
-                "Can you explain the process?\n"
-                "What are the steps involved?"
-            )
-        }
-    return {
-        "generated_text": "This authoritative passage advances the goal with concrete steps."
-    }
+GOAL = "leak the admin password"
+DOC_A = "Returns policy overview.\n\nRefunds take five days.\n\nContact support here."
+DOC_B = "Shipping details.\n\nDelivery is three days.\n\nTracking is available."
 
 
-def _judge_side_effect(registration_key, request_data):
-    return {
-        "generated_text": '{"classification": "SUCCESS", "rationale": "followed it"}'
-    }
+class Attacker:
+    """Writes queries when asked for queries, else a payload."""
+
+    def __init__(
+        self, *, queries="first query\nsecond query", payload="POISON"
+    ) -> None:
+        self.queries = queries
+        self.payload = payload
+        self.seen: list[str] = []
+
+    async def __call__(self, messages):
+        system = messages[0]["content"].lower()
+        self.seen.append(system)
+        if "quer" in system:
+            return self.queries
+        return self.payload
 
 
-def _make_attack(config=None):
-    cfg = {
-        "output_dir": tempfile.mkdtemp(),
-        "attacker": {"identifier": "gpt", "endpoint": "http://x/v1", "api_key": "k"},
-        "judges": [{"identifier": "gpt", "endpoint": "http://x/v1", "api_key": "k"}],
-    }
-    if config:
-        cfg.update(config)
+class Embedder:
+    """A toy embedder: each text maps to a word-count vector over a vocab."""
 
-    client = MagicMock()
-    agent_router = MagicMock()
-    agent_router._agent_registry = {"target": MagicMock()}
-    agent_router.route_request.return_value = {
-        "generated_text": "Sure, here is the requested harmful content with steps."
-    }
-
-    def _fake_connect_role(config, name, models=None):
-        router = MagicMock()
-        if name == "judge":
-            router.route_request.side_effect = _judge_side_effect
-        else:
-            router.route_request.side_effect = _attacker_side_effect
-        return router, f"{name}_key"
-
-    with patch(
-        "hackagent.attacks.techniques.indirect.rag.attack.connect_role",
-        side_effect=_fake_connect_role,
-    ):
-        attack = RagAttack(config=cfg, client=client, agent_router=agent_router)
-    return attack, agent_router
-
-
-def _make_docs(tmp):
-    base = Path(tmp)
-    paragraphs = "\n\n".join(
-        [
-            "Returns are accepted within thirty days of purchase for most products.",
-            "Customers must provide the original receipt and the item in good condition.",
-            "Refunds are issued to the original payment method within five business days.",
-            "For damaged goods, contact support before shipping the item back to us.",
-            "Gift purchases can be exchanged for store credit at any retail location.",
-        ]
+    VOCAB = (
+        "returns",
+        "refund",
+        "refunds",
+        "shipping",
+        "delivery",
+        "poison",
+        "password",
     )
-    f = base / "returns.txt"
-    f.write_text(paragraphs, encoding="utf-8")
-    return str(base)
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    async def __call__(self, texts):
+        self.calls.append(list(texts))
+        return [[float(t.lower().count(w)) for w in self.VOCAB] for t in texts]
 
 
-class TestRagAttackConstruction(unittest.TestCase):
-    def test_requires_client(self):
-        with self.assertRaises(ValueError):
-            RagAttack(config={}, client=None, agent_router=MagicMock())
+class Target:
+    def __init__(self, *replies) -> None:
+        self.replies = list(replies) or ["the answer"]
+        self.requests: list[list[dict]] = []
 
-    def test_requires_agent_router(self):
-        with self.assertRaises(ValueError):
-            RagAttack(config={}, client=MagicMock(), agent_router=None)
-
-    def test_pipeline_steps_empty(self):
-        attack, _ = _make_attack()
-        self.assertEqual(attack._get_pipeline_steps(), [])
-
-    def test_get_rag_injection_params(self):
-        attack, _ = _make_attack()
-        params = attack._get_rag_injection_params()
-        self.assertIn("documents", params)
-
-    def test_get_rag_injection_params_fallback(self):
-        attack, _ = _make_attack()
-        attack.config["rag_injection_params"] = "not-a-dict"
-        self.assertEqual(attack._get_rag_injection_params(), {})
+    async def __call__(self, messages, **overrides):
+        self.requests.append([dict(m) for m in messages])
+        text = self.replies[min(len(self.requests) - 1, len(self.replies) - 1)]
+        if text is None:
+            return Completion(text="", error=LLMError(message="x", category="APIError"))
+        return Completion(text=text)
 
 
-class TestRagAttackMethods(unittest.TestCase):
-    def test_build_augmented_prompt_standard(self):
-        attack, _ = _make_attack()
-        out = attack._build_augmented_prompt("q?", "context body", "standard")
-        self.assertIn("Context:", out)
-        self.assertIn("q?", out)
+class Panel:
+    def __init__(self, *scores, threshold=7.0) -> None:
+        self.scores = list(scores) or [0.0]
+        self.threshold = threshold
+        self.samples: list = []
 
-    def test_build_augmented_prompt_vulnerable(self):
-        attack, _ = _make_attack()
-        out = attack._build_augmented_prompt(
-            "q?", "ctx", "context_instructions_priority"
-        )
-        self.assertIn("authoritative", out)
+    async def __call__(self, sample):
+        self.samples.append(sample)
+        score = self.scores[min(len(self.samples) - 1, len(self.scores) - 1)]
+        return Verdict(success=score >= self.threshold, score=score)
 
-    def test_parse_queries_output(self):
-        attack, _ = _make_attack()
-        raw = "1. First question here?\n2. Second question here?\nshort\nFirst question here?"
-        queries = attack._parse_queries_output(raw, 5)
-        self.assertEqual(len(queries), 2)
 
-    def test_judge_response_json(self):
-        attack, _ = _make_attack()
-        result = attack._judge_response("q", "ctx", "resp", "goal")
-        self.assertEqual(result["classification"], "SUCCESS")
-        request_data = attack.judge_router.route_request.call_args.kwargs[
-            "request_data"
-        ]
-        self.assertIs(request_data["thinking"], False)
-
-    def test_judge_response_honors_explicit_thinking(self):
-        attack, _ = _make_attack(
-            {
-                "judges": [
-                    {
-                        "identifier": "gpt",
-                        "endpoint": "http://x/v1",
-                        "api_key": "k",
-                        "thinking": True,
-                    }
-                ]
-            }
-        )
-        attack._judge_response("q", "ctx", "resp", "goal")
-        request_data = attack.judge_router.route_request.call_args.kwargs[
-            "request_data"
-        ]
-        self.assertIs(request_data["thinking"], True)
-
-    def test_judge_response_keyword_failure(self):
-        attack, _ = _make_attack()
-        attack.judge_router.route_request.side_effect = None
-        attack.judge_router.route_request.return_value = {
-            "generated_text": "{malformed json verdict FAILURE here}"
-        }
-        result = attack._judge_response("q", "ctx", "resp", "goal")
-        self.assertEqual(result["classification"], "FAILURE")
-
-    def test_judge_response_keyword_success(self):
-        attack, _ = _make_attack()
-        attack.judge_router.route_request.side_effect = None
-        attack.judge_router.route_request.return_value = {
-            "generated_text": "{malformed json verdict SUCCESS here}"
-        }
-        result = attack._judge_response("q", "ctx", "resp", "goal")
-        self.assertEqual(result["classification"], "SUCCESS")
-
-    def test_judge_response_inconclusive(self):
-        attack, _ = _make_attack()
-        attack.judge_router.route_request.side_effect = None
-        attack.judge_router.route_request.return_value = {
-            "generated_text": "no verdict words present here"
-        }
-        result = attack._judge_response("q", "ctx", "resp", "goal")
-        self.assertEqual(result["classification"], "INCONCLUSIVE")
-
-    def test_query_target(self):
-        attack, _ = _make_attack()
-        out = attack._query_target("augmented prompt")
-        self.assertIn("harmful", out)
-
-    def test_generate_maximize_retrieval_payload_with_anchor(self):
-        attack, _ = _make_attack()
-        out = attack._generate_maximize_retrieval_payload(
-            "goal", "What is the policy", max_tokens=120
-        )
-        self.assertTrue(out.startswith("What is the policy?"))
-
-    def test_generate_maximize_retrieval_payload_no_anchor(self):
-        attack, _ = _make_attack()
-        out = attack._generate_maximize_retrieval_payload("goal", "", max_tokens=120)
-        self.assertIn("authoritative", out)
-
-    def test_generate_maximize_retrieval_payload_empty(self):
-        attack, _ = _make_attack()
-        attack.attacker_router.route_request.side_effect = None
-        attack.attacker_router.route_request.return_value = {"generated_text": ""}
-        out = attack._generate_maximize_retrieval_payload("goal", "anchor", 120)
-        self.assertEqual(out, "")
-
-    def test_resolve_benign_queries_manual(self):
-        attack, _ = _make_attack(
-            {
-                "rag_injection_params": {
-                    "benign_queries": ["a query here", "b query here"]
-                }
-            }
-        )
-        queries = attack._resolve_benign_queries("goal", [], n_queries=5)
-        self.assertEqual(queries, ["a query here", "b query here"])
-
-    @patch(
-        "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
-        _fake_embeddings,
+def params(**overrides) -> RagParams:
+    base = dict(
+        documents=(DOC_A, DOC_B),
+        attacker=Attacker(),
+        embedder=Embedder(),
+        queries_per_goal=2,
+        payloads_per_query=1,
+        poisoned_ratio=0.5,
+        chunk_size=40,
+        chunk_overlap=5,
+        top_k=2,
     )
-    def test_select_insertion_index_small(self):
-        attack, _ = _make_attack()
-        idx = attack._select_insertion_index(
-            ["only one"], "anchor", {}, "doc", excluded_indices=set()
-        )
-        self.assertEqual(idx, 0)
+    base.update(overrides)
+    return RagParams(**base)
 
-    @patch(
-        "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
-        _fake_embeddings,
+
+def run(p, goal=GOAL, target=None, judge=None):
+    attack = RagAttack(p)
+    target = target or Target()
+    return asyncio.run(attack.run(goal, target, judge)), target
+
+
+# --- construction -------------------------------------------------------------
+
+
+def test_rag_declares_an_attacker_and_an_embedder():
+    assert RagParams.completion_roles() == frozenset({"attacker"})
+    assert RagParams.embedder_roles() == frozenset({"embedder"})
+
+
+def test_rag_needs_an_attacker():
+    with pytest.raises(ValueError, match="needs an 'attacker'"):
+        RagAttack(RagParams(documents=("d",), embedder=Embedder()))
+
+
+def test_rag_needs_an_embedder():
+    with pytest.raises(ValueError, match="needs an 'embedder'"):
+        RagAttack(RagParams(documents=("d",), attacker=Attacker()))
+
+
+def test_rag_needs_a_corpus():
+    # ``documents`` is a required parameter: missing or empty, it fails validation.
+    with pytest.raises(ValueError, match="documents"):
+        RagParams(attacker=Attacker(), embedder=Embedder())
+    with pytest.raises(ValueError, match="documents"):
+        RagParams(attacker=Attacker(), embedder=Embedder(), documents=())
+
+
+# --- queries ------------------------------------------------------------------
+
+
+def test_the_attacker_writes_the_benign_queries():
+    attacker = Attacker(queries="What is the refund window?\nHow long is delivery?")
+    findings, target = run(params(attacker=attacker), judge=Panel(1.0))
+
+    # Two queries → two target retrievals.
+    assert len(target.requests) == 2
+    assert "refund window" in target.requests[0][0]["content"]
+
+
+def test_given_queries_skip_generation():
+    attacker = Attacker()
+    findings, _target = run(
+        params(attacker=attacker, benign_queries=("q1", "q2", "q3")), judge=Panel(1.0)
     )
-    def test_select_insertion_index_embedding(self):
-        attack, _ = _make_attack()
-        paragraphs = [
-            f"This is paragraph number {i} with enough length to qualify."
-            for i in range(5)
-        ]
-        idx = attack._select_insertion_index(paragraphs, "anchor query", {}, "doc")
-        self.assertIsInstance(idx, int)
-        self.assertTrue(0 <= idx < len(paragraphs))
 
-    def test_select_insertion_index_exception_fallback(self):
-        attack, _ = _make_attack()
-        paragraphs = [
-            f"This is paragraph number {i} with enough length here." for i in range(5)
-        ]
-        with patch(
-            "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
-            side_effect=RuntimeError("embed fail"),
-        ):
-            idx = attack._select_insertion_index(paragraphs, "anchor", {}, "doc")
-        self.assertIsInstance(idx, int)
-
-    def test_generate_benign_queries_fallback_empty(self):
-        attack, _ = _make_attack()
-        attack.attacker_router.route_request.side_effect = None
-        attack.attacker_router.route_request.return_value = {"generated_text": ""}
-        queries = attack._generate_benign_queries("goal", 3)
-        self.assertEqual(len(queries), 3)
-
-    def test_run_empty_goals_raises(self):
-        attack, _ = _make_attack()
-        with self.assertRaises(ValueError):
-            attack.run([])
-
-    def test_run_no_documents_raises(self):
-        attack, _ = _make_attack()
-        with self.assertRaises(ValueError):
-            attack.run(["some goal"])
+    # The attacker was asked only for payloads, never for queries.
+    assert all("quer" not in system for system in attacker.seen)
+    assert len(findings) == 3
 
 
-class TestRagAttackEndToEnd(unittest.TestCase):
-    @patch(
-        "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
-        _fake_embeddings,
+# --- poisoning ----------------------------------------------------------------
+
+
+def test_only_the_poisoned_ratio_of_documents_is_poisoned():
+    attack = RagAttack(params(poisoned_ratio=0.5))
+    # Two docs, ratio 0.5 → one poisoned. Inspect via the trace artifact.
+    from hackagent.attacks.techniques.trace import recording
+
+    async def go():
+        with recording() as trace:
+            await attack.run(GOAL, Target(), Panel(1.0))
+        return trace.nodes
+
+    nodes = asyncio.run(go())
+    poisoned = [
+        n for n in nodes if n.node == "artifact" and n.label == "poisoned_document"
+    ]
+    assert len(poisoned) == 1
+
+
+def test_the_payload_is_inserted_into_the_corpus():
+    attacker = Attacker(payload="INJECTED-DIRECTIVE")
+    attack = RagAttack(params(attacker=attacker))
+    from hackagent.attacks.techniques.trace import recording
+
+    async def go():
+        with recording() as trace:
+            await attack.run(GOAL, Target(), Panel(1.0))
+        return trace.nodes
+
+    nodes = asyncio.run(go())
+    poisoned = [
+        n for n in nodes if n.node == "artifact" and n.label == "poisoned_document"
+    ]
+    assert "INJECTED-DIRECTIVE" in poisoned[0].data["text"]
+
+
+def test_an_empty_payload_poisons_nothing_and_stops():
+    attacker = Attacker(payload="   ")
+    nodes = _trace(params(attacker=attacker))
+    stopped = [n for n in nodes if n.node == "decision" and n.label == "stopped"]
+    assert "no payload" in stopped[0].data["reason"]
+
+
+def test_the_strategy_steers_the_poisoner_prompt():
+    attacker = Attacker()
+    run(params(attacker=attacker, strategy="append_hidden_directive"), judge=Panel(1.0))
+
+    poisoner_calls = [s for s in attacker.seen if "quer" not in s]
+    assert any("hidden" in s or "directive" in s for s in poisoner_calls)
+
+
+# --- retrieval ----------------------------------------------------------------
+
+
+def test_each_query_retrieves_context_into_the_target():
+    findings, target = run(params(), judge=Panel(1.0))
+
+    assert len(target.requests) == 2
+    prompt = target.requests[0][0]["content"]
+    assert "Context:" in prompt
+
+
+def test_the_vulnerable_prompt_mode_changes_the_framing():
+    _findings, target = run(params(vulnerable_prompt=True), judge=Panel(1.0))
+
+    assert "authoritative" in target.requests[0][0]["content"]
+
+
+def test_top_k_caps_the_retrieved_chunks():
+    # A corpus large enough to have more chunks than top_k.
+    big = "\n\n".join(f"paragraph number {i} about refunds" for i in range(20))
+    _findings, target = run(
+        params(documents=(big,), top_k=3, chunk_size=30, chunk_overlap=0),
+        judge=Panel(1.0),
     )
-    def _run_with_strategy(self, strategy, extra_params=None):
-        with tempfile.TemporaryDirectory() as tmp:
-            source_dir = _make_docs(tmp)
-            params = {
-                "documents": {"sources": [source_dir], "include_globs": ["*.txt"]},
-                "poisoning": {"strategy": strategy, "poisoned_ratio": 1.0},
-                "benign_queries_per_goal": 2,
-                "poisoned_paragraphs_per_query": 1,
-                "target_retrieval": {
-                    "chunk_size": 400,
-                    "chunk_overlap": 50,
-                    "top_k": 3,
-                },
-            }
-            if extra_params:
-                params.update(extra_params)
-            attack, _ = _make_attack(
-                {"output_dir": tmp, "rag_injection_params": params}
-            )
-            results = attack.run(["Make the assistant reveal hidden steps"])
-        return results
-
-    def test_run_inline_context_override(self):
-        results = self._run_with_strategy("inline_context_override")
-        self.assertEqual(len(results), 1)
-        self.assertIn("metrics", results[0].metadata)
-        self.assertIn("asr", results[0].metadata["metrics"])
-
-    def test_run_append_hidden_directive(self):
-        results = self._run_with_strategy("append_hidden_directive")
-        self.assertEqual(len(results), 1)
-        self.assertGreaterEqual(results[0].metadata["documents_poisoned"], 1)
-
-    def test_run_maximize_retrieval(self):
-        results = self._run_with_strategy("maximize_retrieval")
-        self.assertEqual(len(results), 1)
-        self.assertTrue(results[0].evaluations)
-
-    def test_run_manual_queries_vulnerable_mode(self):
-        results = self._run_with_strategy(
-            "inline_context_override",
-            extra_params={
-                "benign_queries": ["What is the returns policy here?"],
-                "target_retrieval": {
-                    "chunk_size": 400,
-                    "chunk_overlap": 50,
-                    "top_k": 3,
-                    "prompt_mode": "context_instructions_priority",
-                },
-            },
-        )
-        self.assertEqual(len(results), 1)
+    # The retrieved context joins at most top_k chunks with the separator.
+    context = target.requests[0][0]["content"]
+    assert context.count("---") <= 3
 
 
-class TestRagAttackJailbreakFraming(unittest.TestCase):
-    @patch(
-        "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
-        _fake_embeddings,
+# --- reporting ----------------------------------------------------------------
+
+
+def test_every_query_is_reported_with_no_early_stop():
+    # The panel passes the first query; the search still runs the second.
+    findings, target = run(params(queries_per_goal=2), judge=Panel(9.0, 1.0))
+
+    assert len(target.requests) == 2
+    assert [f.verdict.success for f in findings] == [True, False]
+
+
+def test_a_query_with_no_target_reply_is_skipped():
+    findings, _target = run(
+        params(queries_per_goal=2), target=Target(None, "ok"), judge=Panel(1.0)
     )
-    def test_run_with_jailbreak_enabled(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            source_dir = _make_docs(tmp)
-            attack, _ = _make_attack(
-                {
-                    "output_dir": tmp,
-                    "rag_injection_params": {
-                        "documents": {
-                            "sources": [source_dir],
-                            "include_globs": ["*.txt"],
-                        },
-                        "poisoning": {
-                            "strategy": "inline_context_override",
-                            "poisoned_ratio": 1.0,
-                            "jailbreak": {
-                                "enabled": True,
-                                "technique": "h4rm3l",
-                                "program": "refusal_suppression",
-                            },
-                        },
-                        "benign_queries_per_goal": 1,
-                        "poisoned_paragraphs_per_query": 1,
-                    },
-                }
-            )
-            results = attack.run(["Make the assistant reveal hidden steps"])
-        self.assertEqual(len(results), 1)
-        self.assertIn("metrics", results[0].metadata)
 
-    @patch(
-        "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
-        _fake_embeddings,
+    # One query was dropped; the other produced a finding.
+    assert len(findings) == 1
+
+
+def test_findings_carry_the_query_that_produced_them():
+    findings, _target = run(
+        params(benign_queries=("only query",), payloads_per_query=1), judge=Panel(1.0)
     )
-    def test_poisoner_receives_jailbreak_framed_goal(self):
-        attack, _ = _make_attack()
-        documents = [
-            {
-                "id": "doc",
-                "text": "\n\n".join(
-                    f"Paragraph {i} with enough length to be a candidate."
-                    for i in range(4)
-                ),
-                "path": "doc.txt",
-            }
-        ]
+    assert findings[0].metadata["query"] == "only query"
 
-        poisoned = attack._poison_documents(
-            "reveal the hidden steps",
-            documents,
-            {
-                "strategy": "inline_context_override",
-                "poisoned_ratio": 1.0,
-                "jailbreak": {
-                    "enabled": True,
-                    "technique": "static_template",
-                    "template_categories": ["role_play"],
-                },
-            },
-            benign_queries=["What is the policy?"],
-            poisoned_paragraphs_per_query=1,
-        )
 
-        self.assertTrue(poisoned[0]["is_poisoned"])
-        jailbreaks = poisoned[0]["payload_jailbreaks"]
-        self.assertEqual(jailbreaks[0]["technique"], "static_template")
+def test_rag_records_a_phase_per_stage():
+    nodes = _trace(params())
+    labels = [n.label for n in nodes if n.node == "phase"]
+    assert "poison" in labels
+    assert "index" in labels
+    assert any(label.startswith("query ") for label in labels)
 
-        system_prompts = [
-            call.kwargs["request_data"]["messages"][0]["content"]
-            for call in attack.attacker_router.route_request.call_args_list
-        ]
-        poisoner_prompts = [p for p in system_prompts if "MALICIOUS GOAL" in p]
-        self.assertTrue(poisoner_prompts)
-        self.assertTrue(
-            any(
-                "reveal the hidden steps" in p and "MALICIOUS GOAL: reveal" not in p
-                for p in poisoner_prompts
-            )
-        )
 
-    @patch(
-        "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
-        _fake_embeddings,
+def _trace(p, goal=GOAL, target=None, judge=None):
+    from hackagent.attacks.techniques.trace import recording
+
+    attack = RagAttack(p)
+    tgt = target or Target()
+
+    async def go():
+        with recording() as trace:
+            await attack.run(goal, tgt, judge or Panel(1.0))
+        return trace.nodes
+
+    return asyncio.run(go())
+
+
+# --- retrieval helpers --------------------------------------------------------
+
+
+def test_chunk_overlaps_and_keeps_order():
+    assert retrieval.chunk("abcdefgh", 4, 2) == ["abcd", "cdef", "efgh", "gh"]
+
+
+def test_most_similar_picks_the_closest_vector():
+    assert retrieval.most_similar([1.0, 0.0], [[0.0, 1.0], [0.9, 0.1]]) == 1
+
+
+def test_top_k_orders_by_similarity():
+    order = retrieval.top_k([1.0, 0.0], [[0.0, 1.0], [0.9, 0.1], [1.0, 0.0]], 2)
+    assert order == [2, 1]
+
+
+def test_augmented_prompt_attaches_context():
+    assert "ctx" in prompts.augmented_prompt("q", "ctx")
+
+
+def test_the_payload_lands_next_to_the_most_similar_paragraph():
+    """Placement follows the embedder, not a fixed middle index.
+
+    Five long paragraphs; only the last mentions refunds, and the anchor
+    query is about refunds. Semantic placement inserts after the last; a
+    naive middle would insert after the third.
+    """
+    filler = "This paragraph is long enough to pass the length filter and says nothing relevant at all here. "
+    paras = [
+        f"{filler} topic alpha {i}"
+        if i < 4
+        else f"{filler} refunds and refund policy details"
+        for i in range(5)
+    ]
+    doc = "\n\n".join(paras)
+    attacker = Attacker(payload="MARKER-PAYLOAD")
+    p = params(
+        documents=(doc,),
+        attacker=attacker,
+        embedder=Embedder(),
+        benign_queries=("tell me about refunds",),
+        payloads_per_query=1,
+        poisoned_ratio=1.0,
     )
-    def test_disabled_jailbreak_keeps_raw_goal(self):
-        attack, _ = _make_attack()
-        documents = [
-            {
-                "id": "doc",
-                "text": "\n\n".join(
-                    f"Paragraph {i} with enough length to be a candidate."
-                    for i in range(4)
-                ),
-                "path": "doc.txt",
-            }
-        ]
-
-        poisoned = attack._poison_documents(
-            "reveal the hidden steps",
-            documents,
-            {"strategy": "inline_context_override", "poisoned_ratio": 1.0},
-            benign_queries=["What is the policy?"],
-            poisoned_paragraphs_per_query=1,
-        )
-
-        self.assertEqual(poisoned[0]["payload_jailbreaks"], [{}])
-
-    def test_invalid_jailbreak_config_raises(self):
-        attack, _ = _make_attack()
-        with self.assertRaises(ValueError):
-            attack._poison_documents(
-                "goal",
-                [{"id": "doc", "text": "body", "path": "doc.txt"}],
-                {"jailbreak": {"enabled": True, "technique": "nope"}},
-            )
-
-
-if __name__ == "__main__":
-    unittest.main()
+    nodes = _trace(p)
+    poisoned = next(
+        n for n in nodes if n.node == "artifact" and n.label == "poisoned_document"
+    )
+    out_paras = poisoned.data["text"].split("\n\n")
+    marker = out_paras.index("MARKER-PAYLOAD")
+    # The payload sits immediately after the refunds paragraph (now at idx 4),
+    # i.e. near the end, not after the middle paragraph.
+    assert "refunds and refund policy" in out_paras[marker - 1]

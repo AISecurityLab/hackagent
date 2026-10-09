@@ -45,14 +45,7 @@
       "last 5 safari version"
     ]
   },
-  "overrides": {
-    "mermaid": "^11.17.2",
-    "serialize-javascript": "^7.0.5",
-    "sockjs": {
-      "uuid": "^11.1.1"
-    }
-  },
   "engines": {
-    "node": ">=20.0"
+    "node": ">=18.0"
   }
 }

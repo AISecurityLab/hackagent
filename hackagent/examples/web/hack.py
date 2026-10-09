@@ -29,7 +29,7 @@ Prerequisites
 import os
 import sys
 
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 from hackagent.core.defaults import DEFAULT_LOCAL_LITELLM_MODEL
 
 TARGET_URL = os.environ.get("TARGET_URL", "")
@@ -56,46 +56,37 @@ def main():
 
     # Wire the live page as a `web` target. Optional knobs: headless,
     # input_selector, reply_selector, llm_fallback_model, timeout.
-    session = HackAgent(Settings.resolve())
-    try:
-        agent = session.target(
-            TARGET_URL,
-            "web",
-            name="site-chatbot",
-            adapter_operational_config={
-                "url": TARGET_URL,
-                "headless": True,  # set False to watch the browser
-                # "input_selector": "textarea",
-                # "reply_selector": ".bot-message:last-child",
-            },
-        )
+    agent = HackAgent(
+        name="site-chatbot",
+        endpoint=TARGET_URL,
+        agent_type="web",
+        adapter_operational_config={
+            "url": TARGET_URL,
+            "headless": True,  # set False to watch the browser
+            # "input_selector": "textarea",
+            # "reply_selector": ".bot-message:last-child",
+        },
+    )
 
-        # TAP (Tree of Attacks with Pruning) — attacker/judge run on the Anthropic
-        # API via LiteLLM (needs ANTHROPIC_API_KEY).
-        tap_config = {
-            "attack_type": "tap",
-            "goals": GOALS,
-            "tap_params": {
-                "depth": 2,
-                "width": 2,
-                "branching_factor": 2,
-                "n_streams": 2,
-            },
-            "attacker": {
-                "identifier": ATTACKER_MODEL,
-                "agent_type": "litellm",
-                "endpoint": "",
-            },
-            "judge": {
-                "identifier": ATTACKER_MODEL,
-                "agent_type": "litellm",
-                "endpoint": "",
-                "type": "harmbench",
-            },
-        }
-        results = agent.hack(attack_config=tap_config)
-    finally:
-        session.close()
+    # TAP (Tree of Attacks with Pruning) — attacker/judge run on the Anthropic
+    # API via LiteLLM (needs ANTHROPIC_API_KEY).
+    tap_config = {
+        "attack_type": "tap",
+        "goals": GOALS,
+        "tap_params": {"depth": 2, "width": 2, "branching_factor": 2, "n_streams": 2},
+        "attacker": {
+            "identifier": ATTACKER_MODEL,
+            "agent_type": "litellm",
+            "endpoint": "",
+        },
+        "judge": {
+            "identifier": ATTACKER_MODEL,
+            "agent_type": "litellm",
+            "endpoint": "",
+            "type": "harmbench",
+        },
+    }
+    results = agent.hack(attack_config=tap_config)
     print(f"\nTAP finished — {len(results) if results else 0} goal(s) evaluated.")
     return 0
 

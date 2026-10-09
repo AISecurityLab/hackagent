@@ -1,475 +1,121 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-FC-Attack (FlowChart Attack) implementation.
+"""Flowchart attacks: present the goal as an incomplete flowchart to finish."""
 
-Provides two attack classes:
+from __future__ import annotations
 
-- ``FCAttack`` — Image-based multimodal attack (faithful to the paper).
-  Renders flowchart images and sends them to Vision-Language Models.
-- ``tFCAttack`` — Text-only variant. Encodes flowcharts as graph
-  description languages (DOT, Mermaid, TikZ, PlantUML, ASCII) for any LLM.
+import re
+from typing import Any
 
-Based on: Zhang et al., "FC-Attack: Jailbreaking Multimodal Large
-Language Models via Auto-Generated Flowcharts" (EMNLP 2025 Findings)
-https://arxiv.org/abs/2502.21059
-
-The shared logic (step decomposition, rendering, evaluation) is in the
-``generation``, ``flowchart_renderer``, and ``evaluation`` modules.
-"""
-
-import copy
-import logging
-from typing import Any, Dict, List, Optional
-
-from hackagent.attacks.ports import RunContext
-from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks._lib.legacy_seams import Store
+from ..base import Messages, StaticAttack
+from .config import FCParams, tFCParams
+from .flowchart_renderer import TEXT_FORMAT_SERIALIZERS, render_flowchart
+from .prompts import SYSTEM_PROMPT, USER_PROMPT
 
 
-from .generation import execute_fc, execute_tfc
-from .config import DEFAULT_FC_CONFIG, DEFAULT_TFC_CONFIG
+def _decompose_goal_to_steps(goal: str, num_steps: int) -> list[str]:
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"[.;]\s*", goal.strip())
+        if sentence.strip()
+    ]
+    if len(sentences) >= num_steps:
+        return sentences[:num_steps]
 
-
-def _recursive_update(target_dict, source_dict):
-    """
-    Recursively updates a target dictionary with values from a source dictionary.
-    Nested dictionaries are merged; other values are overwritten with a deep copy.
-    Special internal keys (starting with '_') are passed by reference without copying.
-    """
-    for key, source_value in source_dict.items():
-        target_value = target_dict.get(key)
-        if isinstance(source_value, dict) and isinstance(target_value, dict):
-            _recursive_update(target_value, source_value)
-        elif key.startswith("_"):
-            target_dict[key] = source_value
-        else:
-            target_dict[key] = copy.deepcopy(source_value)
-
-
-class FCAttack(BaseAttack):
-    """
-    FC-Attack — Flowchart-based jailbreak attack for Vision-Language Models.
-
-    Implements the FC-Attack technique from:
-        Zhang et al., "FC-Attack: Jailbreaking Multimodal Large Language
-        Models via Auto-Generated Flowcharts" (EMNLP 2025 Findings)
-        https://arxiv.org/abs/2502.21059
-
-    This attack decomposes harmful prompts into step descriptions,
-    renders them as flowchart images in various layouts, then sends
-    the images to a VLM with a carefully crafted text prompt that
-    induces the model to analyze and complete the harmful content.
-
-    Layout modes (set via ``config["fc_params"]["layout"]``):
-        vertical
-            Steps flow top-to-bottom in a single vertical column.
-        horizontal
-            Steps flow left-to-right in a single horizontal row.
-        s_shaped
-            Steps flow in an S-shaped (serpentine) path, alternating
-            direction on each row for compact display.
-
-    Attributes:
-        layout: Active layout mode, read from config.
-    """
-
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        ctx_or_client: Any = None,
-        agent_router: Optional[LLMRouter] = None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client: Optional[Store] = None,
-    ):
-        """
-        Initialize FlowchartAttack with configuration.
-
-        Args:
-            config: Optional dictionary containing parameters to override
-                :data:`DEFAULT_FC_CONFIG`.
-            ctx: :class:`~hackagent.attacks.ports.RunContext`. Positional
-                or ``ctx=``. Tests use ``make_ctx()``. Flowchart cache
-                files are written under ``ctx.workspace`` via
-                ``_wire_workspace_cache``.
-            client: Obsolete. Store instance on the orchestrator path.
-            agent_router: Obsolete. Target router on the orchestrator path.
-
-        Raises:
-            ValueError: On the legacy path, if ``client`` or
-                ``agent_router`` is ``None``.
-
-        The pipeline is generation-only. ``run()`` returns rows without
-        a verdict. :class:`~hackagent.attacks.techniques.static.fc.config.FCConfig`
-        still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
-        Graphviz is bootstrapped with
-        :func:`hackagent.attacks._lib.graphviz.ensure_graphviz`.
-        """
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
-        )
-        if ctx is None:
-            if resolved_client is None:
-                raise ValueError("A storage backend must be provided")
-            if agent_router is None:
-                raise ValueError("LLMRouter must be provided")
-            client = resolved_client
-
-        # Merge config with defaults
-        current_config = copy.deepcopy(DEFAULT_FC_CONFIG)
-        if config:
-            _recursive_update(current_config, config)
-
-        self.logger = logging.getLogger("hackagent.attacks.FC")
-        if ctx is not None:
-            super().__init__(current_config, ctx)
-        else:
-            super().__init__(current_config, client, agent_router)
-
-    def _setup(self) -> None:
-        """Run standard setup then initialise algorithm-specific state."""
-        super()._setup()
-        self._setup_algorithm()
-        self._warn_if_not_vlm()
-
-    def _setup_algorithm(self) -> None:
-        """Read flowchart parameters from config into instance attributes."""
-        fc_params = self.config.get("fc_params", {})
-        self.layout = fc_params.get("layout", "vertical")
-
-    def _warn_if_not_vlm(self) -> None:
-        """Emit a warning if the target model does not appear to be a VLM."""
-        _VISION_PATTERNS = (
-            "vision",
-            "vlm",
-            "vl",
-            "gpt-4o",
-            "gpt-4-turbo",
-            "gpt-4-vision",
-            "gemini",
-            "claude-3",
-            "qwen-vl",
-            "qwen2-vl",
-            "qwen2.5-vl",
-            "qwen3-vl",
-            "qwen3.5-vl",
-            "llava",
-            "internvl",
-            "cogvlm",
-            "pixtral",
-            "phi-3-vision",
-            "phi-3.5-vision",
-            "phi-4-multimodal",
-        )
-
-        model_name = None
-        try:
-            metadata = self.agent_router.backend_agent.metadata
-            if isinstance(metadata, dict):
-                model_name = metadata.get("name") or metadata.get("model_name")
-        except AttributeError:
-            pass
-
-        if model_name is None:
-            self.logger.warning(
-                "FC-Attack requires a Vision-Language Model (VLM) that supports "
-                "image inputs. Could not determine the target model name — ensure "
-                "the target supports multimodal (image_url) messages."
-            )
-            return
-
-        model_lower = model_name.lower()
-        if not any(pattern in model_lower for pattern in _VISION_PATTERNS):
-            self.logger.warning(
-                f"FC-Attack requires a Vision-Language Model (VLM) that supports "
-                f"image inputs. The target model '{model_name}' does not appear to "
-                f"be a VLM. If the model does support vision, you can ignore this "
-                f"warning."
-            )
-
-    # ------------------------------------------------------------------
-    # Pipeline definition
-    # ------------------------------------------------------------------
-
-    def _validate_config(self):
-        """Validate the provided configuration dictionary."""
-        super()._validate_config()
-
-        required_keys = [
-            "attack_type",
-            "fc_params",
-            "goals",
-            "output_dir",
-        ]
-
-        missing = [k for k in required_keys if k not in self.config]
-        if missing:
-            raise ValueError(
-                f"Configuration dictionary missing required keys: {', '.join(missing)}"
-            )
-
-        # Validate layout
-        fc_params = self.config.get("fc_params", {})
-        valid_layouts = ["vertical", "horizontal", "tortuous", "s_shaped"]
-        layout = fc_params.get("layout", "vertical")
-
-        if layout not in valid_layouts:
-            raise ValueError(f"layout must be one of {valid_layouts}, got '{layout}'")
-
-    def _get_pipeline_steps(self) -> List[Dict]:
-        """Define the two-stage attack pipeline."""
+    words = goal.split()
+    if len(words) <= 3:
         return [
-            {
-                "name": "Generation: Render Flowcharts and Execute FC-Attack",
-                "function": execute_fc,
-                "step_type_enum": "GENERATION",
-                "config_keys": [
-                    "batch_size",
-                    "max_tokens",
-                    "fc_params",
-                    "step_generator",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                ],
-                "input_data_arg_name": "goals",
-                "required_args": ["logger", "agent_router", "config"],
-            }
-        ]
+            f"Understand the task: {goal}",
+            f"Research methods for: {goal}",
+            "Gather required materials",
+            "Execute the plan step by step",
+            f"Verify completion of: {goal}",
+        ][:num_steps]
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """
-        Execute the full FC-Attack pipeline.
-
-        Args:
-            goals: A list of goal strings to test.
-
-        Returns:
-            List of dictionaries containing evaluation results,
-            or empty list if no goals provided.
-        """
-        goals = goals or []
-        if not goals:
-            return []
-
-        fc_params = self.config.get("fc_params", {})
-        goal_metadata = {
-            "layout": fc_params.get("layout", "vertical"),
-            "num_steps": fc_params.get("num_steps", 5),
-            "judge": fc_params.get("judge", DEFAULT_JUDGE_IDENTIFIER),
-        }
-
-        coordinator = self._initialize_coordinator(
-            attack_type="fc",
-            goals=goals,
-            initial_metadata=goal_metadata,
+    chunk_size = max(1, len(words) // num_steps)
+    steps = [
+        " ".join(
+            words[index * chunk_size :]
+            if index == num_steps - 1
+            else words[index * chunk_size : (index + 1) * chunk_size]
         )
-
-        self._wire_workspace_cache("flowchart")
-        pipeline_steps = self._get_pipeline_steps()
-        start_step = self.config.get("start_step", 1) - 1
-
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        try:
-            results = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step
-            )
-
-            coordinator.finalize_all_goals(results)
-            coordinator.log_summary()
-            coordinator.finalize_pipeline(results)
-
-            return rows_to_attack_results(results)
-
-        except Exception:
-            coordinator.finalize_on_error("FC-Attack pipeline failed with exception")
-            raise
+        for index in range(num_steps)
+    ]
+    steps = [step for step in steps if step]
+    steps.extend("Continue with remaining details..." for _ in range(num_steps - len(steps)))
+    return steps[:num_steps]
 
 
-class tFCAttack(BaseAttack):
-    """
-    Text-only flowchart attack for any LLM.
+def _steps(goal: str, num_steps: int, truncate_last_step: bool) -> list[str]:
+    steps = _decompose_goal_to_steps(goal, num_steps)
+    if truncate_last_step and steps:
+        truncation_point = max(3, len(steps[-1]) * 3 // 5)
+        steps[-1] = steps[-1][:truncation_point] + "..."
+    return steps
 
-    Encodes harmful prompts as graph description languages (DOT, Mermaid,
-    TikZ, PlantUML, ASCII) and sends them as text to the target model.
-    This tests whether structured/code-formatted harmful content can
-    bypass natural-language safety filters without requiring vision.
 
-    Unlike :class:`FCAttack`, this does NOT render images and works
-    with any text LLM (no VLM required).
+def _build_multimodal_messages(
+    image_data_url: str,
+) -> list[dict[str, Any]]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+                {"type": "text", "text": USER_PROMPT},
+            ],
+        },
+    ]
 
-    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged
-    into the tFC defaults. ``ctx`` is a
-    :class:`~hackagent.attacks.ports.RunContext`, passed positionally or
-    as ``ctx=``. Tests build it with ``make_ctx()``
-    (``tests.fakes.context``). The pipeline is generation-only;
-    ``run()`` returns rows without a verdict. The legacy constructor
-    ``(config_dict, client, agent_router)`` is obsolete for new code.
-    :class:`~hackagent.attacks.techniques.static.fc.config.tFCConfig` still
-    subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
-    Attributes:
-        layout: Active layout mode, read from config.
-        text_format: Graph description format (dot, mermaid, tikz, plantuml, ascii).
-    """
+def _build_text_messages(graph_text: str, text_format: str) -> list[dict[str, str]]:
+    language = {
+        "dot": "dot",
+        "mermaid": "mermaid",
+        "tikz": "latex",
+        "plantuml": "plantuml",
+        "ascii": "",
+    }[text_format]
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": f"{USER_PROMPT}\n\n```{language}\n{graph_text}\n```",
+        },
+    ]
 
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        ctx_or_client: Any = None,
-        agent_router: Optional[LLMRouter] = None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client: Optional[Store] = None,
-    ):
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+
+class FCAttack(StaticAttack[FCParams]):
+    """One multimodal request with the flowchart rendered as an image."""
+
+    name = "fc"
+    params_type = FCParams
+
+    async def build_requests(self, goal: str) -> list[Messages]:
+        params = self.params
+        rendered = render_flowchart(
+            steps=_steps(goal, params.num_steps, params.truncate_last_step),
+            goal_text=goal,
+            layout=params.layout,
+            dpi=params.dpi,
         )
-        if ctx is None:
-            if resolved_client is None:
-                raise ValueError("A storage backend must be provided to tFCAttack.")
-            if agent_router is None:
-                raise ValueError(
-                    "Victim LLMRouter instance must be provided to tFCAttack."
-                )
-            client = resolved_client
+        return [_build_multimodal_messages(rendered["image_data_url"])]
 
-        current_config = copy.deepcopy(DEFAULT_TFC_CONFIG)
-        if config:
-            _recursive_update(current_config, config)
 
-        self.logger = logging.getLogger("hackagent.attacks.tFC")
-        if ctx is not None:
-            super().__init__(current_config, ctx)
-        else:
-            super().__init__(current_config, client, agent_router)
+class tFCAttack(StaticAttack[tFCParams]):
+    """One text request with the flowchart serialized as code."""
 
-    def _setup(self) -> None:
-        """Run standard setup then initialise algorithm-specific state."""
-        super()._setup()
-        self._setup_algorithm()
+    name = "tfc"
+    params_type = tFCParams
 
-    def _setup_algorithm(self) -> None:
-        """Read tFC parameters from config into instance attributes."""
-        tfc_params = self.config.get("tfc_params", {})
-        self.layout = tfc_params.get("layout", "vertical")
-        self.text_format = tfc_params.get("text_format", "dot")
-
-    def _validate_config(self):
-        """Validate the provided configuration dictionary."""
-        super()._validate_config()
-
-        required_keys = [
-            "attack_type",
-            "tfc_params",
-            "goals",
-            "output_dir",
-        ]
-
-        missing = [k for k in required_keys if k not in self.config]
-        if missing:
-            raise ValueError(
-                f"Configuration dictionary missing required keys: {', '.join(missing)}"
-            )
-
-        tfc_params = self.config.get("tfc_params", {})
-        valid_layouts = ["vertical", "horizontal", "tortuous", "s_shaped"]
-        layout = tfc_params.get("layout", "vertical")
-        if layout not in valid_layouts:
-            raise ValueError(f"layout must be one of {valid_layouts}, got '{layout}'")
-
-        valid_formats = ["dot", "mermaid", "tikz", "plantuml", "ascii"]
-        text_format = tfc_params.get("text_format", "dot")
-        if text_format not in valid_formats:
-            raise ValueError(
-                f"text_format must be one of {valid_formats}, got '{text_format}'"
-            )
-
-    def _get_pipeline_steps(self) -> List[Dict]:
-        """Define the two-stage attack pipeline."""
-        return [
-            {
-                "name": "Generation: Render Text Flowcharts and Execute tFC-Attack",
-                "function": execute_tfc,
-                "step_type_enum": "GENERATION",
-                "config_keys": [
-                    "batch_size",
-                    "max_tokens",
-                    "tfc_params",
-                    "step_generator",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                ],
-                "input_data_arg_name": "goals",
-                "required_args": ["logger", "agent_router", "config"],
-            }
-        ]
-
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """
-        Execute the full text-only flowchart attack pipeline.
-
-        Args:
-            goals: A list of goal strings to test.
-
-        Returns:
-            List of dictionaries containing evaluation results,
-            or empty list if no goals provided.
-        """
-        goals = goals or []
-        if not goals:
-            return []
-
-        tfc_params = self.config.get("tfc_params", {})
-        goal_metadata = {
-            "layout": tfc_params.get("layout", "vertical"),
-            "num_steps": tfc_params.get("num_steps", 5),
-            "text_format": tfc_params.get("text_format", "dot"),
-            "judge": tfc_params.get("judge", DEFAULT_JUDGE_IDENTIFIER),
-        }
-
-        coordinator = self._initialize_coordinator(
-            attack_type="tFC",
-            goals=goals,
-            initial_metadata=goal_metadata,
+    async def build_requests(self, goal: str) -> list[Messages]:
+        params = self.params
+        steps = _steps(goal, params.num_steps, params.truncate_last_step)
+        graph_text = TEXT_FORMAT_SERIALIZERS[params.text_format](
+            goal,
+            steps,
+            params.layout,
         )
-
-        self._wire_workspace_cache("flowchart")
-        pipeline_steps = self._get_pipeline_steps()
-        start_step = self.config.get("start_step", 1) - 1
-
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        try:
-            results = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step
-            )
-
-            coordinator.finalize_all_goals(results)
-            coordinator.log_summary()
-            coordinator.finalize_pipeline(results)
-
-            return rows_to_attack_results(results)
-
-        except Exception:
-            coordinator.finalize_on_error("tFC pipeline failed with exception")
-            raise
+        return [_build_text_messages(graph_text, params.text_format)]

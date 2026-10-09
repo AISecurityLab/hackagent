@@ -75,5 +75,5 @@ Run the RAG indirect-injection example script.
 def web_example()
 ```
 
-Run the web quick-scan example against DeepAI chat using BoN.
+Run the web quick-scan example against DeepAI chat using PAIR.
 

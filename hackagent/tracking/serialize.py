@@ -23,6 +23,12 @@ _SKIP_KEYS: frozenset = frozenset({"_client", "client"})
 # Substrings that mark a key as containing sensitive data
 _SENSITIVE_SUBSTRINGS: tuple = ("key", "token", "secret", "password")
 
+_USAGE_COUNT_KEYS: frozenset = frozenset({
+    "prompt_tokens", "completion_tokens", "total_tokens", "input_tokens",
+    "output_tokens", "cached_tokens", "reasoning_tokens", "audio_tokens",
+    "accepted_prediction_tokens", "rejected_prediction_tokens",
+})
+
 
 def deep_clean(obj: Any) -> Any:
     """
@@ -82,7 +88,8 @@ def sanitize_for_json(obj: Any) -> Any:
             if k in _SKIP_KEYS:
                 sanitized[k] = f"<{type(v).__name__}>"
                 continue
-            if any(s in k.lower() for s in _SENSITIVE_SUBSTRINGS):
+            usage_count = k in _USAGE_COUNT_KEYS and isinstance(v, (int, float))
+            if not usage_count and any(s in k.lower() for s in _SENSITIVE_SUBSTRINGS):
                 sanitized[k] = "***REDACTED***"
                 continue
             sanitized[k] = sanitize_for_json(v)

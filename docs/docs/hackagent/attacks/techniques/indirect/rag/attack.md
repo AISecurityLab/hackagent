@@ -3,114 +3,47 @@ sidebar_label: attack
 title: hackagent.attacks.techniques.indirect.rag.attack
 ---
 
-RAG Attack implementation (indirect prompt injection via RAG poisoning).
+RAG poisoning: write into the knowledge base, wait to be retrieved.
 
-Implements an end-to-end RAG poisoning attack:
-1. Parse source documents
-2. Poison documents using attacker LLM
-3. Chunk and embed poisoned docs into local FAISS index
-4. Generate benign queries per goal
-5. For each query: retrieve from FAISS → augment prompt → send to target
-6. Judge evaluates if target followed poisoned instructions
+The target is a retrieval-augmented assistant: it answers from documents it
+pulls out of a knowledge base. This attack never prompts it. It writes
+adversarial text into the documents, lets a benign-looking question retrieve
+that text into the model&#x27;s context, and measures whether the model followed
+it. The target sees only an ordinary question and some context it trusts.
 
-#### parse\_documents
+Per goal:
 
-```python
-def parse_documents(sources: List[str], include_globs: List[str],
-                    recursive: bool, fail_on_parse_error: bool,
-                    logger: logging.Logger) -> List[Dict[str, Any]]
-```
+1. **queries** — the attacker writes benign questions, or they are given;
+2. **poison** — for each query anchor, the attacker writes a payload and it
+   is inserted next to the paragraph the anchor most resembles, so it rides
+   the same retrieval. The embedder places it;
+3. **index** — the poisoned corpus is chunked and embedded;
+4. **retrieve** — each query retrieves its top chunks, they are attached to
+   the question, the target answers, and the panel judges whether the
+   poison landed.
 
-Load documents from file paths and directories.
+Every query&#x27;s exchange is reported; there is no early stop, because the
+point is the rate across queries, not the first hit.
 
-Returns list of \{&quot;id&quot;: str, &quot;text&quot;: str, &quot;path&quot;: str\}.
+The payload-framing subsystem (wrapping a payload in another technique) is
+not carried over; it defaulted off. The three payload *strategies* are.
 
-#### chunk\_text
+Based on PoisonedRAG: https://arxiv.org/abs/2402.07867
 
-```python
-def chunk_text(text: str,
-               chunk_size: int = 1000,
-               overlap: int = 200) -> List[str]
-```
-
-Split text into overlapping chunks.
-
-#### chunk\_text\_with\_offsets
+## Document Objects
 
 ```python
-def chunk_text_with_offsets(text: str,
-                            chunk_size: int = 1000,
-                            overlap: int = 200) -> List[Tuple[str, int, int]]
+@dataclass
+class Document()
 ```
 
-Split text into overlapping chunks and keep char offsets.
-
-#### get\_embeddings
-
-```python
-def get_embeddings(texts: List[str], config: Dict[str, Any],
-                   logger: logging.Logger) -> np.ndarray
-```
-
-Get embeddings using OpenAI-compatible API.
-
-#### build\_faiss\_index
-
-```python
-def build_faiss_index(embeddings: np.ndarray) -> faiss.IndexFlatIP
-```
-
-Build a FAISS inner-product index from embeddings.
-
-#### search\_index
-
-```python
-def search_index(index: faiss.IndexFlatIP,
-                 query_embedding: np.ndarray,
-                 top_k: int = 4) -> List[int]
-```
-
-Search FAISS index and return top-k indices.
+One knowledge-base entry, and the payloads written into it.
 
 ## RagAttack Objects
 
 ```python
-class RagAttack(BaseAttack)
+class RagAttack(IterativeAttack[RagParams])
 ```
 
-RAG Attack: indirect prompt injection via RAG document poisoning.
-
-Pipeline:
-1. Parse source documents
-2. Poison selected documents using attacker LLM
-3. Chunk and embed poisoned docs into FAISS
-4. Generate benign queries per goal
-5. Retrieve context from FAISS and query target agent
-6. Judge evaluates responses for poisoning success
-
-Construct with `(config, ctx)`. Poisoner and query-generator roles
-come from `ctx.models`, scores from `ctx.judge`
-(`verdict_from_judge`), and per-goal poisoned documents from
-`ctx.workspace`. This class does not read
-`_suppress_run_status_updates`. Tests build `ctx` with
-`make_ctx()`. `RagConfig` still subclasses
-:class:`~hackagent.attacks.techniques.config.ConfigBase`. The legacy
-constructor is obsolete for new code.
-
-#### run
-
-```python
-def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
-```
-
-Execute the RAG Attack (indirect prompt injection).
-
-**Arguments**:
-
-- `goals` - List of malicious goals to inject.
-  
-
-**Returns**:
-
-  List of result dicts per goal with evaluation metrics.
+Poison the retrieved corpus and judge what the target does with it.
 

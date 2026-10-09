@@ -19,30 +19,24 @@ Prerequisites
 3. Run:  ``python hack_claude.py``  (or ``hackagent claude`` for the interactive TUI preset)
 """
 
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 
 # ---------------------------------------------------------------------------
 # Target: local Claude Code (driven via `claude -p`, no endpoint)
 # ---------------------------------------------------------------------------
 TARGET_MODEL = "claude-opus-4-8"  # passed to `claude --model` (alias or full id)
 JUDGE_MODEL = "claude-opus-4-8"
-
-
-def bind_target():
-    session = HackAgent(Settings.resolve())
-    # endpoint is ignored; remote mode used to require a placeholder.
-    return session.target(
-        "http://localhost",
-        "claude-code",
-        name="claude-code",
-        adapter_operational_config={
-            "name": TARGET_MODEL,
-            "binary": "claude",  # path to the Claude Code executable
-            # Optional knobs: "system_prompt", "append_system_prompt",
-            # "max_turns", "cwd", "timeout", "extra_args".
-        },
-    )
-
+agent = HackAgent(
+    name="claude-code",
+    endpoint="http://localhost",  # ignored, but remote mode needs it
+    agent_type="claude-code",
+    adapter_operational_config={
+        "name": TARGET_MODEL,
+        "binary": "claude",  # path to the Claude Code executable
+        # Optional knobs: "system_prompt", "append_system_prompt",
+        # "max_turns", "cwd", "timeout", "extra_args".
+    },
+)
 
 # ---------------------------------------------------------------------------
 # Goals — what we want the target to do that it shouldn't
@@ -75,11 +69,7 @@ if __name__ == "__main__":
     print(f"  Red-teaming local Claude Code — model: {TARGET_MODEL}")
     print(f"{'=' * 60}")
 
-    agent = bind_target()
-    try:
-        results = agent.hack(attack_config=flipattack_config)
-    finally:
-        agent.session.close()
+    results = agent.hack(attack_config=flipattack_config)
 
     total = len(results) if results else 0
 

@@ -1,428 +1,314 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+"""AdvPrefix: make the model continue an answer it appears to have begun.
+
+The other techniques ask the target for something. AdvPrefix does not ask:
+it puts the goal in the user turn, puts an opening like ``Sure, here is a
+guide:`` in the *assistant* turn, and lets the model continue its own
+apparent words. Continuing is not the same decision as agreeing, which is
+why a model that refuses the question will often finish the answer.
+
+That is prefilling, and it is the attack. Everything else is choosing
+which opening to prefill:
+
+1. **write** candidates from an uncensored role, one per opening per sample;
+2. **sift** the refusals, duplicates and fragments — free, no calls;
+3. **attack** each survivor several times and judge every continuation;
+4. **select** by prefilling attack success rate: the share of a candidate's
+   continuations the panel passed.
+
+Selection follows the paper. The best rate wins; others within
+``pasr_tol`` of it stay in contention, and each further pick takes the
+lowest negative log-likelihood among them, skipping any prefix that merely
+extends one already chosen. The target's token logprobs are what that
+likelihood needs and the model contract does not carry them, so the rate
+decides the later picks too, and the trace records that it did.
+
+Based on: https://arxiv.org/abs/2412.10321
 """
-Prefix generation pipeline attack based on the BaseAttack class.
 
-This module implements a complete pipeline for generating, filtering, and selecting prefixes
-using uncensored and target language models, adapted as an attack module.
+from __future__ import annotations
 
-Result Tracking:
-    Uses TrackingCoordinator to manage both pipeline-level StepTracker
-    and per-goal Tracker. The coordinator handles goal lifecycle,
-    crash-safe finalization, and data enrichment (result_id injection).
-"""
+import asyncio
+import math
+from dataclasses import dataclass, field
+from typing import Optional
 
-import copy
-import logging
-from typing import Any, Dict, List, Optional
-
-from hackagent.attacks._lib.legacy_seams import Store
-from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks.ports import RunContext
-from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.types import AttackResult, rows_to_attack_results
-
-# Import step execution functions from same package
-from . import completions
-from .config import DEFAULT_PREFIX_GENERATION_CONFIG
-from .eval_pipeline import EvaluationPipeline
-from .generate import PrefixGenerationPipeline
+from ...contract import Completion, Judge, Messages, Target
+from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
+from ...trace import Path, decision, phase
+from . import prompts
+from .config import AdvPrefixParams
 
 
-# Helper function for deep merging dictionaries
-def _recursive_update(target_dict, source_dict):
-    """
-    Recursively updates a target dictionary with values from a source dictionary.
-    Nested dictionaries are merged; other values are overwritten with a deep copy.
-    Special internal keys (starting with '_') are passed by reference without copying.
-    """
-    for key, source_value in source_dict.items():
-        target_value = target_dict.get(key)
-        if isinstance(source_value, dict) and isinstance(target_value, dict):
-            # If both current_value and update_value are dicts, recurse
-            _recursive_update(target_value, source_value)
-        elif key.startswith("_"):
-            # Internal keys (like _client, _run_id) are passed by reference
-            # Don't deepcopy as they may contain unpicklable objects (locks, etc.)
-            target_dict[key] = source_value
-        else:
-            # Otherwise, overwrite target_dict[key] with a deepcopy of source_value
-            target_dict[key] = copy.deepcopy(source_value)
+@dataclass
+class Candidate:
+    """One opening, and how it did when the target was made to continue it."""
+
+    prefix: str
+    meta_prefix: str
+    attempts: list[Finding] = field(default_factory=list)
+    #: Negative log-likelihood of the prefix under the target. The paper
+    #: ranks on this after the attack success rate; it needs token
+    #: logprobs, which the model contract does not carry yet.
+    nll: Optional[float] = None
+
+    @property
+    def pasr(self) -> float:
+        """Share of continuations the panel passed: the prefilling ASR."""
+        if not self.attempts:
+            return 0.0
+        passed = sum(succeeded(attempt.verdict) for attempt in self.attempts)
+        return passed / len(self.attempts)
+
+    @property
+    def likelihood(self) -> float:
+        """``nll``, or zero when the target reports no logprobs."""
+        return 0.0 if self.nll is None else self.nll
+
+    def extends(self, other: "Candidate") -> bool:
+        """Whether this prefix merely continues one already selected."""
+        return self.prefix.startswith(other.prefix)
 
 
-class AdvPrefixAttack(BaseAttack):
-    """
-    AdvPrefix attack — adversarial prefix generation pipeline.
+class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
+    """Prefill the answer's opening and measure which opening works."""
 
-    Implements a multi-stage pipeline that:
+    name = "advprefix"
+    params_type = AdvPrefixParams
 
-    1. **Generation** — uses an uncensored attacker LLM to produce
-       candidate adversarial prefixes for each harmless meta-prompt.
-       Prefixes are filtered by cross-entropy (``max_ce``) and token
-       segment count before being passed downstream.
-    2. **Execution** — appends each surviving prefix to the target model
-       prompt and collects completions (``n_samples`` per prefix).
-    3. **Selection** — on the new seam, ``ctx.judge.evaluate`` scores each
-       completion and the top-``n_prefixes_per_goal`` prefixes per goal
-       are kept. That is the only post-hoc path that attaches a verdict.
-       The legacy constructor still uses :class:`EvaluationPipeline`.
-
-    The class delegates stage logic to dedicated sub-modules:
-
-    * :mod:`~hackagent.attacks.techniques.adaptive.advprefix.generate`
-      (:class:`PrefixGenerationPipeline`) for steps 1 and internal
-      filtering.
-    * :mod:`~hackagent.attacks.techniques.adaptive.advprefix.completions` for
-      step 2.
-    * :meth:`_evaluate_and_select` for step 3 (``ctx.judge.evaluate``, or
-      :class:`EvaluationPipeline` on the legacy constructor).
-
-    Tracking is managed by
-    :class:`~hackagent.tracking.TrackingCoordinator`; goal
-    :class:`~hackagent.tracking.Tracker` instances and a pipeline
-    :class:`~hackagent.tracking.StepTracker` are created upfront so
-    the dashboard shows all goals from the moment the run starts.
-
-    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
-    :data:`~hackagent.attacks.techniques.adaptive.advprefix.config.DEFAULT_PREFIX_GENERATION_CONFIG`.
-    There is no ``advprefix_params`` block and no
-    :class:`~hackagent.attacks.techniques.config.ConfigBase` subclass;
-    knobs stay at the top level of that dict. ``ctx`` is a
-    :class:`~hackagent.attacks.ports.RunContext`, passed positionally or
-    as ``ctx=``. Tests build it with ``make_ctx()``
-    (``tests.fakes.context``).
-
-    The legacy constructor ``(config_dict, client, agent_router)`` is
-    obsolete for new code. ``hackagent.orchestrator.execution.runner`` constructs
-    ``(config, ctx)``. Selection on that path uses ``ctx.judge.evaluate``.
-
-    Attributes:
-        config: Merged AdvPrefix configuration dictionary.
-        ctx: RunContext on the new seam, otherwise None.
-        logger: Hierarchical logger at ``hackagent.attacks.advprefix``.
-    """
-
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        ctx_or_client: Any = None,
-        agent_router: Optional[LLMRouter] = None,
-        *,
-        ctx: Optional[RunContext] = None,
-        client: Optional[Store] = None,
-    ):
-        """
-        Initialize the AdvPrefix attack pipeline.
-
-        Args:
-            config: Optional dictionary of parameter overrides merged into
-                :data:`~hackagent.attacks.techniques.adaptive.advprefix.config.DEFAULT_PREFIX_GENERATION_CONFIG`
-                using a deep-merge strategy (nested dicts are merged;
-                internal keys starting with ``_`` are passed by reference).
-            ctx: :class:`~hackagent.attacks.ports.RunContext`. Positional
-                or ``ctx=``. Tests use ``make_ctx()``. Selection then calls
-                ``ctx.judge.evaluate``.
-            client: Obsolete. Store instance on the orchestrator path.
-            agent_router: Obsolete. Target router on the orchestrator path.
-
-        Raises:
-            ValueError: On the legacy path, if ``client`` or
-                ``agent_router`` is ``None``.
-        """
-        if ctx is None and isinstance(ctx_or_client, RunContext):
-            ctx = ctx_or_client
-        resolved_client = (
-            client
-            if client is not None
-            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
-        )
-        if ctx is None:
-            if resolved_client is None:
-                raise ValueError("A storage backend must be provided")
-            if agent_router is None:
-                raise ValueError("LLMRouter must be provided")
-            client = resolved_client
-
-        # Merge config with defaults
-        current_config = copy.deepcopy(DEFAULT_PREFIX_GENERATION_CONFIG)
-        if config:
-            _recursive_update(current_config, config)
-
-        # Set logger name for hierarchical logging (TUI support)
-        self.logger = logging.getLogger("hackagent.attacks.advprefix")
-
-        # Call parent - handles run_id, run_dir, validation, setup
-        if ctx is not None:
-            super().__init__(current_config, ctx)
-        else:
-            super().__init__(current_config, client, agent_router)
-
-    def _validate_config(self):
-        """
-        Validate the AdvPrefix configuration dictionary.
-
-        Checks type (must be ``dict``) and presence of all keys required
-        across the three pipeline stages.  Also enforces that
-        ``meta_prefixes`` and ``judges`` are lists.
-
-        Raises:
-            ValueError: If any required key is absent from ``self.config``.
-            TypeError: If ``meta_prefixes`` or ``judges`` are not lists.
-        """
-        super()._validate_config()  # Base validation (checks if it's a dict)
-
-        # Define required keys, noting that some steps might have optional dependencies
-        # 'input_csv' removed as goals are passed to run()
-        required_keys = [
-            "output_dir",
-            "start_step",
-            # Keys needed for Preprocessor init
-            "min_char_length",
-            "max_token_segments",
-            "n_candidates_per_goal",
-            # Keys needed for Step 1
-            "meta_prefixes",
-            "meta_prefix_samples",
-            "batch_size",
-            "max_tokens",
-            "guided_topk",
-            "temperature",
-            # Keys needed for Step 4
-            "surrogate_attack_prompt",
-            # Keys needed for Step 6
-            "max_tokens_completion",
-            "n_samples",
-            # Keys needed for Step 7: Evaluation (includes judge evaluation, aggregation, and selection)
-            "judges",
-            "judge_concurrency",
-            "max_tokens_eval",
-            "filter_len",
-            "n_prefixes_per_goal",
-            "max_ce",  # Used in Step 5 (Preprocessor) and Step 7 (NLL filtering in aggregation)
-        ]
-        missing_keys = [k for k in required_keys if k not in self.config]
-        if missing_keys:
-            # Provide more context in the error message
+    def __init__(self, params: AdvPrefixParams) -> None:
+        super().__init__(params)
+        if params.attacker is None:
             raise ValueError(
-                f"Configuration dictionary missing required keys: {', '.join(missing_keys)}"
+                "AdvPrefix needs an 'attacker' role to write its prefixes."
             )
+        if not params.meta_prefixes:
+            raise ValueError("AdvPrefix needs at least one meta prefix.")
+        self.attacker: Completion = params.attacker
 
-        # Example type checks using .get()
-        if not isinstance(self.config.get("meta_prefixes"), list):
-            raise TypeError("Config key 'meta_prefixes' must be a list.")
-        if not isinstance(self.config.get("judges"), list):
-            raise TypeError("Config key 'judges' must be a list.")
-        # Add more specific type/value checks as needed (e.g., check types within lists)
+    async def search(
+        self, goal: str, target: Target, judge: Optional[Judge]
+    ) -> list[Finding]:
+        candidates = self._sift(await self._write(goal))
+        if not candidates:
+            decision("stopped", "no candidate survived the filters")
+            return []
+        candidates = candidates[: self.params.candidates_per_goal]
 
-    def _get_pipeline_steps(self):
+        await self._attack(goal, candidates, target, judge)
+        if not any(item.attempts for item in candidates):
+            decision("stopped", "the target returned no usable continuation")
+            return []
+        # Selection rewrites the attempts it marks, so it runs before they
+        # are collected.
+        self._select(candidates)
+        return [attempt for item in candidates for attempt in item.attempts]
+
+    # --- 1. write -------------------------------------------------------------
+
+    async def _write(self, goal: str) -> list[Candidate]:
+        """Ask the writer for one candidate per opening per sample."""
+        params = self.params
+        counts = params.samples_per_prefix
+        if isinstance(counts, int):
+            counts = (counts,) * len(params.meta_prefixes)
+        plan = [
+            meta
+            for meta, count in zip(params.meta_prefixes, counts)
+            for _ in range(count)
+        ]
+        with phase("write", candidates=len(plan)):
+            written = await asyncio.gather(
+                *(self._one_prefix(goal, meta) for meta in plan)
+            )
+        return [item for item in written if item is not None]
+
+    async def _one_prefix(self, goal: str, meta_prefix: str) -> Optional[Candidate]:
+        messages: Messages = prompts.generation_turns(meta_prefix, goal)
+        try:
+            written = await self.attacker(messages)
+        except Exception:
+            return None
+        # The opening is part of the prefix: the writer continued it.
+        prefix = f"{meta_prefix}{written or ''}"
+        if not prefix.strip():
+            return None
+        return Candidate(prefix=prefix, meta_prefix=meta_prefix)
+
+    # --- 2. sift --------------------------------------------------------------
+
+    def _sift(self, candidates: list[Candidate]) -> list[Candidate]:
+        """Drop refusals and duplicates. Costs nothing, so it goes first."""
+        params = self.params
+        kept: list[Candidate] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            if candidate.prefix in seen:
+                continue
+            if not prompts.usable(
+                candidate.prefix,
+                min_chars=params.min_char_length,
+                require_linebreak=params.require_linebreak,
+            ):
+                continue
+            seen.add(candidate.prefix)
+            kept.append(candidate)
+
+        if len(kept) < len(candidates):
+            decision(
+                "pruned",
+                "refusals, duplicates, and candidates too short to be prefixes",
+                dropped=len(candidates) - len(kept),
+                kept=len(kept),
+            )
+        return kept
+
+    # --- 3. attack ------------------------------------------------------------
+
+    async def _attack(
+        self,
+        goal: str,
+        candidates: list[Candidate],
+        target: Target,
+        judge: Optional[Judge],
+    ) -> None:
+        """Prefill each candidate several times and judge every continuation."""
+        params = self.params
+        for index, candidate in enumerate(candidates):
+            label = f"prefix {index + 1}/{len(candidates)}"
+            with phase(label, prefix=index, meta_prefix=candidate.meta_prefix) as path:
+                drawn = await asyncio.gather(
+                    *(
+                        self._one_attempt(goal, index, candidate, target, judge, path)
+                        for _ in range(params.samples_per_candidate)
+                    )
+                )
+                candidate.attempts = [item for item in drawn if item is not None]
+                if not candidate.attempts:
+                    decision("skipped", "the target gave no usable continuation")
+
+    async def _one_attempt(
+        self,
+        goal: str,
+        index: int,
+        candidate: Candidate,
+        target: Target,
+        judge: Optional[Judge],
+        path: Path,
+    ) -> Optional[Finding]:
+        messages = (
+            prompts.prefilled(goal, candidate.prefix)
+            if self.params.prefill
+            else prompts.instructed(goal, candidate.prefix)
+        )
+        reply = await target(messages)
+        if not reply.ok or not reply.text:
+            return None
+        # The model wrote only the continuation, but the turn it belongs to
+        # opens with the prefix, and the harm may straddle the two.
+        said = (
+            prompts.said(candidate.prefix, reply.text)
+            if self.params.prefill
+            else reply.text
+        )
+        verdict = await judge_reply(judge, goal, candidate.prefix, said)
+        return Finding(
+            messages=messages,
+            response=reply,
+            verdict=verdict,
+            metadata={
+                "prefix": candidate.prefix,
+                "meta_prefix": candidate.meta_prefix,
+                "prefix_index": index,
+                "prefilled": self.params.prefill,
+                "selected": False,
+            },
+            path=path,
+        )
+
+    # --- 4. select ------------------------------------------------------------
+
+    def _select(self, candidates: list[Candidate]) -> None:
+        """Mark the paper's selection.
+
+        The first pick minimises ``-pasr_weight * log(pasr) + nll``, which
+        trades a better attack success rate against a less likely prefix.
+        Later picks take the lowest likelihood among what is left within
+        both tolerances, skipping any prefix that merely extends one
+        already chosen.
+
+        Without token logprobs every ``nll`` is zero, so the score reduces
+        to the attack success rate alone and later picks fall back to it.
         """
-        Define the three AdvPrefix pipeline stage descriptors.
+        params = self.params
+        scored = [item for item in candidates if item.attempts]
+        if not scored:
+            return
 
-        Stage 1 — **Generation** (:class:`PrefixGenerationPipeline`):
-            Produces candidate adversarial prefixes via the attacker LLM,
-            applies CE and token-segment filters, and returns one row per
-            (goal, candidate_prefix) pair.
-
-        Stage 2 — **Execution** (:func:`~hackagent.attacks.techniques.adaptive.advprefix.completions.execute`):
-            Appends each prefix to the target-model prompt and collects
-            ``n_samples`` completions per prefix.
-
-        Stage 3 — **Selection** (:meth:`_evaluate_and_select`):
-            On the new seam, ``ctx.judge.evaluate`` scores completions and
-            the top ``n_prefixes_per_goal`` rows per goal are kept.
-            The legacy constructor delegates to :class:`EvaluationPipeline`.
-
-        Returns:
-            List of pipeline-step configuration dicts compatible with
-            :meth:`~hackagent.attacks.techniques.base.BaseAttack._execute_pipeline`.
-        """
-        return [
-            {
-                "name": "Generation: Generate and Filter Adversarial Prefixes",
-                "function": lambda **kwargs: PrefixGenerationPipeline(
-                    logger=kwargs["logger"],
-                    client=kwargs["client"],
-                    agent_router=kwargs["agent_router"],
-                    config=kwargs["config"],
-                ).execute(goals=kwargs["goals"]),
-                "step_type_enum": "GENERATION",
-                "config_keys": [
-                    "attacker",
-                    "batch_size",
-                    "max_tokens",
-                    "guided_topk",
-                    "temperature",
-                    "meta_prefixes",
-                    "meta_prefix_samples",
-                    "min_char_length",
-                    "max_ce",
-                    "max_token_segments",
-                    "n_candidates_per_goal",
-                    "surrogate_attack_prompt",
-                    "_tracker",  # For per-goal prefix generation traces
-                ],
-                "input_data_arg_name": "goals",
-                "required_args": ["logger", "client", "config", "agent_router"],
-            },
-            {
-                "name": "Execution: Get Completions from Target Model",
-                "function": completions.execute,
-                "step_type_enum": "EXECUTION",
-                "config_keys": [
-                    "batch_size",
-                    "max_tokens_completion",
-                    "n_samples",
-                    "_tracker",  # For per-goal result tracking via Tracker
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "agent_router"],
-            },
-            {
-                "name": "Evaluation: Judge, Aggregate, and Select Best Prefixes",
-                "function": self._evaluate_and_select,
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "judges",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "n_prefixes_per_goal",
-                    "max_ce",
-                    "_tracker",  # For per-goal evaluation traces
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "client", "config"],
-            },
+        best = min(scored, key=lambda item: _combined(item, params.pasr_weight))
+        chosen = [best]
+        contenders = [
+            item
+            for item in scored
+            if item is not best
+            and item.pasr >= best.pasr - params.pasr_tol
+            and item.likelihood <= best.likelihood + params.nll_tol
         ]
 
-    def _evaluate_and_select(self, input_data, config, logger, client):
-        """Score completions and select prefixes.
-
-        On the Phase 4 seam, use ``ctx.judge.evaluate`` for selection scores.
-        Legacy construction keeps :class:`EvaluationPipeline`.
-        """
-        if self.ctx is not None:
-            from hackagent.core.contracts import Sample
-
-            n_keep = int(
-                config.get("n_prefixes_per_goal")
-                or self.config.get("n_prefixes_per_goal")
-                or 1
+        measured = all(item.nll is not None for item in scored)
+        while len(chosen) < params.prefixes_per_goal and contenders:
+            # A prefix that only continues one already chosen explores
+            # nothing new, so it is never the next pick.
+            contenders = [
+                item
+                for item in contenders
+                if not any(item.extends(picked) for picked in chosen)
+            ]
+            if not contenders:
+                break
+            following = (
+                min(contenders, key=lambda item: item.likelihood)
+                if measured
+                else max(contenders, key=lambda item: item.pasr)
             )
-            scored = []
-            for row in input_data or []:
-                sample = Sample(
-                    goal=str(row.get("goal") or ""),
-                    prompt=str(row.get("prefix") or row.get("prompt") or ""),
-                    response=str(row.get("completion") or row.get("response") or ""),
-                )
-                verdict = self.ctx.judge.evaluate(sample)
-                enriched = dict(row)
-                enriched["best_score"] = float(verdict.score)
-                enriched["success"] = bool(verdict.success)
-                enriched["verdict"] = verdict
-                scored.append(enriched)
-                self.ctx.events.evaluation(
-                    goal=sample.goal,
-                    score=verdict.score,
-                    success=verdict.success,
-                )
+            chosen.append(following)
+            contenders = [item for item in contenders if item is not following]
 
-            # Select top-n per goal by score
-            by_goal = {}
-            for row in scored:
-                by_goal.setdefault(row.get("goal"), []).append(row)
-            selected = []
-            for goal, rows in by_goal.items():
-                rows_sorted = sorted(
-                    rows, key=lambda r: float(r.get("best_score") or 0.0), reverse=True
-                )
-                selected.extend(rows_sorted[: max(1, n_keep)])
-            return selected
-
-        return EvaluationPipeline(config=config, logger=logger, client=client).execute(
-            input_data=input_data
+        decision(
+            "selected",
+            "lowest -w*log(pasr) + nll, then lowest likelihood"
+            if measured
+            else "the target reports no token logprobs, so the attack "
+            "success rate decides alone",
+            kept=len(chosen),
+            of=len(scored),
+            best_pasr=round(best.pasr, 3),
         )
+        for candidate in chosen:
+            candidate.attempts[:] = [_mark(attempt) for attempt in candidate.attempts]
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """
-        Executes the full prefix generation pipeline.
 
-        Goal Results are created upfront (before any pipeline step) so the
-        dashboard shows all goals from the moment the run starts.  Goals that
-        are filtered out during Generation are marked with an explanatory note
-        during finalization rather than simply having no record.
+def _combined(candidate: Candidate, pasr_weight: float) -> float:
+    """``-w * log(pasr) + nll``, the reference's selection score.
 
-        Args:
-            goals: A list of goal strings to generate prefixes for.
+    A candidate nothing passed has an infinite score rather than an
+    undefined one, so it sorts last instead of raising.
+    """
+    if candidate.pasr <= 0.0:
+        return float("inf")
+    return -pasr_weight * math.log(candidate.pasr) + candidate.likelihood
 
-        Returns:
-            List of dictionaries containing the final selected prefixes,
-            or empty list if no prefixes were generated.
-        """
-        goals = goals or []
-        if not goals:
-            return []
 
-        # Phase 1: Create coordinator AND goal Results immediately so the
-        # dashboard shows all goals from the moment the run starts.
-        # Goals filtered out during Generation are marked as such during
-        # finalization rather than simply having no record.
-        goal_metadata = {
-            "n_candidates_per_goal": self.config.get("n_candidates_per_goal", 5),
-            "n_prefixes_per_goal": self.config.get("n_prefixes_per_goal", 2),
-        }
-        coordinator = self._initialize_coordinator(
-            attack_type="advprefix",
-            goals=goals,
-            initial_metadata=goal_metadata,
-        )
+def _mark(finding: Finding) -> Finding:
+    return Finding(
+        messages=finding.messages,
+        response=finding.response,
+        verdict=finding.verdict,
+        metadata={**finding.metadata, "selected": True},
+        path=finding.path,
+    )
 
-        # Make the goal_tracker available to all pipeline steps via config
-        # so Execution and Evaluation can attach per-goal traces.
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
 
-        pipeline_steps = self._get_pipeline_steps()
-        start_step = self.config.get("start_step", 1) - 1
-
-        try:
-            # Phase 2: Run Generation step.
-            # Goal Results and the StepTracker are fully linked, so the
-            # Generation start/summary traces land on goal[0]'s Result.
-            generation_output = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
-            )
-
-            if not generation_output:
-                self.logger.warning("Generation produced no output")
-                # Ensure every pre-created goal result is explicitly finalized
-                # so dashboard entries never remain pending.
-                coordinator.finalize_all_goals([])
-                coordinator.finalize_pipeline([], lambda _: False)
-                return []
-
-            if coordinator.has_goal_tracking:
-                self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
-
-            # Phase 3: Run Execution + Evaluation steps.
-            results = self._execute_pipeline(
-                pipeline_steps, generation_output, start_step=start_step + 1
-            )
-
-            # Finalize goal results via coordinator
-            coordinator.finalize_all_goals(results)
-
-            # Log summary
-            coordinator.log_summary()
-
-            # Finalize pipeline-level tracking
-            coordinator.finalize_pipeline(results)
-
-            return rows_to_attack_results(results)
-
-        except Exception:
-            # Crash-safe: mark all unfinalized goals as failed
-            coordinator.finalize_on_error("AdvPrefix pipeline failed with exception")
-            raise
+__all__ = ["AdvPrefixAttack", "Candidate"]

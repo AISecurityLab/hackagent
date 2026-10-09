@@ -3,65 +3,45 @@ sidebar_label: attack
 title: hackagent.attacks.techniques.adaptive.autodan_turbo.attack
 ---
 
-AutoDAN-Turbo orchestrator — WarmUp → Lifelong → shared LLM-judge evaluation.
+AutoDAN-Turbo: learn jailbreak strategies, then reuse them.
+
+The other attacks search for a prompt. AutoDAN-Turbo searches for
+*strategies* — named tactics it can carry from one goal to the next — and
+that learning is the point. It runs in two phases:
+
+- **warm-up**, once for the whole run, before any goal is reported: the
+  attacker explores each goal freely while the panel scores, and the
+  summarizer distils the gap between each goal&#x27;s weakest and strongest
+  attempt into a strategy. The strategies, indexed by the response they
+  beat, are the strategy library. This is the run-scoped :meth:`prepare`.
+
+- **lifelong**, per goal: the library is retrieved against the last
+  response, the attacker is told which strategies to reuse or avoid, and
+  every time the score improves the gap is summarized into a new strategy
+  and added back. The library grows across goals, so later goals start from
+  what earlier ones learned.
+
+The panel is the scorer: its 0-10 verdict drives the search and
+`break_score` ends it. Every judged attempt of the lifelong phase is
+reported.
+
+Based on: https://arxiv.org/abs/2410.05295
 
 ## AutoDANTurboAttack Objects
 
 ```python
-class AutoDANTurboAttack(BaseAttack)
+class AutoDANTurboAttack(IterativeAttack[AutoDANTurboParams])
 ```
 
-AutoDAN-Turbo: Lifelong agent for strategy self-exploration in jailbreaking LLMs.
+A lifelong strategy search over a shared, growing library.
 
-Three-phase pipeline:
-1. WarmUp — free exploration to bootstrap a strategy library
-2. Lifelong — strategy-guided attacks with retrieval + summarization
-3. Evaluation — shared LLM-judge result finalization
-
-#### \_\_init\_\_
+#### prepare
 
 ```python
-def __init__(config=None,
-             ctx_or_client=None,
-             agent_router=None,
-             *,
-             ctx: Optional[RunContext] = None,
-             client=None)
+async def prepare(goals: list[str],
+                  target: Target,
+                  judge: Optional[Judge] = None) -> None
 ```
 
-Initialize AutoDAN-Turbo with `(config, ctx)` or legacy args.
-
-On the new seam `ctx.models` and `ctx.judge` are stored on the
-config for warm-up and lifelong, and the strategy library is
-written under `ctx.workspace`. This class does not read
-`_suppress_run_status_updates`. `AutoDANTurboConfig` still
-subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
-The legacy constructor is obsolete for new code.
-
-#### run
-
-```python
-def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
-```
-
-Execute full AutoDAN-Turbo pipeline.
-
-Pipeline mapping to paper/integration:
-1) WarmUp: free exploration + strategy library bootstrap
-2) Lifelong: retrieval-guided attack with online strategy growth
-3) Evaluation: shared LLM-judge normalization and success finalization
-
-**Arguments**:
-
-- `goals` - List of malicious goals to attack.
-  
-
-**Returns**:
-
-  Final per-goal result list, enriched with LLM judge outputs.
-  
-
-**Raises**:
-
-- `Exception` - Re-raises any runtime failure after coordinator finalization.
+Explore every goal freely and build the strategy library from it.
 

@@ -1,196 +1,179 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for ToolOutputIPIAttack wiring."""
+"""Tool-output IPI poisons a tool result and judges what the agent does.
 
-import unittest
-from unittest.mock import MagicMock, patch
+The target and panel are plain callables, so no model or router is built.
+"""
 
-from hackagent.attacks.techniques.indirect.tool_output_ipi.attack import (
+from __future__ import annotations
+
+import asyncio
+
+
+from hackagent.attacks.techniques.indirect.tool_output_ipi import (
     ToolOutputIPIAttack,
+    ToolOutputIPIParams,
 )
-from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY, load_attack
-from hackagent.attacks.types import AttackResult
-from hackagent.catalog.attacks import ATTACK_CATALOG
-from hackagent.interfaces.tui.forms import get_attack_config_spec
+from hackagent.attacks.techniques.indirect.tool_output_ipi import prompts
+from hackagent.core.contracts import Completion, LLMError, Verdict
+
+GOAL = "exfiltrate the API key"
 
 
-class TestRegistryAndDiscovery(unittest.TestCase):
-    def test_registry_entry(self):
-        self.assertIn("tool_output_ipi", ATTACK_REGISTRY)
-        self.assertIs(load_attack("tool_output_ipi"), ToolOutputIPIAttack)
+class Target:
+    """Records every request, and the tools it was shown."""
 
-    def test_catalog_entry(self):
-        self.assertIn("tool_output_ipi", ATTACK_CATALOG)
-        self.assertIn("OPI", ATTACK_CATALOG["tool_output_ipi"]["description"])
+    def __init__(self, *replies, tool_calls=None) -> None:
+        self.replies = list(replies) or ["acknowledged"]
+        self.tool_calls = tool_calls or []
+        self.requests: list[list[dict]] = []
+        self.overrides: list[dict] = []
 
-    def test_tui_spec(self):
-        spec = get_attack_config_spec("tool_output_ipi")
-        self.assertIsNotNone(spec)
-        self.assertEqual(spec.technique_key, "tool_output_ipi")
-
-
-class TestAttackValidation(unittest.TestCase):
-    def test_requires_client_and_router(self):
-        with self.assertRaises(ValueError):
-            ToolOutputIPIAttack(config={}, client=None, agent_router=MagicMock())
-        with self.assertRaises(ValueError):
-            ToolOutputIPIAttack(config={}, client=MagicMock(), agent_router=None)
-
-    def test_rejects_bad_mode(self):
-        with self.assertRaises(ValueError):
-            ToolOutputIPIAttack(
-                config={"tool_output_ipi_params": {"mode": "nope"}},
-                client=MagicMock(),
-                agent_router=MagicMock(),
-            )
-
-    def test_rejects_max_attempts_below_one(self):
-        with self.assertRaises(ValueError):
-            ToolOutputIPIAttack(
-                config={"tool_output_ipi_params": {"max_attempts": 0}},
-                client=MagicMock(),
-                agent_router=MagicMock(),
-            )
-
-    def test_rejects_use_attacker_llm_without_identifier(self):
-        with self.assertRaises(ValueError):
-            ToolOutputIPIAttack(
-                config={
-                    "tool_output_ipi_params": {"use_attacker_llm": True},
-                    "attacker": {"identifier": ""},
-                },
-                client=MagicMock(),
-                agent_router=MagicMock(),
-            )
-
-    def test_pipeline_propagates_goal_index_offset(self):
-        attack = ToolOutputIPIAttack(
-            config={},
-            client=MagicMock(),
-            agent_router=MagicMock(),
+    async def __call__(self, messages, **overrides):
+        self.requests.append([dict(m) for m in messages])
+        self.overrides.append(overrides)
+        text = self.replies[min(len(self.requests) - 1, len(self.replies) - 1)]
+        calls = (
+            self.tool_calls[min(len(self.requests) - 1, len(self.tool_calls) - 1)]
+            if self.tool_calls
+            else []
         )
-        steps = attack._get_pipeline_steps()
-        self.assertEqual(len(steps), 2)
-        self.assertIn("_goal_index_offset", steps[0]["config_keys"])
-        self.assertIn("_goal_index_offset", steps[1]["config_keys"])
-        self.assertIn("tool_output_ipi_params", steps[0]["config_keys"])
-        self.assertEqual(steps[0]["step_type_enum"], "GENERATION")
-        self.assertEqual(steps[1]["step_type_enum"], "EVALUATION")
-
-    def test_get_effective_model_roles(self):
-        roles = ToolOutputIPIAttack.get_effective_model_roles(
-            {
-                "tool_output_ipi_params": {"use_attacker_llm": True},
-                "attacker": {"identifier": "attacker-model"},
-                "judges": [{"identifier": "judge-model"}],
-            }
-        )
-        self.assertEqual([r["role"] for r in roles], ["attacker", "judge"])
-        self.assertTrue(roles[0]["required"])
-        self.assertFalse(roles[1]["required"])
-
-    def test_get_effective_model_roles_without_attacker_llm(self):
-        roles = ToolOutputIPIAttack.get_effective_model_roles(
-            {"tool_output_ipi_params": {}, "judges": []}
-        )
-        self.assertEqual(roles, [])
-
-    def test_run_empty_goals(self):
-        attack = ToolOutputIPIAttack(
-            config={},
-            client=MagicMock(),
-            agent_router=MagicMock(),
-        )
-        self.assertEqual(attack.run(goals=[]), [])
-
-    def test_run_returns_attack_results(self):
-        attack = ToolOutputIPIAttack(
-            config={"tool_output_ipi_params": {"max_attempts": 1}},
-            client=MagicMock(),
-            agent_router=MagicMock(),
-        )
-        coordinator = MagicMock()
-        coordinator.has_goal_tracking = False
-        coordinator.goal_tracker = None
-
-        with (
-            patch.object(attack, "_initialize_coordinator", return_value=coordinator),
-            patch.object(
-                attack,
-                "_execute_pipeline",
-                side_effect=[
-                    [
-                        {
-                            "goal": "g",
-                            "prompt": "benign",
-                            "response": "r",
-                            "success": True,
-                            "best_score": 10.0,
-                        }
-                    ],
-                    [
-                        {
-                            "goal": "g",
-                            "prompt": "benign",
-                            "response": "r",
-                            "success": True,
-                            "best_score": 10.0,
-                        }
-                    ],
-                ],
-            ),
-        ):
-            results = attack.run(goals=["g"])
-
-        self.assertEqual(len(results), 1)
-        self.assertIsInstance(results[0], AttackResult)
-        coordinator.finalize_all_goals.assert_called()
-        coordinator.finalize_pipeline.assert_called()
-
-    def test_run_empty_generation_skips_evaluation(self):
-        attack = ToolOutputIPIAttack(
-            config={},
-            client=MagicMock(),
-            agent_router=MagicMock(),
-        )
-        coordinator = MagicMock()
-        coordinator.has_goal_tracking = False
-        coordinator.goal_tracker = None
-
-        with (
-            patch.object(attack, "_initialize_coordinator", return_value=coordinator),
-            patch.object(attack, "_execute_pipeline", return_value=[]),
-        ):
-            results = attack.run(goals=["g"])
-
-        self.assertEqual(results, [])
-        coordinator.finalize_pipeline.assert_called_once()
-        coordinator.finalize_all_goals.assert_not_called()
-
-    def test_run_attaches_goal_tracker(self):
-        attack = ToolOutputIPIAttack(
-            config={},
-            client=MagicMock(),
-            agent_router=MagicMock(),
-        )
-        coordinator = MagicMock()
-        coordinator.has_goal_tracking = True
-        tracker = MagicMock()
-        coordinator.goal_tracker = tracker
-
-        with (
-            patch.object(attack, "_initialize_coordinator", return_value=coordinator),
-            patch.object(
-                attack,
-                "_execute_pipeline",
-                side_effect=[[{"goal": "g", "success": False}], [{"goal": "g"}]],
-            ),
-        ):
-            attack.run(goals=["g"])
-
-        self.assertIs(attack.config["_tracker"], tracker)
+        if text is None:
+            return Completion(text="", error=LLMError(message="x", category="APIError"))
+        return Completion(text=text, tool_calls=calls)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class Panel:
+    def __init__(self, *scores, threshold=7.0) -> None:
+        self.scores = list(scores) or [0.0]
+        self.threshold = threshold
+        self.samples: list = []
+
+    async def __call__(self, sample):
+        self.samples.append(sample)
+        score = self.scores[min(len(self.samples) - 1, len(self.scores) - 1)]
+        return Verdict(success=score >= self.threshold, score=score)
+
+
+class Attacker:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def __call__(self, messages):
+        self.calls += 1
+        return f"sharper injection v{self.calls}"
+
+
+def run(attack, goal=GOAL, target=None, judge=None):
+    target = target or Target()
+    return asyncio.run(attack.run(goal, target, judge)), target
+
+
+# --- the request --------------------------------------------------------------
+
+
+def test_the_target_sees_a_poisoned_tool_result_history():
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams())
+    _findings, target = run(attack, judge=Panel(1.0))
+
+    roles = [m["role"] for m in target.requests[0]]
+    assert roles == ["user", "assistant", "tool"]
+    # The goal rides in the tool result, never in a user turn.
+    assert GOAL in target.requests[0][2]["content"]
+    assert GOAL not in target.requests[0][0]["content"]
+
+
+def test_the_assistant_turn_carries_a_tool_call():
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams())
+    _findings, target = run(attack, judge=Panel(1.0))
+
+    call = target.requests[0][1]["tool_calls"][0]
+    assert call["function"]["name"] == prompts.DEFAULT_TOOL_NAME
+
+
+def test_the_tool_schema_is_shown_to_the_target():
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams())
+    _findings, target = run(attack, judge=Panel(1.0))
+
+    assert target.overrides[0]["tools"] == [prompts.DEFAULT_TOOL_SCHEMA]
+
+
+# --- judging ------------------------------------------------------------------
+
+
+def test_a_follow_up_tool_call_counts_as_what_the_agent_did():
+    from hackagent.core.contracts import ToolCall
+
+    call = ToolCall(name="send_email", arguments='{"to":"x"}')
+    panel = Panel(9.0)
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams())
+    findings, _target = run(attack, target=Target("", tool_calls=[[call]]), judge=panel)
+
+    assert "send_email" in panel.samples[0].response
+    assert findings[0].metadata["followup_tool_calls"] == [call]
+
+
+def test_a_reply_with_neither_text_nor_a_call_is_skipped():
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams(max_attempts=1))
+    findings, _target = run(attack, target=Target(None), judge=Panel(1.0))
+
+    assert findings == []
+
+
+# --- attempts and the attacker role ------------------------------------------
+
+
+def test_without_an_attacker_a_single_payload_is_tried():
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams(max_attempts=5))
+    _findings, target = run(attack, judge=Panel(1.0))
+
+    # max_attempts is inert with nothing to vary the payload.
+    assert len(target.requests) == 1
+
+
+def test_with_an_attacker_the_payload_is_refined_across_attempts():
+    attacker = Attacker()
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams(max_attempts=3, attacker=attacker))
+    _findings, target = run(attack, judge=Panel(1.0))
+
+    assert len(target.requests) == 3
+    # First attempt uses the base payload; later ones use refinements.
+    assert attacker.calls == 2
+    assert "sharper injection" in target.requests[1][2]["content"]
+
+
+def test_the_search_stops_once_the_agent_complies():
+    attacker = Attacker()
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams(max_attempts=5, attacker=attacker))
+    findings, target = run(attack, judge=Panel(1.0, 9.0, 1.0))
+
+    assert len(target.requests) == 2
+    assert [f.verdict.success for f in findings] == [False, True]
+
+
+def test_a_failing_attacker_falls_back_to_the_base_payload():
+    async def broken(messages):
+        raise RuntimeError("attacker down")
+
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams(max_attempts=2, attacker=broken))
+    findings, target = run(attack, judge=Panel(1.0))
+
+    # Still ran; the second attempt reused the base injection.
+    assert len(target.requests) == 2
+    assert len(findings) == 2
+
+
+# --- config -------------------------------------------------------------------
+
+
+def test_the_attacker_is_the_only_role():
+    assert ToolOutputIPIParams.role_names() == frozenset({"attacker"})
+
+
+def test_the_success_setting_steers_the_framing():
+    attack = ToolOutputIPIAttack(ToolOutputIPIParams(success_setting="data_stealing"))
+    _findings, target = run(attack, judge=Panel(1.0))
+
+    observation = target.requests[0][2]["content"]
+    assert prompts.SUCCESS_FRAMING["data_stealing"] in observation

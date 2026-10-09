@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 
 from hackagent.interfaces.tui.forms import get_all_attack_specs
 from hackagent.interfaces.tui.views.attacks.executor import AttacksExecutorMixin
-from hackagent.orchestrator.setup.registry import load_config_model
 
 _SKIPPED = {"attack_type", "goals", "dataset", "intents", "output_dir"}
 
@@ -28,11 +27,13 @@ class TestFormsFromSchema(unittest.TestCase):
         specs = get_all_attack_specs()
         self.assertIn("crescendo", specs)
         self.assertIn("rag", specs)
-        self.assertIn("pair", specs)
+        self.assertIn("autodan_turbo", specs)
 
     def test_form_fields_are_the_flattened_json_schema(self):
-        spec = get_all_attack_specs()["pair"]
-        schema = load_config_model("pair").model_json_schema()
+        from hackagent.attacks.techniques.registry import params_schema
+
+        spec = get_all_attack_specs()["autodan_turbo"]
+        schema = params_schema("autodan_turbo")
         properties = set(schema.get("properties") or {})
         roots = {field.key.split(".", 1)[0] for field in spec.fields}
         self.assertTrue(spec.fields)
@@ -73,58 +74,73 @@ def _status_text(host: _Host) -> str:
     return "\n".join(chunks)
 
 
+class _Outcome:
+    """A minimal campaign AttackOutcome for the worker's result summary."""
+
+    def __init__(self, name):
+        self.name = name
+        self.attempts = ()
+        self.error = None
+
+
+class _Result:
+    def __init__(self, attacks):
+        self.attacks = attacks
+
+
 class TestAttackSubscribe(unittest.TestCase):
-    def _run(self, emit, **kwargs):
+    """The worker runs the assembled spec through ``run_campaign`` and drives
+    progress from the campaign's own lifecycle events."""
+
+    def _run(self, emit, campaign):
         host = _Host()
 
-        def hack(**hack_kwargs):
-            emit(hack_kwargs["on_event"])
-            return [{"goal": "g"}]
-
-        def hack_chain(**chain_kwargs):
-            emit(chain_kwargs["on_event"])
-            return [{"goal": "g", "is_success": True}]
+        def run_campaign(spec, *, on_event=None, store=None):
+            emit(on_event)
+            return _Result(tuple(_Outcome(a["name"]) for a in spec.get("attacks", ())))
 
         session = MagicMock()
-        session.target.return_value.hack.side_effect = hack
-        session.target.return_value.hack_chain.side_effect = hack_chain
-        with patch("hackagent.HackAgent", return_value=session):
-            host._run_attack_async(
-                agent_name="bot",
-                agent_type="openai-sdk",
-                endpoint="http://localhost:8000",
-                goals="do the thing",
-                timeout=5,
-                **kwargs,
-            )
+        with (
+            patch("hackagent.HackAgent", return_value=session),
+            patch(
+                "hackagent.orchestrator.campaign.run_campaign", side_effect=run_campaign
+            ) as run,
+        ):
+            host._run_attack_async(campaign, strategy_label="crescendo")
         host.widgets["#attack-actions-viewer"].subscribe_to_bus.assert_called_once()
+        run.assert_called_once()
+        # The campaign's results are written to the session's local store.
+        self.assertIs(run.call_args.kwargs["store"], session.backend)
         return host
 
-    def test_single_attack_subscribes_through_on_event(self):
-        def emit(on_event):
-            on_event("goal_finalized", success=True, goal="g")
+    def _campaign(self, *names):
+        return {
+            "version": 1,
+            "campaign": {"name": "TUI — test"},
+            "dataset": {"source": {"type": "inline", "goals": ["g"]}},
+            "target": {
+                "name": "bot",
+                "connection": {"provider": "litellm", "type": "OPENAI_SDK"},
+            },
+            "attacks": [{"name": name} for name in names],
+        }
 
-        host = self._run(emit, attack_config={"attack_type": "pair", "goals": ["g"]})
+    def test_goal_events_advance_the_status(self):
+        def emit(on_event):
+            on_event("attack_started", attack="crescendo", expected_goals=2)
+            on_event("goal_finished", goal_index=0, success=True, elapsed_s=1.2)
+
+        host = self._run(emit, self._campaign("crescendo"))
         text = _status_text(host)
         self.assertIn("Goal 1", text)
-        self.assertNotIn("Attack Failed", text)
+        self.assertNotIn("Campaign Failed", text)
 
-    def test_chain_subscribes_through_hack_chain_on_event(self):
+    def test_attack_started_reports_the_goal_count(self):
         def emit(on_event):
-            on_event(
-                "step_started",
-                step_name="Attack Execution",
-                expected_total_goals=2,
-            )
+            on_event("attack_started", attack="crescendo", expected_goals=2)
 
-        host = self._run(
-            emit,
-            attack_config=None,
-            attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
-            chain_goals=["g"],
-            escalate_only_mitigated=True,
-        )
+        host = self._run(emit, self._campaign("crescendo", "rag"))
         text = _status_text(host)
         self.assertIn("Goals to process", text)
         self.assertIn("2", text)
-        self.assertNotIn("Attack Failed", text)
+        self.assertNotIn("Campaign Failed", text)

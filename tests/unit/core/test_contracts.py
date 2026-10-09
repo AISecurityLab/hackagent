@@ -99,6 +99,12 @@ def test_model_spec_parses_agent_type_and_forbids_unknown_fields():
         ModelSpec(identifier="llama3", not_a_field=True)
 
 
+def test_model_spec_normalizes_capabilities():
+    spec = ModelSpec(identifier="vlm", capabilities=["VISION", " text "])
+
+    assert spec.capabilities == frozenset({"vision", "text"})
+
+
 def test_judge_spec_extends_model_spec():
     judge = JudgeSpec(identifier="judge-model", type="jailbreakbench", range="binary")
     assert isinstance(judge, ModelSpec)

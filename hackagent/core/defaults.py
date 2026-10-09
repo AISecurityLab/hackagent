@@ -59,6 +59,11 @@ DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = DEFAULT_LOCAL_AGENT_TYPE
 DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
 
+# The attack a CLI command preselects when the user names none. A static
+# technique that needs no attacker/judge role, so a bare ``--no-tui`` run works
+# out of the box; the user picks a heavier strategy explicitly.
+DEFAULT_CLI_ATTACK_TYPE = "flipattack"
+
 # ---------------------------------------------------------------------------
 # Remote defaults: roles served by the HackAgent API (used when a
 # HACKAGENT_API_KEY is available).
@@ -86,6 +91,7 @@ __all__ = [
     "DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT",
     "DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE",
     "DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS",
+    "DEFAULT_CLI_ATTACK_TYPE",
     "DEFAULT_MAX_OUTPUT_TOKENS",
     "DEFAULT_REMOTE_ROLE_ENDPOINT",
     "DEFAULT_REMOTE_AGENT_TYPE",

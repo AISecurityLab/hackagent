@@ -156,7 +156,7 @@ def test_install_on_click_command_configures_before_main(
     [
         ["--version"],
         ["version"],
-        ["scan", "--help"],
+        ["campaign", "--help"],
     ],
 )
 def test_windows_binary_smoke_commands_on_cp1252(

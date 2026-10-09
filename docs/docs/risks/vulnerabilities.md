@@ -1,4 +1,5 @@
 ---
+sidebar_position: 3
 sidebar_label: Vulnerabilities
 title: Vulnerabilities
 ---
@@ -116,7 +117,7 @@ print(JAILBREAK_PROFILE.dataset_presets)
 # ['strongreject', 'harmbench', 'advbench', 'jailbreakbench', ...]
 
 print(JAILBREAK_PROFILE.attack_techniques)
-# ['h4rm3l', 'tap', 'pair']
+# ['h4rm3l', 'TAP', 'PAIR']
 
 print(JAILBREAK_PROFILE.objective)   # 'jailbreak'
 print(JAILBREAK_PROFILE.metrics)     # ['asr', 'judge_score']

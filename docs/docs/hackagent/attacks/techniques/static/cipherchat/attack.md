@@ -3,35 +3,21 @@ sidebar_label: attack
 title: hackagent.attacks.techniques.static.cipherchat.attack
 ---
 
-CipherChat attack implementation.
-
-Based on RobustNLP/CipherChat (MIT):
-https://github.com/RobustNLP/CipherChat
-
-Paper: &quot;GPT-4 Is Too Smart To Be Safe: Stealthy Chat with LLMs via Cipher&quot;
-(ICLR 2024)
+CipherChat: talk to the target in a cipher and decode its replies.
 
 ## CipherChatAttack Objects
 
 ```python
-class CipherChatAttack(BaseAttack)
+class CipherChatAttack(StaticAttack[CipherChatParams])
 ```
 
-CipherChat jailbreak attack using encoded non-natural language prompts.
+One request carrying the enciphered goal and cipher instructions.
 
-Construct with `(config, ctx)`. `config` is a dict deep-merged into
-:data:`~hackagent.attacks.techniques.static.cipherchat.config.DEFAULT_CIPHERCHAT_CONFIG`.
-`ctx` is a :class:`~hackagent.attacks.ports.RunContext`, passed
-positionally or as `ctx=`. Tests build it with `make_ctx()`
-(`tests.fakes.context`).
+#### decode
 
-The pipeline encodes the goal, queries the target, and optionally
-decodes the reply. It does not embed a judge step. `run()` returns
-rows without a verdict.
+```python
+def decode(response: str) -> str
+```
 
-The legacy constructor `(config_dict, client, agent_router)` is
-obsolete for new code. `hackagent.orchestrator.execution.runner` constructs
-`(config, ctx)`.
-:class:`~hackagent.attacks.techniques.static.cipherchat.config.CipherChatConfig`
-still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+Decode the reply when it appears to use the selected cipher.
 

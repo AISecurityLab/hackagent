@@ -3,57 +3,30 @@ sidebar_label: attack
 title: hackagent.attacks.techniques.indirect.tool_output_ipi.attack
 ---
 
-Tool-output indirect prompt injection (tool_output_ipi) attack.
+Tool-output indirect prompt injection: poison what a tool returns.
 
-Poisons tool / function-call *observations* so a tool-using agent may follow
-a malicious goal after a benign user task (InjecAgent / OPI family).
+Every other technique here talks to the target as the user. This one does
+not say a word as the user: it stands between the agent and its tools and
+hands back a *tool result* that carries an instruction. The question is
+whether an agent that trusts its tools will carry that instruction out — a
+follow-up tool call, or compliance in its reply — as though the tool had
+told it to.
 
-This is distinct from `rag`, which poisons
-RAG documents — not tool return values.
+So the request the target sees is a short history it did not have: the user
+asks something benign, the assistant calls a tool, and the tool returns the
+poison. The target is given the tool schemas too, so a follow-up call is
+something it *can* make. Whether it does is what the panel judges.
 
-Pipeline:
-1. Generation — craft poisoned tool observations, query target, inline judge
-2. Evaluation — post-processing (server sync, tracker, ASR)
+An optional `attacker` role rewrites the payload between attempts; without
+one, a single payload is tried.
 
-Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when `hackagent.catalog.taxonomy` is present; add a permanent `ATTACK_TAXONOMY` entry when `603` merges).
+Based on InjecAgent: https://arxiv.org/abs/2403.02691
 
 ## ToolOutputIPIAttack Objects
 
 ```python
-class ToolOutputIPIAttack(BaseAttack)
+class ToolOutputIPIAttack(IterativeAttack[ToolOutputIPIParams])
 ```
 
-Tool-output indirect prompt injection (InjecAgent / OPI).
-
-For each malicious goal the attack:
-1. Starts from a benign user message that would elicit a tool call.
-2. Appends a simulated (or live) `role=tool` observation containing an
-   adversarial injection aimed at the goal.
-3. Re-queries the target with the full messages history.
-4. Judges whether the response or subsequent tool call follows the
-   injected instructions (direct harm and/or data stealing).
-
-Construct with `(config, ctx)`. Scoring uses `ctx.judge.score`
-through :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
-`InlineStepJudge` remains the fallback when `ctx` is absent.
-Tests build `ctx` with `make_ctx()`. The legacy constructor is
-obsolete for new code. `ToolOutputIPIConfig` still subclasses
-:class:`~hackagent.attacks.techniques.config.ConfigBase`.
-
-#### run
-
-```python
-def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
-```
-
-Execute the tool-output IPI pipeline.
-
-**Arguments**:
-
-- `goals` - Malicious goals the poisoned tool observation should induce.
-  
-
-**Returns**:
-
-  List of :class:`~hackagent.attacks.types.AttackResult` rows.
+Hand the agent a poisoned tool result and see what it does with it.
 

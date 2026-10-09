@@ -2,21 +2,20 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Integration tests for multi-attack selection in the Attacks tab.
+Integration tests for the row-based Attacks tab.
 
-Covers the SelectionList-based strategy picker: it defaults to the
-Jailbreak evaluation campaign's primary attacks (h4rm3l -> TAP -> PAIR),
-matching HackAgent.hack_chain's default. Checking a single attack must
-behave exactly as before (HackAgent.hack), while checking 2+ attacks must
-build a per-step attack_config list and execute via HackAgent.hack_chain,
-with a user-controllable "escalate only mitigated" flag.
+The tab is a declarative campaign builder: each attack is an ``AttackRow``
+(its technique + its own attacker model + parameters) and each judge is a
+``JudgeRow``. The form assembles a ``CampaignSpec`` and runs it through
+``run_campaign``. These tests drive the real Textual widgets to cover adding
+and removing rows, escalate visibility, and the assembled spec.
 """
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 from textual.app import App
-from textual.widgets import Checkbox, Input, Select, SelectionList, Static
+from textual.widgets import Button, Checkbox, Input, Select, Static
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.theme import css_variables
@@ -24,6 +23,7 @@ from hackagent.interfaces.tui.views.attacks import (
     AttacksTab,
     _default_campaign_attack_keys,
 )
+from hackagent.interfaces.tui.views.attacks.rows import AttackRow, JudgeRow
 
 
 @pytest.fixture
@@ -35,9 +35,7 @@ def cli_config():
 
 
 class AttacksHostApp(App):
-    """Mounts AttacksTab standalone, mirroring HackAgentTUI's brand palette
-    so AttacksTab's CSS (which references $brand-* variables) resolves the
-    same way it does under the real app."""
+    """Mounts AttacksTab standalone, mirroring HackAgentTUI's brand palette."""
 
     def get_css_variables(self) -> dict[str, str]:
         return {**super().get_css_variables(), **css_variables()}
@@ -55,30 +53,28 @@ def _fill_required_fields(tab: AttacksTab) -> None:
     tab.query_one("#endpoint-url", Input).value = "http://localhost:8000"
 
 
-def _select_only(tab: AttacksTab, keys) -> None:
-    """Reduce the strategy selection to exactly `keys`, in that order."""
-    selection_list = tab.query_one("#attack-strategies", SelectionList)
-    selection_list.deselect_all()
-    for key in keys:
-        selection_list.select(key)
+def _attack_types(tab: AttacksTab) -> list[str]:
+    return [row.attack_type() for row in tab.query(AttackRow)]
 
 
-class TestStrategySelectionDefaults:
+def _remove_row(tab: AttacksTab, row) -> None:
+    button = row.query_one(".remove-row", Button)
+    tab._remove_row(button)
+
+
+class TestDefaults:
     @pytest.mark.asyncio
-    async def test_defaults_to_jailbreak_campaign_in_order(self, cli_config):
+    async def test_defaults_to_jailbreak_campaign_rows_in_order(self, cli_config):
         app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
-            selection_list = tab.query_one("#attack-strategies", SelectionList)
-            assert selection_list.selected == ["h4rm3l", "tap", "pair"]
-            assert selection_list.selected == _default_campaign_attack_keys()
+            assert _attack_types(tab) == _default_campaign_attack_keys()
+            assert _attack_types(tab) == ["h4rm3l", "tap", "pair"]
+            assert len(list(tab.query(JudgeRow))) == 1
 
     @pytest.mark.asyncio
-    async def test_escalate_toggle_visible_by_default(self, cli_config):
-        """The campaign default has 3 attacks selected, so the escalate
-        toggle (only relevant for 2+ attacks) is visible out of the box."""
-
+    async def test_escalate_toggle_visible_with_multiple_attacks(self, cli_config):
         app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
@@ -89,257 +85,235 @@ class TestStrategySelectionDefaults:
             )
 
     @pytest.mark.asyncio
-    async def test_escalate_toggle_defaults_to_enabled(self, cli_config):
-        """The initial checkbox state matches the library default and the
-        state ``_clear_form`` resets to."""
-
+    async def test_escalate_toggle_hidden_with_single_attack(self, cli_config):
         app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
-            assert tab.query_one("#escalate-only-mitigated", Checkbox).value is True
+            rows = list(tab.query(AttackRow))
+            _remove_row(tab, rows[2])
+            _remove_row(tab, rows[1])
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert len(list(tab.query(AttackRow))) == 1
+            assert tab.query_one("#escalate-only-mitigated", Checkbox).display is False
+
+
+class TestAddRemoveRows:
+    @pytest.mark.asyncio
+    async def test_add_attack_appends_a_row(self, cli_config):
+        app = AttacksHostApp(cli_config)
+        async with app.run_test() as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
+            tab._add_attack_row()
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert len(list(tab.query(AttackRow))) == 4
 
     @pytest.mark.asyncio
-    async def test_escalate_toggle_hidden_with_single_selection(self, cli_config):
+    async def test_add_judge_appends_a_row(self, cli_config):
         app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
-            _select_only(tab, ["h4rm3l"])
+            tab._add_judge_row()
+            await pilot.pause()
+            assert len(list(tab.query(JudgeRow))) == 2
+
+    @pytest.mark.asyncio
+    async def test_cannot_remove_the_last_attack(self, cli_config):
+        app = AttacksHostApp(cli_config)
+        async with app.run_test() as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
+            rows = list(tab.query(AttackRow))
+            _remove_row(tab, rows[2])
+            _remove_row(tab, rows[1])
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            # One row left — removing it is refused.
+            last = list(tab.query(AttackRow))[0]
+            _remove_row(tab, last)
+            await pilot.pause()
+            assert len(list(tab.query(AttackRow))) == 1
+
+
+class TestAssembledSpec:
+    @pytest.mark.asyncio
+    async def test_dry_run_previews_the_campaign_spec(self, cli_config):
+        app = AttacksHostApp(cli_config)
+        async with app.run_test() as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
+            _fill_required_fields(tab)
+
+            tab._execute_attack(dry_run=True)
             await pilot.pause()
 
-            assert tab.query_one("#escalate-only-mitigated", Checkbox).display is False
+            text = str(tab.query_one("#execution-status", Static).render())
+            assert "Campaign spec" in text
+            assert "h4rm3l" in text and "tap" in text and "pair" in text
+
+    @pytest.mark.asyncio
+    async def test_execute_runs_the_assembled_spec(self, cli_config):
+        app = AttacksHostApp(cli_config)
+        async with app.run_test() as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
+            _fill_required_fields(tab)
+            # Reduce to a single static attack so no attacker is required and
+            # the assembled spec is small.
+            rows = list(tab.query(AttackRow))
+            _remove_row(tab, rows[2])
+            _remove_row(tab, rows[1])
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            tab.query_one(AttackRow).query_one(
+                ".row-attack-type", Select
+            ).value = "flipattack"
+            await pilot.pause()
+
+            class _Result:
+                attacks = ()
+
+            session = MagicMock()
+            with (
+                patch("hackagent.HackAgent", return_value=session),
+                patch(
+                    "hackagent.orchestrator.campaign.run_campaign",
+                    return_value=_Result(),
+                ) as run,
+            ):
+                tab._execute_attack(dry_run=False)
+                await app.workers.wait_for_complete()
+
+            run.assert_called_once()
+            spec = run.call_args.args[0]
+            assert [a["name"] for a in spec["attacks"]] == ["flipattack"]
+            assert spec["target"]["name"] == "my-agent"
+            assert run.call_args.kwargs["store"] is session.backend
+
+    @pytest.mark.asyncio
+    async def test_multiple_judges_form_the_panel_with_aggregation(self, cli_config):
+        app = AttacksHostApp(cli_config)
+        async with app.run_test() as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
+            _fill_required_fields(tab)
+            tab._add_judge_row()
+            await pilot.pause()
+            tab.query_one("#judge-aggregation", Select).value = "mean"
+
+            tab._execute_attack(dry_run=True)
+            await pilot.pause()
+
+            campaign = tab._build_campaign_spec(
+                agent_name="my-agent",
+                agent_type="openai-sdk",
+                endpoint="http://localhost:8000",
+                timeout=300,
+                attack_rows=list(tab.query(AttackRow)),
+                reject=lambda _m: None,
+            )
+            assert len(campaign["evaluation"]["judges"]) == 2
+            assert campaign["evaluation"]["aggregation"] == "mean"
+
+
+class TestWizard:
+    @pytest.mark.asyncio
+    async def test_starts_on_target_step_with_back_disabled(self, cli_config):
+        from textual.widgets import ContentSwitcher
+
+        app = AttacksHostApp(cli_config)
+        async with app.run_test(size=(120, 45)) as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
             assert (
-                tab.query_one("#escalate-only-mitigated-help", Static).display is False
+                tab.query_one("#wizard-steps", ContentSwitcher).current == "step-target"
+            )
+            assert tab.query_one("#wizard-back", Button).disabled is True
+
+    @pytest.mark.asyncio
+    async def test_next_is_gated_by_target_validation(self, cli_config):
+        from textual.widgets import ContentSwitcher
+
+        app = AttacksHostApp(cli_config)
+        async with app.run_test(size=(120, 45)) as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
+            switcher = tab.query_one("#wizard-steps", ContentSwitcher)
+
+            # Empty target → Next is refused with a message.
+            tab._next_step()
+            await pilot.pause()
+            assert switcher.current == "step-target"
+            assert "agent name" in str(
+                tab.query_one("#validation-errors", Static).render()
             )
 
-    @pytest.mark.asyncio
-    async def test_clear_form_resets_to_default_campaign(self, cli_config):
-        app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
-            tab = app.query_one(AttacksTab)
+            # Filled target → Next advances.
+            _fill_required_fields(tab)
+            tab.query_one("#agent-type", Select).value = "openai-sdk"
+            tab._next_step()
             await pilot.pause()
-            selection_list = tab.query_one("#attack-strategies", SelectionList)
-
-            _select_only(tab, ["baseline"])
-            await pilot.pause()
-            assert selection_list.selected == ["baseline"]
-
-            tab._clear_form()
-            await pilot.pause()
-            assert selection_list.selected == ["h4rm3l", "tap", "pair"]
-
-
-class TestConfiguringDropdownRestrictedToSelection:
-    """The 'Configuring' Select must only ever offer checked strategies —
-    you shouldn't be able to open the config form for an attack that isn't
-    actually part of the current run."""
+            assert switcher.current == "step-attacks"
 
     @pytest.mark.asyncio
-    async def test_dropdown_lists_only_checked_strategies_by_default(self, cli_config):
+    async def test_run_step_shows_a_summary(self, cli_config):
         app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
-            tab = app.query_one(AttacksTab)
-            await pilot.pause()
-            focus_select = tab.query_one("#attack-strategy-focus", Select)
-            option_values = [
-                value for _, value in focus_select._options if value != Select.NULL
-            ]
-            assert option_values == ["h4rm3l", "tap", "pair"]
-
-    @pytest.mark.asyncio
-    async def test_dropdown_shrinks_when_selection_shrinks(self, cli_config):
-        app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
-            tab = app.query_one(AttacksTab)
-            await pilot.pause()
-            _select_only(tab, ["h4rm3l"])
-            await pilot.pause()
-
-            focus_select = tab.query_one("#attack-strategy-focus", Select)
-            option_values = [
-                value for _, value in focus_select._options if value != Select.NULL
-            ]
-            assert option_values == ["h4rm3l"]
-            assert focus_select.value == "h4rm3l"
-
-    @pytest.mark.asyncio
-    async def test_focus_switches_away_when_focused_strategy_is_unchecked(
-        self, cli_config
-    ):
-        app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
-            tab = app.query_one(AttacksTab)
-            await pilot.pause()
-            tab._switch_focused_strategy("tap")
-            await pilot.pause()
-            assert tab._focused_strategy == "tap"
-
-            # Uncheck "tap" (the currently-focused strategy) — focus and the
-            # dropdown's options must both move away from it.
-            _select_only(tab, ["h4rm3l", "pair"])
-            await pilot.pause()
-
-            focus_select = tab.query_one("#attack-strategy-focus", Select)
-            option_values = [value for _, value in focus_select._options]
-            assert "tap" not in option_values
-            assert tab._focused_strategy in {"h4rm3l", "pair"}
-            assert focus_select.value == tab._focused_strategy
-
-    @pytest.mark.asyncio
-    async def test_selecting_in_configuring_then_unchecking_it_does_not_crash(
-        self, cli_config
-    ):
-        """Regression test: picking a strategy via the "Configuring" Select
-        (posting a real ``Select.Changed`` through the UI, not calling
-        ``_switch_focused_strategy`` directly) and then unchecking that same
-        strategy from the SelectionList used to raise
-        ``NoMatches: No nodes match '#label' on SelectCurrent`` — caused by
-        ``Select.BLANK`` (which is just the bool ``False`` in this Textual
-        version, not the blank-value sentinel) being misdetected as a real
-        selection wherever a blank/`Select.NULL` value briefly passed
-        through `on_select_changed`, triggering a spurious extra re-render.
-        """
-
-        app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
-            tab = app.query_one(AttacksTab)
-            await pilot.pause()
-
-            focus_select = tab.query_one("#attack-strategy-focus", Select)
-            focus_select.value = "tap"
-            await pilot.pause()
-            assert tab._focused_strategy == "tap"
-
-            selection_list = tab.query_one("#attack-strategies", SelectionList)
-            selection_list.deselect("tap")
-            await pilot.pause()
-
-            assert "tap" not in selection_list.selected
-            assert tab._focused_strategy in {"h4rm3l", "pair"}
-            # No unhandled exception propagated out of run_test() above —
-            # that's the actual regression being guarded against.
-
-
-class TestFocusedStrategyValueCaching:
-    @pytest.mark.asyncio
-    async def test_switching_focus_away_and_back_preserves_values(self, cli_config):
-        app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
-            tab = app.query_one(AttacksTab)
-            await pilot.pause()
-            first_key, second_key = "h4rm3l", "tap"
-
-            resolved_before = tab._resolve_config_for_strategy(first_key)
-            assert resolved_before  # sanity: spec has at least one default field
-
-            tab._switch_focused_strategy(second_key)
-            await pilot.pause()
-            assert tab._focused_strategy == second_key
-
-            tab._switch_focused_strategy(first_key)
-            await pilot.pause()
-            assert tab._focused_strategy == first_key
-
-            resolved_after = tab._resolve_config_for_strategy(first_key)
-            assert resolved_after == resolved_before
-
-
-class TestExecuteAttackChainBuilding:
-    """`_execute_attack(dry_run=True)` never spawns a worker thread, so the
-    chain-building branch can be exercised synchronously by inspecting the
-    preview text written to the status widget."""
-
-    @pytest.mark.asyncio
-    async def test_dry_run_single_strategy_uses_singular_attack_config(
-        self, cli_config
-    ):
-        app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(120, 45)) as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
             _fill_required_fields(tab)
-            _select_only(tab, ["h4rm3l"])
+            tab.query_one("#agent-type", Select).value = "openai-sdk"
+            tab._go_to_step(3)
             await pilot.pause()
+            summary = str(tab.query_one("#run-summary", Static).render())
+            assert "my-agent" in summary
+            assert "h4rm3l" in summary
 
-            tab._execute_attack(dry_run=True)
 
-            text = str(tab.query_one("#execution-status", Static).render())
-            assert "Escalate Only Mitigated" not in text
-            assert "h4rm3l" in text
+class TestRowLayout:
+    @staticmethod
+    async def _expanded_row_height(cli_config, terminal_height: int) -> int:
+        from textual.widgets import Collapsible
 
-    @pytest.mark.asyncio
-    async def test_dry_run_default_campaign_builds_chain_preview(self, cli_config):
         app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(120, terminal_height)) as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
-            _fill_required_fields(tab)
-
-            tab._execute_attack(dry_run=True)
-
-            text = str(tab.query_one("#execution-status", Static).render())
-            assert "Escalate Only Mitigated" in text
-            assert "h4rm3l" in text
-            assert "tap" in text
-            assert "pair" in text
-
-
-class TestExecuteAttackDispatch:
-    """Verify Execute routes to HackAgent.hack vs HackAgent.hack_chain based
-    on how many strategies are checked."""
+            row = list(tab.query(AttackRow))[1]
+            row.query_one(Collapsible).collapsed = False
+            await pilot.pause()
+            await pilot.pause()
+            return row.outer_size.height
 
     @pytest.mark.asyncio
-    async def test_single_strategy_calls_hack_not_hack_chain(self, cli_config):
-        app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
-            tab = app.query_one(AttacksTab)
-            await pilot.pause()
-            _fill_required_fields(tab)
-            _select_only(tab, ["h4rm3l"])
-            await pilot.pause()
-
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.hack.return_value = []
-            with patch(
-                "hackagent.HackAgent",
-                return_value=mock_agent_instance,
-            ):
-                tab._execute_attack(dry_run=False)
-                await app.workers.wait_for_complete()
-
-            mock_agent_instance.hack.assert_called_once()
-            mock_agent_instance.hack_chain.assert_not_called()
-            called_kwargs = mock_agent_instance.hack.call_args.kwargs
-            assert called_kwargs["attack_config"]["attack_type"] == "h4rm3l"
+    async def test_expanded_row_is_content_sized_not_viewport_sized(self, cli_config):
+        """The Parameters container must size to its content. A bare Vertical
+        defaults to ``height: 1fr`` and balloons to fill the viewport, which
+        made the oversized rows overlap; at ``height: auto`` the same expanded
+        row is the same height regardless of terminal size."""
+        short = await self._expanded_row_height(cli_config, 40)
+        tall = await self._expanded_row_height(cli_config, 80)
+        assert short == tall
 
     @pytest.mark.asyncio
-    async def test_default_campaign_calls_hack_chain_not_hack(self, cli_config):
+    async def test_rows_do_not_overlap_when_parameters_expand(self, cli_config):
+        """Every attack row keeps its own vertical band — expanding the rows'
+        Parameters must stack them, never draw one over another."""
+        from textual.widgets import Collapsible
+
         app = AttacksHostApp(cli_config)
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(120, 70)) as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
-            _fill_required_fields(tab)
+            rows = list(tab.query(AttackRow))
+            for row in rows:
+                row.query_one(Collapsible).collapsed = False
+            await pilot.pause()
+            await pilot.pause()
 
-            # Uncheck escalate-only-mitigated to verify the flag is forwarded.
-            tab.query_one("#escalate-only-mitigated", Checkbox).value = False
-
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.hack_chain.return_value = []
-            with patch(
-                "hackagent.HackAgent",
-                return_value=mock_agent_instance,
-            ):
-                tab._execute_attack(dry_run=False)
-                await app.workers.wait_for_complete()
-
-            mock_agent_instance.hack_chain.assert_called_once()
-            mock_agent_instance.hack.assert_not_called()
-            called_kwargs = mock_agent_instance.hack_chain.call_args.kwargs
-            attacks = called_kwargs["attacks"]
-            assert [a["attack_type"] for a in attacks] == ["h4rm3l", "tap", "pair"]
-            assert called_kwargs["escalate_only_mitigated"] is False
-            assert called_kwargs["goals"] == ["Return fake weather data"]
-
-            assert called_kwargs["escalate_only_mitigated"] is False
-            assert called_kwargs["goals"] == ["Return fake weather data"]
+            for upper, lower in zip(rows, rows[1:]):
+                assert lower.region.y >= upper.region.y + upper.region.height

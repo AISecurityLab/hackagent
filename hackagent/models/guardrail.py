@@ -18,13 +18,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
+from dataclasses import dataclass, field, replace
+from typing import Any, List, Literal, Mapping, Optional, Protocol, Sequence
 
-from hackagent.core.contracts import LLM, Message, ModelSpec
+from hackagent.core.contracts import GuardrailInfo, ModelSpec
+from hackagent.core.contracts.protocols import CompletionModel
 from hackagent.core.logging import get_logger
-from hackagent.models import envelope as _envelope
-from hackagent.models.client import EnvelopeLLM
+from hackagent.models.completions.cli import last_user_text
+from hackagent.models.model import Model
+from hackagent.models.response import ModelResponse
 
 logger = get_logger(__name__)
 
@@ -67,16 +69,16 @@ class Guardrail(Protocol):
     def check(self, text: str) -> GuardrailResult: ...
 
 
-class LLMGuardrail:
+class ModelGuardrail:
     """A guardrail that asks a classifier model for a JSON verdict."""
 
-    def __init__(self, llm: LLM, system_prompt: Optional[str] = None) -> None:
+    def __init__(self, llm: CompletionModel, system_prompt: Optional[str] = None) -> None:
         self.llm = llm
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
 
     def describe(self) -> ModelSpec:
         """The classifier model's spec."""
-        return self.llm.describe()
+        return getattr(self.llm, "describe")()
 
     def check(self, text: str) -> GuardrailResult:
         """Classify ``text``; fails open when the classifier is unavailable."""
@@ -85,8 +87,8 @@ class LLMGuardrail:
 
         completion = self.llm.complete(
             [
-                Message(role="system", content=self.system_prompt),
-                Message(role="user", content=text),
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": text},
             ],
             max_tokens=256,
             temperature=0,
@@ -101,6 +103,9 @@ class LLMGuardrail:
                 explanation=f"Guardrail unavailable: {completion.error.message}",
             )
         return parse_verdict(completion.text or "")
+
+
+LLMGuardrail = ModelGuardrail
 
 
 def parse_verdict(raw: str) -> GuardrailResult:
@@ -136,94 +141,54 @@ def parse_verdict(raw: str) -> GuardrailResult:
     )
 
 
-class Guarded(EnvelopeLLM):
-    """``llm`` with guardrails applied to every call."""
+class GuardedModel(Model):
+    """Apply the shared guardrail policy to native completions."""
 
-    def __init__(
-        self,
-        llm: EnvelopeLLM,
-        before: Optional[Guardrail] = None,
-        after: Optional[Guardrail] = None,
-    ) -> None:
-        self.llm = llm
+    def __init__(self, model: Model, before: Optional[Guardrail] = None, after: Optional[Guardrail] = None) -> None:
+        self.model = model
         self.before = before
         self.after = after
-        self.instance_id = llm.instance_id
-        self.adapter = llm.adapter
 
-    def with_params(self, **params: Any) -> "Guarded":
-        return Guarded(self.llm.with_params(**params), self.before, self.after)
-
-    def describe(self) -> ModelSpec:
-        return self.llm.describe()
-
-    def _blocked_before(self, request_data: Dict[str, Any]) -> Optional[Dict]:
-        if self.before is None:
-            return None
-        text = _envelope.prompt_text(request_data)
-        if not text.strip():
-            return None
-        return self._verdict_envelope("before", self.before, text, request_data)
-
-    def _censored_after(
-        self, request_data: Dict[str, Any], response: Dict[str, Any]
-    ) -> Optional[Dict]:
-        if self.after is None:
-            return None
-        text = str(
-            response.get("processed_response") or response.get("generated_text") or ""
-        ).strip()
-        if not text:
-            return None
-        return self._verdict_envelope("after", self.after, text, request_data)
-
-    def _verdict_envelope(
-        self,
-        side: str,
-        guardrail: Guardrail,
-        text: str,
-        request_data: Dict[str, Any],
-    ) -> Optional[Dict]:
+    def _check(self, side: Literal["before", "after"], text: str, response: ModelResponse) -> ModelResponse:
+        guardrail = self.before if side == "before" else self.after
+        if guardrail is None or not text.strip():
+            return response
         result = guardrail.check(text)
         if result.is_safe:
-            return None
-        logger.warning(
-            "%s guardrail flagged %s for agent %s: %s",
-            side,
-            "prompt" if side == "before" else "response",
-            self.instance_id,
-            result.explanation,
-        )
-        return _envelope.build_guardrail_envelope(
-            side=side,
-            agent_id=self.instance_id,
-            request_data=request_data,
-            categories=list(result.categories),
-            reasoning=result.explanation,
+            return response
+        info = GuardrailInfo(side=side, categories=result.categories, reasoning=result.explanation)
+        return replace(
+            response, text="", raw_response=None, reasoning_content=None, tool_calls=[],
+            guardrail=info,
+            metadata={**response.metadata, "ok": False, "guardrail": info.model_dump(exclude_none=True)},
         )
 
-    def send(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        blocked = self._blocked_before(request_data)
-        if blocked is not None:
+    def complete(self, messages: Sequence[Mapping[str, Any]], **overrides: Any) -> ModelResponse:
+        blocked = self._check(
+            "before", last_user_text(list(messages)) or "", ModelResponse(text="")
+        )
+        if blocked.guardrail is not None:
             return blocked
-        response = self.llm.send(request_data)
-        return self._censored_after(request_data, response) or response
+        response = self.model.complete(messages, **overrides)
+        return self._check("after", response.text, response) if response.ok else response
 
-    async def asend(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        blocked = await asyncio.to_thread(self._blocked_before, request_data)
-        if blocked is not None:
+    async def acomplete(self, messages: Sequence[Mapping[str, Any]], **overrides: Any) -> ModelResponse:
+        blocked = await asyncio.to_thread(
+            self._check, "before", last_user_text(list(messages)) or "", ModelResponse(text=""),
+        )
+        if blocked.guardrail is not None:
             return blocked
-        response = await self.llm.asend(request_data)
-        censored = await asyncio.to_thread(self._censored_after, request_data, response)
-        return censored or response
+        response = await self.model.acomplete(messages, **overrides)
+        return await asyncio.to_thread(self._check, "after", response.text, response) if response.ok else response
 
 
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
-    "Guarded",
+    "GuardedModel",
     "Guardrail",
     "GuardrailResult",
     "GuardrailSpec",
     "LLMGuardrail",
+    "ModelGuardrail",
     "parse_verdict",
 ]

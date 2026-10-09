@@ -3,30 +3,16 @@ sidebar_label: config
 title: hackagent.attacks.techniques.multi_turn.crescendo.config
 ---
 
-Configuration for the Crescendo attack.
+Configuration for Crescendo.
 
-## CrescendoConfig Objects
-
-```python
-class CrescendoConfig(ConfigBase)
-```
-
-Complete typed configuration for the Crescendo attack.
-
-#### from\_dict
+## CrescendoParams Objects
 
 ```python
-@classmethod
-def from_dict(cls, config_dict: Dict[str, Any]) -> "CrescendoConfig"
+class CrescendoParams(AttackParams)
 ```
 
-Create a :class:`CrescendoConfig` from a plain dictionary.
+How far the conversation escalates, and how often it may rephrase.
 
-#### to\_dict
-
-```python
-def to_dict() -> Dict[str, Any]
-```
-
-Convert to dictionary suitable for :meth:`HackAgent.hack`.
+`attacker` is a role: the model that proposes each next question, so
+Crescendo cannot run without it.
 

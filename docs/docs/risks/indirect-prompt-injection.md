@@ -1,15 +1,16 @@
 ---
-sidebar_label: Indirect Prompt Injection
-title: Indirect Prompt Injection
+sidebar_position: 4
+sidebar_label: Indirect Injection
+title: Indirect Injection
 ---
 
-# Indirect Prompt Injection
+# Indirect Injection
 
 This page describes a dedicated cybersecurity risk scenario where an LLM is manipulated through **untrusted content that the model ingests as context**, not through a malicious user prompt. The user can be fully benign — the compromise happens upstream, in the data the model reads.
 
 - **Risk Macro-Category**: Cybersecurity
 - **Risk Scenario**: Indirect Injection (hidden instructions in content the model consumes)
-- **Example Attacks in HackAgent**: [RAG Attack](../attacks/rag.md) (`attack_type="rag"`), [Tool-output IPI](../attacks/tool_output_ipi.md) (`attack_type="tool_output_ipi"`)
+- **Example Attacks in HackAgent**: [RAG Attack](../reference/attacks/rag.md) (`attack_type="rag"`), [Tool-output IPI](../reference/attacks/tool_output_ipi.md) (`attack_type="tool_output_ipi"`)
 
 Indirect injection is a *family* of attacks, not a single technique. Any data path that feeds external content into the model's context can be weaponized. The two implemented vectors above — document poisoning and tool-observation injection — are the starting points; other channels share the same root cause.
 
@@ -30,8 +31,8 @@ Indirect injection can enter through any channel that injects external text into
 
 | Vector | How the payload arrives | Example |
 |---|---|---|
-| **RAG / document poisoning** | Poisoned documents are chunked, embedded, and retrieved as context | A poisoned KB article retrieved for a benign query (see [RAG Attack](../attacks/rag.md)) |
-| **Tool / function-call output** | A tool the agent calls returns attacker-controlled text | A poisoned tool observation after a benign lookup (see [Tool-output IPI](../attacks/tool_output_ipi.md)) |
+| **RAG / document poisoning** | Poisoned documents are chunked, embedded, and retrieved as context | A poisoned KB article retrieved for a benign query (see [RAG Attack](../reference/attacks/rag.md)) |
+| **Tool / function-call output** | A tool the agent calls returns attacker-controlled text | A poisoned tool observation after a benign lookup (see [Tool-output IPI](../reference/attacks/tool_output_ipi.md)) |
 | **Web search & browsing** | The agent fetches a page whose content includes injected directives | A crafted webpage that says "ignore prior rules and…" in visible or hidden text |
 | **Ingested messages & files** | Emails, tickets, calendar invites, or uploaded files are summarized/acted on | A support email containing a hidden instruction the agent follows |
 | **Multi-agent / shared memory** | One agent writes attacker-influenced content another agent later reads | A poisoned shared note propagated across an agent pipeline |
@@ -124,11 +125,11 @@ Recommended evaluation signals:
 
 ## Implemented vectors
 
-HackAgent ships two end-to-end indirect-injection attacks. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. Category and tags: [Attack taxonomy](../attacks/taxonomy.mdx).
+HackAgent ships two end-to-end indirect-injection attacks. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. Category and tags: [Attack taxonomy](../reference/attacks/index.md).
 
 ### RAG Attack — document poisoning
 
-The **RAG Attack** (`attack_type: "rag"`) poisons knowledge-base documents that are later retrieved as context. **Category:** Static. **Tags:** Indirect, RAG. Full pipeline, strategies, and configuration: [RAG Attack](../attacks/rag.md).
+The **RAG Attack** (`attack_type: "rag"`) poisons knowledge-base documents that are later retrieved as context. **Category:** Static. **Tags:** Indirect, RAG. Full pipeline, strategies, and configuration: [RAG Attack](../reference/attacks/rag.md).
 
 ```python
 from hackagent import HackAgent, Settings
@@ -159,7 +160,7 @@ results = agent.hack(
 
 ### Tool-output IPI — poisoned tool observations
 
-**Tool-output IPI** (`attack_type: "tool_output_ipi"`) injects adversarial instructions into tool / function-call observations after a benign user task (InjecAgent / OPI). **Category:** Adaptive. **Tags:** Indirect (not `rag`). Full configuration: [Tool-output IPI](../attacks/tool_output_ipi.md).
+**Tool-output IPI** (`attack_type: "tool_output_ipi"`) injects adversarial instructions into tool / function-call observations after a benign user task (InjecAgent / OPI). **Category:** Adaptive. **Tags:** Indirect (not `rag`). Full configuration: [Tool-output IPI](../reference/attacks/tool_output_ipi.md).
 
 ```python
 from hackagent import HackAgent, AgentType, Settings

@@ -9,19 +9,19 @@ by structure. This package does not import ``attacks``.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Optional, Sequence
 
 from hackagent.core.contracts import (
-    LLM,
     NORMALIZED_SCORE_MAX,
     JudgeVote,
-    Message,
     Sample,
     Verdict,
 )
 from hackagent.evaluation.base import AssertionResult
 from hackagent.evaluation.judges import JUDGE_DEFAULT_RANGE, judge_type
+from hackagent.core.contracts.protocols import CompletionModel
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def normalize_score(score: float, judge_range: str) -> float:
     return (bounded / native_max) * NORMALIZED_SCORE_MAX
 
 
-class LLMJudge:
+class ModelJudge:
     """One registered judge type bound to an ``LLM``.
 
     A reply that cannot be parsed confidently is retried once. When the call
@@ -57,7 +57,7 @@ class LLMJudge:
     def __init__(
         self,
         kind: str,
-        llm: LLM,
+        llm: CompletionModel,
         *,
         name: Optional[str] = None,
         system_prompt: Optional[str] = None,
@@ -74,11 +74,17 @@ class LLMJudge:
         prompt = self.kind.render(sample)
         parsed = self._complete(prompt)
         if not parsed.is_confident:
-            parsed = self._complete(
-                "Your previous reply could not be parsed.\n"
-                f"Previous reply: {(parsed.explanation or '')[:200]}\n"
-                "Answer again, following the required format exactly.\n\n" + prompt
-            )
+            parsed = self._complete(_retry_prompt(parsed, prompt))
+        return self._to_vote(parsed)
+
+    async def avote(self, sample: Sample) -> JudgeVote:
+        prompt = self.kind.render(sample)
+        parsed = await self._acomplete(prompt)
+        if not parsed.is_confident:
+            parsed = await self._acomplete(_retry_prompt(parsed, prompt))
+        return self._to_vote(parsed)
+
+    def _to_vote(self, parsed: AssertionResult) -> JudgeVote:
         if not parsed.is_confident:
             logger.warning("Judge %s abstained: %s", self.name, parsed.explanation)
             return JudgeVote(judge=self.name, error=parsed.explanation)
@@ -92,21 +98,46 @@ class LLMJudge:
             explanation=parsed.explanation,
         )
 
-    def _complete(self, prompt: str) -> AssertionResult:
+    def _messages(self, prompt: str) -> list[dict[str, str]]:
         messages = []
         if isinstance(self.system_prompt, str) and self.system_prompt.strip():
-            messages.append(Message(role="system", content=self.system_prompt.strip()))
-        messages.append(Message(role="user", content=prompt))
+            messages.append({"role": "system", "content": self.system_prompt.strip()})
+        messages.append({"role": "user", "content": prompt})
+        return messages
+
+    def _complete(self, prompt: str) -> AssertionResult:
         try:
-            completion = self.llm.complete(messages)
+            completion = self.llm.complete(self._messages(prompt))
         except Exception as exc:
             logger.warning("Judge %s call failed: %s", self.name, exc)
             return AssertionResult(0, f"Judge call failed: {exc}", False)
+        return self._parse(completion)
+
+    async def _acomplete(self, prompt: str) -> AssertionResult:
+        try:
+            completion = await self.llm.acomplete(self._messages(prompt))
+        except Exception as exc:
+            logger.warning("Judge %s call failed: %s", self.name, exc)
+            return AssertionResult(0, f"Judge call failed: {exc}", False)
+        return self._parse(completion)
+
+    def _parse(self, completion: Any) -> AssertionResult:
         if not getattr(completion, "ok", True):
             err = getattr(completion, "error", None)
             message = getattr(err, "message", None) or "judge call failed"
             return AssertionResult(0, f"Judge call failed: {message}", False)
         return self.kind.parse(getattr(completion, "text", None))
+
+
+def _retry_prompt(parsed: AssertionResult, prompt: str) -> str:
+    return (
+        "Your previous reply could not be parsed.\n"
+        f"Previous reply: {(parsed.explanation or '')[:200]}\n"
+        "Answer again, following the required format exactly.\n\n" + prompt
+    )
+
+
+LLMJudge = ModelJudge
 
 
 def _judge_range(judge: Any) -> str:
@@ -193,15 +224,29 @@ class Panel:
         return self.evaluate(sample).score
 
     def evaluate(self, sample: Sample) -> Verdict:
-        votes = []
+        votes = [_as_vote(judge, sample, self.threshold) for judge in self.judges]
+        return self._combine(votes)
+
+    async def aevaluate(self, sample: Sample) -> Verdict:
+        """Ask every judge concurrently. Judges must provide ``avote``."""
+
+        async def ask(judge: Any) -> JudgeVote:
+            try:
+                return await judge.avote(sample)
+            except Exception as exc:
+                logger.warning("Judge %s failed: %s", _judge_name(judge), exc)
+                return JudgeVote(judge=_judge_name(judge), error=f"Judge failed: {exc}")
+
+        votes = await asyncio.gather(*(ask(judge) for judge in self.judges))
+        return self._combine(list(votes))
+
+    def _combine(self, votes: list[JudgeVote]) -> Verdict:
         normalized = []
-        for judge in self.judges:
-            vote = _as_vote(judge, sample, self.threshold)
-            votes.append(vote)
+        for judge, vote in zip(self.judges, votes):
             if vote.abstained:
                 continue
             native = 0.0 if vote.score is None else float(vote.score)
-            # LLMJudge.vote reports the native scale and declares ``range``.
+            # A model judge reports its native scale and declares ``range``.
             # A port Judge's evaluate()/score() is already on 0..10.
             if hasattr(judge, "vote"):
                 value = normalize_score(native, _judge_range(judge))

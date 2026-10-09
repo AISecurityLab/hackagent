@@ -14,7 +14,6 @@ Language Models via Auto-Generated Flowcharts" (EMNLP 2025 Findings)
 import base64
 import hashlib
 import json
-import logging
 import os
 import platform
 import re
@@ -27,8 +26,6 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List
 from urllib.request import Request, urlopen
-
-logger = logging.getLogger(__name__)
 
 _GRAPHVIZ_AVAILABLE: bool | None = None
 _GRAPHVIZ_DOT_BIN: str | None = None
@@ -189,7 +186,7 @@ def _extract_zip_preserving_symlinks(zip_path: Path, destination: Path) -> None:
                 try:
                     out_path.chmod(mode)
                 except OSError:
-                    logger.debug("Could not chmod extracted file %s", out_path)
+                    pass
 
 
 def _repair_macos_dylib_symlinks(root: Path) -> int:
@@ -230,10 +227,8 @@ def _repair_macos_dylib_symlinks(root: Path) -> int:
             os.symlink(target_name, alias_file)
             repaired += 1
         except OSError:
-            logger.debug("Could not repair dylib symlink for %s", alias_file)
+            pass
 
-    if repaired:
-        logger.info("Repaired %d Graphviz dylib symlink(s) under %s", repaired, root)
     return repaired
 
 
@@ -442,10 +437,6 @@ def _resolve_dot_binary(allow_download: bool | None = None) -> str | None:
         ):
             _GRAPHVIZ_DOT_BIN = str(path)
             return _GRAPHVIZ_DOT_BIN
-        logger.warning(
-            "Ignoring HACKAGENT_GRAPHVIZ_DOT=%s (file not found or not executable)",
-            dot_from_env,
-        )
 
     dot_on_path = shutil.which("dot")
     if dot_on_path:
@@ -466,16 +457,10 @@ def _resolve_dot_binary(allow_download: bool | None = None) -> str | None:
         release = _fetch_graphviz_latest_release()
         links = release.get("assets", {}).get("links", [])
         if not isinstance(links, list):
-            logger.warning("Invalid Graphviz release payload: missing assets.links")
             return None
 
         asset = _pick_latest_graphviz_asset(links, platform.system())
         if not asset:
-            logger.warning(
-                "No portable Graphviz archive found for OS '%s'. "
-                "Set HACKAGENT_GRAPHVIZ_DOT to a local dot binary.",
-                platform.system(),
-            )
             return None
 
         version = str(release.get("tag_name") or "latest")
@@ -494,7 +479,6 @@ def _resolve_dot_binary(allow_download: bool | None = None) -> str | None:
             return _GRAPHVIZ_DOT_BIN
 
         archive_path = install_root / asset_name
-        logger.info("Downloading Graphviz archive: %s", asset_name)
         _download_file(asset_url, archive_path)
 
         archive_name = archive_path.name.lower()
@@ -503,10 +487,6 @@ def _resolve_dot_binary(allow_download: bool | None = None) -> str | None:
         elif archive_name.endswith(".pkg") and platform.system().lower() == "darwin":
             _extract_macos_pkg_payload(archive_path, install_root)
         else:
-            logger.warning(
-                "Unsupported Graphviz archive type '%s'",
-                archive_path.name,
-            )
             return None
 
         _repair_macos_dylib_symlinks(install_root)
@@ -514,10 +494,6 @@ def _resolve_dot_binary(allow_download: bool | None = None) -> str | None:
 
         extracted_dot = _find_dot_binary(install_root)
         if not extracted_dot:
-            logger.warning(
-                "Graphviz archive extracted but dot binary was not found in %s",
-                install_root,
-            )
             return None
 
         if platform.system().lower() != "windows":
@@ -525,14 +501,13 @@ def _resolve_dot_binary(allow_download: bool | None = None) -> str | None:
                 current_mode = extracted_dot.stat().st_mode
                 extracted_dot.chmod(current_mode | 0o111)
             except OSError:
-                logger.debug("Could not chmod +x %s", extracted_dot, exc_info=True)
+                pass
 
             _initialize_graphviz_plugins(str(extracted_dot))
 
         _GRAPHVIZ_DOT_BIN = str(extracted_dot)
         return _GRAPHVIZ_DOT_BIN
-    except Exception as exc:  # pragma: no cover - network/runtime dependent
-        logger.warning("Graphviz auto-download failed: %s", exc)
+    except Exception:  # pragma: no cover - network/runtime dependent
         return None
 
 

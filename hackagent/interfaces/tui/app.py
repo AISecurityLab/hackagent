@@ -11,7 +11,7 @@ from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Footer, TabbedContent, TabPane
+from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.theme import css_variables
@@ -64,8 +64,8 @@ class HackAgentTUI(App):
 
     Tab.-active {
         color: $brand-text;
-        background: $brand-dark;  /* dark red when active */
-        text-style: bold;
+        background: $brand;  /* brighter red when active — clear contrast */
+        text-style: bold underline;
     }
 
     Tab:hover {
@@ -157,15 +157,18 @@ class HackAgentTUI(App):
     }
     """
 
-    TITLE = "🔴 HACKAGENT 🔴 - AI Security Testing Toolkit"
-    SUB_TITLE = "Red Team Security Interface"
+    TITLE = "HackAgent"
+    SUB_TITLE = "AI red-team cockpit — Campaign ▸ Results ▸ Targets ▸ Config"
 
+    # Tab switching is on the number keys, in the order of the red-team
+    # journey (compose a campaign → read results → manage targets → config),
+    # and shown in the footer so the navigation is discoverable.
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
-        Binding("a", "switch_tab('agents')", "Target Agents", show=False),
-        Binding("k", "switch_tab('attacks')", "Attacks", show=False),
-        Binding("r", "switch_tab('results')", "Results", show=False),
-        Binding("c", "switch_tab('config')", "Config", show=False),
+        Binding("1", "switch_tab('attacks')", "Campaign"),
+        Binding("2", "switch_tab('results')", "Results"),
+        Binding("3", "switch_tab('agents')", "Targets"),
+        Binding("4", "switch_tab('config')", "Config"),
         Binding("f5", "refresh", "Refresh", show=True),
         Binding("ctrl+y", "copy_selection", "Copy logs", show=True),
     ]
@@ -173,14 +176,15 @@ class HackAgentTUI(App):
     def __init__(
         self,
         cli_config: CLIConfig,
-        initial_tab: str = "agents",
+        initial_tab: str = "attacks",
         initial_data: dict[Any, Any] | None = None,
     ):
         """Initialize the TUI application.
 
         Args:
             cli_config: CLI configuration object
-            initial_tab: Which tab to show initially (default: "agents")
+            initial_tab: Which tab to show initially (default: "attacks", the
+                campaign composer — the cockpit's primary job)
             initial_data: Initial data to pre-fill in the tab (default: None)
         """
         super().__init__()
@@ -195,17 +199,20 @@ class HackAgentTUI(App):
 
     def compose(self) -> ComposeResult:
         """Compose the UI layout."""
+        yield Header()
+        # Tabs follow the red-team journey left-to-right: compose a campaign,
+        # read its results, manage the targets, configure the tool.
         with TabbedContent(initial=self.initial_tab):
-            with TabPane("Target Agents", id="agents"):
-                yield AgentsTab(self.cli_config)
-
-            with TabPane("Attacks", id="attacks"):
+            with TabPane("⚔ Campaign", id="attacks"):
                 yield AttacksTab(self.cli_config, initial_data=self.initial_data)
 
-            with TabPane("Results", id="results"):
+            with TabPane("📊 Results", id="results"):
                 yield ResultsTab(self.cli_config)
 
-            with TabPane("Config", id="config"):
+            with TabPane("🎯 Targets", id="agents"):
+                yield AgentsTab(self.cli_config)
+
+            with TabPane("⚙ Config", id="config"):
                 yield ConfigTab(self.cli_config)
 
         yield Footer()

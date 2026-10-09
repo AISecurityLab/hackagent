@@ -2,30 +2,30 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for the Google ADK adapter.
+Unit tests for the Google ADK backend.
 
-Issue #379 routes ADK through LiteLLM via a custom provider, so the
-``ADKAgent`` no longer makes the HTTP calls itself — its custom handler
-does. These tests exercise both layers: handler-level (HTTP transport)
-and adapter-level (end-to-end via the public ``handle_request``).
+ADK is routed through LiteLLM via a custom provider, so ``ADKModel`` does not
+make the HTTP calls itself — its custom handler does. These tests exercise both
+layers: handler-level (HTTP transport) and model-level (end-to-end via the
+public ``complete``).
 """
 
 import logging
 import unittest
-import uuid
 from unittest.mock import MagicMock, patch
 
 import httpx
 
-from hackagent.models.adapters.adk import (
-    ADKAgent,
-    AgentConfigurationError,
-    AgentInteractionError,
+from hackagent.core.contracts import AgentType, ModelSpec
+from hackagent.models.completions import adk as adk_module
+from hackagent.models.completions.adk import (
+    ADKConfigurationError,
+    ADKInteractionError,
+    ADKModel,
     _extract_final_text,
     _get_adk_custom_llm_class,
-    _last_user_text,
 )
-from hackagent.models.adapters import adk as adk_provider_module
+from hackagent.models.completions.cli import last_user_text as _last_user_text
 
 logging.disable(logging.CRITICAL)
 
@@ -39,6 +39,23 @@ def _make_httpx_http_status_error(
     return httpx.HTTPStatusError(
         f"HTTP Error: {status_code}", request=request, response=response
     )
+
+
+def _spec(**config):
+    name = config.pop("name", "test_app")
+    endpoint = config.pop("endpoint", "http://fake-adk.com")
+    timeout = config.pop("timeout", None)
+    return ModelSpec(
+        identifier=name,
+        agent_type=AgentType.GOOGLE_ADK,
+        endpoint=endpoint,
+        timeout=timeout,
+        extra=dict(config),
+    )
+
+
+def _model(**config):
+    return ADKModel(_spec(**config))
 
 
 def _make_handler(**overrides):
@@ -58,12 +75,11 @@ def _make_handler(**overrides):
 
 
 class TestADKModuleLayout(unittest.TestCase):
-    """ADK lives at ``router/providers/adk.py`` (Phase F.3)."""
+    """ADK lives at ``models/completions/adk.py``."""
 
     def test_helpers_are_module_level(self):
-        self.assertIs(_extract_final_text, adk_provider_module._extract_final_text)
-        self.assertIs(_last_user_text, adk_provider_module._last_user_text)
-        self.assertIs(ADKAgent, adk_provider_module.ADKAgent)
+        self.assertIs(_extract_final_text, adk_module._extract_final_text)
+        self.assertIs(ADKModel, adk_module.ADKModel)
 
 
 class TestADKHelpers(unittest.TestCase):
@@ -154,7 +170,7 @@ class TestADKCustomLLMTransport(unittest.TestCase):
         mock_resp.raise_for_status.side_effect = _make_httpx_http_status_error(500)
         mock_post.return_value = mock_resp
         handler = _make_handler()
-        with self.assertRaises(AgentInteractionError):
+        with self.assertRaises(ADKInteractionError):
             handler._create_session(session_id="abc")
 
     @patch("httpx.post")
@@ -163,7 +179,7 @@ class TestADKCustomLLMTransport(unittest.TestCase):
             "nope", request=httpx.Request("POST", "http://fake-adk.com")
         )
         handler = _make_handler()
-        with self.assertRaises(AgentInteractionError):
+        with self.assertRaises(ADKInteractionError):
             handler._create_session(session_id="abc")
 
     @patch("httpx.post")
@@ -184,79 +200,77 @@ class TestADKCustomLLMTransport(unittest.TestCase):
         self.assertEqual(result["status_code"], 200)
 
 
-class TestADKAgentInit(unittest.TestCase):
+class TestADKModelInit(unittest.TestCase):
     def test_init_success(self):
-        adapter = ADKAgent(
-            id=str(uuid.uuid4()),
-            config={
-                "name": "my_app",
-                "endpoint": "http://fake-adk.com/",
-                "user_id": "alice",
-                "timeout": 60,
-            },
+        model = _model(
+            name="my_app",
+            endpoint="http://fake-adk.com/",
+            user_id="alice",
+            timeout=60,
         )
-        self.assertEqual(adapter.endpoint, "http://fake-adk.com")
-        self.assertEqual(adapter.name, "my_app")
-        self.assertEqual(adapter.user_id, "alice")
-        self.assertEqual(adapter.timeout, 60)
-        # The adapter routes through LiteLLM under a per-instance provider.
+        self.assertEqual(model.endpoint, "http://fake-adk.com")
+        self.assertEqual(model.name, "my_app")
+        self.assertEqual(model.user_id, "alice")
+        self.assertEqual(model.timeout, 60)
+        # The model routes through LiteLLM under a per-instance provider.
         self.assertTrue(
-            adapter.litellm_model.startswith("hackagent_adk_")
-            and adapter.litellm_model.endswith("/my_app")
+            model.litellm_model.startswith("hackagent_adk_")
+            and model.litellm_model.endswith("/my_app")
         )
 
     def test_init_default_timeout(self):
-        adapter = ADKAgent(
-            id="t1",
-            config={"name": "a", "endpoint": "http://x", "user_id": "u"},
-        )
-        self.assertEqual(adapter.timeout, 120)
+        model = _model(name="a", endpoint="http://x", user_id="u")
+        self.assertEqual(model.timeout, 120)
+
+    def test_init_user_id_defaults(self):
+        model = _model(name="a", endpoint="http://x")
+        self.assertEqual(model.user_id, "hackagent")
 
     def test_init_missing_name(self):
-        with self.assertRaises(AgentConfigurationError):
-            ADKAgent(id="e1", config={"endpoint": "http://x", "user_id": "u"})
+        with self.assertRaises(ADKConfigurationError):
+            ADKModel(
+                ModelSpec(
+                    identifier="",
+                    agent_type=AgentType.GOOGLE_ADK,
+                    endpoint="http://x",
+                    extra={"user_id": "u"},
+                )
+            )
 
     def test_init_missing_endpoint(self):
-        with self.assertRaises(AgentConfigurationError):
-            ADKAgent(id="e2", config={"name": "a", "user_id": "u"})
-
-    def test_init_missing_user_id(self):
-        with self.assertRaises(AgentConfigurationError):
-            ADKAgent(id="e3", config={"name": "a", "endpoint": "http://x"})
+        with self.assertRaises(ADKConfigurationError):
+            ADKModel(
+                ModelSpec(
+                    identifier="a",
+                    agent_type=AgentType.GOOGLE_ADK,
+                    extra={"user_id": "u"},
+                )
+            )
 
     def test_init_registers_custom_provider(self):
         import litellm
 
-        adapter = ADKAgent(
-            id="reg1",
-            config={
-                "name": "app",
-                "endpoint": "http://fake-adk.com",
-                "user_id": "u",
-            },
-        )
+        model = _model(name="app", endpoint="http://fake-adk.com", user_id="u")
         providers = [entry["provider"] for entry in litellm.custom_provider_map]
-        self.assertIn(f"hackagent_adk_{adapter.id}", providers)
+        self.assertIn(f"hackagent_adk_{model.id}", providers)
+
+    def test_registered_in_native_model_map(self):
+        from hackagent.models.build import _native_model_classes
+
+        self.assertIs(_native_model_classes()[AgentType.GOOGLE_ADK], ADKModel)
 
 
-class TestADKAgentHandleRequest(unittest.TestCase):
+class TestADKModelComplete(unittest.TestCase):
     def setUp(self):
-        self.adapter = ADKAgent(
-            id="h1",
-            config={
-                "name": "test_app",
-                "endpoint": "http://fake-adk.com",
-                "user_id": "u",
-                "fresh_session_per_request": False,
-            },
+        self.model = _model(
+            name="test_app",
+            endpoint="http://fake-adk.com",
+            user_id="u",
+            fresh_session_per_request=False,
         )
-
-    def test_missing_prompt_returns_400(self):
-        response = self.adapter.handle_request({})
-        self.assertEqual(response["status_code"], 400)
 
     @patch("httpx.post")
-    def test_handle_request_success_routes_through_adk(self, mock_post):
+    def test_complete_success_routes_through_adk(self, mock_post):
         # First call creates the session; second call is /run.
         session_resp = MagicMock(status_code=200, raise_for_status=MagicMock())
         run_events = [{"content": {"parts": [{"text": "agent reply"}]}}]
@@ -265,43 +279,39 @@ class TestADKAgentHandleRequest(unittest.TestCase):
         run_resp.raise_for_status = MagicMock()
         mock_post.side_effect = [session_resp, run_resp]
 
-        response = self.adapter.handle_request({"prompt": "hello"})
+        response = self.model.complete([{"role": "user", "content": "hello"}])
 
-        self.assertEqual(response["status_code"], 200)
-        self.assertEqual(response["generated_text"], "agent reply")
-        self.assertEqual(response["adapter_type"], "ADKAgent")
-        agent_data = response["agent_specific_data"]
-        self.assertEqual(agent_data.get("adk_events_list"), run_events)
-        self.assertEqual(agent_data.get("adk_session_id"), self.adapter.session_id)
+        self.assertEqual(response.text, "agent reply")
+        self.assertIsNone(response.error)
+        self.assertEqual(response.metadata.get("adk_events_list"), run_events)
+        self.assertEqual(response.metadata.get("adk_session_id"), self.model.session_id)
 
     @patch("httpx.post")
-    def test_handle_request_uses_explicit_session_id(self, mock_post):
+    def test_complete_uses_explicit_session_id(self, mock_post):
         session_resp = MagicMock(status_code=200, raise_for_status=MagicMock())
         run_resp = MagicMock(status_code=200, headers={}, text="[]")
         run_resp.json.return_value = [{"content": {"parts": [{"text": "ok"}]}}]
         run_resp.raise_for_status = MagicMock()
         mock_post.side_effect = [session_resp, run_resp]
 
-        response = self.adapter.handle_request(
-            {"prompt": "hi", "session_id": "explicit-123"}
+        response = self.model.complete(
+            [{"role": "user", "content": "hi"}], session_id="explicit-123"
         )
-        self.assertEqual(response["status_code"], 200)
-        self.assertEqual(
-            response["agent_specific_data"]["adk_session_id"], "explicit-123"
-        )
+        self.assertIsNone(response.error)
+        self.assertEqual(response.metadata.get("adk_session_id"), "explicit-123")
         # Session-create POST should target the explicit id.
         session_call_url = mock_post.call_args_list[0][0][0]
         self.assertIn("/sessions/explicit-123", session_call_url)
 
     @patch("httpx.post")
-    def test_handle_request_run_http_error_returns_500(self, mock_post):
+    def test_complete_run_http_error_returns_error(self, mock_post):
         session_resp = MagicMock(status_code=200, raise_for_status=MagicMock())
         run_resp = MagicMock(status_code=500, text="boom", headers={})
         run_resp.raise_for_status.side_effect = _make_httpx_http_status_error(500)
         mock_post.side_effect = [session_resp, run_resp]
-        response = self.adapter.handle_request({"prompt": "hi"})
-        self.assertEqual(response["status_code"], 500)
-        self.assertIn("HTTP Error: 500", response["error_message"])
+        response = self.model.complete([{"role": "user", "content": "hi"}])
+        self.assertIsNotNone(response.error)
+        self.assertIn("HTTP Error: 500", response.error.message)
 
 
 if __name__ == "__main__":

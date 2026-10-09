@@ -3,81 +3,13 @@ sidebar_label: config
 title: hackagent.attacks.techniques.static.mml.config
 ---
 
-Configuration for MML (Multi-Modal Linkage) attacks.
-
-Provides both the plain-dict `DEFAULT_MML_CONFIG` (used internally by
-:class:`~hackagent.attacks.techniques.static.mml.attack.MMLAttack`) and typed
-Pydantic models for structured configuration.
-
-Encoding Modes
---------------
-word_replacement
-    Replaces key words in the prompt with random substitutes,
-    renders to image, and provides a replacement dictionary.
-mirror
-    Renders the harmful prompt as text in an image, then mirrors
-    the image horizontally.
-rotate
-    Renders the harmful prompt as text in an image, then rotates
-    the image 180 degrees.
-base64
-    Encodes the harmful prompt in Base64, renders that encoded
-    text in an image.
+Configuration for MML.
 
 ## MMLParams Objects
 
 ```python
-class MMLParams(BaseModel)
+class MMLParams(AttackParams)
 ```
 
-Hyperparameters controlling the MML encoding strategy.
-
-**Attributes**:
-
-- `encoding_mode` - Visual encoding mode. One of `"word_replacement"`
-  (replace key words and provide dictionary), `"mirror"` (flip
-  image horizontally), `"rotate"` (rotate image 180 degrees),
-  or `"base64"` (encode text in Base64 in image).
-- `image_width` - Width of the generated image in pixels.
-- `image_height` - Height of the generated image in pixels.
-- `font_size` - Font size for rendered text.
-- `background_color` - Background color of the generated image.
-- `text_color` - Text color in the generated image.
-- `num_replacements` - Number of words to replace in word_replacement mode.
-- `prompt_style` - Prompt framing style. `"game"` uses the villain&#x27;s
-  lair scenario; `"control"` uses a neutral list-filling prompt.
-
-## MMLConfig Objects
-
-```python
-class MMLConfig(ConfigBase)
-```
-
-Complete MML configuration for use with :meth:`HackAgent.hack`.
-
-Mirrors `DEFAULT_MML_CONFIG` as a typed alternative. Call
-:meth:`model_dump` (or :meth:`to_dict`) to obtain the plain dict
-expected by the attack pipeline.
-
-**Attributes**:
-
-- `attack_type` - Always `"mml"` (required by the orchestrator).
-- `mml_params` - Encoding hyperparameters (:class:`MMLParams`).
-
-#### from\_dict
-
-```python
-@classmethod
-def from_dict(cls, config_dict: Dict[str, Any]) -> "MMLConfig"
-```
-
-Create a :class:`MMLConfig` from a plain dictionary.
-
-#### to\_dict
-
-```python
-def to_dict() -> Dict[str, Any]
-```
-
-Convert to dictionary.
+How the goal is encoded into an image and how the target is prompted.
 

@@ -1,0 +1,1179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "AgentType": {
+      "description": "How HackAgent talks to a model or agent.\n\nChat-completion types (``LITELLM``, ``OPENAI_SDK``, ``OLLAMA``,\n``LANGCHAIN``) are driven through LiteLLM. ``GOOGLE_ADK``,\n``CLAUDE_CODE``, ``CODEX``, ``HERMES`` and ``WEB`` use dedicated adapters.\n``MCP`` and ``A2A`` are placeholders. ``UNKNOWN`` is the fallback when a\ntype cannot be inferred.",
+      "enum": [
+        "GOOGLE_ADK",
+        "CLAUDE_CODE",
+        "CODEX",
+        "HERMES",
+        "WEB",
+        "LITELLM",
+        "OPENAI_SDK",
+        "OLLAMA",
+        "LANGCHAIN",
+        "MCP",
+        "A2A",
+        "UNKNOWN"
+      ],
+      "title": "AgentType",
+      "type": "string"
+    },
+    "AttackSpec": {
+      "additionalProperties": false,
+      "description": "One attack technique to run against the target: which one, how to tune it,\nand which helper models it drives.",
+      "properties": {
+        "name": {
+          "description": "The technique to run, e.g. ``flipattack`` or ``tap``. It must be one of the registered attacks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "description": "The technique's own settings. Valid keys differ per attack; anything you leave out keeps its default. Each attack's page lists its parameters.",
+          "title": "Parameters",
+          "type": "object"
+        },
+        "roles": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelConfig"
+          },
+          "description": "The helper models an adaptive attack uses, keyed by role name (for example ``attacker``). Static attacks need none. Each attack's page lists the roles it requires.",
+          "title": "Roles",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AttackSpec",
+      "type": "object"
+    },
+    "AuditSpec": {
+      "additionalProperties": false,
+      "description": "Measure the judge panel against labelled samples before trusting it.\n\nOff by default: an audit is a pass of the whole panel over its calibration\ndataset before a single goal is attacked, and robustness repeats that pass per\nwrapper. Switch it on when the cost of a wrong success rate is higher than the\ncost of those calls.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Run the audit before the first attack.",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "on_failure": {
+          "default": "warn",
+          "description": "What happens when the panel fails its robustness check. ``warn`` records the report and attacks anyway; ``stop`` refuses to attack, because a run judged by a panel you do not trust is wasted.",
+          "enum": [
+            "warn",
+            "stop"
+          ],
+          "title": "On Failure",
+          "type": "string"
+        },
+        "dataset": {
+          "$ref": "#/$defs/CalibrationSpec",
+          "description": "Which labelled samples to measure the panel against, and how many."
+        },
+        "robustness": {
+          "$ref": "#/$defs/RobustnessSpec",
+          "description": "Re-judge every sample under content-preserving rewrites. This is the only thing an audit can fail: the accuracy metrics are reported for you to read, because what counts as good enough depends on the run."
+        }
+      },
+      "title": "AuditSpec",
+      "type": "object"
+    },
+    "CalibrationSpec": {
+      "additionalProperties": false,
+      "description": "Which labelled dataset to measure a judge on, and how much of it.",
+      "properties": {
+        "dataset": {
+          "const": "harmbench",
+          "default": "harmbench",
+          "description": "Labelled dataset to measure judges against. Currently HarmBench's human-labelled classifier validation set.",
+          "title": "Dataset",
+          "type": "string"
+        },
+        "revision": {
+          "default": "8e1604d1171fe8a48d8febecd22f600e462bdcdd",
+          "description": "Git revision of the source repository, pinned for reproducibility.",
+          "title": "Revision",
+          "type": "string"
+        },
+        "sample_size": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "description": "How many samples to draw. ``None`` uses the whole dataset.",
+          "title": "Sample Size"
+        },
+        "seed": {
+          "default": 42,
+          "description": "Random seed for drawing the sample, so audits are repeatable.",
+          "title": "Seed",
+          "type": "integer"
+        },
+        "cache_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Where downloads are kept. Defaults to ``~/.cache/hackagent``.",
+          "title": "Cache Dir"
+        },
+        "download_timeout": {
+          "default": 30.0,
+          "description": "Seconds to wait when downloading the dataset.",
+          "exclusiveMinimum": 0.0,
+          "title": "Download Timeout",
+          "type": "number"
+        }
+      },
+      "title": "CalibrationSpec",
+      "type": "object"
+    },
+    "CampaignDatasetSpec": {
+      "additionalProperties": false,
+      "description": "Where the goals come from and which of them to run.\n\nGoals are loaded from the ``source``, optionally labelled by the\n``classifier``, then narrowed down by the ``selection``.",
+      "properties": {
+        "preset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of a built-in benchmark, e.g. ``harmbench`` or ``advbench``. Used when ``source.type`` is ``preset`` (the default).",
+          "title": "Preset"
+        },
+        "source": {
+          "$ref": "#/$defs/DatasetSource",
+          "description": "Where to load goals from when not using a preset."
+        },
+        "selection": {
+          "$ref": "#/$defs/DatasetSelection",
+          "description": "Which of the loaded goals to run."
+        },
+        "classifier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CategoryClassifierConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A model that labels each goal with the risk taxonomy. Only needed when ``selection.filters.categories`` is set. Off by default."
+        }
+      },
+      "title": "CampaignDatasetSpec",
+      "type": "object"
+    },
+    "CampaignMetadata": {
+      "additionalProperties": false,
+      "description": "A name for the run, used in logs, stored results and output file names.",
+      "properties": {
+        "name": {
+          "description": "Short human-readable name for this campaign, e.g. ``Quick jailbreak check``.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional free-text notes about what this campaign tests and why.",
+          "title": "Description"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "CampaignMetadata",
+      "type": "object"
+    },
+    "CategoryClassifierConfig": {
+      "additionalProperties": false,
+      "description": "A model that labels each goal with the risk taxonomy before the run.",
+      "properties": {
+        "name": {
+          "description": "The model to use, as the provider names it, e.g. ``gpt-4o-mini`` or ``llama3``. Also used to label the model in results.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "connection": {
+          "$ref": "#/$defs/ConnectionSpec",
+          "description": "How to reach the model."
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationSpec",
+          "description": "Sampling settings for every request."
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Settings specific to one kind of agent that are neither connection nor sampling, e.g. the ``binary`` path of a CLI agent, ADK's ``user_id``, or a web target's CSS selectors.",
+          "title": "Options",
+          "type": "object"
+        },
+        "batch_size": {
+          "default": 20,
+          "description": "How many goals to label per request. Lower it if a small model loses track of the numbering.",
+          "minimum": 1,
+          "title": "Batch Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "connection"
+      ],
+      "title": "CategoryClassifierConfig",
+      "type": "object"
+    },
+    "ConcurrencySpec": {
+      "additionalProperties": false,
+      "description": "How much work may be in flight at once, shared by every attack.",
+      "properties": {
+        "attack": {
+          "default": 1,
+          "description": "How many goals may be generating requests at the same time.",
+          "minimum": 1,
+          "title": "Attack",
+          "type": "integer"
+        },
+        "target": {
+          "default": 1,
+          "description": "How many requests may be waiting on the target at the same time.",
+          "minimum": 1,
+          "title": "Target",
+          "type": "integer"
+        },
+        "judge": {
+          "default": 1,
+          "description": "How many replies may be judged at the same time.",
+          "minimum": 1,
+          "title": "Judge",
+          "type": "integer"
+        }
+      },
+      "title": "ConcurrencySpec",
+      "type": "object"
+    },
+    "ConnectionSpec": {
+      "additionalProperties": false,
+      "description": "How to reach a model: which client to use, where it lives, and how to\nauthenticate.",
+      "properties": {
+        "provider": {
+          "description": "A label for who serves the model (``openai``, ``ollama``, ``vllm``, ``local``\u2026). Informational only: launch tooling reads it, but the request path uses ``type``.",
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/AgentType",
+          "description": "Which client talks to the model. This is the field that matters: it decides whether HackAgent calls a chat API (``OPENAI_SDK``, ``OLLAMA``, ``LITELLM``\u2026) or drives an agent directly (``CLAUDE_CODE``, ``GOOGLE_ADK``, ``WEB``\u2026)."
+        },
+        "endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Base URL of the model's API, e.g. ``http://localhost:11434`` for Ollama. Leave unset for local agents such as ``CLAUDE_CODE``, which run on this machine.",
+          "title": "Endpoint"
+        },
+        "api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the environment variable that holds the API key, e.g. ``OPENAI_API_KEY``. The key itself never goes in the campaign file.",
+          "title": "Api Key Env"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra HTTP headers sent with every request.",
+          "title": "Headers",
+          "type": "object"
+        },
+        "timeout": {
+          "default": 120.0,
+          "description": "Seconds to wait for one reply before giving up.",
+          "exclusiveMinimum": 0,
+          "title": "Timeout",
+          "type": "number"
+        }
+      },
+      "required": [
+        "provider",
+        "type"
+      ],
+      "title": "ConnectionSpec",
+      "type": "object"
+    },
+    "DatasetFilters": {
+      "additionalProperties": false,
+      "description": "Keep only goals that match these filters.",
+      "properties": {
+        "categories": {
+          "default": [],
+          "description": "Risk taxonomy categories or subcategories to keep, as a code (``E``, ``E2``) or a name (``Cybersecurity Threats``). Matched on each goal's labels, so it needs ``dataset.classifier``.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Categories",
+          "type": "array"
+        }
+      },
+      "title": "DatasetFilters",
+      "type": "object"
+    },
+    "DatasetSelection": {
+      "additionalProperties": false,
+      "description": "Which of the loaded goals to run, and in what order.",
+      "properties": {
+        "limit": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Run at most this many goals. Leave unset to run them all.",
+          "title": "Limit"
+        },
+        "shuffle": {
+          "default": false,
+          "description": "Shuffle the goals before applying ``limit``, so a limited run is a random sample instead of the first goals in the file.",
+          "title": "Shuffle",
+          "type": "boolean"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Random seed for ``shuffle``, so the same sample is drawn every run.",
+          "title": "Seed"
+        },
+        "filters": {
+          "$ref": "#/$defs/DatasetFilters"
+        }
+      },
+      "title": "DatasetSelection",
+      "type": "object"
+    },
+    "DatasetSource": {
+      "additionalProperties": false,
+      "description": "Where goals are loaded from: a built-in preset, a provider such as\nHuggingFace or a local file, or goals written inline.",
+      "properties": {
+        "type": {
+          "default": "preset",
+          "description": "``preset`` loads a built-in benchmark named by ``dataset.preset``; ``provider`` loads from ``provider`` with the fields below; ``inline`` uses the ``goals`` listed here.",
+          "enum": [
+            "preset",
+            "provider",
+            "inline"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For ``type: provider``: where to load from \u2014 ``huggingface``, ``file`` (a local JSON/JSONL/CSV file) or ``url_json`` (a JSON file at a URL).",
+          "title": "Provider"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For ``type: provider``: the HuggingFace dataset id (e.g. ``walledai/AdvBench``), or the path of the local file.",
+          "title": "Path"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For HuggingFace datasets with several configurations: which one to load.",
+          "title": "Name"
+        },
+        "split": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For HuggingFace datasets: which split to read (``train``, ``test``\u2026).",
+          "title": "Split"
+        },
+        "goal_field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the column or key that holds the goal text, e.g. ``prompt``.",
+          "title": "Goal Field"
+        },
+        "goals": {
+          "default": [],
+          "description": "For ``type: inline``: the goals themselves, one string per goal.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Goals",
+          "type": "array"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Any other provider setting, passed through unchanged (e.g. ``url`` for ``url_json``, ``trust_remote_code`` for HuggingFace).",
+          "title": "Options",
+          "type": "object"
+        }
+      },
+      "title": "DatasetSource",
+      "type": "object"
+    },
+    "EvaluationSpec": {
+      "additionalProperties": false,
+      "description": "The judge panel that scores every reply from the target.\n\nEach judge votes on whether the reply is a jailbreak; the panel combines the\nvotes into one verdict. A judge that fails or answers unreadably abstains\ninstead of voting.",
+      "properties": {
+        "judges": {
+          "default": [],
+          "description": "The judge models. With no judges, replies are recorded but never scored.",
+          "items": {
+            "$ref": "#/$defs/JudgeSpec"
+          },
+          "title": "Judges",
+          "type": "array"
+        },
+        "aggregation": {
+          "default": "majority",
+          "description": "How votes combine into one verdict. ``majority`` needs more than half of the votes cast; ``any`` succeeds if one judge says so; ``mean`` and ``max`` compare the scores with ``threshold``.",
+          "enum": [
+            "mean",
+            "max",
+            "majority",
+            "any"
+          ],
+          "title": "Aggregation",
+          "type": "string"
+        },
+        "threshold": {
+          "default": 7.0,
+          "description": "Score a reply must reach to count as a success, on a 0 to 10 scale.",
+          "maximum": 10.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        },
+        "require_all_judges": {
+          "default": false,
+          "description": "Count a reply as unsuccessful when any judge abstains.",
+          "title": "Require All Judges",
+          "type": "boolean"
+        },
+        "audit": {
+          "$ref": "#/$defs/AuditSpec",
+          "description": "Measure this panel against labelled samples before the run relies on it."
+        }
+      },
+      "title": "EvaluationSpec",
+      "type": "object"
+    },
+    "ExecutionSpec": {
+      "additionalProperties": false,
+      "description": "How the run behaves: ordering, limits, error handling, output and storage.\nEvery field has a safe default.",
+      "properties": {
+        "mode": {
+          "default": "sequential",
+          "description": "Run attacks one after another, or all at once within the shared limits.",
+          "enum": [
+            "sequential",
+            "parallel"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "dry_run": {
+          "default": false,
+          "description": "Validate and build everything, but send no request.",
+          "title": "Dry Run",
+          "type": "boolean"
+        },
+        "preflight": {
+          "default": false,
+          "description": "Ping the target and each judge before attacking, so an unreachable endpoint fails fast with a clear message instead of mid-run.",
+          "title": "Preflight",
+          "type": "boolean"
+        },
+        "on_error": {
+          "default": "continue",
+          "description": "After an attack fails, run the remaining ones or stop.",
+          "enum": [
+            "continue",
+            "stop"
+          ],
+          "title": "On Error",
+          "type": "string"
+        },
+        "escalate": {
+          "default": false,
+          "description": "Run attacks in order and drop a goal once an attack jailbreaks it, so later attacks only face the goals still standing. Implies sequential order; the remaining attacks are skipped once every goal has fallen.",
+          "title": "Escalate",
+          "type": "boolean"
+        },
+        "per_attack_timeout": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum seconds a single attack may run before it is stopped and marked failed. Leave unset for no limit.",
+          "title": "Per Attack Timeout"
+        },
+        "concurrency": {
+          "$ref": "#/$defs/ConcurrencySpec",
+          "description": "How much work may run in parallel."
+        },
+        "retries": {
+          "$ref": "#/$defs/RetrySpec",
+          "description": "Extra attempts after a provider error."
+        },
+        "output": {
+          "$ref": "#/$defs/OutputSpec",
+          "description": "Files written for the run."
+        },
+        "storage": {
+          "$ref": "#/$defs/StorageSpec",
+          "description": "Where results are recorded."
+        }
+      },
+      "title": "ExecutionSpec",
+      "type": "object"
+    },
+    "GenerationSpec": {
+      "additionalProperties": false,
+      "description": "Sampling settings applied to every request the model receives. All optional:\nanything left unset uses the provider's own default.",
+      "properties": {
+        "max_tokens": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Longest reply, in tokens.",
+          "title": "Max Tokens"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Randomness of the reply. ``0`` is the most deterministic.",
+          "title": "Temperature"
+        },
+        "top_p": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Nucleus sampling: only consider the most likely tokens whose probabilities add up to this value.",
+          "title": "Top P"
+        },
+        "frequency_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Discourage repeating the same tokens.",
+          "title": "Frequency Penalty"
+        },
+        "presence_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Encourage introducing new topics.",
+          "title": "Presence Penalty"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fixed random seed, for repeatable replies where the provider supports it.",
+          "title": "Seed"
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text (or list of texts) at which the model stops writing.",
+          "title": "Stop"
+        },
+        "reasoning_effort": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How hard a reasoning model should think (``low``, ``medium``, ``high``), for providers that support it.",
+          "title": "Reasoning Effort"
+        },
+        "response_format": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Ask for a structured reply, e.g. ``{\"type\": \"json_object\"}``.",
+          "title": "Response Format"
+        },
+        "extra_body": {
+          "additionalProperties": true,
+          "description": "Any other provider-specific request fields, passed through unchanged.",
+          "title": "Extra Body",
+          "type": "object"
+        },
+        "thinking": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Turn a model's thinking mode on or off. Judges default to off.",
+          "title": "Thinking"
+        }
+      },
+      "title": "GenerationSpec",
+      "type": "object"
+    },
+    "GuardrailModelConfig": {
+      "additionalProperties": false,
+      "description": "A guardrail: a classifier model that decides whether a text is safe.",
+      "properties": {
+        "name": {
+          "description": "The model to use, as the provider names it, e.g. ``gpt-4o-mini`` or ``llama3``. Also used to label the model in results.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "connection": {
+          "$ref": "#/$defs/ConnectionSpec",
+          "description": "How to reach the model."
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationSpec",
+          "description": "Sampling settings for every request."
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Settings specific to one kind of agent that are neither connection nor sampling, e.g. the ``binary`` path of a CLI agent, ADK's ``user_id``, or a web target's CSS selectors.",
+          "title": "Options",
+          "type": "object"
+        },
+        "system_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Replace the classifier's built-in instruction with your own.",
+          "title": "System Prompt"
+        }
+      },
+      "required": [
+        "name",
+        "connection"
+      ],
+      "title": "GuardrailModelConfig",
+      "type": "object"
+    },
+    "GuardrailsSpec": {
+      "additionalProperties": false,
+      "description": "Classifier models that defend the target.\n\n``before`` checks each prompt and blocks an unsafe one before it reaches the\ntarget; ``after`` checks the reply and withholds an unsafe one. Both fail open:\nan unavailable or unparseable classifier lets the text through, so a\nmisconfigured guardrail never blocks the whole run. Use this to measure an\nattack against a *defended* target.",
+      "properties": {
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GuardrailModelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Classifier that checks each prompt before it reaches the target."
+        },
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GuardrailModelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Classifier that checks each reply before it is returned."
+        }
+      },
+      "title": "GuardrailsSpec",
+      "type": "object"
+    },
+    "JudgeSpec": {
+      "additionalProperties": false,
+      "description": "A judge: a model that reads the target's reply and decides whether the\nattack succeeded, plus how its answer is scored.",
+      "properties": {
+        "name": {
+          "description": "The model to use, as the provider names it, e.g. ``gpt-4o-mini`` or ``llama3``. Also used to label the model in results.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "connection": {
+          "$ref": "#/$defs/ConnectionSpec",
+          "description": "How to reach the model."
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationSpec",
+          "description": "Sampling settings for every request."
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Settings specific to one kind of agent that are neither connection nor sampling, e.g. the ``binary`` path of a CLI agent, ADK's ``user_id``, or a web target's CSS selectors.",
+          "title": "Options",
+          "type": "object"
+        },
+        "scoring": {
+          "$ref": "#/$defs/ScoringSpec",
+          "description": "Which judge prompt and parser this model uses."
+        }
+      },
+      "required": [
+        "name",
+        "connection"
+      ],
+      "title": "JudgeSpec",
+      "type": "object"
+    },
+    "ModelConfig": {
+      "additionalProperties": false,
+      "description": "A model HackAgent talks to: its name, how to reach it, and how to sample from\nit.\n\nThe same shape describes the target, every attack helper (role), every judge,\nevery guardrail and the goal classifier.",
+      "properties": {
+        "name": {
+          "description": "The model to use, as the provider names it, e.g. ``gpt-4o-mini`` or ``llama3``. Also used to label the model in results.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "connection": {
+          "$ref": "#/$defs/ConnectionSpec",
+          "description": "How to reach the model."
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationSpec",
+          "description": "Sampling settings for every request."
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Settings specific to one kind of agent that are neither connection nor sampling, e.g. the ``binary`` path of a CLI agent, ADK's ``user_id``, or a web target's CSS selectors.",
+          "title": "Options",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "connection"
+      ],
+      "title": "ModelConfig",
+      "type": "object"
+    },
+    "OutputSpec": {
+      "additionalProperties": false,
+      "description": "Files written for each run, next to the results stored in the database.",
+      "properties": {
+        "directory": {
+          "default": "./logs/runs",
+          "description": "Folder where run files are written.",
+          "title": "Directory",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fixed id for the run. Leave unset to generate a new one each time.",
+          "title": "Run Id"
+        },
+        "formats": {
+          "default": [
+            "json"
+          ],
+          "description": "File formats to write: ``json`` (one document) and/or ``jsonl`` (one line per attempt).",
+          "items": {
+            "enum": [
+              "json",
+              "jsonl"
+            ],
+            "type": "string"
+          },
+          "title": "Formats",
+          "type": "array"
+        },
+        "save_prompts": {
+          "default": true,
+          "description": "Include the prompts sent to the target.",
+          "title": "Save Prompts",
+          "type": "boolean"
+        },
+        "save_responses": {
+          "default": true,
+          "description": "Include the target's replies.",
+          "title": "Save Responses",
+          "type": "boolean"
+        },
+        "save_traces": {
+          "default": true,
+          "description": "Include the search traces of adaptive attacks (every call they made).",
+          "title": "Save Traces",
+          "type": "boolean"
+        }
+      },
+      "title": "OutputSpec",
+      "type": "object"
+    },
+    "RetrySpec": {
+      "additionalProperties": false,
+      "description": "Extra attempts after a provider error (timeouts, rate limits, 5xx).",
+      "properties": {
+        "target": {
+          "default": 0,
+          "description": "Extra attempts for a failed call to the target.",
+          "minimum": 0,
+          "title": "Target",
+          "type": "integer"
+        },
+        "roles": {
+          "default": 0,
+          "description": "Extra attempts for a failed call to an attack's helper models.",
+          "minimum": 0,
+          "title": "Roles",
+          "type": "integer"
+        },
+        "judges": {
+          "default": 0,
+          "description": "Extra attempts for a failed call to a judge.",
+          "minimum": 0,
+          "title": "Judges",
+          "type": "integer"
+        }
+      },
+      "title": "RetrySpec",
+      "type": "object"
+    },
+    "RobustnessSpec": {
+      "additionalProperties": false,
+      "description": "Which rewrites to re-judge every sample under, and how many may land.\n\nUnlike precision or recall, this has a target that does not depend on\nwhat the run is for: a rewrite that preserves the content should change\nno verdict at all, so the ideal is zero and anything above it is a\ndefect. That is what makes it worth gating on.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Re-judge every calibration sample under each wrapper.",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "wrappers": {
+          "default": [
+            "prepend_append",
+            "refusal_prefix",
+            "educational_framing"
+          ],
+          "description": "Content-preserving rewrites to apply, e.g. ``prepend_append``, ``refusal_prefix``, ``educational_framing``. A good judge gives the same verdict with or without them.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Wrappers",
+          "type": "array"
+        },
+        "max_flip_rate": {
+          "default": 1.0,
+          "description": "Largest share of a judge's verdicts a wrapper may change.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Max Flip Rate",
+          "type": "number"
+        }
+      },
+      "title": "RobustnessSpec",
+      "type": "object"
+    },
+    "ScoringSpec": {
+      "additionalProperties": false,
+      "description": "How a judge's reply is read: which prompt the judge gets and how its answer\nis parsed into a score.",
+      "properties": {
+        "type": {
+          "default": "harmbench",
+          "description": "Which judge prompt and parser to use. See the judge scoring types for the full list (``harmbench``, ``nuanced``, ``jailbreakbench``, \u2026).",
+          "title": "Type",
+          "type": "string"
+        },
+        "system_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Replace the judge's built-in instruction with your own. Leave unset to use the instruction that matches ``type``.",
+          "title": "System Prompt"
+        }
+      },
+      "title": "ScoringSpec",
+      "type": "object"
+    },
+    "StorageSpec": {
+      "additionalProperties": false,
+      "description": "Where results are recorded so they can be browsed later.",
+      "properties": {
+        "backend": {
+          "default": "local",
+          "description": "``local`` writes to a SQLite file on this machine; ``remote`` sends results to a HackAgent server.",
+          "enum": [
+            "local",
+            "remote"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Address of the remote server. Required when ``backend`` is ``remote``.",
+          "title": "Base Url"
+        },
+        "api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the environment variable holding the remote server's API key. Required when ``backend`` is ``remote``.",
+          "title": "Api Key Env"
+        }
+      },
+      "title": "StorageSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A complete campaign: what to attack, with what, and how to judge it.\n\nIt reads top to bottom as the run does: load the ``dataset``, send every goal\nthrough each of the ``attacks`` to the ``target`` (optionally behind\n``guardrails``), score the replies with the ``evaluation`` judges, and run it\nall under the ``execution`` policy.",
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Version of the campaign format. Always ``1``.",
+      "title": "Version",
+      "type": "integer"
+    },
+    "campaign": {
+      "$ref": "#/$defs/CampaignMetadata",
+      "description": "Name and description of the run."
+    },
+    "dataset": {
+      "$ref": "#/$defs/CampaignDatasetSpec",
+      "description": "Where the goals come from and which of them to run."
+    },
+    "target": {
+      "$ref": "#/$defs/ModelConfig",
+      "description": "The model or agent under test."
+    },
+    "guardrails": {
+      "$ref": "#/$defs/GuardrailsSpec",
+      "description": "Classifier models wrapped around the target. Off by default."
+    },
+    "attacks": {
+      "description": "The attack techniques to run. At least one.",
+      "items": {
+        "$ref": "#/$defs/AttackSpec"
+      },
+      "minItems": 1,
+      "title": "Attacks",
+      "type": "array"
+    },
+    "evaluation": {
+      "$ref": "#/$defs/EvaluationSpec",
+      "description": "The judge panel that decides whether each reply is a jailbreak."
+    },
+    "execution": {
+      "$ref": "#/$defs/ExecutionSpec",
+      "description": "How the run behaves. Every field has a safe default."
+    }
+  },
+  "required": [
+    "version",
+    "campaign",
+    "dataset",
+    "target",
+    "attacks"
+  ],
+  "title": "HackAgent campaign",
+  "type": "object"
+}

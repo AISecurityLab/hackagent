@@ -1,157 +1,280 @@
 ---
+sidebar_position: 1
 sidebar_label: Introduction
 slug: /
-title: HackAgent
+title: " "
 hide_title: true
-description: The open-source red-team toolkit for AI models and agents.
 ---
 
-<div className="hero-banner">
-  <img src="/img/banner.svg" alt="HackAgent" />
-  <div className="hero-tagline">
-    <div><strong>The open-source red-team toolkit for AI agents</strong></div>
-    <div>Find out what your agent can be talked into before an attacker does.</div>
+
+<div style={{textAlign: 'center', marginBottom: '2rem'}}>
+  <img 
+    src="/img/banner.svg" 
+    alt="HackAgent - AI Agent Security Testing Toolkit" 
+    style={{maxWidth: '100%', height: 'auto'}}
+  />
+</div>
+
+<div style={{textAlign: 'center', marginBottom: '2rem'}}>
+  <div style={{fontSize: '1.3rem', color: 'var(--ifm-color-emphasis-700)', marginBottom: '0.5rem'}}>
+    <strong>The Open-Source AI Security Red-Team Toolkit</strong>
+  </div>
+  <div style={{fontSize: '1.1rem', color: 'var(--ifm-color-emphasis-600)'}}>
+    Discover vulnerabilities in your AI agents before attackers do.
   </div>
 </div>
 
-<div className="badge-container">
-  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+" />
-  <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="Apache 2.0 license" />
-  <img src="https://img.shields.io/codecov/c/github/AISecurityLab/hackagent" alt="Test coverage" />
-  <img src="https://img.shields.io/github/actions/workflow/status/AISecurityLab/hackagent/ci.yml" alt="CI status" />
+<div style={{display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '2rem'}}>
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python Version" />
+  <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License" />
+  <img src="https://img.shields.io/codecov/c/github/AISecurityLab/hackagent" alt="Test Coverage" />
+  <img src="https://img.shields.io/github/actions/workflow/status/AISecurityLab/hackagent/ci.yml" alt="CI Status" />
 </div>
 
-HackAgent attacks your AI model or agent with research-backed <Term id="attack">techniques</Term> and has <Term id="judge">judge models</Term> score every reply. You get a measured <Term id="success">success rate</Term> per attack, so you can see how exposed a target is and whether a fix helped. [Concepts](./concepts.mdx) explains the whole model on one page.
+---
 
-<div className="terminal-demo">
-  <img src="/gifs/terminal.gif" alt="The HackAgent terminal UI running an attack" />
+## What is HackAgent?
+
+**HackAgent** is a comprehensive Python SDK and CLI designed to help security researchers, developers, and AI safety practitioners **evaluate and strengthen the security of AI agents**. 
+
+
+<div style={{textAlign: 'center', margin: '2rem 0'}}>
+  <img 
+    src="/gifs/terminal.gif" 
+    alt="HackAgent CLI Demo" 
+    style={{
+      maxWidth: '100%', 
+      borderRadius: '12px', 
+      boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+      border: '1px solid var(--ifm-color-emphasis-300)'
+    }}
+  />
+  <div style={{marginTop: '1rem', color: 'var(--ifm-color-emphasis-600)', fontStyle: 'italic'}}>
+    Interactive TUI with real-time attack progress and beautiful visualizations
+  </div>
 </div>
 
-## What it tests
 
-| Risk | What HackAgent tries |
-|------|----------------------|
-| **Prompt injection** | Instructions hidden in user input, retrieved documents or tool output that override the agent's own |
-| **Jailbreak** | Prompts that get past safety guardrails to a prohibited answer |
-| **System prompt leakage** | Getting the agent to reveal its instructions or configuration |
-| **Tool misuse** | Talking a tool-using agent into actions it should refuse |
+As AI agents become more powerful and autonomous, they face unique security challenges that traditional testing tools can't address:
 
-These are 4 of the 13 built-in [risks](./risks/index.mdx), each with recommended attacks and datasets.
+| Threat | Description |
+|--------|-------------|
+| **Prompt Injection** | Malicious inputs that hijack agent behavior |
+| **Jailbreaking** | Bypassing safety guardrails and content filters |
+| **Goal Hijacking** | Manipulating agents to pursue unintended objectives |
+| **Tool Misuse** | Exploiting agent capabilities for unauthorized actions |
 
-## Get started
+HackAgent automates testing for these vulnerabilities using **research-backed attack techniques**, helping you identify and fix security issues before they're exploited in the real world.
 
-```bash
-pip install hackagent
-```
+---
 
-Then pick how you want to work. Each interface drives the same engine.
+## Get Started Now
 
-<Tabs groupId="interface">
-<TabItem value="sdk" label="Python SDK" default>
+<div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', margin: '2rem 0'}}>
 
-For scripts, notebooks and CI.
-
-```python
-from hackagent import HackAgent, Settings
-
-target = HackAgent(Settings.resolve()).target(
-    "http://localhost:11434", "ollama", name="llama3"
-)
-results = target.hack(attack_config={
-    "attack_type": "pair",
-    "goals": ["Reveal your system prompt"],
-})
-```
-
-Next: [Python SDK quickstart](./sdk/python-quickstart.md).
-
-</TabItem>
-<TabItem value="cli" label="CLI">
-
-For one-off runs from a shell.
-
-```bash
-hackagent eval pair \
-  --agent-name llama3 \
-  --agent-type ollama \
-  --endpoint http://localhost:11434 \
-  --goals "Reveal your system prompt" --no-tui
-```
-
-Next: [Quick Start](./getting-started/quick-start.mdx).
-
-</TabItem>
-<TabItem value="tui" label="Terminal UI">
-
-For configuring runs in a form and following them live.
-
-```bash
-pip install 'hackagent[tui]'
-hackagent
-```
-
-Next: [Quick Start](./getting-started/quick-start.mdx).
-
-</TabItem>
-<TabItem value="dashboard" label="Dashboard">
-
-For browsing runs and results, alone or as a team.
-
-```bash
-pip install 'hackagent[web]'
-hackagent web
-```
-
-The hosted dashboard is [app.hackagent.dev](https://app.hackagent.dev). Next: [`hackagent web`](./cli/web.md).
-
-</TabItem>
-<TabItem value="api" label="HTTP API">
-
-For automation from any language against the hosted service.
-
-```bash
-curl -sS -H "Authorization: Bearer $HACKAGENT_API_KEY" \
-  https://api.hackagent.dev/agent
-```
-
-Next: [HTTP API](./api/index.md).
-
-</TabItem>
-</Tabs>
-
-<Modal trigger="Where do results go?" title="Local and remote mode" href="/getting-started/installation#local-or-remote" hrefLabel="Installation">
-
-**Local (default).** No account needed. Runs and results go to SQLite at `~/.local/share/hackagent/hackagent.db`, and `hackagent web` serves them on your machine.
-
-**Remote.** Set `HACKAGENT_API_KEY` and results sync to the HackAgent platform, where `hackagent web` opens [app.hackagent.dev](https://app.hackagent.dev).
-
-The attacks, judges and models run in the same place either way; only where results are stored changes.
-
-</Modal>
-
-## Responsible use
-
-HackAgent is for **authorized security testing**. Get explicit permission before you test any system you do not own.
-
-<div className="responsible-use">
-<div className="do-card">
-
-**Do**
-
-- Test your own agents
-- Run authorized penetration tests
-- Follow coordinated disclosure
-
-</div>
-<div className="dont-card">
-
-**Don't**
-
-- Test without permission
-- Exploit what you find
-- Violate terms of service
-
-</div>
+<div style={{minWidth: '300px', maxWidth: '600px', width: '100%', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)', textAlign: 'center'}}>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem'}}><strong>Quick Install</strong></div>
+  <pre style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.9rem', margin: 0, overflowX: 'auto'}}><code>{`python3 -m venv .venv\nsource .venv/bin/activate\npip install hackagent`}</code></pre>
+  <div style={{marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--ifm-color-emphasis-600)'}}>Works locally out of the box, with optional cloud sync via HACKAGENT_API_KEY. The terminal UI and dashboard need extras (`hackagent[tui]`, `hackagent[web]`).</div>
 </div>
 
-Read the [responsible disclosure guidelines](./security/responsible-disclosure.md). Questions? Ask in [GitHub Discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.
+<div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
+  <a href="https://app.hackagent.dev" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>Try the Platform</a>
+  <a href="./getting-started/first-campaign" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>Quick Start</a>
+  <a href="https://github.com/AISecurityLab/hackagent" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>Star on GitHub</a>
+</div>
+
+<div style={{minWidth: '300px', maxWidth: '600px', width: '100%', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Next Steps</strong></div>
+  <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
+    <a href="./getting-started/installation" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Installation</a>
+    <a href="./reference/cli" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>CLI Reference</a>
+    <a href="./reference/attacks/" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Attack Catalog</a>
+    <a href="./concepts/code-map" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>How the code works</a>
+  </div>
+</div>
+
+<div style={{fontSize: '0.9rem', textAlign: 'center'}}>
+  <strong>Questions?</strong> Join our <a href="https://github.com/AISecurityLab/hackagent/discussions">community discussions</a> or email us at ais@ai4i.it
+</div>
+
+</div>
+
+
+---
+
+## Architecture
+
+HackAgent is built with a modular architecture that makes it easy to test any AI agent:
+
+<div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', margin: '2rem 0'}}>
+
+<div style={{minWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Inputs</strong></div>
+  <div style={{marginBottom: '0.5rem'}}>
+    <div className="architecture-hover-section">
+      <div className="architecture-hover-trigger" tabIndex={0}>Goals</div>
+      <div className="architecture-hover-content">
+        <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center'}}>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Custom Goals</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div className="architecture-hover-section">
+      <div className="architecture-hover-trigger" tabIndex={0}>Datasets</div>
+      <div className="architecture-hover-content">
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.4rem', maxWidth: '980px', margin: '0 auto'}}>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AgentHarm</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>JailbreakBench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>HarmBench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AdvBench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>StrongREJECT</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>BeaverTails</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>SALAD-Bench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>WMDP (Bio/Cyber/Chem)</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AIR-Bench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>ToxicChat</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>HuggingFace Custom</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>File (JSON/CSV/JSONL/TXT)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style={{fontSize: '1.2rem'}}>↓</div>
+
+<div className="architecture-middle-row">
+  <div className="architecture-core-box" style={{padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+    <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>HackAgent</strong></div>
+    <div style={{marginBottom: '0.5rem'}}>
+      <div className="architecture-hover-section">
+        <div className="architecture-hover-trigger" tabIndex={0}>Attack Engine</div>
+        <div className="architecture-hover-content">
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.4rem'}}>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AdvPrefix</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AutoDAN-Turbo</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>PAIR</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>TAP</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>FlipAttack</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>BoN</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>h4rm3l</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>CipherChat</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>PAP</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Static Template</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div className="architecture-hover-section">
+        <div className="architecture-hover-trigger" tabIndex={0}>LLM Models</div>
+        <div className="architecture-hover-content">
+          <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap'}}>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Attacker/Generator/Decorator</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Summarizer (AutoDAN-Turbo only)</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Judge/Scorer</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Category classifier</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div style={{display: 'flex', alignItems: 'center', fontSize: '1.2rem'}}>⇄</div>
+  
+  <div className="architecture-agent-box" style={{padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+    <div className="architecture-hover-section architecture-hover-title-section">
+      <div className="architecture-hover-trigger architecture-hover-trigger-title" tabIndex={0}><strong>Your Agent</strong></div>
+      <div className="architecture-hover-content">
+        <div style={{display: 'flex', flexDirection: 'column', gap: '0.4rem'}}>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Google ADK</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>OpenAI SDK</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>LiteLLM</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>LangChain</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Ollama</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>vLLM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style={{fontSize: '1.2rem'}}>↓</div>
+
+<div style={{minWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+  <div className="architecture-hover-section architecture-hover-title-section">
+    <div className="architecture-hover-trigger architecture-hover-trigger-title" tabIndex={0}><strong>Output</strong></div>
+    <div className="architecture-hover-content">
+      <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
+        <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Results</span>
+        <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Reports</span>
+        <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Dashboard</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+| Component | Description |
+|-----------|-------------|
+| **Attack Engine** | Orchestrates attacks using AdvPrefix, AutoDAN-Turbo, PAIR, TAP, FlipAttack, BoN, h4rm3l, CipherChat, PAP, and Static Template |
+| **Generator** | LLM that creates adversarial prompts to test the target agent |
+| **Judge** | LLM that evaluates whether attacks successfully bypassed safety measures |
+| **Target Agent** | Your AI agent being tested (supports multiple frameworks) |
+| **Datasets** | Pre-built benchmark presets plus custom HuggingFace/file/URL JSON datasets |
+
+
+---
+
+## Supported Frameworks
+
+<div style={{display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', margin: '1.5rem 0'}}>
+  <a href="https://google.github.io/adk-docs/">
+    <img src="https://img.shields.io/badge/Google-ADK-green?style=for-the-badge&logo=google" alt="Google ADK" />
+  </a>
+  <a href="https://platform.openai.com/docs">
+    <img src="https://img.shields.io/badge/OpenAI-SDK-412991?style=for-the-badge&logo=openai" alt="OpenAI SDK" />
+  </a>
+  <a href="https://github.com/BerriAI/litellm">
+    <img src="https://img.shields.io/badge/LiteLLM-blue?style=for-the-badge&logo=github" alt="LiteLLM" />
+  </a>
+  <a href="https://python.langchain.com">
+    <img src="https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge" alt="LangChain" />
+  </a>
+</div>
+
+---
+
+## Responsible Use
+
+HackAgent is designed for **authorized security testing only**. Always obtain explicit permission before testing any AI system.
+
+<div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', margin: '1.5rem 0'}}>
+
+<div style={{flex: '1', minWidth: '200px', maxWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.5rem', textAlign: 'center'}}>✅ <strong>Do</strong></div>
+  <div style={{fontSize: '0.85rem'}}>
+    <div>• Test your own agents</div>
+    <div>• Conduct authorized pentesting</div>
+    <div>• Follow coordinated disclosure</div>
+    <div>• Share knowledge responsibly</div>
+  </div>
+</div>
+
+<div style={{flex: '1', minWidth: '200px', maxWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.5rem', textAlign: 'center'}}>❌ <strong>Don't</strong></div>
+  <div style={{fontSize: '0.85rem'}}>
+    <div>• Test without permission</div>
+    <div>• Exploit vulnerabilities maliciously</div>
+    <div>• Violate terms of service</div>
+    <div>• Share exploits irresponsibly</div>
+  </div>
+</div>
+
+</div>
+
+[Read our full Responsible Use Guidelines →](./security/responsible-disclosure.md)

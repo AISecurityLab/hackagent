@@ -15,13 +15,10 @@ from rich.traceback import install
 
 from hackagent._version import get_version
 from hackagent.interfaces.cli.commands import (
-    attack,
-    claude as claude_cmd,
-    codex as codex_cmd,
+    campaign as campaign_cmd,
     datasets as datasets_cmd,
     examples,
     results,
-    scan as scan_cmd,
     web as web_cmd,
 )
 from hackagent.interfaces.cli.commands import (
@@ -409,10 +406,7 @@ def doctor(ctx):
         console.print("  hackagent --help        # Show all commands")
 
 
-cli.add_command(attack.eval_cmd)
-cli.add_command(scan_cmd.scan)
-cli.add_command(claude_cmd.claude)
-cli.add_command(codex_cmd.codex)
+cli.add_command(campaign_cmd.campaign)
 cli.add_command(datasets_cmd.datasets)
 cli.add_command(examples.examples)
 cli.add_command(results.results)

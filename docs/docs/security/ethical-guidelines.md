@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # Ethical Guidelines & Security Best Practices
 
 This document outlines the ethical framework and security best practices for using HackAgent responsibly in AI security research and testing.
@@ -76,31 +80,30 @@ agent = HackAgent(
     timeout=30,  # Reasonable timeout
 ).target(
     "http://localhost:11434",
-    "ollama",
-    name="llama3",
 )
 ```
 
 **Rate Limiting Compliance:**
 ```python
 import time
+import asyncio
+from hackagent import HackAgent
 
 class ResponsibleTester:
-    def __init__(self, target, rate_limit_delay=1.0):
-        # target comes from HackAgent(...).target(...)
-        self.target = target
+    def __init__(self, agent: HackAgent, rate_limit_delay=1.0):
+        self.agent = agent
         self.rate_limit_delay = rate_limit_delay
         self.last_request_time = 0
-
-    def test_with_rate_limit(self, attack_config):
+    
+    async def test_with_rate_limit(self, attack_config):
         # Respect rate limits
         time_since_last = time.time() - self.last_request_time
         if time_since_last < self.rate_limit_delay:
-            time.sleep(self.rate_limit_delay - time_since_last)
-
-        results = self.target.hack(attack_config=attack_config)
+            await asyncio.sleep(self.rate_limit_delay - time_since_last)
+        
+        result = await self.agent.hack(attack_config)
         self.last_request_time = time.time()
-        return results
+        return result
 ```
 
 ### Testing Boundaries

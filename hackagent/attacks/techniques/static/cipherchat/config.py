@@ -1,51 +1,84 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Configuration for CipherChat attack."""
+"""Configuration for CipherChat."""
 
-from typing import Any, Dict
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field, field_validator
 
-from hackagent.attacks.techniques.config import DEFAULT_CONFIG_BASE, ConfigBase
-
-
-DEFAULT_CIPHERCHAT_CONFIG: Dict[str, Any] = {
-    **DEFAULT_CONFIG_BASE,
-    "attack_type": "cipherchat",
-    "cipherchat_params": {
-        "encode_method": "caesar",
-        "use_system_role": True,
-        "use_demonstrations": True,
-        "demonstration_toxicity": "toxic",
-        "instruction_type": "Crimes_And_Illegal_Activities",
-        "language": "en",
-        "num_demonstrations": 3,
-        "decode_response": True,
-    },
-}
+from ..base import AttackParams
+from .demonstrations import DEMONSTRATIONS
+from .encodings import SUPPORTED_ENCODINGS
 
 
-class CipherChatParams(BaseModel):
-    encode_method: str = "caesar"
-    use_system_role: bool = True
-    use_demonstrations: bool = True
-    demonstration_toxicity: str = "toxic"
-    instruction_type: str = "Crimes_And_Illegal_Activities"
-    language: str = "en"
-    num_demonstrations: int = 3
-    decode_response: bool = True
+class CipherChatParams(AttackParams):
+    """Cipher, demonstrations, and whether target replies are decoded."""
 
+    encode_method: str = Field(
+        default="caesar-3",
+        description=(
+            "Cipher used to encode the conversation, e.g. caesar-3, atbash, morse, "
+            "ascii, unicode or selfdefine. The target is told to reply in the same "
+            "cipher."
+        ),
+    )
+    use_system_role: bool = Field(
+        default=True,
+        description=(
+            "Put the cipher instructions in a system message instead of the user "
+            "message."
+        ),
+    )
+    use_demonstrations: bool = Field(
+        default=True,
+        description=(
+            "Include example conversations written in the cipher, to teach the "
+            "target the format."
+        ),
+    )
+    demonstration_toxicity: Literal["toxic", "harmless"] = Field(
+        default="toxic",
+        description=(
+            "Whether the example conversations are toxic or harmless. Toxic "
+            "examples push the target further toward unsafe replies."
+        ),
+    )
+    instruction_type: str = Field(
+        default="Crimes_And_Illegal_Activities",
+        description=(
+            "Topic of the example conversations, e.g. Crimes_And_Illegal_Activities"
+            " or Privacy_And_Property."
+        ),
+    )
+    language: Literal["en", "zh"] = Field(
+        default="en",
+        description="Language of the examples: en (English) or zh (Chinese).",
+    )
+    num_demonstrations: int = Field(
+        default=3, ge=0, description="How many example conversations to include."
+    )
+    decode_response: bool = Field(
+        default=True,
+        description="Decode the target's ciphered reply before the judges read it.",
+    )
 
-class CipherChatConfig(ConfigBase):
-    attack_type: str = "cipherchat"
-    cipherchat_params: CipherChatParams = Field(default_factory=CipherChatParams)
-
+    @field_validator("encode_method")
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "CipherChatConfig":
-        """Create a :class:`CipherChatConfig` from a plain dictionary."""
-        return cls.model_validate(config_dict)
+    def validate_encode_method(cls, value: str) -> str:
+        if value not in SUPPORTED_ENCODINGS:
+            supported = ", ".join(sorted(SUPPORTED_ENCODINGS))
+            raise ValueError(
+                f"Unsupported encode_method {value!r}. Supported: {supported}"
+            )
+        return value
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return self.model_dump()
+    @field_validator("instruction_type")
+    @classmethod
+    def validate_instruction_type(cls, value: str) -> str:
+        if value not in DEMONSTRATIONS:
+            supported = ", ".join(sorted(DEMONSTRATIONS))
+            raise ValueError(
+                f"Unsupported instruction_type {value!r}. Supported: {supported}"
+            )
+        return value

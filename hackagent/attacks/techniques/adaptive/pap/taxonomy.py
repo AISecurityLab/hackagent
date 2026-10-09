@@ -14,7 +14,7 @@ Ported from the original PAP codebase:
 Based on: https://arxiv.org/abs/2401.06373
 """
 
-from typing import Dict, List
+from typing import Dict, List, Sequence, Union
 
 # --------------------------------------------------------------------------- #
 # Persuasion taxonomy: 40 techniques with definitions and examples
@@ -396,6 +396,41 @@ def get_technique_by_name(name: str) -> Dict[str, str]:
         if t["technique"].lower() == name_lower:
             return t
     raise KeyError(f"Unknown persuasion technique: {name!r}")
+
+
+#: Every technique in the taxonomy, in taxonomy order.
+ALL_TECHNIQUES: List[str] = [entry["technique"] for entry in PERSUASION_TAXONOMY]
+
+#: The five techniques the paper's broad scan found most effective.
+TOP_5_TECHNIQUES: List[str] = [
+    "Evidence-based Persuasion",
+    "Expert Endorsement",
+    "Misrepresentation",
+    "Authority Endorsement",
+    "Logical Appeal",
+]
+
+
+def resolve_techniques(selection: Union[str, Sequence[str]]) -> List[str]:
+    """Resolve ``"top5"``, ``"all"``, or explicit names to technique names.
+
+    Raises ``ValueError`` for a name the taxonomy does not define.
+    """
+    if selection == "top5":
+        return list(TOP_5_TECHNIQUES)
+    if selection == "all":
+        return list(ALL_TECHNIQUES)
+    if isinstance(selection, str):
+        raise ValueError(
+            f"techniques must be 'top5', 'all', or a list; got {selection!r}"
+        )
+    names = [str(name) for name in selection]
+    if not names:
+        raise ValueError("techniques list must not be empty")
+    unknown = sorted(set(names) - set(ALL_TECHNIQUES))
+    if unknown:
+        raise ValueError(f"Unknown persuasion technique(s): {', '.join(unknown)}")
+    return names
 
 
 # --------------------------------------------------------------------------- #

@@ -31,23 +31,79 @@ def _escape(value: Any) -> str:
 
 
 # =====================================================================
-# Shared agent-type choices reused by target agent and guardrail selects.
+# Shared agent-type choices reused by target agent, model, and guardrail
+# selects. Only types the model stack can actually build are offered —
+# ``mcp``/``a2a`` have no backend and are deliberately left out.
 # =====================================================================
 _AGENT_TYPE_CHOICES = [
     ("Google ADK", "google-adk"),
     ("Claude Code", "claude-code"),
+    ("Codex CLI", "codex"),
     ("Web (live browser)", "web"),
     ("LiteLLM", "litellm"),
     ("LangChain", "langchain"),
     ("OpenAI SDK", "openai-sdk"),
     ("Ollama", "ollama"),
-    ("MCP", "mcp"),
-    ("A2A", "a2a"),
 ]
 
-# Agent types that run locally and therefore have no endpoint URL. For these
-# the endpoint field is legitimately empty and must not block execution.
-_ENDPOINT_OPTIONAL_AGENT_TYPES = {"claude-code"}
+# Agent types with a native, local backend (no HTTP endpoint). For these the
+# endpoint field is legitimately empty and must not block execution; a
+# campaign target of this type carries ``provider: local`` rather than a
+# LiteLLM provider.
+_ENDPOINT_OPTIONAL_AGENT_TYPES = {"claude-code", "codex"}
+_NATIVE_AGENT_TYPES = {
+    "GOOGLE_ADK",
+    "CLAUDE_CODE",
+    "CODEX",
+    "HERMES",
+    "WEB",
+}
+
+
+def _connection(agent_type: Any, endpoint: str) -> Dict[str, Any]:
+    """The campaign ``connection`` block for a form's type/endpoint pair.
+
+    ``connection.type`` is the :class:`AgentType` value; ``provider`` is
+    informational — ``local`` for a native backend, ``litellm`` otherwise.
+    """
+    from hackagent.core.contracts import AgentType
+
+    type_value = AgentType.parse(str(agent_type)).value
+    provider = "local" if type_value in _NATIVE_AGENT_TYPES else "litellm"
+    connection: Dict[str, Any] = {"provider": provider, "type": type_value}
+    endpoint = (endpoint or "").strip()
+    if endpoint:
+        connection["endpoint"] = endpoint
+    return connection
+
+
+def model_config_from_fields(
+    name: str,
+    agent_type: Any,
+    endpoint: str,
+    *,
+    options: Optional[Dict[str, Any]] = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """A campaign ``ModelConfig`` dict from a form's name/type/endpoint fields.
+
+    Returns ``None`` when no name was entered (the model is unconfigured).
+    ``options`` carries backend-specific settings (a CLI agent's ``binary``,
+    ADK's ``user_id``, …); ``extra`` merges extra top-level keys such as a
+    judge's ``scoring``.
+    """
+    name = (name or "").strip()
+    if not name:
+        return None
+    config: Dict[str, Any] = {
+        "name": name,
+        "connection": _connection(agent_type, endpoint),
+    }
+    if options:
+        config["options"] = dict(options)
+    if extra:
+        config.update(extra)
+    return config
 
 
 def _default_campaign_attack_keys() -> List[str]:
@@ -111,17 +167,12 @@ def _field_widget_id(field: ConfigField) -> str:
 
 def build_guardrail_config(
     name: str, agent_type: Any, endpoint: str
-) -> Optional[Dict[str, str]]:
-    """Build a guardrail config dict from the form's name/type/endpoint fields.
+) -> Optional[Dict[str, Any]]:
+    """A campaign guardrail ``ModelConfig`` from the form's name/type/endpoint.
 
     Returns ``None`` when no guardrail name was entered. The name is used
-    verbatim: model identifiers are case-sensitive.
+    verbatim: model identifiers are case-sensitive. A guardrail is an
+    ordinary model in the spec (``GuardrailModelConfig``), so this is just a
+    named :func:`model_config_from_fields`.
     """
-    name = (name or "").strip()
-    if not name:
-        return None
-    return {
-        "identifier": name,
-        "agent_type": str(agent_type),
-        "endpoint": (endpoint or "").strip(),
-    }
+    return model_config_from_fields(name, agent_type, endpoint)

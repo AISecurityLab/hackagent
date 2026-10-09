@@ -19,12 +19,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from hackagent.interfaces.tui.events import (
-    EVENT_GOAL_FINALIZED,
     EVENT_GOAL_STARTED,
-    EVENT_STEP_ENDED,
     EVENT_STEP_STARTED,
     TUIEvent,
-    TUIEventBus,
 )
 from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
 
@@ -230,118 +227,3 @@ class TestAgentActionsViewerDispatch:
         assert args is None
         assert "matched 3 lines" in result
         assert step_number == 6
-
-
-# ============================================================================
-# Tracker / StepTracker event emission
-# ============================================================================
-
-
-class TestTrackerEmitsEvents:
-    """`Tracker` should publish goal lifecycle events on the bus."""
-
-    def test_create_goal_result_emits_goal_started_without_backend(self) -> None:
-        from hackagent.tracking.goals.tracker import Tracker
-
-        bus = TUIEventBus()
-        received: List[TUIEvent] = []
-        bus.subscribe(received.append, event_type=EVENT_GOAL_STARTED)
-
-        tracker = Tracker(
-            backend=None,
-            run_id=None,
-            logger=MagicMock(),
-            attack_type="advprefix",
-            event_bus=bus,
-        )
-        tracker.create_goal_result(goal="Test goal", goal_index=0)
-
-        assert len(received) == 1
-        payload = received[0].payload
-        assert payload["goal"] == "Test goal"
-        assert payload["goal_index"] == 0
-        assert payload["attack_type"] == "advprefix"
-
-    def test_finalize_goal_emits_goal_finalized(self) -> None:
-        from hackagent.tracking.goals.tracker import Tracker
-
-        bus = TUIEventBus()
-        received: List[TUIEvent] = []
-        bus.subscribe(received.append, event_type=EVENT_GOAL_FINALIZED)
-
-        tracker = Tracker(
-            backend=None,
-            run_id=None,
-            logger=MagicMock(),
-            attack_type="advprefix",
-            event_bus=bus,
-        )
-        ctx = tracker.create_goal_result(goal="Test", goal_index=0)
-        tracker.finalize_goal(ctx, success=True, evaluation_notes="ok")
-
-        assert len(received) == 1
-        payload = received[0].payload
-        assert payload["goal_index"] == 0
-        assert payload["success"] is True
-        assert payload["evaluation_notes"] == "ok"
-
-    def test_tracker_without_bus_does_not_raise(self) -> None:
-        """Backwards compat: omitting event_bus must keep working."""
-        from hackagent.tracking.goals.tracker import Tracker
-
-        tracker = Tracker(
-            backend=None,
-            run_id=None,
-            logger=MagicMock(),
-            attack_type="x",
-        )
-        ctx = tracker.create_goal_result(goal="g", goal_index=0)
-        tracker.finalize_goal(ctx, success=False)
-
-
-class TestStepTrackerEmitsEvents:
-    """`StepTracker.track_step` should emit step_started/step_ended."""
-
-    def test_track_step_emits_lifecycle_when_disabled(self) -> None:
-        from hackagent.tracking.steps.context import TrackingContext
-        from hackagent.tracking.steps.tracker import StepTracker
-
-        bus = TUIEventBus()
-        received: List[TUIEvent] = []
-        bus.subscribe(received.append)
-
-        ctx = TrackingContext.create_disabled()
-        ctx.event_bus = bus
-        tracker = StepTracker(ctx)
-
-        with tracker.track_step("Generate", "STEP_GEN"):
-            pass
-
-        types = [e.event_type for e in received]
-        assert types == [EVENT_STEP_STARTED, EVENT_STEP_ENDED]
-        assert received[0].payload["step_name"] == "Generate"
-        assert received[1].payload["success"] is True
-
-    def test_track_step_emits_step_ended_on_failure(self) -> None:
-        from hackagent.tracking.steps.context import TrackingContext
-        from hackagent.tracking.steps.tracker import StepTracker
-
-        bus = TUIEventBus()
-        received: List[TUIEvent] = []
-        bus.subscribe(received.append, event_type=EVENT_STEP_ENDED)
-
-        ctx = TrackingContext.create_disabled()
-        ctx.event_bus = bus
-        tracker = StepTracker(ctx)
-
-        with pytest.raises(RuntimeError):
-            with tracker.track_step("Failing", "STEP_X"):
-                raise RuntimeError("boom")
-
-        assert len(received) == 1
-        assert received[0].payload["success"] is False
-        assert "boom" in received[0].payload["error"]
-
-
-if __name__ == "__main__":  # pragma: no cover
-    pytest.main([__file__, "-v"])

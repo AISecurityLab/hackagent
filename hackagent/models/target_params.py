@@ -6,7 +6,7 @@
 Preferred runtime source remains ``Target(..., target_config=...)`` on the facade.
 This typed model is the home for those knobs once technique configs stop
 inheriting them from
-:class:`~hackagent.attacks.techniques.config.ConfigBase`.
+the target model.
 """
 
 from __future__ import annotations
@@ -38,4 +38,9 @@ class TargetParams(BaseModel):
     thinking: Optional[bool] = None
 
 
-__all__ = ["TargetParams"]
+def default_target() -> Dict[str, Any]:
+    """A fresh dict of the target's default generation parameters."""
+    return TargetParams().model_dump()
+
+
+__all__ = ["TargetParams", "default_target"]

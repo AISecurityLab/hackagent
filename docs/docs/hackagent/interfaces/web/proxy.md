@@ -1,5 +1,5 @@
 ---
-sidebar_label: proxy
+sidebar_label: _proxy
 title: hackagent.interfaces.web._proxy
 ---
 

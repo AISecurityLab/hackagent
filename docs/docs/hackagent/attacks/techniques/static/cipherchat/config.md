@@ -3,28 +3,13 @@ sidebar_label: config
 title: hackagent.attacks.techniques.static.cipherchat.config
 ---
 
-Configuration for CipherChat attack.
+Configuration for CipherChat.
 
-## CipherChatConfig Objects
-
-```python
-class CipherChatConfig(ConfigBase)
-```
-
-#### from\_dict
+## CipherChatParams Objects
 
 ```python
-@classmethod
-def from_dict(cls, config_dict: Dict[str, Any]) -> "CipherChatConfig"
+class CipherChatParams(AttackParams)
 ```
 
-Create a :class:`CipherChatConfig` from a plain dictionary.
-
-#### to\_dict
-
-```python
-def to_dict() -> Dict[str, Any]
-```
-
-Convert to dictionary.
+Cipher, demonstrations, and whether target replies are decoded.
 

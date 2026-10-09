@@ -12,7 +12,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.models.adapters.browser import (
+from hackagent.models.completions.browser import (
     BrowserScanError,
     _find_input,
     _find_send_button,
@@ -97,7 +97,7 @@ class TestFindSendButton(unittest.TestCase):
 class TestEnsureChromium(unittest.TestCase):
     def test_package_missing_raises(self):
         with patch(
-            "hackagent.models.adapters.browser._get_playwright",
+            "hackagent.models.completions.browser._get_playwright",
             return_value=(None, False),
         ):
             with self.assertRaises(BrowserScanError):
@@ -106,14 +106,16 @@ class TestEnsureChromium(unittest.TestCase):
     def test_already_installed_is_noop(self):
         with (
             patch(
-                "hackagent.models.adapters.browser._get_playwright",
+                "hackagent.models.completions.browser._get_playwright",
                 return_value=(object(), True),
             ),
             patch(
-                "hackagent.models.adapters.browser.chromium_installed",
+                "hackagent.models.completions.browser.chromium_installed",
                 return_value=True,
             ),
-            patch("hackagent.models.adapters.browser.install_chromium") as mock_install,
+            patch(
+                "hackagent.models.completions.browser.install_chromium"
+            ) as mock_install,
         ):
             ensure_chromium()
             mock_install.assert_not_called()
@@ -121,11 +123,11 @@ class TestEnsureChromium(unittest.TestCase):
     def test_missing_without_auto_install_raises(self):
         with (
             patch(
-                "hackagent.models.adapters.browser._get_playwright",
+                "hackagent.models.completions.browser._get_playwright",
                 return_value=(object(), True),
             ),
             patch(
-                "hackagent.models.adapters.browser.chromium_installed",
+                "hackagent.models.completions.browser.chromium_installed",
                 return_value=False,
             ),
         ):
@@ -135,14 +137,16 @@ class TestEnsureChromium(unittest.TestCase):
     def test_missing_with_auto_install_downloads(self):
         with (
             patch(
-                "hackagent.models.adapters.browser._get_playwright",
+                "hackagent.models.completions.browser._get_playwright",
                 return_value=(object(), True),
             ),
             patch(
-                "hackagent.models.adapters.browser.chromium_installed",
+                "hackagent.models.completions.browser.chromium_installed",
                 return_value=False,
             ),
-            patch("hackagent.models.adapters.browser.install_chromium") as mock_install,
+            patch(
+                "hackagent.models.completions.browser.install_chromium"
+            ) as mock_install,
         ):
             ensure_chromium(auto_install=True)
             mock_install.assert_called_once()
@@ -152,7 +156,7 @@ class TestInstallChromium(unittest.TestCase):
     def test_success(self):
         proc = MagicMock(returncode=0)
         with patch(
-            "hackagent.models.adapters.browser.subprocess.run", return_value=proc
+            "hackagent.models.completions.browser.subprocess.run", return_value=proc
         ) as mock_run:
             install_chromium()
             argv = mock_run.call_args.args[0]
@@ -161,14 +165,14 @@ class TestInstallChromium(unittest.TestCase):
     def test_nonzero_exit_raises(self):
         proc = MagicMock(returncode=1)
         with patch(
-            "hackagent.models.adapters.browser.subprocess.run", return_value=proc
+            "hackagent.models.completions.browser.subprocess.run", return_value=proc
         ):
             with self.assertRaises(BrowserScanError):
                 install_chromium()
 
     def test_missing_executable_raises(self):
         with patch(
-            "hackagent.models.adapters.browser.subprocess.run",
+            "hackagent.models.completions.browser.subprocess.run",
             side_effect=FileNotFoundError(),
         ):
             with self.assertRaises(BrowserScanError):
@@ -176,7 +180,7 @@ class TestInstallChromium(unittest.TestCase):
 
     def test_chromium_installed_false_without_playwright(self):
         with patch(
-            "hackagent.models.adapters.browser._get_playwright",
+            "hackagent.models.completions.browser._get_playwright",
             return_value=(None, False),
         ):
             self.assertFalse(chromium_installed())

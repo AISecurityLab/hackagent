@@ -47,10 +47,10 @@ class Guardrail(Protocol)
 
 Anything that can classify a piece of text.
 
-## LLMGuardrail Objects
+## ModelGuardrail Objects
 
 ```python
-class LLMGuardrail()
+class ModelGuardrail()
 ```
 
 A guardrail that asks a classifier model for a JSON verdict.
@@ -77,15 +77,15 @@ Classify `text`; fails open when the classifier is unavailable.
 def parse_verdict(raw: str) -> GuardrailResult
 ```
 
-Parse `{"safe": ..., "categories": [...], "reasoning": ...}`.
+Parse `{&quot;safe&quot;: ..., &quot;categories&quot;: [...], &quot;reasoning&quot;: ...}`.
 
 Falls back to keyword detection when the text is not JSON.
 
-## Guarded Objects
+## GuardedModel Objects
 
 ```python
-class Guarded(EnvelopeLLM)
+class GuardedModel(Model)
 ```
 
-`llm` with guardrails applied to every call.
+Apply the shared guardrail policy to native completions.
 

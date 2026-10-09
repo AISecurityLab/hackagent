@@ -55,14 +55,13 @@ from pathlib import Path
 from typing import Any, Dict
 
 try:
-    from hackagent import HackAgent, Settings
+    from hackagent import HackAgent
     from hackagent.core.contracts import AgentType
 except ModuleNotFoundError:
-    # hackagent/examples/litellm_multi_provider/demo.py → repo root is parents[3].
-    project_root = Path(__file__).resolve().parents[3]
+    project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from hackagent import HackAgent, Settings
+    from hackagent import HackAgent
     from hackagent.core.contracts import AgentType
 
 
@@ -210,18 +209,8 @@ def build_demo_config(provider: str) -> dict:
 def run_demo(provider: str) -> object:
     """Build the config for ``provider`` and execute the attack."""
     config = build_demo_config(provider)
-    agent_cfg = config["agent"]
-    session = HackAgent(Settings.resolve())
-    try:
-        target = session.target(
-            agent_cfg["endpoint"],
-            agent_cfg["agent_type"],
-            name=agent_cfg.get("name"),
-            adapter_operational_config=agent_cfg.get("adapter_operational_config"),
-        )
-        return target.hack(attack_config=config["attack_config"])
-    finally:
-        session.close()
+    agent = HackAgent(**config["agent"])
+    return agent.hack(attack_config=config["attack_config"])
 
 
 def _parse_args() -> argparse.Namespace:

@@ -94,6 +94,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "goal_field": "prompt",
         "split": "train",
         "fallback_fields": ["behavior", "goal", "input"],
+        "extra_fields": ["category"],
         "description": "HarmBench - 200 standard harmful behavior prompts",
     },
     "harmbench_contextual": {

@@ -25,7 +25,7 @@ hardcoding lists.
 
 To add a new attack, give it exactly one :class:`AttackCategory` in
 :data:`ATTACK_TAXONOMY` and any applicable :class:`AttackTag` values, and
-put its package under `hackagent/attacks/techniques/<folder>/`: `indirect`
+put its package under `hackagent/attacks/techniques/&lt;folder&gt;/`: `indirect`
 when it carries :attr:`AttackTag.INDIRECT`, otherwise the category value
 (`static`, `adaptive` or `multi_turn`).
 

@@ -123,8 +123,6 @@ class ResultsTab(
     BINDINGS = [
         Binding("enter", "view_result", "View Details"),
         Binding("s", "show_summary", "Summary"),
-        Binding("c", "toggle_compare", "Compare Runs"),
-        Binding("d", "show_dashboard", "Dashboard"),
         Binding("pageup", "prev_page", "Previous Page", show=False),
         Binding("pagedown", "next_page", "Next Page", show=False),
         Binding("[", "prev_page", "Previous Page"),
@@ -149,8 +147,6 @@ class ResultsTab(
         self.selected_result: Any = None
         self._detail_page: int = 0  # Current page for result details pagination
         self._run_id_map: dict[str, Any] = {}  # Map run ID strings to run objects
-        self._compare_runs: list[Any] = []  # Runs selected for comparison
-        self._show_dashboard: bool = False  # Toggle dashboard view
         self._total_count: int = (
             0  # Total number of runs from API (for correct numbering)
         )
@@ -174,8 +170,6 @@ class ResultsTab(
                 yield Button("🔄 Refresh", id="refresh-results", variant="primary")
                 yield Button("📊 CSV", id="export-csv", variant="default")
                 yield Button("📄 JSON", id="export-json", variant="default")
-                yield Button("⚖️ Compare", id="compare-btn", variant="warning")
-                yield Button("📈 Dashboard", id="dashboard-btn", variant="success")
 
             with Horizontal(classes="toolbar"):
                 yield Label("Filter:")

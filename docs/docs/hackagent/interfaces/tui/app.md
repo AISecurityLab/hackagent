@@ -19,7 +19,7 @@ HackAgent Terminal User Interface Application
 
 ```python
 def __init__(cli_config: CLIConfig,
-             initial_tab: str = "agents",
+             initial_tab: str = "attacks",
              initial_data: dict[Any, Any] | None = None)
 ```
 
@@ -28,7 +28,8 @@ Initialize the TUI application.
 **Arguments**:
 
 - `cli_config` - CLI configuration object
-- `initial_tab` - Which tab to show initially (default: &quot;agents&quot;)
+- `initial_tab` - Which tab to show initially (default: &quot;attacks&quot;, the
+  campaign composer — the cockpit&#x27;s primary job)
 - `initial_data` - Initial data to pre-fill in the tab (default: None)
 
 #### get\_css\_variables

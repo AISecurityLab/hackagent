@@ -1,15 +1,13 @@
+---
+sidebar_position: 2
+---
+
 # Comprehensive Security Audit
 
 A **comprehensive audit** tests all vulnerabilities using multiple datasets and advanced attack techniques for complete security coverage.
 
-:::note Reading ASR
-`agent.hack(attack_config=...)` returns a list of row dicts. The examples below compute ASR from those rows with this helper:
-
-```python
-def asr(rows):
-    """Fraction of rows the judges marked successful."""
-    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
-```
+:::note
+`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
 :::
 
 ## When to Use
@@ -55,8 +53,7 @@ from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROF
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai-sdk",
+    "http://localhost:8080/chat",
     name="comprehensive-audit",
 )
 
@@ -96,7 +93,7 @@ for profile in profiles:
 
             key = f"{profile.name}_{atk.technique}_{ds.preset}"
             audit_results[key] = {
-                "asr": asr(result),
+                "asr": result.get("asr"),
                 "dataset": ds.preset,
                 "attack": atk.technique,
                 "objective": profile.objective,
@@ -166,9 +163,9 @@ Use multiple judges for validation:
 attack_config = {
     "attack_type": "pair",
     "dataset": {"preset": "advbench"},
-    "judges": [
+    judges=[
         {"identifier": "ollama/llama3", "type": "harmbench"},
-        {"identifier": "gpt-4", "type": "nuanced", "endpoint": "https://api.openai.com/v1"},
+        {"identifier": "gpt-4", "type": "openai"},
     ],
 }
 result = agent.hack(attack_config=attack_config)
@@ -196,7 +193,7 @@ result = agent.hack(attack_config=attack_config)
 
 ### Summary Metrics
 
-Compute run-level metrics from `Verdict`s. `Panel.evaluate` produces them. `generate_summary_report` and `is_successful_result` (`hackagent.attacks.evaluator.metrics`) are removed; metrics take verdicts, not result rows. See [Evaluation](../../evaluation/index.md).
+Compute run-level metrics from `Verdict`s. `Panel.evaluate` produces them. `generate_summary_report` and `is_successful_result` (`hackagent.attacks.evaluator.metrics`) are removed; metrics take verdicts, not result rows. See [Evaluation](../../reference/evaluation.md).
 
 ```python
 from hackagent.core.contracts import Sample

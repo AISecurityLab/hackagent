@@ -86,39 +86,53 @@ class TestOnEvent(unittest.TestCase):
         def on_event(event_type, **payload):
             seen.append((event_type, payload))
 
-        def fake_run(_agent, _attack_config, **kwargs):
-            kwargs["_tui_event_bus"].emit("goal_finalized", goal="g", success=True)
+        def fake_run(
+            _target, _attack_config, *, run_config_override=None, on_event=None
+        ):
+            on_event("goal_finalized", goal="g", success=True)
             return [{"goal": "g"}]
 
-        with patch("hackagent.orchestrator.execution.runner.run", side_effect=fake_run):
+        with patch(
+            "hackagent.orchestrator.campaign.legacy.run_as_campaign",
+            side_effect=fake_run,
+        ):
             rows = self.target.hack(
-                attack_config={"attack_type": "baseline", "goals": ["g"]},
+                attack_config={"attack_type": "autodan_turbo", "goals": ["g"]},
                 on_event=on_event,
             )
 
         self.assertEqual(rows, [{"goal": "g"}])
         self.assertEqual(seen, [("goal_finalized", {"goal": "g", "success": True})])
 
-    def test_hack_chain_forwards_on_event_into_each_step(self):
+    def test_hack_chain_forwards_on_event_into_the_campaign(self):
         seen = []
 
         def on_event(event_type, **payload):
             seen.append((event_type, payload.get("attack")))
 
-        def fake_run(_agent, attack_config, **kwargs):
-            kwargs["_tui_event_bus"].emit(
-                "step_started", attack=attack_config["attack_type"]
-            )
-            return [{"goal": "g", "is_success": False}]
+        def fake_run(_target, attacks, *, on_event=None, **_kwargs):
+            # The campaign emits one event per attack; the chain forwards the
+            # caller's sink into it.
+            for step in attacks:
+                on_event("attack_started", attack=step["attack_type"])
+            return []
 
-        with patch("hackagent.orchestrator.execution.runner.run", side_effect=fake_run):
+        with patch(
+            "hackagent.orchestrator.campaign.legacy.run_chain_as_campaign",
+            side_effect=fake_run,
+        ):
             self.target.hack_chain(
-                attacks=[{"attack_type": "baseline"}, {"attack_type": "pair"}],
+                attacks=[
+                    {"attack_type": "autodan_turbo"},
+                    {"attack_type": "pair"},
+                ],
                 goals=["g"],
                 on_event=on_event,
             )
 
-        self.assertEqual(seen, [("step_started", "baseline"), ("step_started", "pair")])
+        self.assertEqual(
+            seen, [("attack_started", "autodan_turbo"), ("attack_started", "pair")]
+        )
 
 
 class TestReadApi(unittest.TestCase):

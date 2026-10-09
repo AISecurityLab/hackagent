@@ -12,13 +12,10 @@ import os
 import threading
 import time
 
-from hackagent import HackAgent, Settings
+from hackagent import HackAgent
 from hackagent.core.contracts import AgentType
 
-if __package__:
-    from .agent import PORT, TARGET_MODEL, app, ensure_seed_database
-else:
-    from agent import PORT, TARGET_MODEL, app, ensure_seed_database
+from agent import app, PORT, TARGET_MODEL, ensure_seed_database
 
 TARGET_ENDPOINT = f"http://127.0.0.1:{PORT}/v1"
 OLLAMA_ENDPOINT = os.environ.get("OLLAMA_ENDPOINT", "http://localhost:11434")
@@ -65,44 +62,40 @@ if __name__ == "__main__":
         ).start()
         time.sleep(2)
 
-    session = HackAgent(Settings.resolve())
-    try:
-        target = session.target(
-            TARGET_ENDPOINT,
-            AgentType.OPENAI_SDK,
-            name=TARGET_MODEL,
-            adapter_operational_config={
-                "name": TARGET_MODEL,
-                "endpoint": TARGET_ENDPOINT,
-            },
-        )
+    target = HackAgent(
+        name=TARGET_MODEL,
+        endpoint=TARGET_ENDPOINT,
+        agent_type=AgentType.OPENAI_SDK,
+        adapter_operational_config={
+            "name": TARGET_MODEL,
+            "endpoint": TARGET_ENDPOINT,
+        },
+    )
 
-        config = {
-            "attack_type": "flipattack",
-            "goals": GOALS,
-            "max_tokens": 800,
-            # "attacker": _ollama_role(ATTACKER_MODEL, max_tokens=800, temperature=0.8),
-            "judge": _ollama_role(JUDGE_MODEL, max_tokens=120, temperature=0.0),
-            "category_classifier": {
-                "identifier": JUDGE_MODEL,
-                "agent_type": AgentType.OLLAMA,
-                "endpoint": OLLAMA_ENDPOINT,
-                "max_tokens": 100,
-                "temperature": 0.0,
-            },
-            "goal_batch_size": 2,
-            "goal_batch_workers": 1,
-        }
+    config = {
+        "attack_type": "flipattack",
+        "goals": GOALS,
+        "max_tokens": 800,
+        # "attacker": _ollama_role(ATTACKER_MODEL, max_tokens=800, temperature=0.8),
+        "judge": _ollama_role(JUDGE_MODEL, max_tokens=120, temperature=0.0),
+        "category_classifier": {
+            "identifier": JUDGE_MODEL,
+            "agent_type": AgentType.OLLAMA,
+            "endpoint": OLLAMA_ENDPOINT,
+            "max_tokens": 100,
+            "temperature": 0.0,
+        },
+        "goal_batch_size": 2,
+        "goal_batch_workers": 1,
+    }
 
-        print("Running FlipAttack against DB tool sandbox...")
-        print(f"Target endpoint: {TARGET_ENDPOINT}")
-        print(f"Target model: {TARGET_MODEL}")
-        # print(f"Attacker model: {ATTACKER_MODEL} @ {OLLAMA_ENDPOINT}")
-        print(f"Judge model: {JUDGE_MODEL} @ {OLLAMA_ENDPOINT}")
+    print("Running FlipAttack against DB tool sandbox...")
+    print(f"Target endpoint: {TARGET_ENDPOINT}")
+    print(f"Target model: {TARGET_MODEL}")
+    # print(f"Attacker model: {ATTACKER_MODEL} @ {OLLAMA_ENDPOINT}")
+    print(f"Judge model: {JUDGE_MODEL} @ {OLLAMA_ENDPOINT}")
 
-        results = target.hack(attack_config=config)
-        print(
-            f"FlipAttack completed ({len(results) if isinstance(results, list) else 0} rows)"
-        )
-    finally:
-        session.close()
+    results = target.hack(attack_config=config)
+    print(
+        f"FlipAttack completed ({len(results) if isinstance(results, list) else 0} rows)"
+    )

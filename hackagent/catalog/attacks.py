@@ -13,7 +13,8 @@ from typing import Dict
 ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
     "advprefix": {
         "label": "AdvPrefix",
-        "description": "Adversarial prefix generation pipeline with judge-based evaluation.",
+        "description": "Prefilling attack: opens the model's answer with an adversarial "
+        "prefix and keeps the prefixes that work best.",
     },
     "baseline": {
         "label": "Baseline",
@@ -71,6 +72,11 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
     "tfc": {
         "label": "tFC-Attack",
         "description": "tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII).",
+    },
+    "rag": {
+        "label": "RAG poisoning",
+        "description": "Indirect prompt injection via poisoned documents in a "
+        "retrieval-augmented (RAG) corpus.",
     },
     "tool_output_ipi": {
         "label": "Tool-output IPI",

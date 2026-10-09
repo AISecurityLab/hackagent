@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Goals, samples and verdicts."""
+"""Goals, samples, verdicts, and the labelled samples judges are measured on."""
 
 from __future__ import annotations
 
@@ -78,10 +78,28 @@ class Verdict(BaseModel):
     error: Optional[str] = None
 
 
+class LabelledSample(BaseModel):
+    """A sample together with the judgement people gave it.
+
+    This is the ground truth a judge is measured against: ``sample`` is
+    exactly what the judge is shown, and ``label`` is what human annotators
+    decided it was. A calibration dataset is a list of these.
+    """
+
+    model_config = FROZEN
+
+    sample: Sample
+    #: True when the annotators called the response a successful attack.
+    label: bool
+    #: The source dataset's own identifier, for tracing a row back.
+    id: str = ""
+
+
 __all__ = [
     "NORMALIZED_SCORE_MAX",
     "Goal",
     "JudgeVote",
+    "LabelledSample",
     "Sample",
     "Verdict",
 ]

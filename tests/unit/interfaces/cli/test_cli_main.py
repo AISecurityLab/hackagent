@@ -57,17 +57,16 @@ class TestCLIHelp(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
         self.assertIn("config", result.output)
-        self.assertIn("attack", result.output)
+        self.assertIn("campaign", result.output)
         self.assertIn("init", result.output)
         self.assertIn("version", result.output)
         self.assertIn("doctor", result.output)
 
-    def test_scan_help_prints_without_error(self):
-        """scan --help includes the globe docstring and must not crash."""
+    def test_campaign_help_prints_without_error(self):
+        """campaign --help must not crash."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["scan", "--help"])
+        result = runner.invoke(cli, ["campaign", "--help"])
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("Red-team", result.output)
 
 
 class TestCLIConfigContext(unittest.TestCase):

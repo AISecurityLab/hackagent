@@ -5,17 +5,10 @@
 
 from pathlib import Path
 
-import pytest
 
 import hackagent.attacks.techniques as techniques
 from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.catalog.taxonomy import ATTACK_IDS, AttackTag, get_attack_taxonomy
-from hackagent.orchestrator.setup.registry import (
-    ATTACK_REGISTRY,
-    CONFIG_REGISTRY,
-    load_attack,
-    load_config_model,
-)
 
 _CATEGORY_FOLDERS = {"static", "adaptive", "multi_turn", "indirect"}
 
@@ -31,47 +24,20 @@ def _folder(attack_id: str) -> str:
     return taxonomy.category.value
 
 
-def test_registry_ids_equal_catalog_ids():
-    """Registry keys are the catalog AttackIds.
+def test_campaign_registry_ids_equal_catalog_ids():
+    """Every attack is a campaign attack now, so the campaign registry is the
+    one that must cover the catalog. The legacy ATTACK_REGISTRY is empty."""
+    from hackagent.attacks.techniques.registry import ATTACKS
 
-    ``ATTACK_CATALOG`` is the CLI label table and is a subset (it still
-    omits ``rag``). The id set the registry must match is ``ATTACK_IDS``.
-    """
-    assert set(ATTACK_REGISTRY) == set(ATTACK_IDS)
-    assert set(ATTACK_CATALOG) <= set(ATTACK_REGISTRY)
+    assert set(ATTACKS) == set(ATTACK_IDS)
+    assert set(ATTACK_CATALOG) <= set(ATTACKS)
 
 
-def test_load_attack_imports_the_registered_class():
-    cls = load_attack("baseline")
+def test_the_campaign_registry_imports_a_technique_class():
+    from hackagent.attacks.techniques.registry import get_attack_class
+
+    cls = get_attack_class("baseline")
     assert cls.__name__ == "BaselineAttack"
-    assert f"{cls.__module__}:{cls.__name__}" == ATTACK_REGISTRY["baseline"]
-
-
-def test_unknown_attack_id_is_rejected():
-    with pytest.raises(ValueError, match="Unsupported attack_type: missing"):
-        load_attack("missing")
-
-
-def test_config_model_is_optional_and_loaded_from_the_registry():
-    assert load_config_model("baseline") is None
-    assert load_config_model("advprefix") is None
-    model = load_config_model("pair")
-    assert model is not None
-    assert model.__name__ == "PairConfig"
-
-
-@pytest.mark.parametrize(
-    "attack_id, spec",
-    [*ATTACK_REGISTRY.items(), *CONFIG_REGISTRY.items()],
-)
-def test_technique_lives_in_its_category_folder(attack_id, spec):
-    module = spec.partition(":")[0]
-    folder = module.split(".")[3]
-    assert module.startswith("hackagent.attacks.techniques.")
-    assert folder == _folder(attack_id), (
-        f"{attack_id} is in techniques/{folder}/, but its taxonomy puts it in "
-        f"techniques/{_folder(attack_id)}/"
-    )
 
 
 def test_every_technique_package_is_in_a_category_folder():

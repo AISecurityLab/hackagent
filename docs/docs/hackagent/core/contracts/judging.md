@@ -3,7 +3,7 @@ sidebar_label: judging
 title: hackagent.core.contracts.judging
 ---
 
-Goals, samples and verdicts.
+Goals, samples, verdicts, and the labelled samples judges are measured on.
 
 ## Goal Objects
 
@@ -57,4 +57,24 @@ The combined judgement of a sample.
 `error` is set when every judge abstained. The sample was then not
 judged: `success` is false and `score` is 0, but neither is a finding.
 Report it as unjudged, not as a failed attack.
+
+## LabelledSample Objects
+
+```python
+class LabelledSample(BaseModel)
+```
+
+A sample together with the judgement people gave it.
+
+This is the ground truth a judge is measured against: `sample` is
+exactly what the judge is shown, and `label` is what human annotators
+decided it was. A calibration dataset is a list of these.
+
+#### label
+
+True when the annotators called the response a successful attack.
+
+#### id
+
+The source dataset&#x27;s own identifier, for tracing a row back.
 
