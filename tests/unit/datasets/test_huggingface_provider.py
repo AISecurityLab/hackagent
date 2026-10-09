@@ -63,6 +63,31 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
             self.assertEqual(goals[1], "Goal 2")
             self.assertEqual(goals[2], "Goal 3")
 
+    def test_load_goals_with_offset(self):
+        """offset skips goals before limit applies."""
+
+        with patch.dict("sys.modules", {"datasets": MagicMock()}):
+            import sys
+
+            mock_datasets = sys.modules["datasets"]
+            records = [{"prompt": f"Goal {i}"} for i in range(20)]
+            mock_dataset = MagicMock()
+            mock_dataset.__iter__ = MagicMock(return_value=iter(records))
+            mock_dataset.__len__ = MagicMock(return_value=20)
+            mock_datasets.load_dataset.return_value = mock_dataset
+
+            from hackagent.datasets.providers.huggingface import (
+                HuggingFaceDatasetProvider,
+            )
+
+            provider = HuggingFaceDatasetProvider(
+                {"path": "test/dataset", "goal_field": "prompt", "offset": 5}
+            )
+
+            self.assertEqual(
+                provider.load_goals(limit=3), ["Goal 5", "Goal 6", "Goal 7"]
+            )
+
     def test_load_goals_with_limit(self):
         """Test that limit parameter works correctly."""
 

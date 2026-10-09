@@ -232,3 +232,20 @@ class TestUrlJsonDatasetProvider(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUrlJsonDatasetProviderOffset(unittest.TestCase):
+    def test_load_goals_applies_offset_before_limit(self):
+        payload = json.dumps([{"query": f"Goal {i}"} for i in range(5)])
+        with patch(
+            "hackagent.datasets.providers.url_json.urllib.request.urlopen",
+            return_value=_MockHTTPResponse(payload),
+        ):
+            provider = UrlJsonDatasetProvider(
+                {
+                    "url": "https://example.com/dataset.json",
+                    "goal_field": "query",
+                    "offset": 3,
+                }
+            )
+            self.assertEqual(provider.load_goals(limit=1), ["Goal 3"])

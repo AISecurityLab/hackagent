@@ -195,6 +195,7 @@ class FileDatasetProvider(DatasetProvider):
 
         goals = []
         count = 0
+        offset, skipped = self._offset(), 0
 
         for record in records:
             if limit and count >= limit:
@@ -207,6 +208,9 @@ class FileDatasetProvider(DatasetProvider):
             )
 
             if goal:
+                if skipped < offset:
+                    skipped += 1
+                    continue
                 goals.append(goal)
                 count += 1
             else:

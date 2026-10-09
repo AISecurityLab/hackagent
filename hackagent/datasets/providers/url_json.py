@@ -107,6 +107,7 @@ class UrlJsonDatasetProvider(DatasetProvider):
         goals = []
         self.last_extracted_extras = []
         count = 0
+        offset, skipped = self._offset(), 0
 
         for record in dataset:
             if limit and count >= limit:
@@ -117,6 +118,9 @@ class UrlJsonDatasetProvider(DatasetProvider):
             )
 
             if goal:
+                if skipped < offset:
+                    skipped += 1
+                    continue
                 extra_data = {}
                 if self.extra_fields:
                     extra_data = {
