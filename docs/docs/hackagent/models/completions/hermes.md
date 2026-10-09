@@ -7,7 +7,7 @@ Hermes backend: drive `hermes -z` through a LiteLLM custom provider.
 
 Hermes Agent is Nous Research&#x27;s open-source, self-hosted agent. It exposes no
 OpenAI-compatible HTTP endpoint, but it does ship a documented one-shot
-headless mode (`hermes -z &quot;prompt&quot;`) that prints only the final response.
+headless mode (`hermes -z "prompt"`) that prints only the final response.
 That is the same shape as `claude -p`, so — exactly like the Claude Code
 backend — we register a per-instance :class:`litellm.CustomLLM` handler under a
 unique provider name whose `completion` shells out to `hermes` instead of
@@ -34,12 +34,12 @@ Native backend for a locally-installed Hermes Agent CLI.
 
 Drives Hermes in one-shot headless mode (`hermes -z`) through a
 per-instance :class:`litellm.CustomLLM` handler registered under a unique
-provider name (`hackagent_hermes_&lt;id&gt;`), so requests flow through
+provider name (`hackagent_hermes_<id>`), so requests flow through
 `litellm.completion` like every other backend — even though Hermes speaks
 no HTTP.
 
 Required config:
-- `name`: the model to drive. Passed as `-m &lt;model&gt;` (overriding
+- `name`: the model to drive. Passed as `-m <model>` (overriding
 the configured default for this run only) and used as the LiteLLM
 model string.
 

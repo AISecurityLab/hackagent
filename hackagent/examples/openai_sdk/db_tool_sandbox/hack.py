@@ -65,7 +65,7 @@ if __name__ == "__main__":
     target = HackAgent(
         name=TARGET_MODEL,
         endpoint=TARGET_ENDPOINT,
-        agent_type=AgentType.OPENAI_SDK,
+        agent_type=AgentType.OPENAI,
         adapter_operational_config={
             "name": TARGET_MODEL,
             "endpoint": TARGET_ENDPOINT,

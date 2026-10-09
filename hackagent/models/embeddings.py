@@ -8,6 +8,7 @@ import os
 from typing import TYPE_CHECKING, Any, Dict, Optional
 from urllib.parse import urlsplit
 
+from hackagent.core.contracts import AgentType
 from hackagent.core.defaults import DEFAULT_EMBEDDER_ENDPOINT
 
 if TYPE_CHECKING:
@@ -50,8 +51,14 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
     model = str(config.get("identifier") or "").strip()
     if not model:
         raise ValueError("An embedding model identifier is required")
-    agent_type = config.get("agent_type") or "OPENAI_SDK"
-    agent_type = str(getattr(agent_type, "value", agent_type)).upper()
+    raw_type = config.get("agent_type") or AgentType.OPENAI
+    # Parse, so aliases such as OPENAI_SDK or "openai" select the same branch.
+    parsed = AgentType.parse(raw_type)
+    agent_type = (
+        parsed.value
+        if parsed is not AgentType.UNKNOWN
+        else str(getattr(raw_type, "value", raw_type)).upper()
+    )
     ollama = agent_type == "OLLAMA" or (
         agent_type == "LITELLM" and model.startswith(("ollama/", "ollama_chat/"))
     )
@@ -66,7 +73,7 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
         kwargs["api_base"] = normalize_embedding_endpoint(
             str(endpoint or DEFAULT_EMBEDDER_ENDPOINT), ollama=True
         )
-    elif agent_type == "OPENAI_SDK":
+    elif agent_type == "OPENAI":
         # Custom compatible servers own their model namespace. Only the OpenAI
         # service itself treats an optional "openai/" as a routing prefix here.
         if not endpoint or urlsplit(str(endpoint)).hostname == "api.openai.com":
@@ -100,7 +107,7 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
     elif ollama:
         # Ollama's compatible API needs a client key, but has no default auth.
         kwargs["api_key"] = "ollama"
-    elif agent_type == "OPENAI_SDK" and os.environ.get("OPENAI_API_KEY"):
+    elif agent_type == "OPENAI" and os.environ.get("OPENAI_API_KEY"):
         kwargs["api_key"] = os.environ["OPENAI_API_KEY"]
     if config.get("timeout") is not None:
         kwargs["timeout"] = config["timeout"]

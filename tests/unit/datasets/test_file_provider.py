@@ -291,3 +291,53 @@ class TestFileDatasetProvider(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFileDatasetProviderOffset(unittest.TestCase):
+    """``offset`` skips goals after shuffling and before ``limit``."""
+
+    def _write(self, n: int) -> str:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"goal": f"g{i}"} for i in range(n)], f)
+            return f.name
+
+    def test_offset_skips_goals_before_limit(self):
+        path = self._write(6)
+        try:
+            provider = FileDatasetProvider(
+                {"path": path, "goal_field": "goal", "offset": 2}
+            )
+            self.assertEqual(provider.load_goals(limit=2), ["g2", "g3"])
+            self.assertEqual(provider.load_goals(), ["g2", "g3", "g4", "g5"])
+        finally:
+            Path(path).unlink()
+
+    def test_offset_reaches_the_provider_through_resolve_goals(self):
+        from hackagent.datasets.goals import resolve_goals
+
+        path = self._write(6)
+        try:
+            goals = resolve_goals(
+                dataset={
+                    "provider": "file",
+                    "path": path,
+                    "goal_field": "goal",
+                    "offset": 4,
+                    "limit": 5,
+                }
+            )
+            self.assertEqual([g.text for g in goals], ["g4", "g5"])
+        finally:
+            Path(path).unlink()
+
+    def test_invalid_offset_is_rejected(self):
+        path = self._write(2)
+        try:
+            for bad in (-1, "2", 1.5, True):
+                provider = FileDatasetProvider(
+                    {"path": path, "goal_field": "goal", "offset": bad}
+                )
+                with self.assertRaises(ValueError):
+                    provider.load_goals()
+        finally:
+            Path(path).unlink()

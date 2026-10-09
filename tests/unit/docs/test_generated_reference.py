@@ -63,9 +63,7 @@ def test_every_section_of_the_campaign_format_has_a_page(generated):
 
     # A section is documented either as `<name>.md` or as `<name>/index.md`.
     pages = {path.stem for path in generated if path.suffix == ".md"}
-    pages |= {
-        path.parent.name for path in generated if path.name == "index.md"
-    }
+    pages |= {path.parent.name for path in generated if path.name == "index.md"}
     missing = [
         name
         for name in CampaignSpec.model_fields

@@ -35,7 +35,7 @@ Compile a decorator program string into a callable.
 
 **Returns**:
 
-  A function `(prompt) -&gt; str | Awaitable[str]` applying the chain.
+  A function `(prompt) -> str | Awaitable[str]` applying the chain.
   
 
 **Raises**:

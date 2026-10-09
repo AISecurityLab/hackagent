@@ -1,5 +1,5 @@
 ---
-sidebar_label: _serializers
+sidebar_label: serializers
 title: hackagent.interfaces.web._serializers
 ---
 

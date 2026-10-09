@@ -29,6 +29,13 @@ class DatasetProvider(abc.ABC):
         self.config = config
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
+    def _offset(self) -> int:
+        """How many goals to skip, after shuffling and before ``limit``."""
+        value = self.config.get("offset") or 0
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"'offset' must be a non-negative integer, got {value!r}")
+        return value
+
     @abc.abstractmethod
     def load_goals(
         self,

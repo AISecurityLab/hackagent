@@ -79,10 +79,14 @@ class ModelResponse:
             category=type(error).__name__,
             status_code=getattr(error, "status_code", None),
         )
-        return cls(text="", error=failure, metadata={
-            "ok": False,
-            "error": failure.model_dump(exclude_none=True),
-        })
+        return cls(
+            text="",
+            error=failure,
+            metadata={
+                "ok": False,
+                "error": failure.model_dump(exclude_none=True),
+            },
+        )
 
     @property
     def reasoning(self) -> Optional[str]:
@@ -135,7 +139,9 @@ class ModelResponse:
             text=str(text or ""),
             raw_response=value,
             reasoning_content=value.get("reasoning_content"),
-            tool_calls=list(value.get("tool_calls") or metadata.get("tool_calls") or []),
+            tool_calls=list(
+                value.get("tool_calls") or metadata.get("tool_calls") or []
+            ),
             usage=_as_dict(value.get("usage") or metadata.get("usage")),
             finish_reason=value.get("finish_reason") or metadata.get("finish_reason"),
             model=value.get("model") or metadata.get("provider_model"),
@@ -173,7 +179,9 @@ class ModelResponse:
         if system_fingerprint is not None:
             metadata["system_fingerprint"] = system_fingerprint
         headers_value = _get(value, "_response_headers", _MISSING)
-        response_headers = None if headers_value is _MISSING else _as_dict(headers_value)
+        response_headers = (
+            None if headers_value is _MISSING else _as_dict(headers_value)
+        )
         if response_headers is not None:
             metadata["response_headers"] = response_headers
         return cls(

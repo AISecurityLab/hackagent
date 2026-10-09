@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class AgentType(str, Enum):
     """How HackAgent talks to a model or agent.
 
-    Chat-completion types (``LITELLM``, ``OPENAI_SDK``, ``OLLAMA``,
+    Chat-completion types (``LITELLM``, ``OPENAI``, ``OLLAMA``,
     ``LANGCHAIN``) are driven through LiteLLM. ``GOOGLE_ADK``,
     ``CLAUDE_CODE``, ``CODEX``, ``HERMES`` and ``WEB`` use dedicated adapters.
     ``MCP`` and ``A2A`` are placeholders. ``UNKNOWN`` is the fallback when a
@@ -28,12 +28,14 @@ class AgentType(str, Enum):
     HERMES = "HERMES"
     WEB = "WEB"
     LITELLM = "LITELLM"
-    OPENAI_SDK = "OPENAI_SDK"
+    OPENAI = "OPENAI"
     OLLAMA = "OLLAMA"
     LANGCHAIN = "LANGCHAIN"
     MCP = "MCP"
     A2A = "A2A"
     UNKNOWN = "UNKNOWN"
+    #: Former name of ``OPENAI``; an alias, so ``AgentType.OPENAI is AgentType.OPENAI``.
+    OPENAI_SDK = "OPENAI"
 
     @classmethod
     def _missing_(cls, value: object) -> Optional["AgentType"]:
@@ -74,7 +76,8 @@ def _normalize_agent_type(value: str) -> str:
 
 #: Shorthands accepted for :class:`AgentType`, keyed by normalised spelling.
 _AGENT_TYPE_ALIASES: Dict[str, str] = {
-    "OPENAI": "OPENAI_SDK",
+    "OPENAI_SDK": "OPENAI",
+    "OPENAISDK": "OPENAI",
     "GOOGLE": "GOOGLE_ADK",
     "ADK": "GOOGLE_ADK",
     "CLAUDE": "CLAUDE_CODE",

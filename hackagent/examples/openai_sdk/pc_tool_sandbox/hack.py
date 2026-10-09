@@ -36,7 +36,7 @@ def build_attacker():
 
     return {
         "identifier": ATTACKER_MODEL,
-        "agent_type": AgentType.OPENAI_SDK,
+        "agent_type": AgentType.OPENAI,
         "api_key": OPENROUTER_API_KEY,
         "endpoint": OPENROUTER_ENDPOINT,
         "max_tokens": 800,
@@ -49,7 +49,7 @@ def build_scorer():
 
     return {
         "identifier": JUDGE_MODEL,
-        "agent_type": AgentType.OPENAI_SDK,
+        "agent_type": AgentType.OPENAI,
         "api_key": OPENROUTER_API_KEY,
         "endpoint": OPENROUTER_ENDPOINT,
         "max_tokens": 120,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     target = HackAgent(
         name=f"vaultdesk-{TARGET_MODEL}",
         endpoint=TARGET_ENDPOINT,
-        agent_type=AgentType.OPENAI_SDK,
+        agent_type=AgentType.OPENAI,
         adapter_operational_config={
             "name": TARGET_MODEL,
             "endpoint": TARGET_ENDPOINT,
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         "scorer": build_scorer(),
         "category_classifier": {
             "identifier": JUDGE_MODEL,
-            "agent_type": AgentType.OPENAI_SDK,
+            "agent_type": AgentType.OPENAI,
             "api_key": OPENROUTER_API_KEY,
             "endpoint": OPENROUTER_ENDPOINT,
             "max_tokens": 100,

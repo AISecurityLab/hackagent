@@ -1,0 +1,148 @@
+.trigger {
+  font: inherit;
+  cursor: pointer;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 1rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--ifm-color-primary);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ifm-color-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.button::after {
+  content: '↗';
+  font-size: 0.8em;
+}
+
+.button:hover,
+.button:focus-visible {
+  background: var(--ifm-color-primary);
+  color: var(--ifm-color-white);
+}
+
+.term {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  background: none;
+  color: var(--ifm-color-primary);
+}
+
+.term:hover,
+.term:focus-visible {
+  border-bottom-style: solid;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 10px;
+  background: var(--ifm-background-surface-color);
+  color: inherit;
+  text-align: left;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 12%);
+}
+
+.dialog {
+  width: min(40rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  padding: 0;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 12px;
+  /* --ifm-background-color is transparent in the light theme. */
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 35%);
+}
+
+.wide {
+  width: min(72rem, calc(100vw - 2rem));
+}
+
+.figure {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 10px;
+  background: var(--ifm-background-surface-color);
+  color: inherit;
+  text-align: left;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+.figure:hover,
+.figure:focus-visible {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 12%);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.panel {
+  padding: 1.25rem 1.5rem 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.close {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ifm-color-emphasis-200);
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+  background: var(--ifm-color-emphasis-300);
+}
+
+.body > :last-child {
+  margin-bottom: 0;
+}
+
+.footer {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  font-weight: 600;
+}

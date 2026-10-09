@@ -3,7 +3,17 @@
 
 """Scripted stand-in for a connected :class:`Model`."""
 
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+)
 
 from hackagent.core.contracts import AgentType, ModelSpec
 from hackagent.models.model import Model
@@ -51,7 +61,7 @@ class FakeLLM(Model):
         _shared: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.spec = spec or ModelSpec(
-            identifier="fake-model", agent_type=AgentType.OPENAI_SDK
+            identifier="fake-model", agent_type=AgentType.OPENAI
         )
         self.instance_id = instance_id
         self.params = dict(params or {})

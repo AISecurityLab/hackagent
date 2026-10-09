@@ -75,12 +75,7 @@ def _lang_gpt_steps(
     )
     if few_shot_goal is None:
         return step_one + step_two
-    return (
-        step_one
-        + _few_shot_block(few_shot_goal, mode)
-        + "\n\n"
-        + step_two
-    )
+    return step_one + _few_shot_block(few_shot_goal, mode) + "\n\n" + step_two
 
 
 def _split_sentence_in_half(value: str) -> tuple[str, str]:

@@ -194,7 +194,8 @@ def test_provider_failures_have_one_native_response_contract(asynchronous):
     with patch(method, side_effect=RuntimeError("provider unavailable")):
         response = (
             asyncio.run(model.acomplete([{"role": "user", "content": "test"}]))
-            if asynchronous else model.complete([{"role": "user", "content": "test"}])
+            if asynchronous
+            else model.complete([{"role": "user", "content": "test"}])
         )
     assert not response.ok
     assert response.error.message == "provider unavailable"
@@ -203,10 +204,7 @@ def test_provider_failures_have_one_native_response_contract(asynchronous):
 
 def test_complete_batch_preserves_order_and_bounds_concurrency():
     model = BatchModel()
-    requests = [
-        [{"role": "user", "content": str(index)}]
-        for index in range(5)
-    ]
+    requests = [[{"role": "user", "content": str(index)}] for index in range(5)]
 
     responses = model.complete_batch(requests, max_concurrency=2)
 
@@ -217,10 +215,7 @@ def test_complete_batch_preserves_order_and_bounds_concurrency():
 @pytest.mark.asyncio
 async def test_acomplete_batch_preserves_order_and_bounds_concurrency():
     model = BatchModel()
-    requests = [
-        [{"role": "user", "content": str(index)}]
-        for index in range(5)
-    ]
+    requests = [[{"role": "user", "content": str(index)}] for index in range(5)]
 
     responses = await model.acomplete_batch(requests, max_concurrency=3)
 
@@ -235,13 +230,23 @@ def test_native_guardrails_withhold_content_without_retries(asynchronous, side):
     target = LiteLLMModel("openai/target")
     guarded = GuardedModel(target, **{side: ModelGuardrail(classifier)})
     retrying = RetryingModel(guarded, retries=2)
-    classifier_response = '{"safe": false, "categories": ["test"], "reasoning": "blocked"}'
-    responses = [classifier_response] if asynchronous or side == "before" else ["target content", classifier_response]
+    classifier_response = (
+        '{"safe": false, "categories": ["test"], "reasoning": "blocked"}'
+    )
+    responses = (
+        [classifier_response]
+        if asynchronous or side == "before"
+        else ["target content", classifier_response]
+    )
     method = "litellm.acompletion" if asynchronous else "litellm.completion"
     with patch("litellm.completion", side_effect=responses) as sync_call:
         if asynchronous:
-            with patch(method, new=AsyncMock(return_value="target content")) as async_call:
-                result = asyncio.run(retrying.acomplete([{"role": "user", "content": "test"}]))
+            with patch(
+                method, new=AsyncMock(return_value="target content")
+            ) as async_call:
+                result = asyncio.run(
+                    retrying.acomplete([{"role": "user", "content": "test"}])
+                )
             assert async_call.await_count == (0 if side == "before" else 1)
         else:
             result = retrying.complete([{"role": "user", "content": "test"}])
@@ -254,7 +259,9 @@ def test_native_guardrails_withhold_content_without_retries(asynchronous, side):
     assert result.raw_response is None
 
 
-@pytest.mark.parametrize("values", [{"max_tokens": 0}, {"temperature": -1}, {"top_p": 2}])
+@pytest.mark.parametrize(
+    "values", [{"max_tokens": 0}, {"temperature": -1}, {"top_p": 2}]
+)
 def test_native_generation_reuses_shared_validation(values):
     with pytest.raises(ValidationError):
         ModelGeneration(**values)

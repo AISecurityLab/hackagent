@@ -167,3 +167,14 @@ through each of the `attacks` to the `target` (optionally behind
 `guardrails`), score the replies with the `evaluation` judges, and run it
 all under the `execution` policy.
 
+#### campaign\_json\_schema
+
+```python
+def campaign_json_schema() -> dict[str, Any]
+```
+
+The campaign format as a JSON Schema document.
+
+Editors use it to autocomplete and check `campaign.yaml` as you type; the
+docs site publishes it, and `hackagent campaign schema` prints it.
+

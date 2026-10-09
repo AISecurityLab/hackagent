@@ -136,9 +136,9 @@ def write_outputs(result: CampaignResult,
 
 Write every attempt as one row per configured format.
 
-Search traces of iterative attacks go to `&lt;run_id&gt;.traces.jsonl`, one
+Search traces of iterative attacks go to `<run_id>.traces.jsonl`, one
 line per attempt, so the result rows stay readable. A judge audit goes
-to `&lt;run_id&gt;.audit.json`, beside the results it qualifies.
+to `<run_id>.audit.json`, beside the results it qualifies.
 
 #### summary
 

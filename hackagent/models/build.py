@@ -107,7 +107,7 @@ def _litellm_model(config: ModelConfig) -> LiteLLMModel:
     if connection.type == AgentType.OLLAMA:
         endpoint = normalise_ollama_endpoint(endpoint)
         api_key_env = None
-    elif connection.type == AgentType.OPENAI_SDK and endpoint and not api_key_env:
+    elif connection.type == AgentType.OPENAI and endpoint and not api_key_env:
         # Self-hosted OpenAI-compatible servers accept any key, but the
         # client refuses to send a request without one.
         api_key = "not-needed"

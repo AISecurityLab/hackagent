@@ -98,7 +98,7 @@ Inserts random colour names.
 class HexStringMixInDecorator(WordMixInDecorator)
 ```
 
-Inserts random hex strings like `{&lt;A1B2C3&gt;}`.
+Inserts random hex strings like `{<A1B2C3>}`.
 
 ## MilitaryWordsMixInDecorator Objects
 
@@ -294,7 +294,7 @@ Based on: https://arxiv.org/pdf/2307.15043
 
 **Arguments**:
 
-- `uta_type` - One of `&quot;chatgpt&quot;`, `&quot;bard&quot;`, `&quot;llama&quot;` for the
+- `uta_type` - One of `"chatgpt"`, `"bard"`, `"llama"` for the
   appropriate adversarial suffix.
 
 ## TemplateDecorator Objects

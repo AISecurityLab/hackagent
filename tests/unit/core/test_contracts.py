@@ -33,8 +33,9 @@ from hackagent.core.contracts import (
         ("GOOGLE_ADK", AgentType.GOOGLE_ADK),
         ("google adk", AgentType.GOOGLE_ADK),
         ("adk", AgentType.GOOGLE_ADK),
-        ("openai", AgentType.OPENAI_SDK),
-        ("openai-sdk", AgentType.OPENAI_SDK),
+        ("openai", AgentType.OPENAI),
+        ("openai-sdk", AgentType.OPENAI),
+        ("OPENAI_SDK", AgentType.OPENAI),
         ("claude", AgentType.CLAUDE_CODE),
         ("claude-code", AgentType.CLAUDE_CODE),
         ("hermes-agent", AgentType.HERMES),
@@ -55,8 +56,15 @@ def test_agent_type_parse_falls_back_to_unknown(value):
     assert AgentType.parse(value) is AgentType.UNKNOWN
 
 
+def test_openai_sdk_is_an_alias_of_openai():
+    assert AgentType.OPENAI_SDK is AgentType.OPENAI
+    assert AgentType.OPENAI.value == "OPENAI"
+    # Aliases do not show up when iterating, so pickers list OPENAI once.
+    assert [m for m in AgentType if m.value == "OPENAI"] == [AgentType.OPENAI]
+
+
 def test_agent_type_strict_constructor_still_rejects_unknown_strings():
-    assert AgentType("openai") is AgentType.OPENAI_SDK
+    assert AgentType("openai") is AgentType.OPENAI
     with pytest.raises(ValueError):
         AgentType("not-a-type")
 

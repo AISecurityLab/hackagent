@@ -45,7 +45,7 @@ VLLM_JUDGE_BASE = os.environ.get("VLLM_JUDGE_BASE", "http://localhost:8002/v1")
 agent = HackAgent(
     name=VICTIM_MODEL,
     endpoint=VLLM_VICTIM_BASE,
-    agent_type="OPENAI_SDK",  # vLLM speaks the OpenAI API
+    agent_type="OPENAI",  # vLLM speaks the OpenAI API
 )
 
 # ---------------------------------------------------------------------------

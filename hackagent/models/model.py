@@ -72,7 +72,11 @@ class Model(ABC):
                     on_complete(request_index, response)
                 return response
 
-        return list(await asyncio.gather(*(complete_one(index, item) for index, item in enumerate(requests))))
+        return list(
+            await asyncio.gather(
+                *(complete_one(index, item) for index, item in enumerate(requests))
+            )
+        )
 
     @staticmethod
     def _validate_max_concurrency(max_concurrency: int) -> None:

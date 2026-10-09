@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "AgentType": {
-      "description": "How HackAgent talks to a model or agent.\n\nChat-completion types (``LITELLM``, ``OPENAI_SDK``, ``OLLAMA``,\n``LANGCHAIN``) are driven through LiteLLM. ``GOOGLE_ADK``,\n``CLAUDE_CODE``, ``CODEX``, ``HERMES`` and ``WEB`` use dedicated adapters.\n``MCP`` and ``A2A`` are placeholders. ``UNKNOWN`` is the fallback when a\ntype cannot be inferred.",
+      "description": "How HackAgent talks to a model or agent.\n\nChat-completion types (``LITELLM``, ``OPENAI``, ``OLLAMA``,\n``LANGCHAIN``) are driven through LiteLLM. ``GOOGLE_ADK``,\n``CLAUDE_CODE``, ``CODEX``, ``HERMES`` and ``WEB`` use dedicated adapters.\n``MCP`` and ``A2A`` are placeholders. ``UNKNOWN`` is the fallback when a\ntype cannot be inferred.",
       "enum": [
         "GOOGLE_ADK",
         "CLAUDE_CODE",
@@ -10,12 +10,13 @@
         "HERMES",
         "WEB",
         "LITELLM",
-        "OPENAI_SDK",
+        "OPENAI",
         "OLLAMA",
         "LANGCHAIN",
         "MCP",
         "A2A",
-        "UNKNOWN"
+        "UNKNOWN",
+        "OPENAI"
       ],
       "title": "AgentType",
       "type": "string"
@@ -294,7 +295,7 @@
         },
         "type": {
           "$ref": "#/$defs/AgentType",
-          "description": "Which client talks to the model. This is the field that matters: it decides whether HackAgent calls a chat API (``OPENAI_SDK``, ``OLLAMA``, ``LITELLM``\u2026) or drives an agent directly (``CLAUDE_CODE``, ``GOOGLE_ADK``, ``WEB``\u2026)."
+          "description": "Which client talks to the model. This is the field that matters: it decides whether HackAgent calls a chat API (``OPENAI``, ``OLLAMA``, ``LITELLM``\u2026) or drives an agent directly (``CLAUDE_CODE``, ``GOOGLE_ADK``, ``WEB``\u2026)."
         },
         "endpoint": {
           "anyOf": [

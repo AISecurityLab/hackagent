@@ -8,7 +8,7 @@ Run declarative campaign files (`campaign.yaml`) from the CLI.
 `hackagent campaign run` loads a campaign, applies any run-time endpoint
 overrides, waits for local servers, and executes it; `validate` resolves it
 (goals, models, judges) without attacking, so configuration errors surface
-before a run starts. Both build on
+before a run starts; `schema` prints the campaign format as JSON Schema. Both build on
 :mod:`hackagent.orchestrator.campaign.overrides`, shared with
 `scripts/run_campaign.py`.
 
@@ -61,4 +61,24 @@ def validate(file: str) -> None
 ```
 
 Resolve a campaign (goals, models, judges) without attacking it.
+
+#### schema
+
+```python
+@campaign.command()
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True),
+    help="Write the schema to this file instead of printing it.",
+)
+def schema(output: Optional[str]) -> None
+```
+
+Print the JSON Schema of campaign files, for editor autocompletion.
+
+
+Save it and point your editor at it, e.g. with the YAML language server:
+  hackagent campaign schema -o campaign.schema.json
+  # yaml-language-server: $schema=./campaign.schema.json
 

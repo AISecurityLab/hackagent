@@ -1,5 +1,5 @@
 ---
-sidebar_label: _static
+sidebar_label: static
 title: hackagent.interfaces.web._static
 ---
 
@@ -10,12 +10,12 @@ installation by one of two routes, in this order:
 
 1. **Bundled in the package tree** (`hackagent/interfaces/web/static`). This is
    how release binaries ship it: PyInstaller collects the directory via
-   `collect_data_files(&quot;hackagent&quot;)`, which preserves the package tree, so
+   `collect_data_files("hackagent")`, which preserves the package tree, so
    resolving relative to `__file__` works in a frozen build. It is how a
    source checkout gets one too, after `scripts/build_webui.sh`.
 
 2. **The `hackagent-webui` distribution**, installed by
-   `pip install &#x27;hackagent[web]&#x27;`. Keeping the ~0.9 MB bundle out of the
+   `pip install 'hackagent[web]'`. Keeping the ~0.9 MB bundle out of the
    `hackagent` wheel means pip handles fetching, caching, mirrors and
    air-gapped wheelhouses, instead of a downloader written here.
 

@@ -27,7 +27,7 @@ Native backend for a locally-installed Claude Code CLI.
 
 Drives Claude Code in headless mode (`claude -p`) through a per-instance
 :class:`litellm.CustomLLM` handler registered under a unique provider name
-(`hackagent_claude_code_&lt;id&gt;`), so requests flow through
+(`hackagent_claude_code_<id>`), so requests flow through
 `litellm.completion` like every other backend — even though Claude Code
 speaks no HTTP.
 

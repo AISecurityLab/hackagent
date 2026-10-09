@@ -28,7 +28,9 @@ def test_inline_goals_drop_blanks():
 
 
 def test_inline_selection_limits_and_shuffles():
-    goals = load_goals(_inline([str(n) for n in range(10)], limit=3, shuffle=True, seed=1))
+    goals = load_goals(
+        _inline([str(n) for n in range(10)], limit=3, shuffle=True, seed=1)
+    )
     assert len(goals) == 3
     assert {g.index for g in goals} == {0, 1, 2}  # renumbered from 0
 

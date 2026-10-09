@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
@@ -25,12 +21,12 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   `hack_chain` compose one attack. `mapping` owns record `eval_*` columns.
   `AttackOrchestrator` and `hackagent.attacks.registry` are gone; there is
   no import shim.
-- **Attack Framework**: Base classes, objectives, and techniques
+- **Attack Framework**: Base classes and techniques
   (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline).
   The attack seam (`hackagent.attacks.ports`, `AttackConfig`, `BaseAttack`)
   is documented alongside `RunSpec` and `TargetParams`.
   Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
-  templates, objectives, progress, inline-judge adapters, `ensure_graphviz`).
+  templates, progress, inline-judge adapters, `ensure_graphviz`).
   Every shipped technique constructs as `BaseAttack(config, ctx)`.
   Private modules are omitted from these pages: `storage._http` and
   `attacks._lib.legacy_seams`.

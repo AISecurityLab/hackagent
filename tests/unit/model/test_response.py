@@ -106,9 +106,7 @@ def test_normalizes_litellm_response_metadata():
     assert response.metadata["response_ms"] == 42.5
     assert response.metadata["system_fingerprint"] == "fp_test"
     assert response.metadata["hidden_params"] == {"response_cost": 0.001}
-    assert response.metadata["response_headers"] == {
-        "x-request-id": "request-123"
-    }
+    assert response.metadata["response_headers"] == {"x-request-id": "request-123"}
     assert response.raw_response is raw_response
 
 
@@ -160,15 +158,26 @@ def test_normalizes_openai_style_response_mapping():
 
 
 def test_custom_provider_errors_and_guardrails_normalize_to_native_fields():
-    failure = ModelResponse.from_value({
-        "status_code": 429, "error_message": "unavailable", "error_category": "rate_limit",
-    })
+    failure = ModelResponse.from_value(
+        {
+            "status_code": 429,
+            "error_message": "unavailable",
+            "error_category": "rate_limit",
+        }
+    )
     assert not failure.ok
     assert failure.error.status_code == 429
     assert failure.metadata["error"]["category"] == "rate_limit"
-    blocked = ModelResponse.from_value({"agent_specific_data": {
-        "guardrail": True, "side": "after", "categories": ["test"], "reasoning": "blocked",
-    }})
+    blocked = ModelResponse.from_value(
+        {
+            "agent_specific_data": {
+                "guardrail": True,
+                "side": "after",
+                "categories": ["test"],
+                "reasoning": "blocked",
+            }
+        }
+    )
     assert not blocked.ok
     assert blocked.error is None
     assert blocked.guardrail.side == "after"

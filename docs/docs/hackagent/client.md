@@ -103,7 +103,7 @@ Choose a technique, goals and parameters for `target`.
 def web_target(url: str, **kwargs: Any) -> tuple[str, Dict[str, Any]]
 ```
 
-Build the `(&quot;web&quot;, operational_config)` pair for a live-browser chatbot.
+Build the `("web", operational_config)` pair for a live-browser chatbot.
 
 #### result\_bucket
 

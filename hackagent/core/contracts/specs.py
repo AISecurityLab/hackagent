@@ -19,7 +19,7 @@ class ModelSpec(BaseModel):
 
     identifier: str
     endpoint: Optional[str] = None
-    agent_type: AgentType = AgentType.OPENAI_SDK
+    agent_type: AgentType = AgentType.OPENAI
     api_key: Optional[str] = None
     api_key_env: Optional[str] = None
     max_tokens: Optional[int] = Field(default=None, ge=1)

@@ -44,7 +44,7 @@ The five techniques the paper&#x27;s broad scan found most effective.
 def resolve_techniques(selection: Union[str, Sequence[str]]) -> List[str]
 ```
 
-Resolve `&quot;top5&quot;`, `&quot;all&quot;`, or explicit names to technique names.
+Resolve `"top5"`, `"all"`, or explicit names to technique names.
 
 Raises `ValueError` for a name the taxonomy does not define.
 

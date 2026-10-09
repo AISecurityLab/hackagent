@@ -1,13 +1,21 @@
----
-sidebar_position: 1
----
-
 # Quick Security Scan
 
 A **quick security scan** focuses on the highest-impact vulnerabilities with fast Static Template attacks, typically completing in 10-15 minutes.
 
-:::note
-`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::note Reading ASR
+`agent.hack(attack_config=...)` returns a list of row dicts, one per attempt. Every attack config below spreads `**MODELS` into it: without a judge, replies are recorded but never scored. The examples use these definitions:
+
+```python
+# The models every attack config below uses: an attacker for adaptive
+# attacks (static ones ignore it) and the judge that scores each reply.
+ollama = {"identifier": "llama3.2", "agent_type": "ollama",
+          "endpoint": "http://localhost:11434"}
+MODELS = {"attacker": ollama, "judges": [{**ollama, "type": "harmbench"}]}
+
+def asr(rows):
+    """Fraction of rows the judges marked successful."""
+    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
+```
 :::
 
 ## When to Use
@@ -33,7 +41,8 @@ from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai",
     name="quick-scan",
 )
 
@@ -47,11 +56,12 @@ for profile in quick_profiles:
     ds = profile.primary_datasets[0].preset
     attack_config = {
         "attack_type": "static_template",
+        **MODELS,
         "dataset": {"preset": ds},
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }
     result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+    print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ## Typical Coverage

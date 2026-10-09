@@ -46,7 +46,9 @@ def build_panel(
         for index, name in enumerate(names)
     ]
     judges = [
-        ModelJudge(kind, llm, name=name, system_prompt=system_prompt, threshold=threshold)
+        ModelJudge(
+            kind, llm, name=name, system_prompt=system_prompt, threshold=threshold
+        )
         for (kind, _identifier, llm, system_prompt), name in zip(bound, unique)
     ]
     return Panel(judges, aggregation=aggregation, threshold=threshold)

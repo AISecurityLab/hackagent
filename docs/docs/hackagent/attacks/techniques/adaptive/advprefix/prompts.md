@@ -21,7 +21,7 @@ opening rather than describing one.
 
 Openings the writer continues, from the reference implementation&#x27;s
 `meta_prefixes`. They are the literal first word of the prefix, not an
-instruction about it; `&quot;&quot;` lets the writer open however it likes.
+instruction about it; `""` lets the writer open however it likes.
 
 #### START\_PATTERNS
 

@@ -49,7 +49,9 @@ def attempt_summary(row: dict[str, Any]) -> dict[str, Any]:
 def verdict_node(nodes: list[dict[str, Any]]) -> dict[str, Any] | None:
     """The node an attempt's verdict hangs on: its target call, else its first call."""
     calls = [node for node in nodes if node["node"] == "call"]
-    targets = [node for node in calls if (node.get("data") or {}).get("role") == "target"]
+    targets = [
+        node for node in calls if (node.get("data") or {}).get("role") == "target"
+    ]
     return (targets or calls or [None])[0]
 
 
@@ -77,9 +79,9 @@ def load_run(traces: Path) -> dict[str, Any]:
             merged.setdefault((node.get("scope", "goal"), tuple(node["path"])), node)
         owner = verdict_node(record["nodes"])
         if owner is not None:
-            merged[(owner.get("scope", "goal"), tuple(owner["path"]))]["attempt"] = record[
-                "request_index"
-            ]
+            merged[(owner.get("scope", "goal"), tuple(owner["path"]))]["attempt"] = (
+                record["request_index"]
+            )
 
     attacks: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for (attack, goal_index), entry in sorted(goals.items()):
@@ -106,7 +108,9 @@ def render(runs: list[dict[str, Any]]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("path", type=Path, help="a *.traces.jsonl file or a run directory")
+    parser.add_argument(
+        "path", type=Path, help="a *.traces.jsonl file or a run directory"
+    )
     parser.add_argument("-o", "--output", type=Path, help="output HTML file")
     args = parser.parse_args()
 
@@ -116,7 +120,9 @@ def main() -> None:
     output = args.output or (
         args.path / "trace-dashboard.html"
         if args.path.is_dir()
-        else args.path.with_name(args.path.name.removesuffix(SUFFIX) + ".dashboard.html")
+        else args.path.with_name(
+            args.path.name.removesuffix(SUFFIX) + ".dashboard.html"
+        )
     )
     output.write_text(render([load_run(file) for file in files]), encoding="utf-8")
     print(output)
