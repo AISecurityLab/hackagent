@@ -23,7 +23,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Iterator, Optional
 from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from hackagent.core.contracts import AgentType
 
@@ -85,11 +85,17 @@ def installed_models(
     server_pid: int | None = None,
     *,
     provider: str = "ollama",
+    api_key: str | None = None,
 ) -> set[str]:
-    """Wait for readiness and return installed or served model identifiers."""
+    """Wait for readiness and return installed or served model identifiers.
+
+    ``api_key`` is sent as a bearer token to an OpenAI-compatible server, which
+    answers 401 to an unauthenticated model listing when started with a key.
+    """
     ollama = provider == "ollama"
     label = "Ollama" if ollama else "OpenAI-compatible server"
     path = "/api/tags" if ollama else "/models"
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key and not ollama else {}
     deadline = time.monotonic() + timeout
     while True:
         if server_pid is not None:
@@ -100,7 +106,8 @@ def installed_models(
                     f"{label} exited before becoming ready; inspect server logs"
                 ) from exc
         try:
-            with urlopen(f"{endpoint.rstrip('/')}{path}", timeout=3) as response:
+            request = Request(f"{endpoint.rstrip('/')}{path}", headers=headers)
+            with urlopen(request, timeout=3) as response:
                 payload = json.load(response)
             return (
                 {model["name"] for model in payload["models"]}
@@ -171,6 +178,7 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
     """
     required: dict[tuple[str, str], set[str]] = {}
     kinds: dict[str, str] = {}
+    keys: dict[str, str] = {}
     for kind, model in campaign_models(values):
         connection = model["connection"]
         wire = AgentType.parse(connection["type"])
@@ -183,6 +191,9 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
                 raise ValueError("local model servers require an explicit endpoint")
             required.setdefault((wire, endpoint), set()).add(model["name"])
             kinds.setdefault(endpoint, kind)
+            key = os.environ.get(connection.get("api_key_env") or "", "").strip()
+            if key:
+                keys.setdefault(endpoint, key)
     pids = {
         "target": readiness.server_pid,
         "role": readiness.attacker_server_pid,
@@ -200,6 +211,7 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
                 readiness.wait_for_server,
                 pids[kinds[endpoint]],
                 provider="openai",
+                api_key=keys.get(endpoint),
             )
             label = "served OpenAI-compatible"
         missing = names - available

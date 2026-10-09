@@ -15,6 +15,7 @@ from hackagent.orchestrator.campaign.overrides import (
     ServerReadiness,
     apply_endpoint_overrides,
     campaign_models,
+    installed_models,
     wait_for_servers,
 )
 
@@ -125,6 +126,50 @@ def test_wait_for_servers_reports_a_missing_model():
     ):
         with pytest.raises(RuntimeError, match="Missing"):
             wait_for_servers(_values(), ServerReadiness())
+
+
+def test_wait_for_servers_sends_the_connection_key(monkeypatch):
+    monkeypatch.setenv("SERVER_KEY", "secret")
+    values = _values()
+    for judge in values["evaluation"]["judges"]:
+        judge["connection"]["api_key_env"] = "SERVER_KEY"
+    with patch(
+        "hackagent.orchestrator.campaign.overrides.installed_models",
+        return_value={"target", "atk", "shared", "other"},
+    ) as listed:
+        wait_for_servers(values, ServerReadiness())
+    keys = {call.args[0]: call.kwargs["api_key"] for call in listed.call_args_list}
+    assert keys == {
+        "http://host/v1": "secret",
+        "http://atk/v1": None,
+        "http://other/v1": "secret",
+    }
+
+
+def test_installed_models_authenticates_to_an_openai_compatible_server():
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b'{"data": [{"id": "served"}]}'
+
+    seen = []
+
+    def fake_urlopen(request, timeout):
+        seen.append(request)
+        return _Response()
+
+    with patch("hackagent.orchestrator.campaign.overrides.urlopen", fake_urlopen):
+        served = installed_models(
+            "http://host/v1", 1.0, provider="openai", api_key="secret"
+        )
+    assert served == {"served"}
+    assert seen[0].full_url == "http://host/v1/models"
+    assert seen[0].get_header("Authorization") == "Bearer secret"
 
 
 def test_apply_does_not_mutate_when_no_override_is_given():
