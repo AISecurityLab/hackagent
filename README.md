@@ -127,7 +127,7 @@ is never exposed to the browser.
 hackagent web
 ```
 
-Install it with `pip install 'hackagent[web]'`; see the [web command docs](docs/docs/cli/web.md) for modes and options.
+Install it with `pip install 'hackagent[web]'`; see the [web command docs](docs/docs/getting-started/dashboard.mdx) for modes and options.
 
 ## Responsible Use
 
