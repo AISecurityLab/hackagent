@@ -1,13 +1,21 @@
----
-sidebar_position: 2
----
-
 # Comprehensive Security Audit
 
 A **comprehensive audit** tests all vulnerabilities using multiple datasets and advanced attack techniques for complete security coverage.
 
-:::note
-`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::note Reading ASR
+`agent.hack(attack_config=...)` returns a list of row dicts, one per attempt. Every attack config below spreads `**MODELS` into it: without a judge, replies are recorded but never scored. The examples use these definitions:
+
+```python
+# The models every attack config below uses: an attacker for adaptive
+# attacks (static ones ignore it) and the judge that scores each reply.
+ollama = {"identifier": "llama3.2", "agent_type": "ollama",
+          "endpoint": "http://localhost:11434"}
+MODELS = {"attacker": ollama, "judges": [{**ollama, "type": "harmbench"}]}
+
+def asr(rows):
+    """Fraction of rows the judges marked successful."""
+    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
+```
 :::
 
 ## When to Use
@@ -53,7 +61,8 @@ from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROF
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai",
     name="comprehensive-audit",
 )
 
@@ -86,6 +95,7 @@ for profile in profiles:
             print(f"[RUN] {profile.name}: {atk.technique} + {ds.preset}")
             attack_config = {
                 "attack_type": atk.technique,
+                **MODELS,
                 "dataset": {"preset": ds.preset},
                 "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
             }
@@ -93,10 +103,9 @@ for profile in profiles:
 
             key = f"{profile.name}_{atk.technique}_{ds.preset}"
             audit_results[key] = {
-                "asr": result.get("asr"),
+                "asr": asr(result),
                 "dataset": ds.preset,
                 "attack": atk.technique,
-                "objective": profile.objective,
             }
 
 # Print summary
@@ -133,8 +142,8 @@ credential_goals = [
 
 attack_config = {
     "attack_type": "static_template",
+    **MODELS,
     "goals": credential_goals,
-    "objective": CREDENTIAL_EXPOSURE_PROFILE.objective,
 }
 result = agent.hack(attack_config=attack_config)
 
@@ -147,8 +156,8 @@ tool_goals = [
 
 attack_config = {
     "attack_type": "static_template",
+    **MODELS,
     "goals": tool_goals,
-    "objective": MALICIOUS_TOOL_INVOCATION_PROFILE.objective,
 }
 result = agent.hack(attack_config=attack_config)
 ```
@@ -162,10 +171,11 @@ Use multiple judges for validation:
 ```python
 attack_config = {
     "attack_type": "pair",
+    **MODELS,
     "dataset": {"preset": "advbench"},
-    judges=[
+    "judges": [
         {"identifier": "ollama/llama3", "type": "harmbench"},
-        {"identifier": "gpt-4", "type": "openai"},
+        {"identifier": "gpt-4", "type": "nuanced", "endpoint": "https://api.openai.com/v1"},
     ],
 }
 result = agent.hack(attack_config=attack_config)
@@ -173,12 +183,13 @@ result = agent.hack(attack_config=attack_config)
 
 ### Custom Judge System Prompt
 
-Set `system_prompt` on a judge to prepend your own system message to every judge
-request (for example an in-house rubric or persona):
+Set `system_prompt` on a judge to replace its built-in instruction with your own
+(for example an in-house rubric):
 
 ```python
 attack_config = {
     "attack_type": "pair",
+    **MODELS,
     "dataset": {"preset": "advbench"},
     "judges": [
         {

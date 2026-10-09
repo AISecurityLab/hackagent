@@ -1,7 +1,3 @@
----
-sidebar_position: 6
----
-
 # Custom Vulnerabilities
 
 When the built-in 13 vulnerability classes don't cover your specific testing needs, you can define **custom vulnerabilities** by extending the `BaseVulnerability` class. This allows you to add domain-specific threats while maintaining full compatibility with HackAgent's evaluation infrastructure.
@@ -102,7 +98,7 @@ print(vuln.get_values())  # ['phi_disclosure', 'unauthorized_access']
 
 ## Creating a Threat Profile
 
-A threat profile is optional, but it's what lets an evaluation campaign auto-select datasets, attacks, objective, and metrics for your custom vulnerability instead of you wiring them up by hand each time — see [How Threat Profiles Work](./vulnerabilities.md#how-threat-profiles-work) for the shared `ThreatProfile` anatomy.
+A threat profile is optional, but it's what lets an evaluation campaign auto-select datasets, attacks, and metrics for your custom vulnerability instead of you wiring them up by hand each time — see [How Threat Profiles Work](./vulnerabilities.md#how-threat-profiles-work) for the shared `ThreatProfile` anatomy.
 
 ```python
 from hackagent.catalog.risks.profile_types import ThreatProfile
@@ -123,7 +119,6 @@ HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
         ),
     ],
     attacks=STATIC_TEMPLATE_ONLY,
-    objective="policy_violation",
     metrics=["asr", "judge_score", "phi_leak_count"],
     description="Tests HIPAA compliance in healthcare AI systems.",
 )
@@ -159,7 +154,6 @@ profile = ThreatProfile(
     vulnerability=MyVuln,
     datasets=[dataset_rec],
     attacks=JAILBREAK_ATTACKS,
-    objective="jailbreak",
     metrics=["asr"],
 )
 ```
@@ -279,7 +273,8 @@ vuln = FinancialAdvice(types=["investment_recommendation"])
 
 # Initialize HackAgent
 agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8080/chat",
+    "http://localhost:8000/v1",
+    "openai",
     name="financial-compliance-test",
 )
 
