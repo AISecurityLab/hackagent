@@ -72,7 +72,9 @@ class Guardrail(Protocol):
 class ModelGuardrail:
     """A guardrail that asks a classifier model for a JSON verdict."""
 
-    def __init__(self, llm: CompletionModel, system_prompt: Optional[str] = None) -> None:
+    def __init__(
+        self, llm: CompletionModel, system_prompt: Optional[str] = None
+    ) -> None:
         self.llm = llm
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
 
@@ -144,42 +146,72 @@ def parse_verdict(raw: str) -> GuardrailResult:
 class GuardedModel(Model):
     """Apply the shared guardrail policy to native completions."""
 
-    def __init__(self, model: Model, before: Optional[Guardrail] = None, after: Optional[Guardrail] = None) -> None:
+    def __init__(
+        self,
+        model: Model,
+        before: Optional[Guardrail] = None,
+        after: Optional[Guardrail] = None,
+    ) -> None:
         self.model = model
         self.before = before
         self.after = after
 
-    def _check(self, side: Literal["before", "after"], text: str, response: ModelResponse) -> ModelResponse:
+    def _check(
+        self, side: Literal["before", "after"], text: str, response: ModelResponse
+    ) -> ModelResponse:
         guardrail = self.before if side == "before" else self.after
         if guardrail is None or not text.strip():
             return response
         result = guardrail.check(text)
         if result.is_safe:
             return response
-        info = GuardrailInfo(side=side, categories=result.categories, reasoning=result.explanation)
+        info = GuardrailInfo(
+            side=side, categories=result.categories, reasoning=result.explanation
+        )
         return replace(
-            response, text="", raw_response=None, reasoning_content=None, tool_calls=[],
+            response,
+            text="",
+            raw_response=None,
+            reasoning_content=None,
+            tool_calls=[],
             guardrail=info,
-            metadata={**response.metadata, "ok": False, "guardrail": info.model_dump(exclude_none=True)},
+            metadata={
+                **response.metadata,
+                "ok": False,
+                "guardrail": info.model_dump(exclude_none=True),
+            },
         )
 
-    def complete(self, messages: Sequence[Mapping[str, Any]], **overrides: Any) -> ModelResponse:
+    def complete(
+        self, messages: Sequence[Mapping[str, Any]], **overrides: Any
+    ) -> ModelResponse:
         blocked = self._check(
             "before", last_user_text(list(messages)) or "", ModelResponse(text="")
         )
         if blocked.guardrail is not None:
             return blocked
         response = self.model.complete(messages, **overrides)
-        return self._check("after", response.text, response) if response.ok else response
+        return (
+            self._check("after", response.text, response) if response.ok else response
+        )
 
-    async def acomplete(self, messages: Sequence[Mapping[str, Any]], **overrides: Any) -> ModelResponse:
+    async def acomplete(
+        self, messages: Sequence[Mapping[str, Any]], **overrides: Any
+    ) -> ModelResponse:
         blocked = await asyncio.to_thread(
-            self._check, "before", last_user_text(list(messages)) or "", ModelResponse(text=""),
+            self._check,
+            "before",
+            last_user_text(list(messages)) or "",
+            ModelResponse(text=""),
         )
         if blocked.guardrail is not None:
             return blocked
         response = await self.model.acomplete(messages, **overrides)
-        return await asyncio.to_thread(self._check, "after", response.text, response) if response.ok else response
+        return (
+            await asyncio.to_thread(self._check, "after", response.text, response)
+            if response.ok
+            else response
+        )
 
 
 __all__ = [

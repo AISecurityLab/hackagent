@@ -150,9 +150,7 @@ class ConfigTab(VerticalScroll):
         except ValueError as exc:
             self.notify(str(exc), title="Configuration invalid", severity="error")
             return
-        self.notify(
-            "Configuration is valid.", title="Valid", severity="information"
-        )
+        self.notify("Configuration is valid.", title="Valid", severity="information")
 
     def _reset_config(self) -> None:
         """Reset configuration to defaults, reporting the outcome."""

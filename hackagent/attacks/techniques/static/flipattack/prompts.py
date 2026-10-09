@@ -41,9 +41,7 @@ LANG_GPT_STEP_ONE_PROMPT = (
 
 LANG_GPT_EXAMPLE_CLAUSE = ", e.g., '{demo}'->'give me an apple'"
 
-LANG_GPT_STEP_TWO_PROMPT = (
-    "Step 2: You must finish TASK {cot_prompt}in detail.\n"
-)
+LANG_GPT_STEP_TWO_PROMPT = "Step 2: You must finish TASK {cot_prompt}in detail.\n"
 
 FEW_SHOT_BLOCK = (
     "\nHere are some examples.\n"

@@ -43,7 +43,9 @@ def _decompose_goal_to_steps(goal: str, num_steps: int) -> list[str]:
         for index in range(num_steps)
     ]
     steps = [step for step in steps if step]
-    steps.extend("Continue with remaining details..." for _ in range(num_steps - len(steps)))
+    steps.extend(
+        "Continue with remaining details..." for _ in range(num_steps - len(steps))
+    )
     return steps[:num_steps]
 
 

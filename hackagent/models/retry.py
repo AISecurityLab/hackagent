@@ -13,14 +13,18 @@ class RetryingModel(Model):
         self.model = model
         self.retries = retries
 
-    def complete(self, messages: Sequence[Mapping[str, Any]], **overrides: Any) -> ModelResponse:
+    def complete(
+        self, messages: Sequence[Mapping[str, Any]], **overrides: Any
+    ) -> ModelResponse:
         for attempt in range(self.retries + 1):
             response = self.model.complete(messages, **overrides)
             if response.error is None or attempt == self.retries:
                 return response
         raise AssertionError("unreachable")
 
-    async def acomplete(self, messages: Sequence[Mapping[str, Any]], **overrides: Any) -> ModelResponse:
+    async def acomplete(
+        self, messages: Sequence[Mapping[str, Any]], **overrides: Any
+    ) -> ModelResponse:
         for attempt in range(self.retries + 1):
             response = await self.model.acomplete(messages, **overrides)
             if response.error is None or attempt == self.retries:

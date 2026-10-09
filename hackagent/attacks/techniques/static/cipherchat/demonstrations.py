@@ -269,4 +269,3 @@ DEMONSTRATIONS = {
         "toxic_demons_zh": toxic_demons_unsafe_instruction_zh,
     },
 }
-

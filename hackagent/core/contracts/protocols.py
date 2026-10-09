@@ -17,11 +17,15 @@ class LLM(Protocol):
     """A callable model. Calls never raise for provider errors."""
 
     def complete(
-        self, messages: Union[str, Sequence[Union[Message, Mapping[str, Any]]]], **params: Any
+        self,
+        messages: Union[str, Sequence[Union[Message, Mapping[str, Any]]]],
+        **params: Any,
     ) -> Completion: ...
 
     async def acomplete(
-        self, messages: Union[str, Sequence[Union[Message, Mapping[str, Any]]]], **params: Any
+        self,
+        messages: Union[str, Sequence[Union[Message, Mapping[str, Any]]]],
+        **params: Any,
     ) -> Completion: ...
 
     def with_params(self, **params: Any) -> "LLM": ...
@@ -50,7 +54,9 @@ class CompletionResult(Protocol):
 class CompletionModel(Protocol):
     """Minimal model capability used by domain-independent evaluation."""
 
-    def complete(self, messages: Sequence[Mapping[str, Any]], **params: Any) -> CompletionResult: ...
+    def complete(
+        self, messages: Sequence[Mapping[str, Any]], **params: Any
+    ) -> CompletionResult: ...
 
 
 __all__ = [

@@ -3,7 +3,17 @@
 
 """Scripted stand-in for a connected :class:`Model`."""
 
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+)
 
 from hackagent.core.contracts import AgentType, ModelSpec
 from hackagent.models.model import Model
