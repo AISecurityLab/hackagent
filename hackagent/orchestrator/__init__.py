@@ -6,12 +6,8 @@
 The runner is the only place that wires catalog, attacks, models, storage,
 evaluation, datasets and tracking into one run.
 
-- :mod:`~hackagent.orchestrator.chain`: the escalating attack chain
+- :mod:`~hackagent.orchestrator.campaign`: a campaign, start to finish
 - :mod:`~hackagent.orchestrator.planning`: the LLM attack planner
 """
 
-from hackagent.orchestrator.chain import hack_chain
-
-__all__ = [
-    "hack_chain",
-]
+__all__: list[str] = []

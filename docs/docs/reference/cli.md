@@ -10,7 +10,6 @@ Every command the `hackagent` executable offers. Run any of them with `--help` t
 
 | Command | What it does |
 |---|---|
-| `hackagent agent` | 🤖 Manage AI agents |
 | `hackagent campaign` | 🎯 Run declarative campaign files (campaign.yaml). |
 | `hackagent config` | 🔧 Manage HackAgent CLI configuration |
 | `hackagent datasets` | 📚 Browse and sample dataset presets |
@@ -21,91 +20,6 @@ Every command the `hackagent` executable offers. Run any of them with `--help` t
 | `hackagent tui` | 🖥️ Launch the campaign builder |
 | `hackagent version` | 📋 Show version information |
 | `hackagent web` | 🌐 Launch the web dashboard. |
-
-## `hackagent agent`
-
-🤖 Manage AI agents
-
-```text
-hackagent agent [OPTIONS] COMMAND [ARGS]...
-```
-
-### `hackagent agent create`
-
-Create a new agent
-
-```text
-hackagent agent create [OPTIONS]
-```
-
-| Name | Kind | Required | Description |
-|---|---|---|---|
-| `--name` | option | yes | Agent name |
-| `--type` | option | yes | Agent type |
-| `--endpoint` | option | yes | Agent endpoint URL |
-| `--description` | option | no | Agent description |
-| `--metadata` | option | no | Additional metadata as JSON string |
-
-### `hackagent agent delete`
-
-Delete an agent
-
-```text
-hackagent agent delete [OPTIONS] AGENT_ID
-```
-
-| Name | Kind | Required | Description |
-|---|---|---|---|
-| `AGENT_ID` | argument | yes |  |
-| `--confirm` | flag | no | Skip confirmation prompt |
-
-### `hackagent agent list`
-
-List registered agents
-
-```text
-hackagent agent list [OPTIONS]
-```
-
-### `hackagent agent show`
-
-Show detailed information about an agent
-
-```text
-hackagent agent show [OPTIONS] AGENT_ID
-```
-
-| Name | Kind | Required | Description |
-|---|---|---|---|
-| `AGENT_ID` | argument | yes |  |
-
-### `hackagent agent test`
-
-Test connection to an agent
-
-```text
-hackagent agent test [OPTIONS] AGENT_NAME
-```
-
-| Name | Kind | Required | Description |
-|---|---|---|---|
-| `AGENT_NAME` | argument | yes |  |
-
-### `hackagent agent update`
-
-Update an existing agent
-
-```text
-hackagent agent update [OPTIONS] AGENT_ID
-```
-
-| Name | Kind | Required | Description |
-|---|---|---|---|
-| `AGENT_ID` | argument | yes |  |
-| `--name` | option | no | New agent name |
-| `--endpoint` | option | no | New agent endpoint |
-| `--description` | option | no | New agent description |
-| `--metadata` | option | no | New metadata as JSON string |
 
 ## `hackagent campaign`
 
@@ -377,21 +291,6 @@ hackagent init [OPTIONS]
 ```text
 hackagent results [OPTIONS] COMMAND [ARGS]...
 ```
-
-### `hackagent results list`
-
-List recent attack results
-
-```text
-hackagent results list [OPTIONS]
-```
-
-| Name | Kind | Required | Description |
-|---|---|---|---|
-| `--limit` | option | no | Number of results to show Defaults to `10`. |
-| `--status` | option | no | Filter by status |
-| `--agent` | option | no | Filter by agent name |
-| `--attack-type` | option | no | Filter by attack type |
 
 ### `hackagent results show`
 

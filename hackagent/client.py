@@ -4,9 +4,10 @@
 """Facade (depth 2).
 
 ``HackAgent`` is constructed from :class:`~hackagent.core.settings.Settings`
-and does not require a target. :meth:`HackAgent.target` binds an endpoint and
-returns an object whose :meth:`~Target.hack` and :meth:`~Target.hack_chain`
-both accept ``on_event``. Interfaces talk only to this module and the public
+and reads what past runs recorded: campaigns, runs, results, agents and the
+catalogs. Running an attack is a campaign —
+:func:`~hackagent.orchestrator.campaign.run_campaign` — and there is no
+second way to do it. Interfaces talk only to this module and the public
 types re-exported from :mod:`hackagent`.
 """
 
@@ -16,11 +17,10 @@ import importlib.util
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
 from hackagent.core.contracts import AgentType
-from hackagent.core.errors import HackAgentError
 from hackagent.core.logging import get_logger
 from hackagent.core.settings import Settings
 
@@ -403,184 +403,6 @@ def _target_spec(
     )
 
 
-class Target:
-    """One victim bound to a :class:`HackAgent` session."""
-
-    def __init__(
-        self,
-        session: "HackAgent",
-        endpoint: str,
-        agent_type: Union[AgentType, str] = AgentType.UNKNOWN,
-        *,
-        name: Optional[str] = None,
-        guardrails: Any = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        target_config: Optional[Dict[str, Any]] = None,
-        adapter_operational_config: Optional[Dict[str, Any]] = None,
-        thinking: Optional[bool] = None,
-    ) -> None:
-        from hackagent.models.connect import check_supported, connect
-        from hackagent.models.factory import ModelFactory, spec_from_config
-        from hackagent.models.guardrail import GuardedModel, GuardrailSpec, LLMGuardrail
-
-        self.session = session
-        self.settings = session.settings
-        self.backend = session.backend
-        processed = AgentType.parse(agent_type)
-        self.target_config = _resolve_target_config(target_config)
-        explicit_target_config = (
-            {
-                key: value
-                for key, value in (target_config or {}).items()
-                if value is not None
-            }
-            if target_config
-            else {}
-        )
-        router_metadata = {
-            key: value
-            for key, value in {**(metadata or {}), **explicit_target_config}.items()
-            if value is not None
-        }
-        router_operational_config = {
-            **self.target_config,
-            **(adapter_operational_config or {}),
-        }
-        if processed == AgentType.OLLAMA:
-            if (
-                thinking is not None
-                and router_operational_config.get("thinking") is None
-            ):
-                router_operational_config["thinking"] = thinking
-        else:
-            router_operational_config.pop("thinking", None)
-
-        check_supported(processed)
-        self.models = ModelFactory(self.settings)
-        context = self.backend.get_context()
-        self.organization_id = context.org_id
-        if processed == AgentType.GOOGLE_ADK:
-            router_operational_config.setdefault("user_id", context.user_id)
-        self.target_spec = _target_spec(
-            name=name or endpoint,
-            endpoint=endpoint,
-            agent_type=processed,
-            metadata=router_metadata,
-            config=router_operational_config,
-        )
-        self.agent_record = self.backend.create_or_update_agent(
-            name=name or endpoint,
-            agent_type=processed.value,
-            endpoint=endpoint,
-            metadata=router_metadata,
-            overwrite_metadata=True,
-        )
-        self.agent_id = self.agent_record.id
-
-        before_guardrail, after_guardrail = _guardrail_sides(guardrails)
-        self.guardrails: Dict[str, Any] = {}
-        for side, guardrail_config in (
-            ("before", before_guardrail),
-            ("after", after_guardrail),
-        ):
-            if guardrail_config:
-                self.guardrails[side] = spec_from_config(
-                    guardrail_config, spec_type=GuardrailSpec
-                )
-                logger.info("%s guardrail active on the target.", side)
-        self.target = connect(self.target_spec, instance_id=str(self.agent_record.id))
-        if self.guardrails:
-            self.target = GuardedModel(
-                self.target,
-                before=self._build_guardrail("before", LLMGuardrail),
-                after=self._build_guardrail("after", LLMGuardrail),
-            )
-
-    def _build_guardrail(self, side: str, guardrail_cls: type) -> Any:
-        spec = self.guardrails.get(side)
-        if spec is None:
-            return None
-        return guardrail_cls(
-            self.models.for_role(spec), system_prompt=spec.system_prompt
-        )
-
-    def hack(
-        self,
-        attack_config: Dict[str, Any],
-        run_config_override: Optional[Dict[str, Any]] = None,
-        fail_on_run_error: bool = True,
-        on_event: Optional[Any] = None,
-    ) -> Any:
-        """Run one attack. ``on_event`` receives ``(event_type, **payload)``."""
-        try:
-            from hackagent.orchestrator.campaign.legacy import (
-                run_as_campaign,
-                runs_as_campaign,
-            )
-
-            attack_type = attack_config.get("attack_type")
-            if not attack_type:
-                raise ValueError("'attack_type' must be provided in attack_config.")
-            if not runs_as_campaign(attack_type):
-                raise ValueError(f"Unsupported attack_type: {attack_type!r}.")
-            logger.info(
-                "Preparing to attack agent '%s' (ID: %s, Type: %s) using strategy '%s'.",
-                self.agent_record.name,
-                self.agent_record.id,
-                self.agent_record.agent_type,
-                attack_type,
-            )
-            return run_as_campaign(
-                self,
-                attack_config,
-                run_config_override=run_config_override,
-                on_event=on_event,
-            )
-        except HackAgentError:
-            raise
-        except ValueError as exc:
-            logger.error(
-                "Configuration error in HackAgent.hack: %s", exc, exc_info=True
-            )
-            raise HackAgentError(f"Configuration error: {exc}") from exc
-        except RuntimeError as exc:
-            logger.error("Runtime error during HackAgent.hack: %s", exc, exc_info=True)
-            if "Failed to create backend agent" in str(
-                exc
-            ) or "Failed to update metadata" in str(exc):
-                raise HackAgentError(f"Backend agent operation failed: {exc}") from exc
-            raise HackAgentError(
-                f"An unexpected runtime error occurred: {exc}"
-            ) from exc
-        except Exception as exc:
-            logger.error("Unexpected error in HackAgent.hack: %s", exc, exc_info=True)
-            raise HackAgentError(
-                f"An unexpected error occurred during attack: {exc}"
-            ) from exc
-
-    def hack_chain(
-        self,
-        attacks: Optional[list] = None,
-        goals: Optional[list] = None,
-        run_config_override: Optional[Dict[str, Any]] = None,
-        fail_on_run_error: bool = True,
-        escalate_only_mitigated: bool = True,
-        on_event: Optional[Any] = None,
-    ) -> list:
-        """Run a sequence of attacks. ``on_event`` is forwarded to each step."""
-        from hackagent.orchestrator.chain import hack_chain as _hack_chain
-
-        return _hack_chain(
-            self,
-            attacks=attacks,
-            goals=goals,
-            run_config_override=run_config_override,
-            fail_on_run_error=fail_on_run_error,
-            escalate_only_mitigated=escalate_only_mitigated,
-            on_event=on_event,
-        )
-
-
 # ---------------------------------------------------------------------------
 # Session
 # ---------------------------------------------------------------------------
@@ -625,31 +447,6 @@ class HackAgent:
         closer = getattr(self.backend, "close", None)
         if callable(closer):
             closer()
-
-    def target(
-        self,
-        endpoint: str,
-        agent_type: Union[AgentType, str] = AgentType.UNKNOWN,
-        *,
-        name: Optional[str] = None,
-        guardrails: Any = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        target_config: Optional[Dict[str, Any]] = None,
-        adapter_operational_config: Optional[Dict[str, Any]] = None,
-        thinking: Optional[bool] = None,
-    ) -> Target:
-        """Bind ``endpoint`` and return an object with ``hack`` and ``hack_chain``."""
-        return Target(
-            self,
-            endpoint,
-            agent_type,
-            name=name,
-            guardrails=guardrails,
-            metadata=metadata,
-            target_config=target_config,
-            adapter_operational_config=adapter_operational_config,
-            thinking=thinking,
-        )
 
     # -- reads ----------------------------------------------------------------
 
@@ -776,7 +573,6 @@ class HackAgent:
 __all__ = [
     "DoctorReport",
     "HackAgent",
-    "Target",
     "catalog_by_id",
     "catalog_entries",
     "ensure_graphviz",

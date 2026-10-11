@@ -6,9 +6,10 @@ title: hackagent.client
 Facade (depth 2).
 
 `HackAgent` is constructed from :class:`~hackagent.core.settings.Settings`
-and does not require a target. :meth:`HackAgent.target` binds an endpoint and
-returns an object whose :meth:`~Target.hack` and :meth:`~Target.hack_chain`
-both accept `on_event`. Interfaces talk only to this module and the public
+and reads what past runs recorded: campaigns, runs, results, agents and the
+catalogs. Running an attack is a campaign —
+:func:`~hackagent.orchestrator.campaign.run_campaign` — and there is no
+second way to do it. Interfaces talk only to this module and the public
 types re-exported from :mod:`hackagent`.
 
 #### primary\_dataset
@@ -123,38 +124,6 @@ def ensure_graphviz(*, allow_download: bool = False) -> Optional[str]
 
 Locate or install the Graphviz `dot` binary used by FC-Attack.
 
-## Target Objects
-
-```python
-class Target()
-```
-
-One victim bound to a :class:`HackAgent` session.
-
-#### hack
-
-```python
-def hack(attack_config: Dict[str, Any],
-         run_config_override: Optional[Dict[str, Any]] = None,
-         fail_on_run_error: bool = True,
-         on_event: Optional[Any] = None) -> Any
-```
-
-Run one attack. `on_event` receives `(event_type, **payload)`.
-
-#### hack\_chain
-
-```python
-def hack_chain(attacks: Optional[list] = None,
-               goals: Optional[list] = None,
-               run_config_override: Optional[Dict[str, Any]] = None,
-               fail_on_run_error: bool = True,
-               escalate_only_mitigated: bool = True,
-               on_event: Optional[Any] = None) -> list
-```
-
-Run a sequence of attacks. `on_event` is forwarded to each step.
-
 ## DoctorReport Objects
 
 ```python
@@ -171,22 +140,6 @@ class HackAgent()
 ```
 
 Session over settings and a store. Bind a victim with :meth:`target`.
-
-#### target
-
-```python
-def target(endpoint: str,
-           agent_type: Union[AgentType, str] = AgentType.UNKNOWN,
-           *,
-           name: Optional[str] = None,
-           guardrails: Any = None,
-           metadata: Optional[Dict[str, Any]] = None,
-           target_config: Optional[Dict[str, Any]] = None,
-           adapter_operational_config: Optional[Dict[str, Any]] = None,
-           thinking: Optional[bool] = None) -> Target
-```
-
-Bind `endpoint` and return an object with `hack` and `hack_chain`.
 
 #### campaign\_runs
 

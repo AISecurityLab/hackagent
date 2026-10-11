@@ -60,31 +60,32 @@ vuln = Jailbreak(types=[
 ### Run an Evaluation Campaign
 
 ```python
-from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.orchestrator.campaign import run_campaign, summary
 
-agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8000/v1",
-    "openai",
-    name="my-agent",
-)
-# Attacks and judges need models of their own; any chat model works.
-ollama = {
-    "identifier": "llama3.2",
-    "agent_type": "ollama",
-    "endpoint": "http://localhost:11434",
+TARGET = {
+    "name": "my-agent",
+    "connection": {
+        "provider": "local",
+        "type": "OPENAI",
+        "endpoint": "http://localhost:8080/chat",
+    },
 }
 
 # Use profile recommendations
 for attack in JAILBREAK_PROFILE.primary_attacks:
     for dataset in JAILBREAK_PROFILE.primary_datasets:
-        attack_config = {
-            "attack_type": attack.technique,
-            "dataset": {"preset": dataset.preset},
-            "attacker": ollama,
-            "judges": [{**ollama, "type": "harmbench"}],
-        }
-        results = agent.hack(attack_config=attack_config)
-        successes = sum(1 for r in results if r.get("success"))
-        print(f"{attack.technique} + {dataset.preset}: {successes}/{len(results)}")
+        result = run_campaign(
+            {
+                "version": 1,
+                "campaign": {
+                    "name": f"{attack.technique} vs {dataset.preset}",
+                    "description": JAILBREAK_PROFILE.objective,
+                },
+                "dataset": {"source": {"type": "preset", "name": dataset.preset}},
+                "target": TARGET,
+                "attacks": [{"name": attack.technique}],
+            }
+        )
+        print(summary(result))
 ```

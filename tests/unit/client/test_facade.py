@@ -72,69 +72,6 @@ class TestSettingsOnlyConstruction(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
-class TestOnEvent(unittest.TestCase):
-    def setUp(self):
-        self.store = RecordingStore()
-        self.session = HackAgent(_settings(), backend=self.store)
-        self.target = self.session.target(
-            "http://localhost:8000", "openai-sdk", name="bot"
-        )
-
-    def test_hack_delivers_events_to_the_callback(self):
-        seen = []
-
-        def on_event(event_type, **payload):
-            seen.append((event_type, payload))
-
-        def fake_run(
-            _target, _attack_config, *, run_config_override=None, on_event=None
-        ):
-            on_event("goal_finalized", goal="g", success=True)
-            return [{"goal": "g"}]
-
-        with patch(
-            "hackagent.orchestrator.campaign.legacy.run_as_campaign",
-            side_effect=fake_run,
-        ):
-            rows = self.target.hack(
-                attack_config={"attack_type": "autodan_turbo", "goals": ["g"]},
-                on_event=on_event,
-            )
-
-        self.assertEqual(rows, [{"goal": "g"}])
-        self.assertEqual(seen, [("goal_finalized", {"goal": "g", "success": True})])
-
-    def test_hack_chain_forwards_on_event_into_the_campaign(self):
-        seen = []
-
-        def on_event(event_type, **payload):
-            seen.append((event_type, payload.get("attack")))
-
-        def fake_run(_target, attacks, *, on_event=None, **_kwargs):
-            # The campaign emits one event per attack; the chain forwards the
-            # caller's sink into it.
-            for step in attacks:
-                on_event("attack_started", attack=step["attack_type"])
-            return []
-
-        with patch(
-            "hackagent.orchestrator.campaign.legacy.run_chain_as_campaign",
-            side_effect=fake_run,
-        ):
-            self.target.hack_chain(
-                attacks=[
-                    {"attack_type": "autodan_turbo"},
-                    {"attack_type": "pair"},
-                ],
-                goals=["g"],
-                on_event=on_event,
-            )
-
-        self.assertEqual(
-            seen, [("attack_started", "autodan_turbo"), ("attack_started", "pair")]
-        )
-
-
 class TestReadApi(unittest.TestCase):
     def setUp(self):
         self.store = RecordingStore()

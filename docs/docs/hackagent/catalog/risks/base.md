@@ -6,9 +6,9 @@ title: hackagent.catalog.risks.base
 Base vulnerability class for all hackagent risk assessments.
 
 Architecture (mirrors the attack layer):
-    HackAgent.hack() → campaign runner → a technique
-                                              ↕
-                     BaseVulnerability ← vulnerability.assess()
+    run_campaign() → campaign runner → a technique
+                                            ↕
+                   BaseVulnerability ← vulnerability.assess()
 
 Each concrete vulnerability:
   1. Defines an Enum of sub-types in its `types.py`

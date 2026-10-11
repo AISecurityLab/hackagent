@@ -50,7 +50,7 @@ class AttackPlan:
     model: str = DEFAULT_PLANNER_MODEL
 
     def to_attack_config(self) -> Dict[str, Any]:
-        """Build a runnable ``attack_config`` dict for :meth:`hackagent.client.Target.hack`."""
+        """Build the attack the planner chose, as a campaign's ``attacks`` entry."""
         config: Dict[str, Any] = {
             "attack_type": self.attack_type,
             "goals": list(self.goals),

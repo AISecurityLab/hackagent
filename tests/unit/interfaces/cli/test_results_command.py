@@ -100,19 +100,6 @@ class TestDisplayResultDetails(unittest.TestCase):
 
 
 class TestResultsCommands(unittest.TestCase):
-    def test_list_launches_results_tui(self):
-        runner = CliRunner()
-        with (
-            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
-            patch("hackagent.interfaces.cli.commands.results.launch_tui") as mock_tui,
-        ):
-            result = runner.invoke(
-                results, ["list", "--limit", "5"], obj={"config": _config()}
-            )
-        self.assertEqual(result.exit_code, 0, result.output)
-        mock_tui.assert_called_once()
-        self.assertEqual(mock_tui.call_args.kwargs["initial_tab"], "results")
-
     def test_show_fetches_and_renders_a_result(self):
         runner = CliRunner()
         result_id = uuid4()

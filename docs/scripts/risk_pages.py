@@ -73,59 +73,71 @@ def _by_relevance(items, render) -> list:
 
 
 def _campaign_example(package: str, profile_name: str, profile: ThreatProfile) -> str:
-    target = """from hackagent import HackAgent, Settings
-from hackagent.catalog.risks.{package} import {profile_name}
+    """The profile's recommendations, as the campaign that would run them.
 
-agent = HackAgent(Settings.resolve()).target(
-    "http://localhost:8000/v1",
-    "openai",
-    name="my-agent",
-)
-# Attacks and judges need models of their own; any chat model works.
-ollama = {{
-    "identifier": "llama3.2",
-    "agent_type": "ollama",
-    "endpoint": "http://localhost:11434",
-}}
-""".format(package=package, profile_name=profile_name)
+    A campaign is the one way to run an attack, so the example builds the
+    document ``hackagent campaign run`` takes rather than calling an API of
+    its own.
+    """
+    header = """from hackagent.catalog.risks.__PACKAGE__ import __PROFILE__
+from hackagent.orchestrator.campaign import run_campaign, summary
+
+TARGET = {
+    "name": "my-agent",
+    "connection": {
+        "provider": "local",
+        "type": "OPENAI",
+        "endpoint": "http://localhost:8080/chat",
+    },
+}
+"""
     if profile.datasets:
         datasets = "primary_datasets" if profile.primary_datasets else "datasets"
-        return (
-            target
-            + f"""
+        body = """
 # Use profile recommendations
-for attack in {profile_name}.primary_attacks:
-    for dataset in {profile_name}.{datasets}:
-        attack_config = {{
-            "attack_type": attack.technique,
-            "dataset": {{"preset": dataset.preset}},
-            "attacker": ollama,
-            "judges": [{{**ollama, "type": "harmbench"}}],
-        }}
-        results = agent.hack(attack_config=attack_config)
-        successes = sum(1 for r in results if r.get("success"))
-        print(f"{{attack.technique}} + {{dataset.preset}}: {{successes}}/{{len(results)}}")
-"""
+for attack in __PROFILE__.primary_attacks:
+    for dataset in __PROFILE__.__DATASETS__:
+        result = run_campaign(
+            {
+                "version": 1,
+                "campaign": {
+                    "name": f"{attack.technique} vs {dataset.preset}",
+                    "description": __PROFILE__.objective,
+                },
+                "dataset": {"source": {"type": "preset", "name": dataset.preset}},
+                "target": TARGET,
+                "attacks": [{"name": attack.technique}],
+            }
         )
-    goals = EXAMPLE_GOALS.get(package, ["<the behaviour you want to elicit>"])
-    goal_lines = "".join(f"    {json.dumps(goal)},\n" for goal in goals)
-    return (
-        target
-        + f"""
+        print(summary(result))
+""".replace("__DATASETS__", datasets)
+    else:
+        goals = EXAMPLE_GOALS.get(package, ["<the behaviour you want to elicit>"])
+        goal_lines = "".join(f"    {json.dumps(goal)},\n" for goal in goals)
+        body = """
 # No dataset preset covers this risk, so write the goals yourself
 goals = [
-{goal_lines}]
+__GOALS__]
 
-for attack in {profile_name}.primary_attacks:
-    results = agent.hack(attack_config={{
-        "attack_type": attack.technique,
-        "goals": goals,
-        "attacker": ollama,
-        "judges": [{{**ollama, "type": "harmbench"}}],
-    }})
-    successes = sum(1 for r in results if r.get("success"))
-    print(f"{{attack.technique}}: {{successes}}/{{len(results)}}")
-"""
+for attack in __PROFILE__.primary_attacks:
+    result = run_campaign(
+        {
+            "version": 1,
+            "campaign": {
+                "name": attack.technique,
+                "description": __PROFILE__.objective,
+            },
+            "dataset": {"source": {"type": "inline", "goals": goals}},
+            "target": TARGET,
+            "attacks": [{"name": attack.technique}],
+        }
+    )
+    print(summary(result))
+""".replace("__GOALS__", goal_lines)
+    return (
+        (header + body)
+        .replace("__PACKAGE__", package)
+        .replace("__PROFILE__", profile_name)
     )
 
 

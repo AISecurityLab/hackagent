@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.table import Table
 
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.cli.utils import handle_errors, launch_tui
+from hackagent.interfaces.cli.utils import handle_errors
 
 console = Console()
 
@@ -34,24 +34,6 @@ def _show_logo_once():
 
         display_hackagent_splash()
         _show_logo_once._shown = True
-
-
-@results.command()
-@click.option("--limit", default=10, help="Number of results to show")
-@click.option(
-    "--status",
-    type=click.Choice(["pending", "running", "completed", "failed"]),
-    help="Filter by status",
-)
-@click.option("--agent", help="Filter by agent name")
-@click.option("--attack-type", help="Filter by attack type")
-@click.pass_context
-@handle_errors
-def list(ctx, limit, status, agent, attack_type):
-    """List recent attack results"""
-    cli_config: CLIConfig = ctx.obj["config"]
-    cli_config.validate()
-    launch_tui(cli_config, initial_tab="results")
 
 
 @results.command()

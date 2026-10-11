@@ -21,10 +21,7 @@ from hackagent.interfaces.cli.commands import (
     results,
     web as web_cmd,
 )
-from hackagent.interfaces.cli.commands import (
-    agent,
-    config,
-)
+from hackagent.interfaces.cli.commands import config
 from hackagent.interfaces.cli.bootstrap import (
     _launch_tui_default,
     _patch_textual_terminal_queries,
@@ -408,7 +405,6 @@ cli.add_command(web_cmd.web)
 
 # Add command groups
 cli.add_command(config.config)
-cli.add_command(agent.agent)
 
 # Cover Click eager options (--version, --help) and the console-script entry.
 install_on_click_command(cli)

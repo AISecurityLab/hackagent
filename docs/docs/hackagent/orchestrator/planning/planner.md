@@ -32,7 +32,7 @@ An LLM-chosen attack strategy for a target.
 def to_attack_config() -> Dict[str, Any]
 ```
 
-Build a runnable `attack_config` dict for :meth:`hackagent.client.Target.hack`.
+Build the attack the planner chose, as a campaign&#x27;s `attacks` entry.
 
 #### summary
 

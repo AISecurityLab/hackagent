@@ -18,8 +18,6 @@ from hackagent.interfaces.cli.commands.results import (
     _display_result_summary,
     _generate_result_statistics,
     _show_logo_once,
-    list as list_cmd,
-    results as results_group,
     show,
     summary,
 )
@@ -60,69 +58,6 @@ class TestShowLogoOnce(unittest.TestCase):
             _show_logo_once()
 
         splash.assert_called_once_with()
-
-    def test_group_invocation_shows_the_logo(self):
-        with (
-            patch("hackagent.interfaces.cli.banner.display_hackagent_splash") as splash,
-            patch.object(results_mod, "launch_tui"),
-        ):
-            result = CliRunner().invoke(
-                results_group, ["list"], obj={"config": MagicMock()}
-            )
-
-        self.assertEqual(result.exit_code, 0)
-        splash.assert_called_once_with()
-
-
-class TestResultsList(unittest.TestCase):
-    def test_list_validates_config_and_opens_the_results_tab(self):
-        config = MagicMock()
-
-        with patch.object(results_mod, "launch_tui") as launch:
-            result = CliRunner().invoke(list_cmd, [], obj={"config": config})
-
-        self.assertEqual(result.exit_code, 0)
-        config.validate.assert_called_once_with()
-        launch.assert_called_once_with(config, initial_tab="results")
-
-    def test_invalid_config_is_reported_as_a_click_exception(self):
-        config = MagicMock()
-        config.validate.side_effect = ValueError("API key is required")
-
-        with patch.object(results_mod, "launch_tui") as launch:
-            result = CliRunner().invoke(list_cmd, [], obj={"config": config})
-
-        self.assertNotEqual(result.exit_code, 0)
-        launch.assert_not_called()
-        self.assertIn("API key is required", result.output)
-
-    def test_filter_options_are_accepted(self):
-        config = MagicMock()
-
-        with patch.object(results_mod, "launch_tui"):
-            result = CliRunner().invoke(
-                list_cmd,
-                [
-                    "--limit",
-                    "5",
-                    "--status",
-                    "completed",
-                    "--agent",
-                    "bot",
-                    "--attack-type",
-                    "tap",
-                ],
-                obj={"config": config},
-            )
-
-        self.assertEqual(result.exit_code, 0)
-
-    def test_unknown_status_choice_is_rejected(self):
-        result = CliRunner().invoke(
-            list_cmd, ["--status", "exploded"], obj={"config": MagicMock()}
-        )
-
-        self.assertEqual(result.exit_code, 2)
 
 
 class TestResultsShow(unittest.TestCase):

@@ -11,7 +11,6 @@
 - :mod:`.results`: attempts, outcomes, and output files
 - :mod:`.audit`: the ``evaluation.audit`` block, run before the attacks
 - :mod:`.preflight`: check every model answers before attacking
-- :mod:`.legacy`: the ``attack_config`` dict → campaign adapter behind ``hack``
 """
 
 from hackagent.orchestrator.campaign.audit import (

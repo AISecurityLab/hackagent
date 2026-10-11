@@ -16,25 +16,6 @@ def results()
 
 📊 View and manage attack results
 
-#### list
-
-```python
-@results.command()
-@click.option("--limit", default=10, help="Number of results to show")
-@click.option(
-    "--status",
-    type=click.Choice(["pending", "running", "completed", "failed"]),
-    help="Filter by status",
-)
-@click.option("--agent", help="Filter by agent name")
-@click.option("--attack-type", help="Filter by attack type")
-@click.pass_context
-@handle_errors
-def list(ctx, limit, status, agent, attack_type)
-```
-
-List recent attack results
-
 #### show
 
 ```python
