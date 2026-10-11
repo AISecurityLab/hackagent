@@ -1,21 +1,13 @@
+---
+sidebar_position: 1
+---
+
 # Quick Security Scan
 
 A **quick security scan** focuses on the highest-impact vulnerabilities with fast Static Template attacks, typically completing in 10-15 minutes.
 
-:::note Reading ASR
-`agent.hack(attack_config=...)` returns a list of row dicts, one per attempt. Every attack config below spreads `**MODELS` into it: without a judge, replies are recorded but never scored. The examples use these definitions:
-
-```python
-# The models every attack config below uses: an attacker for adaptive
-# attacks (static ones ignore it) and the judge that scores each reply.
-ollama = {"identifier": "llama3.2", "agent_type": "ollama",
-          "endpoint": "http://localhost:11434"}
-MODELS = {"attacker": ollama, "judges": [{**ollama, "type": "harmbench"}]}
-
-def asr(rows):
-    """Fraction of rows the judges marked successful."""
-    return sum(1 for r in rows if r.get("success")) / max(len(rows), 1)
-```
+:::note
+`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
 :::
 
 ## When to Use
@@ -35,16 +27,25 @@ Focus on 3-5 critical vulnerabilities using:
 ## Example Implementation
 
 ```python
-from hackagent import HackAgent, Settings
-from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.orchestrator.campaign import run_campaign
 
-agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
-    "http://localhost:8000/v1",
-    "openai",
-    name="quick-scan",
-)
+TARGET = {
+    "name": "quick-scan",
+    "connection": {
+        "provider": "local",
+        "type": "OPENAI_SDK",
+        "endpoint": "http://localhost:8080/v1",
+    },
+}
+
+JUDGE = {
+    "name": "llama3",
+    "connection": {"provider": "ollama", "type": "OLLAMA"},
+    "scoring": {"type": "harmbench"},
+}
 
 quick_profiles = [
     PROMPT_INJECTION_PROFILE,
@@ -53,15 +54,24 @@ quick_profiles = [
 ]
 
 for profile in quick_profiles:
-    ds = profile.primary_datasets[0].preset
-    attack_config = {
-        "attack_type": "static_template",
-        **MODELS,
-        "dataset": {"preset": ds},
-        "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
-    }
-    result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {asr(result):.0%}")
+    result = run_campaign(
+        {
+            "version": 1,
+            "campaign": {"name": f"quick scan · {profile.name}"},
+            "dataset": {
+                "source": {
+                    "type": "preset",
+                    "name": profile.primary_datasets[0].preset,
+                }
+            },
+            "target": TARGET,
+            "attacks": [{"name": "static_template"}],
+            "evaluation": {"judges": [JUDGE]},
+        }
+    )
+    attempts = [a for outcome in result.attacks for a in outcome.attempts]
+    broken = sum(bool(a.verdict and a.verdict.success) for a in attempts)
+    print(f"{profile.name}: {broken} of {len(attempts)} jailbroken")
 ```
 
 ## Typical Coverage
