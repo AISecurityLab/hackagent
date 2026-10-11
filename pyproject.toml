@@ -165,9 +165,10 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
-addopts = "--ignore=tests/e2e/attacks --timeout=120"
+testpaths = ["tests/unit", "tests/integration", "tests/e2e", "tests/live"]
+addopts = "--timeout=120"
 markers = [
+    "live: sends real requests to a local Ollama (use --run-live to enable)",
     "integration: marks integration tests (use --run-integration to enable)",
     "ollama: marks tests that require a running Ollama instance",
     "openai_sdk: marks tests that require OpenAI/OpenRouter API key",

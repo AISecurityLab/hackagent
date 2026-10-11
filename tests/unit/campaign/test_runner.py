@@ -242,7 +242,10 @@ def test_a_target_that_never_replies_leaves_an_error(tmp_path):
     result, _builder = run(iterative_campaign(tmp_path), models=models)
 
     [attempt] = attempts_of(result)
-    assert attempt.error == "target never replied"
+    # The search says what it found, in its own words. It used to say the
+    # target never replied whatever had happened, including when the target
+    # was never reached — which sent the reader to the wrong model.
+    assert "usable reply" in attempt.error
     assert attempt.verdict is None
     assert result.attempt_errors == 1
 
@@ -321,7 +324,10 @@ def test_a_failed_role_call_is_traced_with_its_error(tmp_path):
         n for n in attempt.trace if n.node == "call" and n.data["role"] == "attacker"
     ]
     assert "attacker down" in role_node.error
-    assert attempt.error == "target never replied"
+    # And the attempt blames the attacker, not the target, which answered
+    # every time it was asked.
+    assert "target never replied" not in (attempt.error or "")
+    assert "attacker" in attempt.error, attempt.error
 
 
 def test_a_search_that_raises_keeps_what_it_had_already_traced(tmp_path):

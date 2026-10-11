@@ -552,7 +552,11 @@ class _AttackRunner:
         if not findings:
             return [
                 Attempt(
-                    goal.index, 0, goal.text, error="target never replied", trace=nodes
+                    goal.index,
+                    0,
+                    goal.text,
+                    error=_nothing_came_back(nodes),
+                    trace=nodes,
                 )
             ]
         return [
@@ -656,6 +660,24 @@ def _slices(
         )
         owners[matched].append(node)
     return [tuple(owned) for owned in owners]
+
+
+def _nothing_came_back(nodes: tuple[Any, ...]) -> str:
+    """Why a search produced nothing, taken from what the search recorded.
+
+    This used to say the target never replied, whatever had happened. That is
+    wrong whenever the search stopped before reaching the target — an attacker
+    proposing no usable prompt is the common case — and it sends the reader to
+    debug the model that was working. The trace already knows.
+    """
+    for node in reversed(nodes):
+        reason = (getattr(node, "data", None) or {}).get("reason")
+        if reason:
+            return str(reason)
+        error = getattr(node, "error", None)
+        if error:
+            return str(error)
+    return "the search produced nothing, and recorded no reason"
 
 
 def _ordered(attempts: list[Attempt]) -> tuple[Attempt, ...]:
