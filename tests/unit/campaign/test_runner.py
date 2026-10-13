@@ -499,6 +499,34 @@ def test_a_target_error_records_its_status_code(tmp_path):
     assert isinstance(record.metadata["latency_ms"], int)
 
 
+def test_a_refused_crescendo_turn_is_stored_as_a_failure(tmp_path):
+    from tests.fakes import in_memory_store
+
+    question = json.dumps({"reasoning": "warming up", "question": "a question"})
+    values = campaign(
+        attacks=[
+            {
+                "name": "crescendo",
+                "parameters": {"max_turns": 1, "max_backtracks": 0},
+                "roles": {"attacker": attacker_role()},
+            }
+        ],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    store = in_memory_store()
+    # The panel passes the reply, but the target turned the turn down.
+    models = models_for(
+        target_reply="I'm sorry, I cannot help with that.",
+        judge="yes",
+        attacker=ScriptedModel(question),
+    )
+    run(values, models=models, store=store)
+
+    [record] = store.list_results(page_size=50).items
+    assert record.evaluation_status == "FAILED_JAILBREAK"
+    assert record.metadata["attack_metadata"]["refused"] is True
+
+
 # --- reporting ----------------------------------------------------------------
 
 
