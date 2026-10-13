@@ -717,6 +717,8 @@ class RemoteBackend:
         evaluation_notes: Optional[str] = None,
         evaluation_metrics: Optional[Dict[str, Any]] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        response_status_code: Optional[int] = None,
     ) -> ResultRecord:
         # Persistence-only: the loop never reads the updated row back (reads
         # drain the queue first), so defer the PATCH to the background worker.
@@ -727,6 +729,8 @@ class RemoteBackend:
             evaluation_notes,
             evaluation_metrics,
             agent_specific_data,
+            latency_ms,
+            response_status_code,
         )
         return ResultRecord(
             id=result_id,
@@ -748,6 +752,8 @@ class RemoteBackend:
         evaluation_notes: Optional[str],
         evaluation_metrics: Optional[Dict[str, Any]],
         agent_specific_data: Optional[Dict[str, Any]],
+        latency_ms: Optional[int],
+        response_status_code: Optional[int],
     ) -> None:
         """Background worker body for update_result: issue the PATCH."""
         kwargs: Dict[str, Any] = {}
@@ -762,6 +768,10 @@ class RemoteBackend:
             kwargs["evaluation_metrics"] = evaluation_metrics
         if agent_specific_data is not None:
             kwargs["agent_specific_data"] = agent_specific_data
+        if latency_ms is not None:
+            kwargs["latency_ms"] = latency_ms
+        if response_status_code is not None:
+            kwargs["response_status_code"] = response_status_code
         body = PatchedResultRequest(**kwargs)
         resp = result_partial_update.sync_detailed(
             id=result_id, client=self._client, body=body

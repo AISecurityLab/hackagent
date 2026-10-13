@@ -595,6 +595,19 @@ class TestRemoteBackendResult(unittest.TestCase):
             },
         )
 
+    def test_update_result_sends_the_target_latency_and_status(self):
+        with patch("hackagent.storage.remote.result_partial_update") as mock_patch:
+            mock_patch.sync_detailed.return_value = _mock_response(200)
+            self.backend.update_result(
+                _uid(), latency_ms=1250, response_status_code=429
+            )
+            self.backend.flush()
+
+        self.assertEqual(
+            _sent_json(result_partial_update, mock_patch),
+            {"latency_ms": 1250, "response_status_code": 429},
+        )
+
     def test_update_result_sends_only_what_was_given(self):
         with patch("hackagent.storage.remote.result_partial_update") as mock_patch:
             mock_patch.sync_detailed.return_value = _mock_response(200)

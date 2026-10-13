@@ -132,6 +132,8 @@ class Store(Protocol):
         evaluation_notes: Optional[str] = None,
         evaluation_metrics: Optional[Dict[str, Any]] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        response_status_code: Optional[int] = None,
     ) -> ResultRecord: ...
 
     def list_results(

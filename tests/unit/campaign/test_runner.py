@@ -11,6 +11,7 @@ did on the way there.
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -415,6 +416,87 @@ def test_every_trace_step_is_stored_with_its_result(tmp_path):
         "TOOL_CALL" if n.node == "call" else "OTHER" for n in attempt.trace
     ]
     assert [t.content["node"] for t in stored[:-1]] == [n.node for n in attempt.trace]
+
+
+class SlowModel(ScriptedModel):
+    """A target that takes ``delay`` seconds to answer."""
+
+    def __init__(self, reply="a slow reply", delay: float = 0.05) -> None:
+        super().__init__(reply)
+        self.delay = delay
+
+    async def acomplete(self, messages, **overrides):
+        await asyncio.sleep(self.delay)
+        return await super().acomplete(messages, **overrides)
+
+
+def test_each_result_records_how_long_the_target_took(tmp_path):
+    from tests.fakes import in_memory_store
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    store = in_memory_store()
+    result, _builder = run(
+        values, models=models_for(target=SlowModel(delay=0.05)), store=store
+    )
+
+    [attempt] = attempts_of(result)
+    assert isinstance(attempt.response.latency_ms, int)
+    assert attempt.response.latency_ms >= 50
+    [record] = store.list_results(page_size=50).items
+    assert record.metadata["latency_ms"] == attempt.response.latency_ms
+    assert "response_status_code" not in record.metadata
+
+
+def test_each_iterative_attempt_records_its_own_target_call(tmp_path):
+    from tests.fakes import in_memory_store
+
+    values = iterative_campaign(tmp_path, parameters={"steps": 2, "candidates": 1})
+    store = in_memory_store()
+    result, _builder = run(
+        values,
+        models=models_for(judge="no", target=SlowModel(delay=0.05)),
+        store=store,
+    )
+
+    attempts = attempts_of(result)
+    assert len(attempts) == 2
+    assert all(attempt.response.latency_ms >= 50 for attempt in attempts)
+    stored = {
+        record.metadata["request_index"]: record.metadata["latency_ms"]
+        for record in store.list_results(page_size=50).items
+    }
+    assert stored == {
+        attempt.request_index: attempt.response.latency_ms for attempt in attempts
+    }
+
+
+def test_a_target_error_records_its_status_code(tmp_path):
+    from tests.fakes import in_memory_store
+
+    from hackagent.core.contracts import LLMError
+    from hackagent.models import ModelResponse
+
+    limited = ModelResponse(
+        text="",
+        error=LLMError(message="slow down", category="RateLimitError", status_code=429),
+    )
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    store = in_memory_store()
+    run(
+        values,
+        models=models_for(target=ScriptedModel(lambda _messages: limited)),
+        store=store,
+    )
+
+    [record] = store.list_results(page_size=50).items
+    assert record.metadata["response_status_code"] == 429
+    assert isinstance(record.metadata["latency_ms"], int)
 
 
 # --- reporting ----------------------------------------------------------------
