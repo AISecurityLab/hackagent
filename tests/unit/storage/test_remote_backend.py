@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
+from hackagent.storage._http.api.result import result_create, result_partial_update
 from hackagent.storage.remote import RemoteBackend
 from hackagent.storage.records import (
     AgentRecord,
@@ -39,6 +40,13 @@ def _mock_response(status_code: int, parsed=None, content: bytes = b"{}") -> Mag
     resp.parsed = parsed
     resp.content = content
     return resp
+
+
+def _sent_json(endpoint, mock_endpoint) -> dict:
+    """The JSON body ``endpoint`` would send for the call made to its mock."""
+    kwargs = dict(mock_endpoint.sync_detailed.call_args.kwargs)
+    kwargs.pop("client")
+    return endpoint._get_kwargs(**kwargs)["json"]
 
 
 def _mock_agent_model(name="test-agent"):
@@ -547,6 +555,77 @@ class TestRemoteBackendResult(unittest.TestCase):
 
         self.assertIsInstance(rec, ResultRecord)
         self.assertEqual(rec.evaluation_status, "NOT_EVALUATED")
+
+    def test_create_result_sends_the_goal(self):
+        run_id = _uid()
+        parsed_m = MagicMock()
+        parsed_m.id = _uid()
+
+        with patch("hackagent.storage.remote.result_create") as mock_create:
+            mock_create.sync_detailed.return_value = _mock_response(201, parsed_m)
+            self.backend.create_result(
+                run_id=run_id,
+                goal="Test jailbreak",
+                goal_index=3,
+                request_payload={"prompt": "ignore"},
+                agent_specific_data={"request_index": 1},
+            )
+
+        body = _sent_json(result_create, mock_create)
+        self.assertEqual(body["run"], str(run_id))
+        self.assertEqual(body["goal"], "Test jailbreak")
+        self.assertEqual(body["goal_index"], 3)
+        self.assertEqual(body["agent_specific_data"], {"request_index": 1})
+
+    def test_update_result_sends_the_evaluation_metrics(self):
+        with patch("hackagent.storage.remote.result_partial_update") as mock_patch:
+            mock_patch.sync_detailed.return_value = _mock_response(200)
+            self.backend.update_result(
+                _uid(),
+                evaluation_status="FAILED_JAILBREAK",
+                evaluation_metrics={"eval_hb": 0, "explanation_hb": "refused"},
+            )
+            self.backend.flush()
+
+        self.assertEqual(
+            _sent_json(result_partial_update, mock_patch),
+            {
+                "evaluation_status": "FAILED_JAILBREAK",
+                "evaluation_metrics": {"eval_hb": 0, "explanation_hb": "refused"},
+            },
+        )
+
+    def test_update_result_sends_only_what_was_given(self):
+        with patch("hackagent.storage.remote.result_partial_update") as mock_patch:
+            mock_patch.sync_detailed.return_value = _mock_response(200)
+            self.backend.update_result(_uid(), evaluation_notes="Passed")
+            self.backend.flush()
+
+        self.assertEqual(
+            _sent_json(result_partial_update, mock_patch),
+            {"evaluation_notes": "Passed"},
+        )
+
+    def test_get_result_reads_the_goal_field(self):
+        result_m = self._mock_result_model(_uid(), goal_index=0)
+        result_m.goal = "the stored goal"
+        result_m.goal_index = 4
+
+        with patch("hackagent.storage.remote.result_retrieve") as mock_retrieve:
+            mock_retrieve.sync_detailed.return_value = _mock_response(200, result_m)
+            rec = self.backend.get_result(result_m.id)
+
+        self.assertEqual((rec.goal, rec.goal_index), ("the stored goal", 4))
+
+    def test_get_result_falls_back_to_the_goal_in_agent_data(self):
+        # A server without the goal fields: the mock has no real values there.
+        result_m = self._mock_result_model(_uid(), goal_index=2)
+
+        with patch("hackagent.storage.remote.result_retrieve") as mock_retrieve:
+            mock_retrieve.sync_detailed.return_value = _mock_response(200, result_m)
+            rec = self.backend.get_result(result_m.id)
+
+        self.assertEqual((rec.goal, rec.goal_index), ("g3", 2))
 
     def test_update_result_success(self):
         result_id = _uid()

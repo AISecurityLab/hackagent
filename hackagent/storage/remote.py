@@ -126,6 +126,22 @@ def _coerce_trace_id(raw_id: Any, result_id: UUID, sequence: int) -> UUID:
     return uuid.uuid5(uuid.NAMESPACE_URL, f"trace:{result_id}:{sequence}:{raw_id}")
 
 
+def _result_goal(result) -> tuple[str, int]:
+    """The goal a result was recorded for, and its index.
+
+    Results from servers that predate the ``goal`` fields carry them in
+    ``agent_specific_data``, if at all.
+    """
+    data = result.agent_specific_data
+    data = data if isinstance(data, dict) else {}
+    goal = getattr(result, "goal", None)
+    goal_index = getattr(result, "goal_index", None)
+    return (
+        goal if isinstance(goal, str) and goal else data.get("goal", ""),
+        goal_index if isinstance(goal_index, int) else data.get("goal_index", 0),
+    )
+
+
 def _to_agent_record(agent) -> AgentRecord:
     """Convert an API Agent model to an AgentRecord."""
     return AgentRecord(
@@ -668,6 +684,8 @@ class RemoteBackend:
     ) -> ResultRecord:
         body = ResultRequest(
             run=run_id,
+            goal=goal,
+            goal_index=goal_index,
             request_payload=request_payload,
             evaluation_status=EvalStatus.NOT_EVALUATED,
             agent_specific_data=agent_specific_data,
@@ -707,6 +725,7 @@ class RemoteBackend:
             result_id,
             evaluation_status,
             evaluation_notes,
+            evaluation_metrics,
             agent_specific_data,
         )
         return ResultRecord(
@@ -727,6 +746,7 @@ class RemoteBackend:
         result_id: UUID,
         evaluation_status: Optional[str],
         evaluation_notes: Optional[str],
+        evaluation_metrics: Optional[Dict[str, Any]],
         agent_specific_data: Optional[Dict[str, Any]],
     ) -> None:
         """Background worker body for update_result: issue the PATCH."""
@@ -738,6 +758,8 @@ class RemoteBackend:
                 kwargs["evaluation_status"] = evaluation_status
         if evaluation_notes is not None:
             kwargs["evaluation_notes"] = evaluation_notes
+        if evaluation_metrics is not None:
+            kwargs["evaluation_metrics"] = evaluation_metrics
         if agent_specific_data is not None:
             kwargs["agent_specific_data"] = agent_specific_data
         body = PatchedResultRequest(**kwargs)
@@ -790,11 +812,7 @@ class RemoteBackend:
                 local_start = max(0, start_index - page_start)
                 local_end = min(len(page_results), end_index - page_start)
                 for r in page_results[local_start:local_end]:
-                    goal = ""
-                    goal_index = 0
-                    if isinstance(r.agent_specific_data, dict):
-                        goal = r.agent_specific_data.get("goal", "")
-                        goal_index = r.agent_specific_data.get("goal_index", 0)
+                    goal, goal_index = _result_goal(r)
                     items.append(
                         ResultRecord(
                             id=r.id,
@@ -841,11 +859,7 @@ class RemoteBackend:
                 if rr.status_code == 200 and rr.parsed:
                     embedded = getattr(rr.parsed, "results", None) or []
                     for r in embedded:
-                        goal = ""
-                        goal_index = 0
-                        if isinstance(r.agent_specific_data, dict):
-                            goal = r.agent_specific_data.get("goal", "")
-                            goal_index = r.agent_specific_data.get("goal_index", 0)
+                        goal, goal_index = _result_goal(r)
                         items.append(
                             ResultRecord(
                                 id=r.id,
@@ -878,11 +892,7 @@ class RemoteBackend:
         resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
         if resp.status_code == 200 and resp.parsed:
             r = resp.parsed
-            goal = ""
-            goal_index = 0
-            if isinstance(r.agent_specific_data, dict):
-                goal = r.agent_specific_data.get("goal", "")
-                goal_index = r.agent_specific_data.get("goal_index", 0)
+            goal, goal_index = _result_goal(r)
             return ResultRecord(
                 id=r.id,
                 run_id=r.run if isinstance(r.run, UUID) else UUID(str(r.run)),
