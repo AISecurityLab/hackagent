@@ -79,9 +79,17 @@ def fill(value, slot=""):
         if value.startswith("__NAMED__"):
             return NAMED[value[len("__NAMED__") :]]
         if value == HOLE:
-            return {"goals": ["a goal"], "name": "harmbench", "attack": "baseline"}.get(
-                slot, "harmbench"
-            )
+            return {
+                "goals": ["a goal"],
+                "name": "harmbench",
+                "attack": "baseline",
+                # A page may compute an attack's roles rather than spell them
+                # out, since which roles an attack takes is the attack's own
+                # business.
+                "roles": {"attacker": MODEL},
+                # A page may name a judge of its own before using it.
+                "judges": {**MODEL, "scoring": {"type": "harmbench"}},
+            }.get(slot, "harmbench")
         return value
     if isinstance(value, dict):
         return {k: fill(v, k) for k, v in value.items()}

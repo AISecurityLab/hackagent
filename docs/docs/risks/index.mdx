@@ -84,21 +84,28 @@ hackagent campaign run jailbreak.yaml
 Every profile lists its recommended attacks and datasets; loop over the primary ones:
 
 ```python
-from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.orchestrator.campaign import run_campaign
 
-ollama = {"identifier": "llama3.2", "agent_type": "ollama",
-          "endpoint": "http://localhost:11434"}
-target = HackAgent(Settings.resolve()).target(
-    "http://localhost:8000/v1", "openai", name="my-agent"
-)
+OLLAMA = {"provider": "ollama", "type": "OLLAMA"}
+TARGET = {"name": "my-agent", "connection": {
+    "provider": "local", "type": "OPENAI",
+    "endpoint": "http://localhost:8000/v1"}}
 preset = "harmbench"  # one of JAILBREAK_PROFILE.primary_datasets
 for attack in JAILBREAK_PROFILE.primary_attacks:
-    results = target.hack(attack_config={
-        "attack_type": attack.technique,
-        "dataset": {"preset": preset, "limit": 20},
-        "attacker": ollama,
-        "judges": [{**ollama, "type": "harmbench"}],
+    result = run_campaign({
+        "version": 1,
+        "campaign": {"name": f"{attack.technique} vs {preset}"},
+        "dataset": {
+            "source": {"type": "preset", "name": preset},
+            "selection": {"limit": 20},
+        },
+        "target": TARGET,
+        "attacks": [{"name": attack.technique,
+                     "roles": {"attacker": {"name": "llama3.2",
+                                            "connection": OLLAMA}}}],
+        "evaluation": {"judges": [{"name": "llama3.2", "connection": OLLAMA,
+                                   "scoring": {"type": "harmbench"}}]},
     })
 ```
 
