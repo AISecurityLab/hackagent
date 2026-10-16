@@ -117,8 +117,8 @@ Campaign First run succeeded
 called a jailbreak. `0` here means the model refused, which is the result you
 want from a model that is behaving.
 
-Results are written twice: a JSON file under `./logs/runs/`, and a local
-database you can browse later.
+Results are written twice: a folder per run under `./logs/runs/` (the campaign
+that ran and its results as JSON), and a local database you can browse later.
 
 ```bash
 hackagent results list     # recent runs
@@ -162,8 +162,9 @@ Two things changed:
   so it needs a model of its own: that is the `attacker` **role**. Static attacks
   like FlipAttack need none. Each attack's page lists the roles it takes.
 - **`escalate: true`** drops a goal as soon as any attack jailbreaks it, so later
-  attacks only face the goals still standing. `preflight: true` pings the target
-  and judges first, so a wrong endpoint fails immediately instead of mid-run.
+  attacks only face the goals still standing. Preflight (on by default) checks
+  every model first (target, attack roles, judges…), so a wrong endpoint fails
+  immediately instead of mid-run.
 
 :::caution[Adaptive attacks cost more]
 

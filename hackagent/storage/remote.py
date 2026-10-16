@@ -64,6 +64,7 @@ from hackagent.storage._http.api.models import (
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
+    CampaignRunRecord,
     OrganizationContext,
     PaginatedResult,
     ResultRecord,
@@ -489,14 +490,179 @@ class RemoteBackend:
             return PaginatedResult(items=items, total=resp.parsed.count or len(items))
         return PaginatedResult(items=[], total=0)
 
-    # ── Run ───────────────────────────────────────────────────────────────────
+    # ── Campaign run ──────────────────────────────────────────────────────────
+
+    def create_campaign_run(
+        self,
+        agent_id: UUID,
+        name: str,
+        campaign_config: Dict[str, Any],
+    ) -> CampaignRunRecord:
+        """Persist a campaign through the existing remote run endpoint.
+
+        The hosted API does not yet expose a dedicated campaign-run resource,
+        so a marker distinguishes this parent record from attack runs. Local
+        SQLite uses the normalized table and foreign key directly.
+        """
+
+        config = {
+            "_record_type": "campaign_run",
+            "campaign_name": name,
+            "campaign_config": campaign_config,
+            "evaluation_audit": None,
+        }
+        body = RunRequest(agent=agent_id, attack=None, run_config=config)
+        resp = run_run_tests_create.sync_detailed(client=self._client, body=body)
+        if resp.status_code not in (200, 201):
+            raise RuntimeError(
+                "RemoteBackend: Failed to create campaign run record "
+                f"(status {resp.status_code})"
+            )
+        data = self._parse_json_response(resp)
+        campaign_run_id = UUID(data.get("id") or str(data.get("pk", "")))
+        now = _now()
+        return CampaignRunRecord(
+            id=campaign_run_id,
+            agent_id=agent_id,
+            name=name,
+            campaign_config=campaign_config,
+            audit=None,
+            status="PENDING",
+            run_notes=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+    def update_campaign_run(
+        self,
+        campaign_run_id: UUID,
+        status: Optional[str] = None,
+        audit: Optional[Dict[str, Any]] = None,
+        run_notes: Optional[str] = None,
+    ) -> CampaignRunRecord:
+        current = self.get_campaign_run(campaign_run_id)
+        config = {
+            "_record_type": "campaign_run",
+            "campaign_name": current.name,
+            "campaign_config": current.campaign_config,
+            "evaluation_audit": audit if audit is not None else current.audit,
+        }
+        kwargs: Dict[str, Any] = {"run_config": config}
+        if status is not None:
+            try:
+                kwargs["status"] = RunStatus(status)
+            except ValueError:
+                kwargs["status"] = status
+        if run_notes is not None:
+            kwargs["run_notes"] = run_notes
+        response = run_partial_update.sync_detailed(
+            id=campaign_run_id,
+            client=self._client,
+            body=PatchedRunRequest(**kwargs),
+        )
+        if response.status_code >= 300:
+            raise RuntimeError(
+                "RemoteBackend: Failed to update campaign run record "
+                f"(status {response.status_code})"
+            )
+        return current.model_copy(
+            update={
+                "audit": audit if audit is not None else current.audit,
+                "status": status or current.status,
+                "run_notes": run_notes if run_notes is not None else current.run_notes,
+                "updated_at": _now(),
+            }
+        )
+
+    def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord:
+        self.flush()
+        response = run_retrieve.sync_detailed(id=campaign_run_id, client=self._client)
+        if response.status_code != 200 or response.parsed is None:
+            raise RuntimeError(
+                f"RemoteBackend: Campaign run {campaign_run_id} not found"
+            )
+        run = response.parsed
+        config = run.run_config if isinstance(run.run_config, dict) else {}
+        if config.get("_record_type") != "campaign_run":
+            raise RuntimeError(
+                f"RemoteBackend: Run {campaign_run_id} is not a campaign run"
+            )
+        return CampaignRunRecord(
+            id=run.id,
+            agent_id=run.agent,
+            name=str(config.get("campaign_name") or "Campaign"),
+            campaign_config=config.get("campaign_config")
+            if isinstance(config.get("campaign_config"), dict)
+            else {},
+            audit=config.get("evaluation_audit")
+            if isinstance(config.get("evaluation_audit"), dict)
+            else None,
+            status=run.status.value
+            if hasattr(run.status, "value")
+            else str(run.status),
+            run_notes=getattr(run, "run_notes", None),
+            created_at=_pick_dt(run, "timestamp", "created_at"),
+            updated_at=_pick_dt(run, "updated_at", "timestamp"),
+        )
+
+    def list_campaign_runs(
+        self, page: int = 1, page_size: int = 100
+    ) -> PaginatedResult[CampaignRunRecord]:
+        # The hosted API has no campaign-only filter yet. Page through ordinary
+        # runs and select the parent markers until the requested page is full.
+        found: List[CampaignRunRecord] = []
+        api_page = 1
+        while len(found) < page * page_size:
+            response = run_list.sync_detailed(client=self._client, page=api_page)
+            if response.status_code != 200 or response.parsed is None:
+                break
+            rows = response.parsed.results or []
+            if not rows:
+                break
+            for run in rows:
+                config = run.run_config if isinstance(run.run_config, dict) else {}
+                if config.get("_record_type") != "campaign_run":
+                    continue
+                found.append(
+                    CampaignRunRecord(
+                        id=run.id,
+                        agent_id=run.agent,
+                        name=str(config.get("campaign_name") or "Campaign"),
+                        campaign_config=config.get("campaign_config")
+                        if isinstance(config.get("campaign_config"), dict)
+                        else {},
+                        audit=config.get("evaluation_audit")
+                        if isinstance(config.get("evaluation_audit"), dict)
+                        else None,
+                        status=run.status.value
+                        if hasattr(run.status, "value")
+                        else str(run.status),
+                        run_notes=getattr(run, "run_notes", None),
+                        created_at=_pick_dt(run, "timestamp", "created_at"),
+                        updated_at=_pick_dt(run, "updated_at", "timestamp"),
+                    )
+                )
+            next_page = getattr(response.parsed, "next", None)
+            if not next_page:
+                break
+            api_page += 1
+        start = max(0, (page - 1) * page_size)
+        return PaginatedResult(items=found[start : start + page_size], total=len(found))
+
+    # ── Attack run ────────────────────────────────────────────────────────────
 
     def create_run(
         self,
         attack_id: UUID,
         agent_id: UUID,
         run_config: Dict[str, Any],
+        campaign_run_id: Optional[UUID] = None,
     ) -> RunRecord:
+        if campaign_run_id is not None:
+            run_config = {
+                **run_config,
+                "_campaign_run_id": str(campaign_run_id),
+            }
         body = RunRequest(
             attack=str(attack_id),
             agent=str(agent_id),
@@ -508,6 +674,7 @@ class RemoteBackend:
             run_id = data.get("id") or str(data.get("pk", ""))
             return RunRecord(
                 id=UUID(run_id),
+                campaign_run_id=campaign_run_id,
                 attack_id=attack_id,
                 agent_id=agent_id,
                 run_config=run_config,
@@ -544,6 +711,9 @@ class RemoteBackend:
         if resp.status_code < 300:
             return RunRecord(
                 id=run_id,
+                campaign_run_id=UUID(str(run_config["_campaign_run_id"]))
+                if run_config and run_config.get("_campaign_run_id")
+                else None,
                 attack_id=UUID("00000000-0000-0000-0000-000000000000"),
                 agent_id=UUID("00000000-0000-0000-0000-000000000000"),
                 run_config=run_config or {},
@@ -562,14 +732,15 @@ class RemoteBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[RunRecord]:
-        items: List[RunRecord] = []
+        matching_runs: List[Any] = []
         total = 0
+        campaign_markers_seen = 0
+        exhausted = False
         logical_page = max(1, int(page))
         logical_page_size = max(1, int(page_size))
         start_index = (logical_page - 1) * logical_page_size
         end_index = start_index + logical_page_size
 
-        scanned = 0
         api_page = 1
 
         while True:
@@ -587,42 +758,15 @@ class RemoteBackend:
             page_results = resp.parsed.results or []
             total = resp.parsed.count or total
             if not page_results:
+                exhausted = True
                 break
 
-            page_start = scanned
-            page_end = scanned + len(page_results)
-
-            if page_end > start_index and page_start < end_index:
-                local_start = max(0, start_index - page_start)
-                local_end = min(len(page_results), end_index - page_start)
-                for r in page_results[local_start:local_end]:
-                    rc = r.run_config if isinstance(r.run_config, dict) else {}
-                    # Inject agent_name from API response for dashboard display
-                    agent_name = getattr(r, "agent_name", None)
-                    if agent_name:
-                        rc = {**rc, "_agent_name": agent_name}
-                    items.append(
-                        RunRecord(
-                            id=r.id,
-                            attack_id=r.attack
-                            if isinstance(r.attack, UUID)
-                            else UUID(str(r.attack)),
-                            agent_id=r.agent
-                            if isinstance(r.agent, UUID)
-                            else UUID(str(r.agent)),
-                            run_config=rc,
-                            status=r.status.value
-                            if hasattr(r.status, "value")
-                            else str(r.status),
-                            run_notes=getattr(r, "run_notes", None),
-                            created_at=_pick_dt(r, "timestamp", "created_at"),
-                            updated_at=_pick_dt(r, "updated_at", "timestamp"),
-                        )
-                    )
-
-            scanned = page_end
-            if scanned >= end_index:
-                break
+            for run in page_results:
+                config = run.run_config if isinstance(run.run_config, dict) else {}
+                if config.get("_record_type") == "campaign_run":
+                    campaign_markers_seen += 1
+                    continue
+                matching_runs.append(run)
 
             # `next` is AnyUrl | None — isinstance guards against truthy MagicMocks
             next_page = getattr(resp.parsed, "next", None)
@@ -632,10 +776,51 @@ class RemoteBackend:
                 str(next_page).strip()
             )
             if not has_next:
+                exhausted = True
+                break
+            # Stopping at the requested page keeps the API's own count exact,
+            # but only while nothing has been filtered out of it. Once a
+            # campaign parent has been seen the count no longer matches what
+            # this listing returns, and only a full scan gives a true total.
+            if len(matching_runs) >= end_index and campaign_markers_seen == 0:
                 break
             api_page += 1
 
-        return PaginatedResult(items=items, total=total or len(items))
+        items: List[RunRecord] = []
+        for r in matching_runs[start_index:end_index]:
+            rc = r.run_config if isinstance(r.run_config, dict) else {}
+            # Inject agent_name from API response for dashboard display.
+            agent_name = getattr(r, "agent_name", None)
+            if agent_name:
+                rc = {**rc, "_agent_name": agent_name}
+            items.append(
+                RunRecord(
+                    id=r.id,
+                    campaign_run_id=UUID(str(rc["_campaign_run_id"]))
+                    if rc.get("_campaign_run_id")
+                    else None,
+                    attack_id=r.attack
+                    if isinstance(r.attack, UUID)
+                    else UUID(str(r.attack)),
+                    agent_id=r.agent
+                    if isinstance(r.agent, UUID)
+                    else UUID(str(r.agent)),
+                    run_config=rc,
+                    status=r.status.value
+                    if hasattr(r.status, "value")
+                    else str(r.status),
+                    run_notes=getattr(r, "run_notes", None),
+                    created_at=_pick_dt(r, "timestamp", "created_at"),
+                    updated_at=_pick_dt(r, "updated_at", "timestamp"),
+                )
+            )
+
+        # Parent campaign markers share the hosted run endpoint until its API
+        # gains a dedicated resource. Never expose those markers as attacks,
+        # and never count them: a total above what paging can reach would leave
+        # the caller with a phantom last page.
+        attack_total = len(matching_runs) if exhausted else total
+        return PaginatedResult(items=items, total=attack_total)
 
     def get_run(self, run_id: UUID) -> RunRecord:
         self.flush()
@@ -644,6 +829,10 @@ class RemoteBackend:
             r = resp.parsed
             return RunRecord(
                 id=r.id,
+                campaign_run_id=UUID(str(r.run_config["_campaign_run_id"]))
+                if isinstance(r.run_config, dict)
+                and r.run_config.get("_campaign_run_id")
+                else None,
                 attack_id=r.attack
                 if isinstance(r.attack, UUID)
                 else UUID(str(r.attack)),

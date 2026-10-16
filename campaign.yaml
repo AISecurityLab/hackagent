@@ -29,9 +29,9 @@ campaign:
   description: Local vLLM evaluation of h4rm3l with an LLM decorator
 
 dataset:
-  preset: harmbench
   source:
     type: preset
+    name: harmbench
     # Or give the goals inline instead of a preset/provider:
     # type: inline
     # goals:
@@ -65,8 +65,8 @@ target:
     provider: vllm
     type: OPENAI
     endpoint: http://127.0.0.1:8000/v1
-    api_key_env: null
-    headers: {}
+    api_key_env: null         # name of the env var holding the API key
+    headers: {}               # extra HTTP headers; keep keys out, use api_key_env
     timeout: 300
   generation:
     max_tokens: 512
@@ -126,7 +126,7 @@ attacks:
 
   # Iterative attacks. Uncomment to run them. Each stops at the first
   # exchange the panel below calls a success, and reports one row per
-  # exchange it judged; search traces go to <run_id>.traces.jsonl.
+  # exchange it judged; search traces go to <run_id>/traces.jsonl.
   #
   # - name: bon
   #   parameters:
@@ -301,7 +301,7 @@ evaluation:
   # Measure this panel against human-labelled samples before the run relies
   # on it. Off by default: it is a full pass of the panel over the
   # calibration set before the first attack (and one more per wrapper when
-  # robustness is on). The report lands in <run_id>.audit.json. Precision
+  # robustness is on). The report lands in <run_id>/audit.json. Precision
   # and recall are reported for you to read; only robustness can fail.
   audit:
     enabled: true
@@ -345,7 +345,7 @@ evaluation:
         system_prompt: null
 
 execution:
-  # preflight: true          # ping target + judges before attacking; fail fast
+  # preflight: false         # skip checking every model before attacking
   mode: sequential          # sequential | parallel (attacks share the limits below)
   dry_run: false
   on_error: continue        # continue | stop

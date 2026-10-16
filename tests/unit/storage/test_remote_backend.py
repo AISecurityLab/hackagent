@@ -920,5 +920,249 @@ class TestRemoteBackendDelete(unittest.TestCase):
         )
 
 
+def _mock_run_row(run_config, *, status="COMPLETED") -> MagicMock:
+    """One row as the hosted run endpoint returns it."""
+    row = MagicMock()
+    row.id = _uid()
+    row.attack = _uid()
+    row.agent = _uid()
+    row.run_config = run_config
+    row.status = MagicMock()
+    row.status.value = status
+    row.run_notes = None
+    row.agent_name = None
+    row.timestamp = _dt()
+    row.updated_at = _dt()
+    return row
+
+
+def _mock_page(rows, count, next_url=None) -> MagicMock:
+    parsed = MagicMock()
+    parsed.results = rows
+    parsed.count = count
+    parsed.next = next_url
+    return _mock_response(200, parsed=parsed)
+
+
+def _campaign_marker(name="Nightly", config=None, audit=None) -> dict:
+    return {
+        "_record_type": "campaign_run",
+        "campaign_name": name,
+        "campaign_config": config if config is not None else {"version": 1},
+        "evaluation_audit": audit,
+    }
+
+
+class TestRemoteBackendCampaignRun(unittest.TestCase):
+    """Campaign parents ride on the hosted run endpoint behind a marker."""
+
+    def setUp(self):
+        self.client = _mock_client()
+        self.backend = RemoteBackend(self.client)
+        self.backend._context = OrganizationContext(org_id=_uid(), user_id="1")
+
+    def test_create_campaign_run_posts_a_marked_parent_with_no_attack(self):
+        campaign_run_id = str(_uid())
+        agent_id = _uid()
+        spec = {"version": 1, "campaign": {"name": "Nightly"}}
+
+        with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
+            mock_create.sync_detailed.return_value = _mock_response(
+                201, content=f'{{"id": "{campaign_run_id}"}}'.encode()
+            )
+            record = self.backend.create_campaign_run(agent_id, "Nightly", spec)
+
+        body = mock_create.sync_detailed.call_args.kwargs["body"]
+        self.assertIsNone(body.attack)
+        self.assertEqual(body.run_config["_record_type"], "campaign_run")
+        self.assertEqual(body.run_config["campaign_config"], spec)
+        self.assertEqual(str(record.id), campaign_run_id)
+        self.assertEqual(record.name, "Nightly")
+        self.assertEqual(record.status, "PENDING")
+        self.assertIsNone(record.audit)
+
+    def test_create_campaign_run_raises_so_a_run_never_starts_unrecorded(self):
+        with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
+            mock_create.sync_detailed.return_value = _mock_response(500)
+            with self.assertRaisesRegex(RuntimeError, "campaign run"):
+                self.backend.create_campaign_run(_uid(), "Nightly", {})
+
+    def test_get_campaign_run_reads_the_marker_back(self):
+        audit = {"passed": True, "precision": 1.0}
+        row = _mock_run_row(_campaign_marker(config={"version": 1}, audit=audit))
+
+        with patch("hackagent.storage.remote.run_retrieve") as mock_get:
+            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
+            record = self.backend.get_campaign_run(row.id)
+
+        self.assertEqual(record.name, "Nightly")
+        self.assertEqual(record.campaign_config, {"version": 1})
+        self.assertEqual(record.audit, audit)
+
+    def test_get_campaign_run_rejects_a_plain_attack_run(self):
+        row = _mock_run_row({"batch_size": 4})
+
+        with patch("hackagent.storage.remote.run_retrieve") as mock_get:
+            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
+            with self.assertRaisesRegex(RuntimeError, "not a campaign run"):
+                self.backend.get_campaign_run(row.id)
+
+    def test_update_campaign_run_keeps_the_spec_and_writes_the_audit(self):
+        spec = {"version": 1, "campaign": {"name": "Nightly"}}
+        row = _mock_run_row(_campaign_marker(config=spec))
+        audit = {"passed": False}
+
+        with (
+            patch("hackagent.storage.remote.run_retrieve") as mock_get,
+            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+        ):
+            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
+            mock_patch.sync_detailed.return_value = _mock_response(200)
+            record = self.backend.update_campaign_run(
+                row.id, status="FAILED", audit=audit
+            )
+
+        body = mock_patch.sync_detailed.call_args.kwargs["body"]
+        # The spec is immutable: an update must not drop it.
+        self.assertEqual(body.run_config["campaign_config"], spec)
+        self.assertEqual(body.run_config["evaluation_audit"], audit)
+        self.assertEqual(record.status, "FAILED")
+        self.assertEqual(record.audit, audit)
+
+    def test_update_campaign_run_clears_a_note_with_an_empty_string(self):
+        row = _mock_run_row(_campaign_marker())
+        row.run_notes = "Attack runs failed: tap"
+
+        with (
+            patch("hackagent.storage.remote.run_retrieve") as mock_get,
+            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+        ):
+            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
+            mock_patch.sync_detailed.return_value = _mock_response(200)
+            record = self.backend.update_campaign_run(
+                row.id, status="COMPLETED", run_notes=""
+            )
+
+        self.assertEqual(
+            mock_patch.sync_detailed.call_args.kwargs["body"].run_notes, ""
+        )
+        self.assertEqual(record.run_notes, "")
+
+    def test_update_campaign_run_raises_on_error(self):
+        row = _mock_run_row(_campaign_marker())
+
+        with (
+            patch("hackagent.storage.remote.run_retrieve") as mock_get,
+            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+        ):
+            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
+            mock_patch.sync_detailed.return_value = _mock_response(500)
+            with self.assertRaisesRegex(RuntimeError, "campaign run"):
+                self.backend.update_campaign_run(row.id, status="FAILED")
+
+    def test_list_campaign_runs_returns_only_the_markers(self):
+        rows = [
+            _mock_run_row({"batch_size": 4}),
+            _mock_run_row(_campaign_marker(name="Nightly")),
+            _mock_run_row(_campaign_marker(name="Weekly")),
+        ]
+
+        with patch("hackagent.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.return_value = _mock_page(rows, count=3)
+            result = self.backend.list_campaign_runs()
+
+        self.assertEqual([item.name for item in result.items], ["Nightly", "Weekly"])
+
+
+class TestRemoteBackendRunCampaignLink(unittest.TestCase):
+    """An attack run carries its campaign parent through the run config."""
+
+    def setUp(self):
+        self.client = _mock_client()
+        self.backend = RemoteBackend(self.client)
+        self.backend._context = OrganizationContext(org_id=_uid(), user_id="1")
+
+    def test_create_run_stamps_the_campaign_parent(self):
+        run_id = str(_uid())
+        campaign_run_id = _uid()
+
+        with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
+            mock_create.sync_detailed.return_value = _mock_response(
+                201, content=f'{{"id": "{run_id}"}}'.encode()
+            )
+            record = self.backend.create_run(
+                _uid(), _uid(), {"expected_total_goals": 3}, campaign_run_id
+            )
+
+        body = mock_create.sync_detailed.call_args.kwargs["body"]
+        self.assertEqual(body.run_config["_campaign_run_id"], str(campaign_run_id))
+        self.assertEqual(record.campaign_run_id, campaign_run_id)
+
+    def test_get_run_reads_the_campaign_parent_back(self):
+        campaign_run_id = _uid()
+        row = _mock_run_row({"_campaign_run_id": str(campaign_run_id)})
+
+        with patch("hackagent.storage.remote.run_retrieve") as mock_get:
+            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
+            record = self.backend.get_run(row.id)
+
+        self.assertEqual(record.campaign_run_id, campaign_run_id)
+
+    def test_list_runs_hides_campaign_markers(self):
+        attack_row = _mock_run_row({"batch_size": 4})
+        rows = [_mock_run_row(_campaign_marker()), attack_row]
+
+        with patch("hackagent.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.return_value = _mock_page(rows, count=2)
+            result = self.backend.list_runs()
+
+        self.assertEqual([item.id for item in result.items], [attack_row.id])
+        self.assertEqual(result.total, 1)
+
+    def test_list_runs_total_counts_only_what_paging_can_reach(self):
+        """A marker on an early page must not inflate the total.
+
+        The hosted count includes campaign parents this listing filters out,
+        so stopping at the requested page would report runs that no later
+        page can produce. Once a marker is seen the scan runs to the end.
+        """
+        page_one = _mock_page(
+            [_mock_run_row(_campaign_marker()), _mock_run_row({"n": 1})],
+            count=5,
+            next_url="https://api.example.com/run/?page=2",
+        )
+        page_two = _mock_page(
+            [
+                _mock_run_row(_campaign_marker()),
+                _mock_run_row({"n": 2}),
+                _mock_run_row({"n": 3}),
+            ],
+            count=5,
+        )
+
+        with patch("hackagent.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.side_effect = [page_one, page_two]
+            result = self.backend.list_runs(page=1, page_size=1)
+
+        self.assertEqual(len(result.items), 1)
+        # Three attack runs, not the hosted count of five.
+        self.assertEqual(result.total, 3)
+
+    def test_list_runs_stops_at_the_requested_page_when_nothing_is_filtered(self):
+        """Without a marker the hosted count is exact, so one request is enough."""
+        page_one = _mock_page(
+            [_mock_run_row({"n": 1})],
+            count=10,
+            next_url="https://api.example.com/run/?page=2",
+        )
+
+        with patch("hackagent.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.side_effect = [page_one]
+            result = self.backend.list_runs(page=1, page_size=1)
+
+        self.assertEqual(mock_list.sync_detailed.call_count, 1)
+        self.assertEqual(result.total, 10)
+
+
 if __name__ == "__main__":
     unittest.main()

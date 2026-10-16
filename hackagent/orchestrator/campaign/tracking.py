@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 from uuid import UUID
 
 from hackagent.core.contracts import EvalStatus, RunStatus
@@ -72,6 +72,7 @@ class RunTracker:
         configuration: Mapping[str, Any],
         expected_goals: int,
         output: OutputSpec,
+        campaign_run_id: Optional[UUID] = None,
     ) -> None:
         self.store = store
         self.attack_name = attack_name
@@ -86,6 +87,7 @@ class RunTracker:
             attack_id=attack.id,
             agent_id=agent_id,
             run_config={"expected_total_goals": expected_goals},
+            campaign_run_id=campaign_run_id,
         )
         self.run_id = run.id
         store.update_run(self.run_id, status=RunStatus.RUNNING.value)

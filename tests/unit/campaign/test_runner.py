@@ -12,10 +12,12 @@ did on the way there.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
+import yaml
 
-from hackagent.orchestrator.campaign import run_campaign, summary
+from hackagent.orchestrator.campaign import load_campaign, run_campaign, summary
 
 from .fakes import FakeBuilder, ScriptedModel, campaign, goals, model
 
@@ -354,9 +356,7 @@ def test_retention_settings_apply_to_traces(tmp_path):
     values["execution"]["output"].update(save_prompts=False, save_responses=False)
     result, _builder = run(values, models=models_for())
 
-    traces = next(
-        path for path in result.outputs if path.name.endswith(".traces.jsonl")
-    )
+    traces = next(path for path in result.outputs if path.name == "traces.jsonl")
     rows = [json.loads(line) for line in traces.read_text().splitlines()]
     calls = [n for row in rows for n in row["nodes"] if n["node"] == "call"]
     assert calls
@@ -370,12 +370,11 @@ def test_traces_are_written_beside_the_results(tmp_path):
     values["execution"]["output"]["formats"] = ["json", "jsonl"]
     result, _builder = run(values, models=models_for(judge="no"))
 
-    written = {path.name for path in result.outputs}
-    traces = next(
-        path for path in result.outputs if path.name.endswith(".traces.jsonl")
-    )
+    written = {path.relative_to(tmp_path) for path in result.outputs}
+    traces = next(path for path in result.outputs if path.name == "traces.jsonl")
     [row] = [json.loads(line) for line in traces.read_text().splitlines()]
-    assert f"{result.run_id}.json" in written
+    run_dir = Path(result.run_id)
+    assert {run_dir / "results.json", run_dir / "traces.jsonl"} <= written
     assert row["attack"] == "bon" and row["goal_index"] == 0
     # Each node records where it sits, so the tree survives a flat file.
     assert row["nodes"][0] == {
@@ -394,7 +393,19 @@ def test_traces_are_not_written_when_they_are_turned_off(tmp_path):
     values = iterative_campaign(tmp_path)
     values["execution"]["output"]["save_traces"] = False
     result, _builder = run(values, models=models_for())
-    assert not any(path.name.endswith(".traces.jsonl") for path in result.outputs)
+    assert not any(path.name == "traces.jsonl" for path in result.outputs)
+
+
+def test_the_campaign_that_ran_is_written_beside_the_results(tmp_path):
+    values = iterative_campaign(tmp_path)
+    result, _builder = run(values, models=models_for())
+
+    path = tmp_path / result.run_id / "campaign.yaml"
+    assert path in result.outputs
+    written = yaml.safe_load(path.read_text())
+    # It replays: the same campaign, with every default made explicit.
+    assert load_campaign(written) == load_campaign(values)
+    assert written["execution"]["concurrency"]["target"] == 1
 
 
 def test_every_trace_step_is_stored_with_its_result(tmp_path):

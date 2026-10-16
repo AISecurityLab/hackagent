@@ -27,6 +27,7 @@ from uuid import UUID
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
+    CampaignRunRecord,
     OrganizationContext,
     PaginatedResult,
     ResultRecord,
@@ -68,8 +69,21 @@ CREATE TABLE IF NOT EXISTS attacks (
     created_at      TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS campaign_runs (
+    id                   TEXT PRIMARY KEY,
+    agent_id             TEXT NOT NULL REFERENCES agents(id),
+    name                 TEXT NOT NULL,
+    campaign_config_json TEXT NOT NULL DEFAULT '{}',
+    audit_json           TEXT,
+    status               TEXT NOT NULL DEFAULT 'PENDING',
+    run_notes            TEXT,
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS runs (
     id          TEXT PRIMARY KEY,
+    campaign_run_id TEXT REFERENCES campaign_runs(id),
     attack_id   TEXT NOT NULL REFERENCES attacks(id),
     agent_id    TEXT NOT NULL REFERENCES agents(id),
     config_json TEXT NOT NULL DEFAULT '{}',
@@ -111,6 +125,7 @@ CREATE TABLE IF NOT EXISTS attack_builder_drafts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_attacks_agent   ON attacks(agent_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_runs_agent ON campaign_runs(agent_id);
 CREATE INDEX IF NOT EXISTS idx_runs_attack     ON runs(attack_id);
 CREATE INDEX IF NOT EXISTS idx_results_run     ON results(run_id);
 CREATE INDEX IF NOT EXISTS idx_traces_result   ON traces(result_id);
@@ -150,10 +165,26 @@ class LocalBackend:
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.execute("PRAGMA journal_mode = PERSIST")
         self._conn.executescript(_SCHEMA)
+        self._upgrade_schema()
         self._conn.commit()
         self._lock = threading.Lock()
         self._context: Optional[OrganizationContext] = None
         logger.info(f"LocalBackend initialised at {self._db_path}")
+
+    def _upgrade_schema(self) -> None:
+        """Apply additive migrations required by older local databases."""
+
+        columns = {
+            row[1] for row in self._conn.execute("PRAGMA table_info(runs)").fetchall()
+        }
+        if "campaign_run_id" not in columns:
+            self._conn.execute(
+                "ALTER TABLE runs ADD COLUMN campaign_run_id TEXT "
+                "REFERENCES campaign_runs(id)"
+            )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_runs_campaign ON runs(campaign_run_id)"
+        )
 
     def close(self) -> None:
         """Close the underlying SQLite connection.
@@ -362,21 +393,137 @@ class LocalBackend:
         ]
         return PaginatedResult(items=items, total=total)
 
-    # ── Run ───────────────────────────────────────────────────────────────────
+    # ── Campaign run ──────────────────────────────────────────────────────────
+
+    def create_campaign_run(
+        self,
+        agent_id: UUID,
+        name: str,
+        campaign_config: Dict[str, Any],
+    ) -> CampaignRunRecord:
+        campaign_run_id = uuid.uuid4()
+        now = _now_str()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO campaign_runs "
+                "(id, agent_id, name, campaign_config_json, status, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (
+                    str(campaign_run_id),
+                    str(agent_id),
+                    name,
+                    json.dumps(campaign_config),
+                    "PENDING",
+                    now,
+                    now,
+                ),
+            )
+            self._conn.commit()
+        return CampaignRunRecord(
+            id=campaign_run_id,
+            agent_id=agent_id,
+            name=name,
+            campaign_config=campaign_config,
+            audit=None,
+            status="PENDING",
+            run_notes=None,
+            created_at=_to_dt(now),
+            updated_at=_to_dt(now),
+        )
+
+    def update_campaign_run(
+        self,
+        campaign_run_id: UUID,
+        status: Optional[str] = None,
+        audit: Optional[Dict[str, Any]] = None,
+        run_notes: Optional[str] = None,
+    ) -> CampaignRunRecord:
+        now = _now_str()
+        with self._lock:
+            updates: Dict[str, Any] = {"updated_at": now}
+            if status is not None:
+                updates["status"] = status
+            if audit is not None:
+                updates["audit_json"] = json.dumps(audit)
+            if run_notes is not None:
+                updates["run_notes"] = run_notes
+            set_clause = ", ".join(f"{key}=?" for key in updates)
+            self._conn.execute(
+                f"UPDATE campaign_runs SET {set_clause} WHERE id=?",
+                [*updates.values(), str(campaign_run_id)],
+            )
+            self._conn.commit()
+            row = self._conn.execute(
+                "SELECT * FROM campaign_runs WHERE id=? LIMIT 1",
+                (str(campaign_run_id),),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError(
+                f"LocalBackend: Campaign run {campaign_run_id} not found"
+            )
+        return self._row_to_campaign_run(row)
+
+    def list_campaign_runs(
+        self, page: int = 1, page_size: int = 100
+    ) -> PaginatedResult[CampaignRunRecord]:
+        offset = (page - 1) * page_size
+        with self._lock:
+            total = self._conn.execute("SELECT COUNT(*) FROM campaign_runs").fetchone()[
+                0
+            ]
+            rows = self._conn.execute(
+                "SELECT * FROM campaign_runs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (page_size, offset),
+            ).fetchall()
+        return PaginatedResult(
+            items=[self._row_to_campaign_run(row) for row in rows], total=total
+        )
+
+    def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM campaign_runs WHERE id=? LIMIT 1",
+                (str(campaign_run_id),),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError(
+                f"LocalBackend: Campaign run {campaign_run_id} not found"
+            )
+        return self._row_to_campaign_run(row)
+
+    @staticmethod
+    def _row_to_campaign_run(row: sqlite3.Row) -> CampaignRunRecord:
+        return CampaignRunRecord(
+            id=UUID(row["id"]),
+            agent_id=UUID(row["agent_id"]),
+            name=row["name"],
+            campaign_config=json.loads(row["campaign_config_json"] or "{}"),
+            audit=json.loads(row["audit_json"]) if row["audit_json"] else None,
+            status=row["status"],
+            run_notes=row["run_notes"],
+            created_at=_to_dt(row["created_at"]),
+            updated_at=_to_dt(row["updated_at"]),
+        )
+
+    # ── Attack run ────────────────────────────────────────────────────────────
 
     def create_run(
         self,
         attack_id: UUID,
         agent_id: UUID,
         run_config: Dict[str, Any],
+        campaign_run_id: Optional[UUID] = None,
     ) -> RunRecord:
         run_id = uuid.uuid4()
         now = _now_str()
         with self._lock:
             self._conn.execute(
-                "INSERT INTO runs (id, attack_id, agent_id, config_json, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO runs "
+                "(id, campaign_run_id, attack_id, agent_id, config_json, status, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
                 (
                     str(run_id),
+                    str(campaign_run_id) if campaign_run_id is not None else None,
                     str(attack_id),
                     str(agent_id),
                     json.dumps(run_config),
@@ -388,6 +535,7 @@ class LocalBackend:
             self._conn.commit()
         return RunRecord(
             id=run_id,
+            campaign_run_id=campaign_run_id,
             attack_id=attack_id,
             agent_id=agent_id,
             run_config=run_config,
@@ -429,6 +577,7 @@ class LocalBackend:
             return self._row_to_run(row)
         return RunRecord(
             id=run_id,
+            campaign_run_id=None,
             attack_id=UUID("00000000-0000-0000-0000-000000000000"),
             agent_id=UUID("00000000-0000-0000-0000-000000000000"),
             run_config=run_config or {},
@@ -474,6 +623,9 @@ class LocalBackend:
     def _row_to_run(self, row) -> RunRecord:
         return RunRecord(
             id=UUID(row["id"]),
+            campaign_run_id=UUID(row["campaign_run_id"])
+            if row["campaign_run_id"]
+            else None,
             attack_id=UUID(row["attack_id"]),
             agent_id=UUID(row["agent_id"]),
             run_config=json.loads(row["config_json"] or "{}"),

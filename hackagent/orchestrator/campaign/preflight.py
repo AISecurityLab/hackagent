@@ -1,34 +1,43 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Check that a campaign's models answer before it starts attacking.
+"""Check that every model a campaign uses answers before it starts attacking.
 
 Building a model validates its configuration but sends nothing, so a wrong
 endpoint or a down server only shows up on the first real call — after the
-run has started and partly recorded. When ``execution.preflight`` is on, the
-target and every judge are pinged first, and an unreachable one stops the
-run with a message naming it rather than a wall of mid-run errors.
-
-Roles and embedders are not pinged: they sit behind the per-attack
-completion callables, and their first use surfaces the same error. The
-target and the panel are what every attack and every verdict depend on, so
-they are the ones worth a check up front.
+run has started and partly recorded. When ``execution.preflight`` is on, every
+model is checked first: the target, its guardrails, each attack's roles and
+embedders, the judges and the goal classifier. How a model is checked is its
+own business (:meth:`Model.is_reachable`); preflight only decides which ones,
+checks each distinct model once, and reports every failure together.
 """
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable, Iterator, Mapping
+from dataclasses import dataclass
+from functools import partial
+from typing import TYPE_CHECKING, Any
 
-from hackagent.core.contracts import Sample
 from hackagent.core.logging import get_logger
-from hackagent.models import Model
-from hackagent.orchestrator.campaign.resolve import ResolvedCampaign
+from hackagent.models import Model, ModelConfig, Reachability, embedder_is_reachable
+from hackagent.orchestrator.campaign.spec import CampaignSpec
+
+if TYPE_CHECKING:
+    from hackagent.orchestrator.campaign.resolve import ResolvedCampaign
 
 logger = get_logger(__name__)
 
-#: The smallest prompt that still exercises the request path.
-_PING = [{"role": "user", "content": "ping"}]
-_PING_SAMPLE = Sample(goal="ping", prompt="ping", response="ping")
+
+@dataclass(frozen=True)
+class Probe:
+    """One distinct model, every place the campaign uses it, and its check."""
+
+    name: str
+    uses: tuple[str, ...]
+    check: Callable[[], Awaitable[Reachability]]
+    timeout: float
 
 
 class PreflightError(RuntimeError):
@@ -40,45 +49,74 @@ class PreflightError(RuntimeError):
         super().__init__(f"Preflight failed: {joined}.")
 
 
-async def preflight(resolved: ResolvedCampaign) -> None:
-    """Ping the target and judges; raise :class:`PreflightError` on any failure."""
-    checks = [_reach_target(resolved.target)]
-    panel = resolved.panel
-    if panel is not None:
-        checks += [_reach_judge(judge) for judge in panel.judges]
+def campaign_models(spec: CampaignSpec) -> Iterator[tuple[str, ModelConfig]]:
+    """Yield ``(where, config)`` for every model ``spec`` uses."""
+    yield "target", spec.target
+    for side in ("before", "after"):
+        guardrail = getattr(spec.guardrails, side)
+        if guardrail is not None:
+            yield f"guardrails.{side}", guardrail
+    for index, attack in enumerate(spec.attacks):
+        for role, model in attack.roles.items():
+            yield f"attacks[{index}].{attack.name}.{role}", model
+    for index, judge in enumerate(spec.evaluation.judges):
+        yield f"evaluation.judges[{index}]", judge
+    if spec.dataset.classifier is not None:
+        yield "dataset.classifier", spec.dataset.classifier
 
-    results = await asyncio.gather(*checks)
-    failures = [message for message in results if message is not None]
+
+def model_probes(
+    spec: CampaignSpec,
+    models: Mapping[int, Model],
+    embedders: Mapping[int, Any],
+) -> tuple[Probe, ...]:
+    """One probe per distinct model, from what resolution built.
+
+    ``models`` and ``embedders`` map ``id(config)`` to what was built from
+    that config. A model the campaign uses in several places is checked once.
+    """
+    checks: dict[tuple[Any, ...], Probe] = {}
+    uses: dict[tuple[Any, ...], list[str]] = {}
+    for where, config in campaign_models(spec):
+        key = id(config)
+        if key in embedders:
+            kind = "embed"
+            check: Callable[[], Awaitable[Reachability]] = partial(
+                embedder_is_reachable, embedders[key]
+            )
+        elif key in models:
+            kind, check = "chat", models[key].is_reachable
+        else:
+            continue
+        connection = config.connection
+        identity = (kind, config.name, connection.type, connection.endpoint)
+        checks.setdefault(identity, Probe(config.name, (), check, connection.timeout))
+        uses.setdefault(identity, []).append(where)
+    return tuple(
+        Probe(probe.name, tuple(uses[identity]), probe.check, probe.timeout)
+        for identity, probe in checks.items()
+    )
+
+
+async def preflight(resolved: "ResolvedCampaign") -> None:
+    """Check every model; raise :class:`PreflightError` naming each failure."""
+    probes = resolved.probes
+    results = await asyncio.gather(*(_run(probe) for probe in probes))
+    failures = [
+        f"{probe.name} ({', '.join(probe.uses)}): {result.detail}"
+        for probe, result in zip(probes, results)
+        if not result
+    ]
     if failures:
         raise PreflightError(failures)
     logger.info("preflight | %d model(s) reachable", len(results))
 
 
-async def _reach_target(target: Model) -> str | None:
+async def _run(probe: Probe) -> Reachability:
     try:
-        response = await target.acomplete(_PING)
-    except Exception as exc:
-        return f"target unreachable ({type(exc).__name__}: {exc})"
-    if response.error is not None:
-        return f"target error ({response.error.category}): {response.error.message}"
-    return None
+        return await asyncio.wait_for(probe.check(), timeout=probe.timeout)
+    except asyncio.TimeoutError:
+        return Reachability(False, f"no answer within {probe.timeout:g}s")
 
 
-async def _reach_judge(judge: object) -> str | None:
-    """A judge never raises: an unreachable one abstains with the reason.
-
-    Abstention is normal for an *ambiguous* reply, but on the ``ping`` sample
-    it means the classifier could not be reached, which is what preflight is
-    for.
-    """
-    name = getattr(judge, "name", "judge")
-    try:
-        vote = await judge.avote(_PING_SAMPLE)  # type: ignore[attr-defined]
-    except Exception as exc:
-        return f"judge {name!r} unreachable ({type(exc).__name__}: {exc})"
-    if vote.abstained:
-        return f"judge {name!r} unreachable ({vote.error})"
-    return None
-
-
-__all__ = ["PreflightError", "preflight"]
+__all__ = ["PreflightError", "Probe", "campaign_models", "model_probes", "preflight"]

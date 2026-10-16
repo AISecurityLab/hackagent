@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Mapping
 
@@ -16,7 +17,7 @@ from hackagent.models.completions.litellm import (
     normalise_ollama_endpoint,
     resolve_litellm_model,
 )
-from hackagent.models.model import Model
+from hackagent.models.model import Model, Reachability
 from hackagent.models.provider_config import get_provider_config
 from hackagent.models.retry import RetryingModel
 
@@ -95,6 +96,21 @@ def build_embedder(
         return await asyncio.to_thread(_embed, batch)
 
     return embed
+
+
+async def embedder_is_reachable(
+    embed: Callable[[Sequence[str]], Awaitable[list[list[float]]]],
+) -> Reachability:
+    """Embed one word and report whether a usable vector came back."""
+    started = time.monotonic()
+    try:
+        vectors = await embed(["ping"])
+    except Exception as exc:
+        return Reachability(False, f"{type(exc).__name__}: {exc}")
+    latency = time.monotonic() - started
+    if not vectors or not vectors[0]:
+        return Reachability(False, "the endpoint returned no embedding", latency)
+    return Reachability(True, latency_s=latency)
 
 
 def _litellm_model(config: ModelConfig) -> LiteLLMModel:

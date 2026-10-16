@@ -175,6 +175,7 @@ def run(
 ) -> Dict[str, Any]:
     return {
         "id": str(record.id),
+        "campaign_run_id": _str(getattr(record, "campaign_run_id", None)),
         "agent": str(record.agent_id),
         "agent_name": agent_name,
         "attack": _str(record.attack_id),

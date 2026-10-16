@@ -25,7 +25,7 @@ from hackagent.core.contracts import GuardrailInfo, ModelSpec
 from hackagent.core.contracts.protocols import CompletionModel
 from hackagent.core.logging import get_logger
 from hackagent.models.completions.cli import last_user_text
-from hackagent.models.model import Model
+from hackagent.models.model import Model, Reachability
 from hackagent.models.response import ModelResponse
 
 logger = get_logger(__name__)
@@ -155,6 +155,9 @@ class GuardedModel(Model):
         self.model = model
         self.before = before
         self.after = after
+
+    async def is_reachable(self) -> Reachability:
+        return await self.model.is_reachable()
 
     def _check(
         self, side: Literal["before", "after"], text: str, response: ModelResponse

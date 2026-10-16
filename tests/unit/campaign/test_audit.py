@@ -7,7 +7,7 @@ The judges here are real ``ModelJudge``s over scripted models, so the
 campaign's aggregation and threshold are the ones under test.
 """
 
-from __future__ import annotations
+from uuid import UUID
 
 import pytest
 
@@ -228,6 +228,26 @@ def test_an_enabled_audit_runs_and_is_reported_with_the_result():
     assert summary(result)["audit_passed"] is True
 
 
+def test_an_enabled_audit_is_emitted_before_attack_progress(monkeypatch):
+    events = []
+
+    async def inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "hackagent.orchestrator.campaign.runner.asyncio.to_thread", inline
+    )
+
+    run(
+        audited(robustness={"enabled": True, "max_flip_rate": 1.0}),
+        on_event=lambda event, **payload: events.append((event, payload)),
+    )
+
+    assert events[0][0] == "audit_finished"
+    assert events[0][1]["audit"]["passed"] is True
+    assert events[1][0] == "attack_started"
+
+
 def test_an_audit_that_grades_nothing_reports_no_verdict():
     result, _builder = run(audited())
 
@@ -335,9 +355,72 @@ def test_the_report_is_written_beside_the_run_outputs(tmp_path):
 
     result, _builder = run(values)
 
-    path = tmp_path / f"{result.run_id}.audit.json"
+    path = tmp_path / result.run_id / "audit.json"
     assert path in result.outputs
     assert read_report(path) == result.audit
+
+
+def test_the_report_is_persisted_once_on_the_sql_campaign_run(tmp_path):
+    from unittest.mock import patch
+
+    from hackagent.storage.local import LocalBackend
+
+    from .fakes import goals
+
+    store = LocalBackend(db_path=str(tmp_path / "runs.db"))
+    try:
+
+        async def inline(function, *args, **kwargs):
+            return function(*args, **kwargs)
+
+        with patch("hackagent.orchestrator.campaign.runner.asyncio.to_thread", inline):
+            result = run_campaign(
+                audited(robustness={"enabled": True, "max_flip_rate": 1.0}),
+                build=FakeBuilder({"target": ScriptedModel(), "judge": honest_judge()}),
+                load=goals("goal one"),
+                store=store,
+                calibration=lambda _spec: samples(),
+            )
+
+        assert result.campaign_run_id is not None
+        campaign_record = store.get_campaign_run(UUID(result.campaign_run_id))
+        [attack_run] = store.list_runs(page_size=20).items
+        assert campaign_record.name == result.campaign_name
+        assert campaign_record.audit == result.audit.model_dump(mode="json")
+        assert campaign_record.status == "COMPLETED"
+        assert attack_run.campaign_run_id == campaign_record.id
+        assert "evaluation_audit" not in attack_run.run_config
+    finally:
+        store.close()
+
+
+def test_a_stopping_audit_is_persisted_without_fabricating_attack_runs():
+    from tests.fakes import RecordingStore
+
+    from .fakes import goals
+
+    store = RecordingStore()
+    with pytest.raises(AuditFailed) as raised:
+        run_campaign(
+            audited(
+                "stop",
+                robustness={
+                    "enabled": True,
+                    "wrappers": ["refusal_prefix"],
+                    "max_flip_rate": 0.0,
+                },
+            ),
+            build=FakeBuilder({"target": ScriptedModel(), "judge": brittle_judge()}),
+            load=goals("goal one"),
+            store=store,
+            calibration=lambda _spec: samples(),
+        )
+
+    [stored] = store.campaign_runs.values()
+    assert stored.status == "FAILED"
+    assert stored.audit == raised.value.report.model_dump(mode="json")
+    assert "failed its audit" in stored.run_notes
+    assert store.runs == {}
 
 
 def test_the_campaign_file_supplies_the_dataset_settings():

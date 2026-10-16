@@ -678,6 +678,16 @@ class HackAgent:
             page_size=page_size,
         )
 
+    def campaign_runs(self, *, page: int = 1, page_size: int = 100) -> Any:
+        """List campaign-level runs, including their audit reports."""
+
+        return self.backend.list_campaign_runs(page=page, page_size=page_size)
+
+    def campaign_run(self, campaign_run_id: Any) -> Any:
+        """Retrieve one campaign run and its immutable specification/audit."""
+
+        return self.backend.get_campaign_run(_as_uuid(campaign_run_id))
+
     def run(self, run_id: Any) -> Any:
         return self.backend.get_run(_as_uuid(run_id))
 

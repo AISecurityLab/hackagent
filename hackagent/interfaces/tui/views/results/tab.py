@@ -153,6 +153,7 @@ class ResultsTab(
         # Enrichment caches (populated in refresh_data)
         self._agent_map: dict[str, str] = {}  # agent_id str -> agent name
         self._attack_map: dict[str, str] = {}  # attack_id str -> attack type
+        self._campaign_map: dict[str, Any] = {}  # campaign_run_id -> campaign run
         self._result_counts: dict[
             str, tuple
         ] = {}  # run_id str -> (success, fail, total)
@@ -217,6 +218,7 @@ class ResultsTab(
             table.add_columns(
                 "#",
                 "State",
+                "Campaign",
                 "Agent",
                 "Attack",
                 f"{VULNERABLE.icon}/{MITIGATED.icon}",
@@ -314,6 +316,16 @@ class ResultsTab(
                 agents_result = session.agents(page=1, page_size=500)
                 for ag in agents_result.items:
                     self._agent_map[str(ag.id)] = ag.name
+            except Exception:
+                pass
+
+            # Campaign parents own the immutable spec and audit. Cache them so
+            # every attack row visibly retains its campaign provenance.
+            self._campaign_map.clear()
+            try:
+                campaigns_result = session.campaign_runs(page=1, page_size=500)
+                for campaign in campaigns_result.items:
+                    self._campaign_map[str(campaign.id)] = campaign
             except Exception:
                 pass
 

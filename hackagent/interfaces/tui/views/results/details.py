@@ -14,6 +14,7 @@ from hackagent.interfaces.tui.theme import (
     classify_evaluation_status,
     classify_run_status,
 )
+from hackagent.interfaces.tui.views.audit import audit_markup
 from hackagent.interfaces.tui.views.results.formatters import (
     _escape,
     _format_local_datetime,
@@ -63,6 +64,11 @@ class ResultsDetailsMixin:
             f"📅 {_escape(created)}  "
             f"Status: [bold]{_escape(status_display)}[/bold]\n"
         )
+        campaign_ref = getattr(run, "campaign_run_id", None)
+        if campaign_ref:
+            campaign = self._campaign_map.get(str(campaign_ref))
+            campaign_name = getattr(campaign, "name", None) or str(campaign_ref)
+            summary += f"  Campaign: [bold]{_escape(campaign_name)}[/bold]\n"
         if eval_summary:
             summary += (
                 f"\n[bold bright_green]▌ Evaluation Summary[/bold bright_green]\n"
@@ -141,6 +147,43 @@ class ResultsDetailsMixin:
                 f"[yellow]⚠️ Could not fetch full details: {_escape(str(e))}[/yellow]\n\n[dim]Showing cached data...[/dim]"
             )
             return
+
+        campaign_context = ""
+        campaign_ref = getattr(run, "campaign_run_id", None)
+        if campaign_ref:
+            campaign = self._campaign_map.get(str(campaign_ref))
+            if campaign is None:
+                try:
+                    campaign = session.campaign_run(campaign_ref)
+                    self._campaign_map[str(campaign_ref)] = campaign
+                except Exception:
+                    campaign = None
+            campaign_name = getattr(campaign, "name", None) or str(campaign_ref)
+            campaign_status = getattr(campaign, "status", None)
+            audit = getattr(campaign, "audit", None)
+            audit_state = "not recorded"
+            audit_details = ""
+            if isinstance(audit, dict):
+                passed = audit.get("passed")
+                audit_state = {
+                    True: "passed",
+                    False: "FAILED",
+                    None: "not graded",
+                }.get(passed, "not graded")
+                try:
+                    audit_details = f"\n{audit_markup(audit)}\n"
+                except (TypeError, ValueError):
+                    audit_details = (
+                        "\n[yellow]Stored audit could not be rendered.[/yellow]\n"
+                    )
+            campaign_context = (
+                f"[bold cyan]▌ Campaign[/bold cyan]\n"
+                f"  {_escape(campaign_name)}  "
+                f"[dim]{str(campaign_ref)[:8]}...[/dim]  "
+                f"Status: [bold]{_escape(str(campaign_status or 'Unknown'))}[/bold]  "
+                f"Audit: [bold]{audit_state}[/bold]\n"
+                f"{audit_details}\n"
+            )
 
         # Format creation date from timestamp/created_at
         created = "Unknown"
@@ -231,7 +274,7 @@ class ResultsDetailsMixin:
         )
 
         # Update header widget
-        header_widget.update(header)
+        header_widget.update(campaign_context + header)
 
         # Clear and rebuild results container with collapsible items
         results_container.remove_children()

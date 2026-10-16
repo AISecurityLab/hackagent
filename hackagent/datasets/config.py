@@ -1,9 +1,16 @@
 """Declarative dataset sources and selection settings."""
 
 import random
-from typing import Any, Literal, Mapping, Optional, Sequence
+from typing import Annotated, Any, Literal, Mapping, Optional, Sequence, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from hackagent.core.contracts import Goal
 from hackagent.datasets import taxonomy
@@ -15,30 +22,63 @@ class DatasetModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class DatasetSource(DatasetModel):
-    """Where goals are loaded from: a built-in preset, a provider such as
-    HuggingFace or a local file, or goals written inline."""
+class PresetSource(DatasetModel):
+    """A built-in benchmark, named by its preset."""
 
-    type: Literal["preset", "provider", "inline"] = Field(
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+
+    type: Literal["preset"] = Field(
         default="preset",
+        description="Marks this as a preset source: a built-in benchmark.",
+    )
+    name: str = Field(
+        # Files that spelled this `preset` still load. `type: preset` already
+        # says what kind of source this is, so the field only says which one.
+        validation_alias=AliasChoices("name", "preset"),
         description=(
-            "``preset`` loads a built-in benchmark named by ``dataset.preset``; "
-            "``provider`` loads from ``provider`` with the fields below; ``inline``"
-            " uses the ``goals`` listed here."
+            "Which built-in benchmark to load, e.g. `harmbench` or `advbench`. "
+            "Run `hackagent datasets list` to see them all."
         ),
     )
-    provider: Optional[str] = Field(
-        default=None,
+
+    @field_validator("name")
+    @classmethod
+    def validate_preset(cls, value: str) -> str:
+        if value not in PRESETS:
+            known = ", ".join(sorted(PRESETS))
+            raise ValueError(f"Unknown dataset preset {value!r}. Available: {known}.")
+        return value
+
+
+class InlineSource(DatasetModel):
+    """Goals written straight into the campaign file."""
+
+    type: Literal["inline"] = Field(
+        description="Marks this as an inline source: goals written in the file."
+    )
+    goals: tuple[str, ...] = Field(
+        min_length=1,
+        description="The goals themselves, one string per goal.",
+    )
+
+
+class ProviderSource(DatasetModel):
+    """Goals loaded from a dataset provider: HuggingFace, a file, or a URL."""
+
+    type: Literal["provider"] = Field(
+        description="Marks this as a provider source: loaded from HuggingFace, a file or a URL."
+    )
+    provider: str = Field(
         description=(
-            "For ``type: provider``: where to load from — ``huggingface``, ``file``"
-            " (a local JSON/JSONL/CSV file) or ``url_json`` (a JSON file at a URL)."
+            "Where to load from: `huggingface`, `file` (a local JSON/JSONL/CSV "
+            "file) or `url_json` (a JSON file at a URL)."
         ),
     )
     path: Optional[str] = Field(
         default=None,
         description=(
-            "For ``type: provider``: the HuggingFace dataset id (e.g. "
-            "``walledai/AdvBench``), or the path of the local file."
+            "The HuggingFace dataset id (e.g. `walledai/AdvBench`), or the path "
+            "of the local file."
         ),
     )
     name: Optional[str] = Field(
@@ -49,23 +89,28 @@ class DatasetSource(DatasetModel):
     )
     split: Optional[str] = Field(
         default=None,
-        description="For HuggingFace datasets: which split to read (``train``, ``test``…).",
+        description="For HuggingFace datasets: which split to read (`train`, `test`…).",
     )
     goal_field: Optional[str] = Field(
         default=None,
-        description="Name of the column or key that holds the goal text, e.g. ``prompt``.",
-    )
-    goals: tuple[str, ...] = Field(
-        default=(),
-        description="For ``type: inline``: the goals themselves, one string per goal.",
+        description="Name of the column or key that holds the goal text, e.g. `prompt`.",
     )
     options: Mapping[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Any other provider setting, passed through unchanged (e.g. ``url`` for"
-            " ``url_json``, ``trust_remote_code`` for HuggingFace)."
+            "Any other provider setting, passed through unchanged (e.g. `url` "
+            "for `url_json`, `trust_remote_code` for HuggingFace)."
         ),
     )
+
+
+#: Where goals come from. ``type`` picks the shape, so only the fields that
+#: belong to that shape exist — a preset source has no ``goals``, an inline one
+#: has no ``split``.
+DatasetSource = Annotated[
+    Union[PresetSource, InlineSource, ProviderSource],
+    Field(discriminator="type"),
+]
 
 
 class DatasetFilters(DatasetModel):
@@ -74,9 +119,9 @@ class DatasetFilters(DatasetModel):
     categories: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Risk taxonomy categories or subcategories to keep, as a code (``E``, "
-            "``E2``) or a name (``Cybersecurity Threats``). Matched on each goal's "
-            "labels, so it needs ``dataset.classifier``."
+            "Risk taxonomy categories or subcategories to keep, as a code (`E`, "
+            "`E2`) or a name (`Cybersecurity Threats`). Matched on each goal's "
+            "labels, so it needs `dataset.classifier`."
         ),
     )
 
@@ -97,13 +142,13 @@ class DatasetSelection(DatasetModel):
     shuffle: bool = Field(
         default=False,
         description=(
-            "Shuffle the goals before applying ``limit``, so a limited run is a "
+            "Shuffle the goals before applying `limit`, so a limited run is a "
             "random sample instead of the first goals in the file."
         ),
     )
     seed: Optional[int] = Field(
         default=None,
-        description="Random seed for ``shuffle``, so the same sample is drawn every run.",
+        description="Random seed for `shuffle`, so the same sample is drawn every run.",
     )
     filters: DatasetFilters = Field(
         default_factory=DatasetFilters,
@@ -114,38 +159,60 @@ class DatasetSelection(DatasetModel):
 class DatasetSpec(DatasetModel):
     """Where goals come from and which of them to run."""
 
-    preset: Optional[str] = Field(
-        default=None,
-        description=(
-            "Name of a built-in benchmark, e.g. ``harmbench`` or ``advbench``. Used"
-            " when ``source.type`` is ``preset`` (the default)."
-        ),
-    )
     source: DatasetSource = Field(
-        default_factory=DatasetSource,
-        description="Where to load goals from when not using a preset.",
+        default_factory=lambda: PresetSource(name="harmbench"),
+        description="Where to load goals from.",
     )
     selection: DatasetSelection = Field(
         default_factory=DatasetSelection,
         description="Which of the loaded goals to run.",
     )
 
-    @model_validator(mode="after")
-    def validate_source(self) -> "DatasetSpec":
-        if self.source.type == "preset":
-            if not self.preset:
-                raise ValueError("A preset dataset source requires 'preset'.")
-            if self.preset not in PRESETS:
-                known = ", ".join(sorted(PRESETS))
-                raise ValueError(
-                    f"Unknown dataset preset {self.preset!r}. Available: {known}."
-                )
-        elif self.source.type == "inline":
-            if not self.source.goals:
-                raise ValueError("An inline dataset source requires 'source.goals'.")
-        elif not self.source.provider:
-            raise ValueError("A provider dataset source requires 'source.provider'.")
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def normalise_source(cls, data: Any) -> Any:
+        """Accept older and shorter spellings of the source.
+
+        ``dataset.preset`` used to sit beside ``dataset.source``, so the two
+        could disagree and every source carried every other source's fields;
+        files written that way still load, with the preset moved inside.
+
+        A source that omits ``type`` is also read rather than refused: the
+        fields it does carry say which kind it is, and without that a document
+        can only report that it cannot find the tag.
+        """
+        if not isinstance(data, Mapping):
+            return data
+        data = dict(data)
+        source = data.get("source")
+        source = dict(source) if isinstance(source, Mapping) else None
+
+        preset = data.pop("preset", None)
+        if preset is not None:
+            source = source or {}
+            if source.get("type", "preset") == "preset":
+                source.setdefault("name", preset)
+                source.setdefault("type", "preset")
+
+        if source is not None and "type" not in source:
+            source["type"] = cls._infer_source_type(source)
+        if source is not None:
+            data["source"] = source
+        return data
+
+    @staticmethod
+    def _infer_source_type(source: Mapping[str, Any]) -> str:
+        """Which kind of source the fields present describe."""
+        if "goals" in source:
+            return "inline"
+        if "provider" in source:
+            return "provider"
+        return "preset"
+
+    @property
+    def preset(self) -> Optional[str]:
+        """The preset this dataset loads, when it loads one."""
+        return self.source.name if isinstance(self.source, PresetSource) else None
 
     def to_provider_config(self) -> dict[str, Any]:
         """Translate a declarative source to the dataset provider contract.
@@ -161,17 +228,18 @@ class DatasetSpec(DatasetModel):
                 shuffle=self.selection.shuffle,
                 seed=self.selection.seed,
             )
-        if self.source.type == "preset":
-            config["preset"] = self.preset
-        else:
+        source = self.source
+        if isinstance(source, PresetSource):
+            config["preset"] = source.name
+        elif isinstance(source, ProviderSource):
             config.update(
                 {
-                    "provider": self.source.provider,
-                    "path": self.source.path,
-                    "name": self.source.name,
-                    "split": self.source.split,
-                    "goal_field": self.source.goal_field,
-                    **dict(self.source.options),
+                    "provider": source.provider,
+                    "path": source.path,
+                    "name": source.name,
+                    "split": source.split,
+                    "goal_field": source.goal_field,
+                    **dict(source.options),
                 }
             )
         return {key: value for key, value in config.items() if value is not None}
@@ -179,7 +247,7 @@ class DatasetSpec(DatasetModel):
 
 def load_goals(spec: DatasetSpec) -> list[Goal]:
     """Load and select the goals ``spec`` describes."""
-    if spec.source.type == "inline":
+    if isinstance(spec.source, InlineSource):
         texts: list[str] = [text for text in spec.source.goals if text.strip()]
         extra_by_index: dict[int, dict[str, Any]] = {}
         selection = spec.selection

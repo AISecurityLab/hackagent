@@ -18,6 +18,7 @@ from hackagent.storage.local import LocalBackend
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
+    CampaignRunRecord,
     OrganizationContext,
     PaginatedResult,
     ResultRecord,
@@ -44,6 +45,7 @@ class RecordingStore:
         self.context = OrganizationContext(org_id=uuid4(), user_id="local")
         self.agents: Dict[UUID, AgentRecord] = {}
         self.attacks: Dict[UUID, AttackRecord] = {}
+        self.campaign_runs: Dict[UUID, CampaignRunRecord] = {}
         self.runs: Dict[UUID, RunRecord] = {}
         self.results: Dict[UUID, ResultRecord] = {}
         self.traces: Dict[UUID, List[TraceRecord]] = {}
@@ -140,16 +142,80 @@ class RecordingStore:
     ) -> PaginatedResult[AttackRecord]:
         return self._page("list_attacks", list(self.attacks.values()), page, page_size)
 
+    def create_campaign_run(
+        self,
+        agent_id: UUID,
+        name: str,
+        campaign_config: Dict[str, Any],
+    ) -> CampaignRunRecord:
+        self._note("create_campaign_run", agent_id, name, campaign_config)
+        now = _now()
+        record = CampaignRunRecord(
+            id=uuid4(),
+            agent_id=agent_id,
+            name=name,
+            campaign_config=dict(campaign_config),
+            audit=None,
+            status="PENDING",
+            run_notes=None,
+            created_at=now,
+            updated_at=now,
+        )
+        self.campaign_runs[record.id] = record
+        return record
+
+    def update_campaign_run(
+        self,
+        campaign_run_id: UUID,
+        status: Optional[str] = None,
+        audit: Optional[Dict[str, Any]] = None,
+        run_notes: Optional[str] = None,
+    ) -> CampaignRunRecord:
+        self._note("update_campaign_run", campaign_run_id, status=status)
+        record = self.get_campaign_run(campaign_run_id)
+        updated = record.model_copy(
+            update={
+                "status": status or record.status,
+                "audit": audit if audit is not None else record.audit,
+                "run_notes": run_notes if run_notes is not None else record.run_notes,
+                "updated_at": _now(),
+            }
+        )
+        self.campaign_runs[campaign_run_id] = updated
+        return updated
+
+    def list_campaign_runs(
+        self, page: int = 1, page_size: int = 100
+    ) -> PaginatedResult[CampaignRunRecord]:
+        return self._page(
+            "list_campaign_runs", list(self.campaign_runs.values()), page, page_size
+        )
+
+    def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord:
+        self._note("get_campaign_run", campaign_run_id)
+        try:
+            return self.campaign_runs[campaign_run_id]
+        except KeyError as exc:
+            raise RuntimeError(f"campaign run {campaign_run_id} not found") from exc
+
     def create_run(
         self,
         attack_id: UUID,
         agent_id: UUID,
         run_config: Dict[str, Any],
+        campaign_run_id: Optional[UUID] = None,
     ) -> RunRecord:
-        self._note("create_run", attack_id, agent_id, run_config)
+        self._note(
+            "create_run",
+            attack_id,
+            agent_id,
+            run_config,
+            campaign_run_id=campaign_run_id,
+        )
         now = _now()
         record = RunRecord(
             id=uuid4(),
+            campaign_run_id=campaign_run_id,
             attack_id=attack_id,
             agent_id=agent_id,
             run_config=dict(run_config),

@@ -15,6 +15,7 @@ from hackagent.storage.records import (
     OrganizationContext,
     AgentRecord,
     AttackRecord,
+    CampaignRunRecord,
     RunRecord,
     ResultRecord,
     TraceRecord,
@@ -86,12 +87,38 @@ class Store(Protocol):
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[AttackRecord]: ...
 
+    # ── Campaign run ─────────────────────────────────────────────────────────
+    def create_campaign_run(
+        self,
+        agent_id: UUID,
+        name: str,
+        campaign_config: Dict[str, Any],
+    ) -> CampaignRunRecord: ...
+
+    def update_campaign_run(
+        self,
+        campaign_run_id: UUID,
+        status: Optional[str] = None,
+        audit: Optional[Dict[str, Any]] = None,
+        run_notes: Optional[str] = None,
+    ) -> CampaignRunRecord:
+        """Change what was given. ``None`` leaves a field as it is; pass ``""``
+        to clear a note an earlier update wrote."""
+        ...
+
+    def list_campaign_runs(
+        self, page: int = 1, page_size: int = 100
+    ) -> PaginatedResult[CampaignRunRecord]: ...
+
+    def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord: ...
+
     # ── Run ───────────────────────────────────────────────────────────────────
     def create_run(
         self,
         attack_id: UUID,
         agent_id: UUID,
         run_config: Dict[str, Any],
+        campaign_run_id: Optional[UUID] = None,
     ) -> RunRecord: ...
 
     def update_run(

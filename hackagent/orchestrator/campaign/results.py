@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
+import yaml
+
 from hackagent.attacks.techniques.trace import TraceNode
 from hackagent.core.contracts import StepKind, Verdict
 from hackagent.evaluation.audit import AuditReport
@@ -55,6 +57,20 @@ class Attempt:
         """Text of the last user message, the part the judges see."""
         return user_text(self.messages)
 
+    @property
+    def errors(self) -> tuple[str, ...]:
+        """Every problem the attempt hit: its own, the panel's, each judge's."""
+        found = [self.error] if self.error else []
+        if self.verdict is not None:
+            if self.verdict.error:
+                found.append(f"panel: {self.verdict.error}")
+            found += [
+                f"judge {vote.judge}: {vote.error}"
+                for vote in self.verdict.votes
+                if vote.error
+            ]
+        return tuple(found)
+
 
 def user_text(messages: Sequence[Mapping[str, Any]]) -> str:
     """Text parts of the last user message."""
@@ -91,6 +107,9 @@ class CampaignResult:
     campaign_name: str
     run_id: str
     dry_run: bool
+    #: Primary key of the normalized campaign run in storage. ``None`` for a
+    #: dry run, which deliberately creates no storage records.
+    campaign_run_id: Optional[str] = None
     attacks: tuple[AttackOutcome, ...] = field(default_factory=tuple)
     #: What the configured judge audit found, when one ran.
     audit: Optional[AuditReport] = None
@@ -176,15 +195,29 @@ def trace_step_type(node: TraceNode) -> str:
     return StepKind.TOOL_CALL.value if node.node == "call" else StepKind.OTHER.value
 
 
-def write_outputs(result: CampaignResult, output: OutputSpec) -> tuple[Path, ...]:
-    """Write every attempt as one row per configured format.
+def write_outputs(
+    result: CampaignResult,
+    output: OutputSpec,
+    campaign: Optional[Mapping[str, Any]] = None,
+) -> tuple[Path, ...]:
+    """Write a run's files into ``<directory>/<run_id>/``.
 
-    Search traces of iterative attacks go to ``<run_id>.traces.jsonl``, one
-    line per attempt, so the result rows stay readable. A judge audit goes
-    to ``<run_id>.audit.json``, beside the results it qualifies.
+    ``campaign.yaml`` is the campaign that ran, so the run can be reproduced
+    even when it was never saved as a file. ``results.json`` and/or
+    ``results.jsonl`` hold one row per attempt. Search traces of iterative
+    attacks go to ``traces.jsonl``, one line per attempt, so the result rows
+    stay readable, and a judge audit goes to ``audit.json``.
     """
-    directory = Path(output.directory).expanduser()
+    directory = Path(output.directory).expanduser() / result.run_id
     directory.mkdir(parents=True, exist_ok=True)
+    written = []
+    if campaign is not None:
+        path = directory / "campaign.yaml"
+        path.write_text(
+            yaml.safe_dump(dict(campaign), sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        written.append(path)
     rows = [
         {
             "campaign": result.campaign_name,
@@ -194,13 +227,12 @@ def write_outputs(result: CampaignResult, output: OutputSpec) -> tuple[Path, ...
         for outcome in result.attacks
         for attempt in outcome.attempts
     ]
-    written = []
     if "json" in output.formats:
-        path = directory / f"{result.run_id}.json"
+        path = directory / "results.json"
         path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
         written.append(path)
     if "jsonl" in output.formats:
-        path = directory / f"{result.run_id}.jsonl"
+        path = directory / "results.jsonl"
         path.write_text(
             "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
         )
@@ -230,13 +262,13 @@ def write_outputs(result: CampaignResult, output: OutputSpec) -> tuple[Path, ...
         if outcome.run_trace
     ]
     if output.save_traces and traces:
-        path = directory / f"{result.run_id}.traces.jsonl"
+        path = directory / "traces.jsonl"
         path.write_text(
             "".join(json.dumps(row) + "\n" for row in traces), encoding="utf-8"
         )
         written.append(path)
     if result.audit is not None:
-        path = directory / f"{result.run_id}.audit.json"
+        path = directory / "audit.json"
         path.write_text(result.audit.model_dump_json(indent=2), encoding="utf-8")
         written.append(path)
     return tuple(written)
@@ -247,6 +279,7 @@ def summary(result: CampaignResult) -> dict[str, Any]:
     return {
         "campaign": result.campaign_name,
         "run_id": result.run_id,
+        "campaign_run_id": result.campaign_run_id,
         "dry_run": result.dry_run,
         "succeeded": result.succeeded and result.attempt_errors == 0,
         "attempt_errors": result.attempt_errors,

@@ -302,7 +302,10 @@ class OutputSpec(_Spec):
     """Files written for each run, next to the results stored in the database."""
 
     directory: str = Field(
-        default="./logs/runs", description="Folder where run files are written."
+        default="./logs/runs",
+        description=(
+            "Folder where runs are written, each in a subfolder named after its run id."
+        ),
     )
     run_id: Optional[str] = Field(
         default=None,
@@ -370,10 +373,13 @@ class ExecutionSpec(_Spec):
         default=False, description="Validate and build everything, but send no request."
     )
     preflight: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "Ping the target and each judge before attacking, so an unreachable "
-            "endpoint fails fast with a clear message instead of mid-run."
+            "Check every model the campaign uses (target, guardrails, attack roles "
+            "and embedders, judges, goal classifier) before attacking, so an "
+            "unreachable endpoint fails fast with a clear message instead of "
+            "mid-run. Turn it off to let a run proceed and record such failures "
+            "as attempt errors."
         ),
     )
     on_error: Literal["continue", "stop"] = Field(
@@ -442,6 +448,16 @@ class CampaignSpec(_Spec):
         default_factory=ExecutionSpec,
         description="How the run behaves. Every field has a safe default.",
     )
+
+    def recorded(self) -> dict[str, Any]:
+        """The campaign as it is written to disk and stored with the run.
+
+        The same campaign, reloadable as-is, so a run can be repeated from
+        its own record. No credential passes through here: ``api_key_env``
+        names the variable holding the API key, and the key stays in the
+        environment.
+        """
+        return self.model_dump(mode="json", exclude_none=True)
 
 
 def campaign_json_schema() -> dict[str, Any]:

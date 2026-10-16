@@ -39,7 +39,7 @@ from uuid import uuid4
 from hackagent.core.contracts import ModelSpec
 from hackagent.core.logging import get_logger
 from hackagent.models.completions.cli import _litellm
-from hackagent.models.model import Model
+from hackagent.models.model import Model, Reachability
 from hackagent.models.response import ModelResponse
 
 logger = get_logger(__name__)
@@ -804,20 +804,21 @@ class WebModel(Model):
             litellm._custom_providers.append(provider)
         self._custom_handler = handler
 
-    def probe_ready(self) -> Optional[str]:
-        """Non-invasive reachability check for preflight.
+    async def is_reachable(self) -> Reachability:
+        """Open the page and locate the chat input, without sending anything.
 
-        Starts the browser session and confirms the chat input is locatable
-        WITHOUT sending a message — so the availability probe never types a
-        junk "healthcheck" into the live chatbot (which would contaminate the
-        real conversation and the recorded transcript). Returns None when the
-        widget is reachable, or an error string otherwise.
+        A ping would type a junk message into a live, person-facing chatbot
+        and pollute the conversation the attack then records.
         """
+        import asyncio
+        import time
+
+        started = time.monotonic()
         try:
-            self._custom_handler.session.ready()
-            return None
+            await asyncio.to_thread(self._custom_handler.session.ready)
         except Exception as exc:
-            return f"{type(exc).__name__}: {exc}"
+            return Reachability(False, f"{type(exc).__name__}: {exc}")
+        return Reachability(True, latency_s=time.monotonic() - started)
 
     def complete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any

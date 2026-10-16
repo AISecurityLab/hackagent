@@ -10,7 +10,7 @@
 - :mod:`.tracking`: store records of each attack run
 - :mod:`.results`: attempts, outcomes, and output files
 - :mod:`.audit`: the ``evaluation.audit`` block, run before the attacks
-- :mod:`.preflight`: ping the target and judges before attacking
+- :mod:`.preflight`: check every model answers before attacking
 - :mod:`.legacy`: the ``attack_config`` dict → campaign adapter behind ``hack``
 """
 

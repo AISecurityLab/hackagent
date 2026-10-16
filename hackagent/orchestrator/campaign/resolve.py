@@ -13,8 +13,8 @@ iterative attacks as they search.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Any, Optional
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, Any, Optional
 
 from hackagent.attacks.techniques.iterative import IterativeAttack
 from hackagent.attacks.techniques.registry import get_attack_class
@@ -37,6 +37,9 @@ from hackagent.orchestrator.campaign.spec import (
     GuardrailModelConfig,
     GuardrailsSpec,
 )
+
+if TYPE_CHECKING:
+    from hackagent.orchestrator.campaign.preflight import Probe
 
 ModelBuilder = Callable[..., Model]
 #: Builds the texts-in, vectors-out callable an embedder role receives.
@@ -62,6 +65,8 @@ class ResolvedCampaign:
     panel: Optional[Panel]
     attacks: tuple[ResolvedAttack, ...]
     classifier: Optional[Model] = None
+    #: One reachability check per distinct model, for preflight.
+    probes: tuple["Probe", ...] = ()
 
 
 def resolve_campaign(
@@ -72,29 +77,50 @@ def resolve_campaign(
     build_embed: EmbedderBuilder = build_embedder,
 ) -> ResolvedCampaign:
     """Instantiate everything ``spec`` describes."""
+    from hackagent.orchestrator.campaign.preflight import model_probes
+
+    # What each model config was built into, so preflight can check them all
+    # (roles and embedders are otherwise hidden inside attack callables).
+    models: dict[int, Model] = {}
+    embedders: dict[int, Any] = {}
+
+    def recorded_build(config: ModelConfig, *, retries: int = 0) -> Model:
+        model = build(config, retries=retries)
+        models.setdefault(id(config), model)
+        return model
+
+    def recorded_embed(config: ModelConfig) -> Any:
+        embed = build_embed(config)
+        embedders.setdefault(id(config), embed)
+        return embed
+
     retries = spec.execution.retries
-    return ResolvedCampaign(
+    resolved = ResolvedCampaign(
         spec=spec,
         goals=tuple(load(spec.dataset)),
         target=_guarded(
-            build(spec.target, retries=retries.target),
+            recorded_build(spec.target, retries=retries.target),
             spec.guardrails,
-            build,
+            recorded_build,
             retries.target,
         ),
-        panel=build_panel(spec.evaluation, build, retries=retries.judges),
+        panel=build_panel(spec.evaluation, recorded_build, retries=retries.judges),
         attacks=tuple(
             resolve_attack(
-                attack, build, retries=retries.roles, build_embed=build_embed
+                attack,
+                recorded_build,
+                retries=retries.roles,
+                build_embed=recorded_embed,
             )
             for attack in spec.attacks
         ),
         classifier=(
-            build(spec.dataset.classifier, retries=retries.roles)
+            recorded_build(spec.dataset.classifier, retries=retries.roles)
             if spec.dataset.classifier is not None
             else None
         ),
     )
+    return replace(resolved, probes=model_probes(spec, models, embedders))
 
 
 def resolve_attack(

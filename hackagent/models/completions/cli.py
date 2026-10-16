@@ -23,7 +23,7 @@ from uuid import uuid4
 
 from hackagent.core.contracts import ModelSpec
 from hackagent.core.logging import get_logger
-from hackagent.models.model import Model
+from hackagent.models.model import Model, Reachability
 from hackagent.models.response import ModelResponse
 
 
@@ -161,6 +161,11 @@ class SubprocessCLIModel(Model):
     def _call(self, litellm: Any, messages: List[Dict[str, Any]]) -> Any:
         """Run one turn through LiteLLM. Raises on failure."""
         return litellm.completion(model=self.litellm_model, messages=messages)
+
+    async def is_reachable(self) -> Reachability:
+        # A turn is a full agent run, so only the binary (found at
+        # construction) is checked; authentication surfaces on first use.
+        return Reachability(True, f"{self.binary} found; not called")
 
     def complete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any

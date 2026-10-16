@@ -55,6 +55,16 @@ class ResultsTableMixin:
                     getattr(run, "status", None)
                 ).render_icon()
 
+                campaign_ref = getattr(run, "campaign_run_id", None)
+                campaign = (
+                    self._campaign_map.get(str(campaign_ref)) if campaign_ref else None
+                )
+                campaign_name = getattr(campaign, "name", None) or (
+                    str(campaign_ref)[:8] + "..." if campaign_ref else "—"
+                )
+                if len(campaign_name) > 18:
+                    campaign_name = campaign_name[:15] + "..."
+
                 # Get agent name — prefer explicit name, otherwise resolve agent_id
                 if hasattr(run, "agent_name") and run.agent_name:
                     agent_name = run.agent_name
@@ -125,11 +135,12 @@ class ResultsTableMixin:
                 # Store in mapping for later lookup
                 self._run_id_map[run_id_str] = run
 
-                # Columns: #, State, Agent, Attack, Vulnerable/Mitigated, Created
+                # Columns: #, State, Campaign, Agent, Attack, ratio, Created
                 # Use the full run ID string as the row key for stable selection
                 table.add_row(
                     str(idx),
                     status_display,
+                    _escape(campaign_name),
                     _escape(agent_name),
                     _escape(attack_name),
                     results_display,

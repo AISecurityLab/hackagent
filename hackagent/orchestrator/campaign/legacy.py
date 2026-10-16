@@ -334,7 +334,8 @@ def _parameters(
 
 
 def _execution(config: Mapping[str, Any]) -> Dict[str, Any]:
-    execution: Dict[str, Any] = {"storage": {"backend": "local"}}
+    # ``hack`` hands over models it already connected; it never preflighted them.
+    execution: Dict[str, Any] = {"storage": {"backend": "local"}, "preflight": False}
     if config.get("on_error") in {"continue", "stop"}:
         execution["on_error"] = config["on_error"]
     concurrency = {}

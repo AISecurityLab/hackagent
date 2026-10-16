@@ -4,6 +4,7 @@
 """Unit tests for LocalBackend (server/storage/local.py)."""
 
 import os
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -14,6 +15,7 @@ from hackagent.storage.local import LocalBackend
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
+    CampaignRunRecord,
     OrganizationContext,
     PaginatedResult,
     RunRecord,
@@ -42,6 +44,37 @@ class TestLocalBackendInit(unittest.TestCase):
             backend = _make_backend(tmp)
             try:
                 self.assertIsNone(backend.get_api_key())
+            finally:
+                backend.close()
+
+    def test_existing_database_gains_campaign_run_relationship(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "test.db")
+            connection = sqlite3.connect(path)
+            connection.execute(
+                """CREATE TABLE runs (
+                    id TEXT PRIMARY KEY,
+                    attack_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    config_json TEXT NOT NULL DEFAULT '{}',
+                    status TEXT NOT NULL DEFAULT 'PENDING',
+                    run_notes TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )"""
+            )
+            connection.commit()
+            connection.close()
+
+            backend = LocalBackend(db_path=path)
+            try:
+                columns = {
+                    row[1]
+                    for row in backend._conn.execute(
+                        "PRAGMA table_info(runs)"
+                    ).fetchall()
+                }
+                self.assertIn("campaign_run_id", columns)
             finally:
                 backend.close()
 
@@ -229,6 +262,54 @@ class TestLocalBackendAttack(unittest.TestCase):
         self.assertEqual(result.total, 2)
         types = {a.type for a in result.items}
         self.assertEqual(types, {"tap", "bon"})
+
+
+class TestLocalBackendCampaignRun(unittest.TestCase):
+    """Campaign runs own the spec and audit; attack runs link to them."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.backend = _make_backend(self.tmp)
+        self.agent = self.backend.create_or_update_agent(
+            "campaign-target", "OPENAI_SDK", "http://localhost:8000/v1", {}
+        )
+
+    def test_campaign_run_round_trip(self):
+        record = self.backend.create_campaign_run(
+            self.agent.id,
+            "safety campaign",
+            {"version": 1, "campaign": {"name": "safety campaign"}},
+        )
+        self.assertIsInstance(record, CampaignRunRecord)
+
+        audit = {"samples": 2, "passed": True, "judges": []}
+        updated = self.backend.update_campaign_run(
+            record.id, status="COMPLETED", audit=audit
+        )
+        fetched = self.backend.get_campaign_run(record.id)
+
+        self.assertEqual(updated.audit, audit)
+        self.assertEqual(fetched, updated)
+        self.assertEqual(self.backend.list_campaign_runs().items, [updated])
+
+    def test_attack_run_has_a_real_campaign_foreign_key(self):
+        campaign_run = self.backend.create_campaign_run(
+            self.agent.id, "campaign", {"version": 1}
+        )
+        attack = self.backend.create_attack(
+            "baseline", self.agent.id, self.backend.get_context().org_id, {}
+        )
+        attack_run = self.backend.create_run(
+            attack.id,
+            self.agent.id,
+            {},
+            campaign_run_id=campaign_run.id,
+        )
+
+        self.assertEqual(attack_run.campaign_run_id, campaign_run.id)
+        self.assertEqual(
+            self.backend.get_run(attack_run.id).campaign_run_id, campaign_run.id
+        )
 
 
 class TestLocalBackendRun(unittest.TestCase):

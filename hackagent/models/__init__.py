@@ -3,7 +3,13 @@
 
 """Unified model execution."""
 
-from .build import ModelCallError, as_completion, build_embedder, build_model
+from .build import (
+    ModelCallError,
+    as_completion,
+    build_embedder,
+    build_model,
+    embedder_is_reachable,
+)
 from .config import (
     ConnectionSpec,
     GenerationSpec,
@@ -14,7 +20,7 @@ from .config import (
 from .connect import check_supported, connect
 from .factory import ModelFactory
 from .guardrail import GuardedModel
-from .model import Model
+from .model import Model, Reachability
 from .response import ModelResponse
 
 __all__ = [
@@ -28,9 +34,11 @@ __all__ = [
     "ModelFactory",
     "ModelGeneration",
     "ModelResponse",
+    "Reachability",
     "as_completion",
     "build_embedder",
     "build_model",
+    "embedder_is_reachable",
     "check_supported",
     "connect",
 ]

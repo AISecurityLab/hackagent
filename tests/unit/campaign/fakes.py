@@ -80,7 +80,8 @@ BASE: dict[str, Any] = {
             }
         ],
     },
-    "execution": {"output": {"formats": ["json", "jsonl"]}},
+    # Scripted models count requests; tests opt into preflight's extra ping.
+    "execution": {"preflight": False, "output": {"formats": ["json", "jsonl"]}},
 }
 
 

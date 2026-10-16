@@ -46,13 +46,14 @@ from hackagent.attacks.techniques.trace import (
     record_target_call,
     recording,
 )
-from hackagent.core.contracts import Goal, Sample, Verdict
+from hackagent.core.contracts import Goal, RunStatus, Sample, Verdict
 from hackagent.core.logging import get_logger
 from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals, select_goals
 from hackagent.datasets.labelling import label_goals
 from hackagent.models import ModelResponse, build_embedder, build_model
 from hackagent.orchestrator.campaign.audit import (
+    AuditFailed,
     CalibrationLoader,
     audit_configured_panel,
 )
@@ -83,10 +84,12 @@ from hackagent.storage.store import Store
 
 logger = get_logger(__name__)
 
-#: Receives ``(event_name, **payload)``. A run emits ``attack_started``
-#: (``attack``, ``run_id``, ``expected_goals``), a ``goal_finished`` per goal
-#: (``attack``, ``run_id``, ``goal_index``, ``success``, ``attempts``,
-#: ``elapsed_s``), and ``attack_finished`` (``attack``, ``run_id``, ``error``).
+#: Receives ``(event_name, **payload)``. An audited run first emits
+#: ``audit_finished`` (``audit``), then ``attack_started`` (``attack``,
+#: ``run_id``, ``expected_goals``), a ``goal_finished`` per goal (``attack``,
+#: ``run_id``, ``goal_index``, ``success``, ``attempts``, ``errors`` (distinct
+#: messages of its failed attempts and abstaining judges), ``elapsed_s``), and
+#: ``attack_finished`` (``attack``, ``run_id``, ``error``).
 EventCallback = Callable[..., None]
 
 
@@ -122,24 +125,83 @@ def run_campaign(
             campaign_name=spec.campaign.name, run_id=run_id, dry_run=True
         )
 
-    if spec.execution.preflight:
-        # Fail fast on an unreachable target or judge, before any attack
-        # has started recording against it.
-        asyncio.run(preflight(resolved))
-
-    # Before the first attack: a failing panel should cost one audit, not a
-    # whole run whose numbers then mean nothing.
-    audit = audit_configured_panel(
-        resolved.panel,
-        spec.evaluation.audit,
-        concurrency=spec.execution.concurrency.judge,
-        load=calibration,
-    )
-
     owns_store = store is None
     store = store or open_store(spec.execution.storage)
+    # Written to the run folder and stored with the record, so the run can be
+    # repeated; credentials in connection headers are redacted on the way out.
+    recorded_spec = spec.recorded()
+    campaign_record = None
     try:
-        outcomes = asyncio.run(_execute(resolved, store, on_event))
+        agent_id = register_target(store, resolved.spec.target)
+        campaign_record = store.create_campaign_run(
+            agent_id,
+            spec.campaign.name,
+            recorded_spec,
+        )
+        store.update_campaign_run(campaign_record.id, status=RunStatus.RUNNING.value)
+
+        if spec.execution.preflight:
+            # Fail fast on an unreachable model, before any attack
+            # has started recording against it.
+            asyncio.run(preflight(resolved))
+
+        # Before the first attack: a failing panel should cost one audit, not a
+        # whole run whose numbers then mean nothing. The report belongs to the
+        # campaign run; attack runs reference that parent through a foreign key.
+        try:
+            audit = audit_configured_panel(
+                resolved.panel,
+                spec.evaluation.audit,
+                concurrency=spec.execution.concurrency.judge,
+                load=calibration,
+            )
+        except AuditFailed as exc:
+            audit_payload = exc.report.model_dump(mode="json")
+            store.update_campaign_run(
+                campaign_record.id,
+                status=RunStatus.FAILED.value,
+                audit=audit_payload,
+                run_notes=str(exc),
+            )
+            store.flush()
+            if on_event is not None:
+                on_event("audit_finished", audit=audit_payload)
+            raise
+        if audit is not None:
+            audit_payload = audit.model_dump(mode="json")
+            store.update_campaign_run(
+                campaign_record.id,
+                audit=audit_payload,
+            )
+            if on_event is not None:
+                on_event("audit_finished", audit=audit_payload)
+        outcomes = asyncio.run(
+            _execute(
+                resolved,
+                store,
+                on_event,
+                agent_id=agent_id,
+                campaign_run_id=campaign_record.id,
+            )
+        )
+        failed = [outcome.name for outcome in outcomes if outcome.error is not None]
+        store.update_campaign_run(
+            campaign_record.id,
+            status=(RunStatus.FAILED.value if failed else RunStatus.COMPLETED.value),
+            # "" clears a note an earlier update may have written; None would
+            # leave it in place and claim a clean run had failing attacks.
+            run_notes=(f"Attack runs failed: {', '.join(failed)}" if failed else ""),
+        )
+        store.flush()
+    except Exception as exc:
+        if campaign_record is not None and not isinstance(exc, AuditFailed):
+            store.update_campaign_run(
+                campaign_record.id,
+                status=RunStatus.FAILED.value,
+                run_notes=f"Campaign failed: {exc}",
+            )
+            store.flush()
+        raise
     finally:
         if owns_store:
             store.close()
@@ -150,14 +212,21 @@ def run_campaign(
         dry_run=False,
         attacks=outcomes,
         audit=audit,
+        campaign_run_id=str(campaign_record.id),
     )
-    return replace(result, outputs=write_outputs(result, spec.execution.output))
+    return replace(
+        result,
+        outputs=write_outputs(result, spec.execution.output, recorded_spec),
+    )
 
 
 async def _execute(
     resolved: ResolvedCampaign,
     store: Store,
     on_event: Optional[EventCallback],
+    *,
+    agent_id: UUID,
+    campaign_run_id: UUID,
 ) -> tuple[AttackOutcome, ...]:
     execution = resolved.spec.execution
     if resolved.classifier is not None:
@@ -181,13 +250,14 @@ async def _execute(
     runner = _AttackRunner(
         resolved,
         store,
-        agent_id=await asyncio.to_thread(register_target, store, resolved.spec.target),
+        agent_id=agent_id,
         limits=_Limits.from_counts(
             attack=execution.concurrency.attack,
             target=execution.concurrency.target,
             judge=execution.concurrency.judge,
         ),
         on_event=on_event,
+        campaign_run_id=campaign_run_id,
     )
     if execution.escalate:
         return await _escalate(resolved, execution, runner)
@@ -269,12 +339,14 @@ class _AttackRunner:
         agent_id: UUID,
         limits: _Limits,
         on_event: Optional[EventCallback],
+        campaign_run_id: UUID,
     ) -> None:
         self.resolved = resolved
         self.store = store
         self.agent_id = agent_id
         self.limits = limits
         self.on_event = on_event
+        self.campaign_run_id = campaign_run_id
         self.execution = resolved.spec.execution
         self.require_all_judges = resolved.spec.evaluation.require_all_judges
 
@@ -290,6 +362,7 @@ class _AttackRunner:
             configuration=attack.configuration,
             expected_goals=len(goals),
             output=self.execution.output,
+            campaign_run_id=self.campaign_run_id,
         )
         run_id = str(tracker.run_id)
         logger.info("%s | started | run=%s | goals=%d", attack.name, run_id, len(goals))
@@ -387,6 +460,7 @@ class _AttackRunner:
             goal_index=goal.index,
             success=success,
             attempts=len(attempts),
+            errors=list(dict.fromkeys(e for item in attempts for e in item.errors)),
             elapsed_s=monotonic() - started,
         )
 

@@ -30,7 +30,9 @@ def _sections() -> dict[str, list[tuple[type[BaseModel], str]]]:
     from hackagent.datasets.config import (
         DatasetFilters,
         DatasetSelection,
-        DatasetSource,
+        InlineSource,
+        PresetSource,
+        ProviderSource,
     )
     from hackagent.evaluation.audit import RobustnessSpec
     from hackagent.models.config import ConnectionSpec, GenerationSpec, ModelConfig
@@ -40,7 +42,9 @@ def _sections() -> dict[str, list[tuple[type[BaseModel], str]]]:
         "campaign": [(s.CampaignMetadata, "campaign")],
         "dataset": [
             (s.CampaignDatasetSpec, "dataset"),
-            (DatasetSource, "dataset.source"),
+            (PresetSource, "dataset.source (type: preset)"),
+            (InlineSource, "dataset.source (type: inline)"),
+            (ProviderSource, "dataset.source (type: provider)"),
             (DatasetSelection, "dataset.selection"),
             (DatasetFilters, "dataset.selection.filters"),
             (s.CategoryClassifierConfig, "dataset.classifier"),
@@ -105,9 +109,12 @@ INTROS = {
         "A **goal** is one thing you want the target to do and it should refuse, "
         "such as *Explain how to pick a lock*. The `dataset` section says where "
         "the goals come from and which of them to run.\n\n"
-        "Goals arrive in three ways: from a built-in **preset**, from a "
-        "**provider** such as a HuggingFace dataset or a local file, or written "
-        "**inline** in the campaign file."
+        "Goals arrive in three ways, chosen with `source.type`: from a built-in "
+        "**preset**, from a **provider** such as a HuggingFace dataset or a "
+        "local file, or written **inline** in the campaign file.\n\n"
+        "`source.type` decides which other fields exist — a preset source takes "
+        "a `preset` and nothing else, an inline one takes `goals`. Anything "
+        "belonging to another type is rejected rather than quietly ignored."
     ),
     "target": (
         "The target is the model or agent under test. It is described the same "
@@ -148,7 +155,7 @@ EXAMPLES: dict[str, list[tuple[str, Any]]] = {
             "A built-in benchmark, 10 goals, sampled the same way every run",
             {
                 "dataset": {
-                    "preset": "harmbench",
+                    "source": {"type": "preset", "name": "harmbench"},
                     "selection": {"limit": 10, "shuffle": True, "seed": 42},
                 }
             },
@@ -408,9 +415,10 @@ def _presets() -> str:
         [
             "## Dataset presets {#presets}",
             "",
-            "Set `dataset.preset` to one of these names. Run "
-            "`hackagent datasets list` to see them from the command line, or "
-            "`hackagent datasets sample <name>` to print a few goals.",
+            "Set `dataset.source.name` to one of these names, with "
+            "`dataset.source.type` set to `preset`. Run `hackagent datasets "
+            "list` to see them from the command line, or `hackagent datasets "
+            "sample <name>` to print a few goals.",
             "",
             table(["Preset", "What it holds", "Source"], rows),
         ]

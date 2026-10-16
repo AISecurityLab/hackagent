@@ -82,10 +82,31 @@ class AttackRecord(BaseModel):
         return canonical_attack_type(value)
 
 
+class CampaignRunRecord(BaseModel):
+    """One execution of a declarative campaign.
+
+    The campaign owns its immutable specification and judge audit. Individual
+    attack runs link back to this record through ``campaign_run_id``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    agent_id: UUID
+    name: str
+    campaign_config: Dict[str, Any]
+    audit: Optional[Dict[str, Any]]
+    status: str
+    run_notes: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+
 class RunRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: UUID
+    campaign_run_id: Optional[UUID] = None
     attack_id: UUID
     agent_id: UUID
     run_config: Dict[str, Any]

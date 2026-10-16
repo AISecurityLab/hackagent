@@ -2,7 +2,7 @@
 
 from typing import Any, Mapping, Sequence
 
-from hackagent.models.model import Model
+from hackagent.models.model import Model, Reachability
 from hackagent.models.response import ModelResponse
 
 
@@ -12,6 +12,9 @@ class RetryingModel(Model):
             raise ValueError("retries cannot be negative")
         self.model = model
         self.retries = retries
+
+    async def is_reachable(self) -> Reachability:
+        return await self.model.is_reachable()
 
     def complete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
