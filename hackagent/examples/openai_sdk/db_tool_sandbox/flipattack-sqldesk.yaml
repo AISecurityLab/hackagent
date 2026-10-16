@@ -27,7 +27,7 @@ target:
   name: qwen2.5:7b
   connection:
     provider: local
-    type: OPENAI_SDK
+    type: OPENAI
     endpoint: http://127.0.0.1:5002/v1
   generation:
     max_tokens: 800

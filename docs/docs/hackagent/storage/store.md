@@ -71,7 +71,7 @@ def update_campaign_run(campaign_run_id: UUID,
                         run_notes: Optional[str] = None) -> CampaignRunRecord
 ```
 
-Change what was given. `None` leaves a field as it is; pass `&quot;&quot;`
+Change what was given. `None` leaves a field as it is; pass `""`
 to clear a note an earlier update wrote.
 
 #### count\_result\_buckets

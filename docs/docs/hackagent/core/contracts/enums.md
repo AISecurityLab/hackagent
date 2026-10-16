@@ -13,11 +13,15 @@ class AgentType(str, Enum)
 
 How HackAgent talks to a model or agent.
 
-Chat-completion types (`LITELLM`, `OPENAI_SDK`, `OLLAMA`,
+Chat-completion types (`LITELLM`, `OPENAI`, `OLLAMA`,
 `LANGCHAIN`) are driven through LiteLLM. `GOOGLE_ADK`,
 `CLAUDE_CODE`, `CODEX`, `HERMES` and `WEB` use dedicated adapters.
 `MCP` and `A2A` are placeholders. `UNKNOWN` is the fallback when a
 type cannot be inferred.
+
+#### OPENAI\_SDK
+
+Former name of `OPENAI`; an alias, so `AgentType.OPENAI is AgentType.OPENAI`.
 
 #### \_missing\_
 

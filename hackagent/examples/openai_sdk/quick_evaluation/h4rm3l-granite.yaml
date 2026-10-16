@@ -25,7 +25,7 @@ target:
   name: ibm-granite/granite-4.1-8b
   connection:
     provider: openrouter
-    type: OPENAI_SDK
+    type: OPENAI
     endpoint: https://openrouter.ai/api/v1
     api_key_env: OPENROUTER_API_KEY
   generation:
@@ -43,7 +43,7 @@ attacks:
         name: mistralai/mixtral-8x22b-instruct
         connection:
           provider: openrouter
-          type: OPENAI_SDK
+          type: OPENAI
           endpoint: https://openrouter.ai/api/v1
           api_key_env: OPENROUTER_API_KEY
 
@@ -52,7 +52,7 @@ evaluation:
     - name: openai/gpt-4o
       connection:
         provider: openrouter
-        type: OPENAI_SDK
+        type: OPENAI
         endpoint: https://openrouter.ai/api/v1
         api_key_env: OPENROUTER_API_KEY
       scoring:

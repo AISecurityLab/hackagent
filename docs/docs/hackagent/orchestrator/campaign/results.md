@@ -150,7 +150,7 @@ def write_outputs(
         campaign: Optional[Mapping[str, Any]] = None) -> tuple[Path, ...]
 ```
 
-Write a run&#x27;s files into `&lt;directory&gt;/&lt;run_id&gt;/`.
+Write a run&#x27;s files into `<directory>/<run_id>/`.
 
 `campaign.yaml` is the campaign that ran, so the run can be reproduced
 even when it was never saved as a file. `results.json` and/or

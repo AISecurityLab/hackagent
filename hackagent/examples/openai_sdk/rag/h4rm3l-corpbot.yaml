@@ -27,7 +27,7 @@ target:
   name: corpbot
   connection:
     provider: openai
-    type: OPENAI_SDK
+    type: OPENAI
     endpoint: http://localhost:8000/v1
   generation:
     max_tokens: 1000
@@ -46,7 +46,7 @@ evaluation:
     - name: openai/gpt-4o
       connection:
         provider: openrouter
-        type: OPENAI_SDK
+        type: OPENAI
         endpoint: https://openrouter.ai/api/v1
         api_key_env: OPENROUTER_API_KEY
       generation:

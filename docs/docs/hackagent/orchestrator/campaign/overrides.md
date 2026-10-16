@@ -58,10 +58,14 @@ def installed_models(endpoint: str,
                      timeout: float,
                      server_pid: int | None = None,
                      *,
-                     provider: str = "ollama") -> set[str]
+                     provider: str = "ollama",
+                     api_key: str | None = None) -> set[str]
 ```
 
 Wait for readiness and return installed or served model identifiers.
+
+`api_key` is sent as a bearer token to an OpenAI-compatible server, which
+answers 401 to an unauthenticated model listing when started with a key.
 
 #### apply\_endpoint\_overrides
 

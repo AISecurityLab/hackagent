@@ -24,7 +24,7 @@ target:
   name: corpbot_rag
   connection:
     provider: local
-    type: OPENAI_SDK
+    type: OPENAI
     endpoint: http://localhost:8000/v1
   generation:
     max_tokens: 300
@@ -37,5 +37,5 @@ attacks:
         name: nidum-gemma-2b-uncensored
         connection:
           provider: lmstudio
-          type: OPENAI_SDK
+          type: OPENAI
           endpoint: http://localhost:1234/v1

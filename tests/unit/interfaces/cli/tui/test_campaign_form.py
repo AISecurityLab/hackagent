@@ -26,7 +26,7 @@ def test_fields_carry_schema_defaults_and_requirements() -> None:
 
     assert fields[("name",)].default is MISSING
     assert fields[("connection", "type")].kind == "choice"
-    assert "OPENAI_SDK" in fields[("connection", "type")].choices
+    assert "OPENAI" in fields[("connection", "type")].choices
     assert fields[("connection", "timeout")].default == 120.0
     assert fields[("generation", "thinking")].kind == "tristate"
     # Mappings have no form row.

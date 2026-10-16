@@ -7,7 +7,7 @@ Form fields derived from the campaign&#x27;s pydantic models.
 
 The builder never hand-writes a form: every row comes from a model field, so
 its type, default, bounds and help text are the schema&#x27;s own. A field is
-*advanced* when its schema says so (`json_schema_extra={&quot;advanced&quot;: True}`)
+*advanced* when its schema says so (`json_schema_extra={"advanced": True}`)
 or, for a section that lists its essentials, when it is not one of them.
 
 #### MISSING

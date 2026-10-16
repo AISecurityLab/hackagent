@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../../../docs/static/schema/campaign.schema.json
 #
 # The same jailbreak risk evaluation against a model you serve yourself with
-# vLLM, which speaks the OpenAI API — so the target is an OPENAI_SDK one.
+# vLLM, which speaks the OpenAI API — so the target is an OPENAI one.
 #
 #   1. pip install vllm
 #   2. vllm serve Fastweb/FastwebMIIA-7B               --port 8000   # under test
@@ -30,7 +30,7 @@ target:
   name: Fastweb/FastwebMIIA-7B
   connection:
     provider: vllm
-    type: OPENAI_SDK
+    type: OPENAI
     endpoint: http://localhost:8000/v1
 
 attacks:
@@ -42,7 +42,7 @@ attacks:
         name: Orenguteng/Llama-3-8B-Lexi-Uncensored
         connection:
           provider: vllm
-          type: OPENAI_SDK
+          type: OPENAI
           endpoint: http://localhost:8001/v1
 
   - name: tap
@@ -56,7 +56,7 @@ attacks:
         name: Orenguteng/Llama-3-8B-Lexi-Uncensored
         connection:
           provider: vllm
-          type: OPENAI_SDK
+          type: OPENAI
           endpoint: http://localhost:8001/v1
 
 evaluation:
@@ -64,7 +64,7 @@ evaluation:
     - name: Abel-24/HarmClassifier
       connection:
         provider: vllm
-        type: OPENAI_SDK
+        type: OPENAI
         endpoint: http://localhost:8002/v1
       scoring:
         type: harmbench

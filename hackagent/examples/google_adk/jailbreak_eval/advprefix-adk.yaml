@@ -52,7 +52,7 @@ evaluation:
     - name: hackagent-judge
       connection:
         provider: hackagent
-        type: OPENAI_SDK
+        type: OPENAI
         endpoint: https://api.hackagent.dev/v1
         api_key_env: HACKAGENT_API_KEY
       scoring:

@@ -30,7 +30,7 @@ target:
   name: ibm-granite/granite-4.1-8b
   connection:
     provider: openrouter
-    type: OPENAI_SDK
+    type: OPENAI
     endpoint: https://openrouter.ai/api/v1
     api_key_env: OPENROUTER_API_KEY
   generation:
@@ -51,7 +51,7 @@ evaluation:
     - name: openai/gpt-4o
       connection: &openrouter
         provider: openrouter
-        type: OPENAI_SDK
+        type: OPENAI
         endpoint: https://openrouter.ai/api/v1
         api_key_env: OPENROUTER_API_KEY
       scoring:
