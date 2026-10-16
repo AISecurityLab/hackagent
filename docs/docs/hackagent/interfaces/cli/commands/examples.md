@@ -96,5 +96,5 @@ Run the RAG indirect-injection example.
 def web_example()
 ```
 
-Run the web quick-scan example against DeepAI chat using PAIR.
+Show how to red-team a website chatbot you are authorized to test.
 

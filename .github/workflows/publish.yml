@@ -163,7 +163,8 @@ jobs:
         run: |
           ./dist/hackagent/hackagent --version
           ./dist/hackagent/hackagent version
-          ./dist/hackagent/hackagent scan --help
+          # Builds every model and attack, and sends nothing.
+          ./dist/hackagent/hackagent campaign validate packaging/smoke-campaign.yaml
           # The dashboard must be inside the archive, not rebuilt at runtime.
           ./dist/hackagent/hackagent web --no-browser --port 7871 &
           pid=$!
@@ -190,8 +191,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "hackagent --version exited $LASTEXITCODE" }
           & .\dist\hackagent\hackagent.exe version
           if ($LASTEXITCODE -ne 0) { throw "hackagent version exited $LASTEXITCODE" }
-          & .\dist\hackagent\hackagent.exe scan --help
-          if ($LASTEXITCODE -ne 0) { throw "hackagent scan --help exited $LASTEXITCODE" }
+          & .\dist\hackagent\hackagent.exe campaign validate packaging\smoke-campaign.yaml
+          if ($LASTEXITCODE -ne 0) { throw "hackagent campaign validate exited $LASTEXITCODE" }
 
       - name: Smoke test TUI launch (Unix)
         if: runner.os != 'Windows'

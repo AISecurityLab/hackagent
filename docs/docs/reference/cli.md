@@ -270,7 +270,7 @@ hackagent examples run [OPTIONS] NAME
 
 ### `hackagent examples web`
 
-Run the web quick-scan example against DeepAI chat using PAIR.
+Show how to red-team a website chatbot you are authorized to test.
 
 ```text
 hackagent examples web [OPTIONS]
