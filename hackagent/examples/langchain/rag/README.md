@@ -20,13 +20,18 @@ pip install hackagent openai flask
 # 2. Pull the model
 ollama pull Almawave/Velvet:2b
 
-# 3. Run (starts agent + attacks in one command)
-cd examples/openai_sdk/rag
-python hack.py
+# 3. Build the index and start the agent
+cd examples/langchain/rag
+python ingest.py
+python agent_server.py &
+
+# 4. Attack it
+hackagent campaign run advprefix-corpbot.yaml
 ```
 
 ## Files
 
-- **`knowledge_base.py`** — The RAG document store (policies + confidential docs)
-- **`agent.py`** — The RAG agent (Flask server, OpenAI-compatible `/v1/chat/completions`)
-- **`hack.py`** — Starts the agent + runs HackAgent attacks (AdvPrefix, Static Template, PAIR)
+- **`ingest.py`** — Builds the local index from `policies.pdf`
+- **`read_db.py`** — Inspect what ended up in the index
+- **`agent_server.py`** — The RAG agent (Flask server, OpenAI-compatible `/v1/chat/completions`)
+- **`advprefix-corpbot.yaml`** — The attack: AdvPrefix against the running agent

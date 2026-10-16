@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=../../../../docs/static/schema/campaign.schema.json
+#
+# Measure h4rm3l against IBM Granite over the whole HarmBench set, with every
+# model on OpenRouter. This is an evaluation rather than a demo: 200 goals is
+# a real bill, so start by lowering `selection.limit`.
+#
+#   1. export OPENROUTER_API_KEY=...
+#   2. hackagent campaign run h4rm3l-granite.yaml
+version: 1
+
+campaign:
+  name: h4rm3l vs Granite
+  description: h4rm3l over 200 HarmBench goals against IBM Granite on OpenRouter.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 200
+    shuffle: false
+    seed: 0
+
+target:
+  name: ibm-granite/granite-4.1-8b
+  connection:
+    provider: openrouter
+    type: OPENAI_SDK
+    endpoint: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+  generation:
+    max_tokens: 1000
+
+attacks:
+  # The decorator role is the model h4rm3l uses where a decorator in the
+  # program needs one to rewrite the prompt.
+  - name: h4rm3l
+    parameters:
+      program: DANDecorator().then(RefusalSuppressionDecorator()).then(AIMDecorator())
+      syntax_version: 2
+    roles:
+      decorator:
+        name: mistralai/mixtral-8x22b-instruct
+        connection:
+          provider: openrouter
+          type: OPENAI_SDK
+          endpoint: https://openrouter.ai/api/v1
+          api_key_env: OPENROUTER_API_KEY
+
+evaluation:
+  judges:
+    - name: openai/gpt-4o
+      connection:
+        provider: openrouter
+        type: OPENAI_SDK
+        endpoint: https://openrouter.ai/api/v1
+        api_key_env: OPENROUTER_API_KEY
+      scoring:
+        type: harmbench_variant

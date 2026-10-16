@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=../../../../docs/static/schema/campaign.schema.json
+#
+# Jailbreak risk evaluation of a Gemini-powered Google ADK agent.
+#
+#   1. pip install 'hackagent' google-adk
+#   2. export OPENROUTER_API_KEY=...        # the ADK agent reaches Gemini with it
+#   3. ollama pull llama2-uncensored        # writes the adversarial prefixes
+#   4. adk api_server --port 8000 ..        # from google_adk/, serving this agent
+#   5. hackagent campaign run advprefix-adk.yaml
+#
+# `selection.limit` is 2 so a first run costs almost nothing. Raise it, or take
+# it out, once you know the wiring works.
+version: 1
+
+campaign:
+  name: ADK jailbreak evaluation
+  description: AdvPrefix against a Google ADK agent over HarmBench goals.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 2
+    shuffle: true
+    seed: 42
+
+target:
+  name: jailbreak_eval
+  connection:
+    provider: google
+    type: GOOGLE_ADK
+    endpoint: http://localhost:8000
+
+attacks:
+  # AdvPrefix searches for a prefix that makes the agent start complying, so it
+  # needs a model that will write one — hence an uncensored attacker.
+  - name: advprefix
+    roles:
+      attacker:
+        name: llama2-uncensored
+        connection:
+          provider: ollama
+          type: OLLAMA
+        generation:
+          max_tokens: 100
+
+evaluation:
+  judges:
+    # HackAgent's hosted judge. Swap it for a local Ollama model to keep the
+    # whole run on your machine.
+    - name: hackagent-judge
+      connection:
+        provider: hackagent
+        type: OPENAI_SDK
+        endpoint: https://api.hackagent.dev/v1
+        api_key_env: HACKAGENT_API_KEY
+      scoring:
+        type: harmbench

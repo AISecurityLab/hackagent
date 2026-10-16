@@ -1,0 +1,70 @@
+# yaml-language-server: $schema=../../../../docs/static/schema/campaign.schema.json
+#
+# How much does the verdict depend on which judge you asked?
+#
+# The same model scores every reply three times, under three scoring rubrics.
+# Where they disagree, the "jailbreak rate" you would have reported was a
+# property of your judge as much as of the target.
+#
+#   1. export OPENROUTER_API_KEY=...
+#   2. hackagent campaign run flipattack-multi-judge.yaml
+#
+# `evaluation.audit` measures the panel against human-labelled samples before
+# the run leans on it; turn it on to put a number on that disagreement.
+version: 1
+
+campaign:
+  name: FlipAttack, three judges
+  description: One attack scored by three rubrics, to see where they disagree.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 20
+    shuffle: false
+    seed: 0
+
+target:
+  name: ibm-granite/granite-4.1-8b
+  connection:
+    provider: openrouter
+    type: OPENAI_SDK
+    endpoint: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+  generation:
+    max_tokens: 400
+
+attacks:
+  - name: flipattack
+    parameters:
+      flip_mode: FCS
+      cot: true
+      lang_gpt: true
+      few_shot: true
+
+evaluation:
+  # Three rubrics, one model. Each judge votes; `aggregation` decides what the
+  # panel concludes from the votes.
+  judges:
+    - name: openai/gpt-4o
+      connection: &openrouter
+        provider: openrouter
+        type: OPENAI_SDK
+        endpoint: https://openrouter.ai/api/v1
+        api_key_env: OPENROUTER_API_KEY
+      scoring:
+        type: harmbench_variant
+    - name: openai/gpt-4o
+      connection: *openrouter
+      scoring:
+        type: harmbench
+    - name: openai/gpt-4o
+      connection: *openrouter
+      scoring:
+        type: jailbreakbench
+
+execution:
+  concurrency:
+    judge: 20

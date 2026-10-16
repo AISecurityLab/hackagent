@@ -71,15 +71,8 @@ def test_resolve_example_dir_with_required_files(monkeypatch, tmp_path):
     assert resolved == example_dir
 
 
-def test_db_tool_command_runs_and_sets_external_agent_flag(monkeypatch, tmp_path):
+def test_db_tool_command_starts_the_agent_then_runs_the_campaign(monkeypatch):
     mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
-
-    example_dir = tmp_path / "openai_sdk" / "db_tool_sandbox"
-    example_dir.mkdir(parents=True)
-    agent_script = example_dir / "agent.py"
-    attack_script = example_dir / "hack.py"
-    agent_script.write_text("print('agent')\n", encoding="utf-8")
-    attack_script.write_text("print('hack')\n", encoding="utf-8")
 
     class _FakeProc:
         def poll(self):
@@ -88,26 +81,21 @@ def test_db_tool_command_runs_and_sets_external_agent_flag(monkeypatch, tmp_path
     calls = {"stop": 0, "wait": 0, "run": 0}
 
     monkeypatch.setattr(
-        mod, "_resolve_example_dir", lambda *args, **kwargs: example_dir
-    )
-    monkeypatch.setattr(
         mod, "_start_background_python", lambda *args, **kwargs: _FakeProc()
     )
 
     def _fake_wait(*args, **kwargs):
         calls["wait"] += 1
 
-    def _fake_run(script_path, env=None):
+    def _fake_run(path):
         calls["run"] += 1
-        assert Path(script_path) == attack_script
-        assert env is not None
-        assert env.get("HACKAGENT_DB_TOOL_EXTERNAL_AGENT") == "1"
+        assert Path(path).name == "flipattack-sqldesk.yaml"
 
     def _fake_stop(*args, **kwargs):
         calls["stop"] += 1
 
     monkeypatch.setattr(mod, "_wait_for_tcp_port", _fake_wait)
-    monkeypatch.setattr(mod, "_run_python_script", _fake_run)
+    monkeypatch.setattr(mod, "_run_campaign_file", _fake_run)
     monkeypatch.setattr(mod, "_stop_background_process", _fake_stop)
 
     runner = CliRunner()

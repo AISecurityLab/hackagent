@@ -58,7 +58,11 @@ Expose the HackAgent brand palette as CSS variables.
 def compose() -> ComposeResult
 ```
 
-One header, one view, one footer.
+One view and a footer.
+
+No header bar: the view below says what it is — the builder opens on
+the campaign&#x27;s name and whether it is ready to run — so a title strip
+above it only costs rows the form can use.
 
 #### on\_mount
 

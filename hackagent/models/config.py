@@ -59,9 +59,13 @@ class ConnectionSpec(BaseModel):
     endpoint: Optional[str] = Field(
         default=None,
         description=(
-            "Base URL of the model's API, e.g. ``http://localhost:11434`` for "
-            "Ollama. Leave unset for local agents such as ``CLAUDE_CODE``, which "
-            "run on this machine."
+            "Base URL of the model's API. Leave it unset for an ``OLLAMA`` model "
+            "and HackAgent reads ``OLLAMA_HOST``, falling back to "
+            "``http://localhost:11434`` — so a campaign runs against whichever "
+            "Ollama the machine has without being edited. Writing the URL here "
+            "pins it, which is what you want for a server at a fixed address. "
+            "Local agents such as ``CLAUDE_CODE`` need none: they are launched, "
+            "not called over HTTP."
         ),
     )
     api_key_env: Optional[str] = Field(

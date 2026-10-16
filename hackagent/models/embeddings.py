@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 from urllib.parse import urlsplit
 
 from hackagent.core.contracts import AgentType
-from hackagent.core.defaults import DEFAULT_EMBEDDER_ENDPOINT
+from hackagent.core.settings import resolve_ollama_base_url
 
 if TYPE_CHECKING:
     import numpy as np
@@ -70,8 +70,10 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
                 model = model[len(prefix) :]
                 break
         kwargs.update(model=model, custom_llm_provider="openai")
+        # Resolved per call, like the chat path: a constant read at import
+        # would freeze whichever Ollama the environment named back then.
         kwargs["api_base"] = normalize_embedding_endpoint(
-            str(endpoint or DEFAULT_EMBEDDER_ENDPOINT), ollama=True
+            str(endpoint or resolve_ollama_base_url()), ollama=True
         )
     elif agent_type == "OPENAI":
         # Custom compatible servers own their model namespace. Only the OpenAI

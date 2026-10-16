@@ -33,6 +33,9 @@ OLLAMA_PROVIDER_PREFIX = "ollama_chat"
 # Default local embedder served by Ollama (used by any attack that needs an
 # embedder, e.g. the RAG Attack and AutoDAN-Turbo strategy retrieval).
 DEFAULT_EMBEDDER_IDENTIFIER = "embeddinggemma"
+#: Where an embedder goes when nothing names a server. Resolved once, for
+#: display and for callers that want a concrete value; the embedding path
+#: resolves per call so a change to the environment is picked up.
 DEFAULT_EMBEDDER_ENDPOINT = resolve_ollama_base_url()
 DEFAULT_EMBEDDER_AGENT_TYPE = "OLLAMA"
 # OpenAI-compatible base URL exposed by Ollama (used by the RAG Attack, which

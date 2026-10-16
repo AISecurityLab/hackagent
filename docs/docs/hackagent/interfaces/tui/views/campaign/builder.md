@@ -55,3 +55,11 @@ def action_edit_yaml() -> None
 
 Edit the whole campaign in `$EDITOR`; the form reloads from it.
 
+#### action\_stop
+
+```python
+def action_stop() -> None
+```
+
+Stop the running campaign. Bound to F3 and the Stop button.
+

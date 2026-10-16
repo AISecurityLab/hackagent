@@ -9,9 +9,11 @@ There is a single action, because there is a single thing to do here. The
 campaign it hands over is complete and runnable, so the builder opens on
 something worth reading rather than an empty form.
 
-#### NARROW\_TITLE
+#### LOGO
 
-Shown instead of the logo when the terminal is too narrow for it.
+The logo, without the blank lines the constant is written with. There is
+one banner and the welcome screen always shows it: a terminal too narrow
+for it gets less of it, never a substitute for it.
 
 ## Template Objects
 

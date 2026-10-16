@@ -363,146 +363,105 @@ class TestOllamaCommand(unittest.TestCase):
         self.runner = CliRunner()
         self.config = MagicMock()
 
-    def _invoke(self, module):
+    def test_it_preflights_then_runs_the_campaign(self):
         with (
-            patch.object(ex, "_load_ollama_demo_module", return_value=module),
-            patch.object(ex, "_preflight_ollama_requirements") as preflight,
+            patch.object(ex, "_resolve_example_dir", return_value=Path("/ex")),
+            patch.object(ex, "_preflight_ollama_campaign") as preflight,
+            patch.object(ex, "_run_campaign_file") as run_campaign,
         ):
             result = self.runner.invoke(ollama, [], obj={"config": self.config})
-        return result, preflight
-
-    def test_demo_results_are_summarised(self):
-        module = SimpleNamespace(
-            build_ollama_demo_config=lambda: {"agent": {}},
-            run_ollama_demo=lambda: [{"success": True}, {"success": False}],
-        )
-
-        result, preflight = self._invoke(module)
 
         self.assertEqual(result.exit_code, 0, result.output)
-        preflight.assert_called_once()
-        self.assertIn("Goals tested: 2", result.output)
-        self.assertIn("Successful goals: 1/2", result.output)
+        campaign = Path("/ex/h4rm3l-demo.yaml")
+        preflight.assert_called_once_with(campaign)
+        run_campaign.assert_called_once_with(campaign)
 
-    def test_non_list_results_are_tolerated(self):
-        module = SimpleNamespace(
-            build_ollama_demo_config=lambda: {},
-            run_ollama_demo=lambda: None,
-        )
+    def test_the_models_to_pull_are_read_from_the_campaign(self):
+        """Not from a second list, which a new role would silently escape."""
+        campaign = """
+version: 1
+campaign: {name: t}
+dataset: {source: {type: inline, goals: [g]}}
+target:
+  name: target-model
+  connection: {provider: ollama, type: OLLAMA, endpoint: 'http://localhost:11434'}
+attacks:
+  - name: tap
+    roles:
+      attacker:
+        name: attacker-model
+        connection:
+          provider: ollama
+          type: OLLAMA
+          endpoint: 'http://localhost:11434'
+evaluation:
+  judges:
+    - name: judge-model
+      connection:
+        provider: ollama
+        type: OLLAMA
+        endpoint: 'http://localhost:11434'
+      scoring: {type: harmbench}
+"""
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".yaml", delete=False, encoding="utf-8"
+        ) as handle:
+            handle.write(campaign)
+            path = Path(handle.name)
+        try:
+            found = ex._ollama_models_in(path)
+        finally:
+            path.unlink()
 
-        result, _ = self._invoke(module)
+        self.assertEqual(found["target"], "target-model")
+        self.assertEqual(found["evaluation"], "judge-model")
+        self.assertEqual(found["attacks"], "attacker-model")
 
-        self.assertEqual(result.exit_code, 0)
-        self.assertIn("ollama example completed", result.output)
+    def test_a_campaign_with_no_ollama_models_needs_nothing_pulled(self):
+        campaign = """
+version: 1
+campaign: {name: t}
+dataset: {source: {type: inline, goals: [g]}}
+target:
+  name: gpt-4o
+  connection: {provider: openai, type: OPENAI_SDK, endpoint: 'https://x/v1'}
+attacks: [{name: flipattack}]
+"""
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".yaml", delete=False, encoding="utf-8"
+        ) as handle:
+            handle.write(campaign)
+            path = Path(handle.name)
+        try:
+            self.assertEqual(ex._ollama_models_in(path), {})
+        finally:
+            path.unlink()
 
-    def test_demo_without_a_config_builder_is_rejected(self):
-        result, preflight = self._invoke(SimpleNamespace())
 
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("build_ollama_demo_config", result.output)
-        preflight.assert_not_called()
+class TestNamedExampleCommands(unittest.TestCase):
+    """The named commands are aliases: each points at one example."""
 
-    def test_demo_without_a_runner_is_rejected(self):
-        module = SimpleNamespace(build_ollama_demo_config=lambda: {})
-
-        result, _ = self._invoke(module)
-
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("run_ollama_demo", result.output)
-
-
-class TestScriptBackedCommands(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
 
-    def test_quick_evaluation_runs_the_h4rm3l_script(self):
-        with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/ex")),
-            patch.object(ex, "_run_python_script") as run_script,
-        ):
-            result = self.runner.invoke(quick_evaluation, [])
-
-        self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(run_script.call_args.args[0], Path("/ex/run_h4rm3l.py"))
-
-    def test_rag_example_runs_its_script(self):
-        with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/ex")),
-            patch.object(ex, "_run_python_script") as run_script,
-        ):
-            result = self.runner.invoke(rag_example, [])
-
-        self.assertEqual(result.exit_code, 0)
-        self.assertEqual(
-            run_script.call_args.args[0], Path("/ex/test_indirect_injection.py")
-        )
-
-    def _sandbox_example(self, command, env_flag, default_port):
-        process = MagicMock()
-        with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/ex")),
-            patch.object(ex, "_start_background_python", return_value=process),
-            patch.object(ex, "_wait_for_tcp_port") as wait,
-            patch.object(ex, "_run_python_script") as run_script,
-            patch.object(ex, "_stop_background_process") as stop,
-            patch.dict("os.environ", {}, clear=True),
-        ):
+    def _alias(self, command) -> str:
+        with patch.object(ex, "_run_example") as run_example:
             result = self.runner.invoke(command, [])
-        return result, wait, run_script, stop, process
-
-    def test_pc_tool_starts_the_agent_and_runs_the_attack(self):
-        result, wait, run_script, stop, process = self._sandbox_example(
-            pc_tool, "HACKAGENT_PC_TOOL_EXTERNAL_AGENT", 5001
-        )
-
         self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(wait.call_args.kwargs["port"], 5001)
-        self.assertEqual(
-            run_script.call_args.kwargs["env"]["HACKAGENT_PC_TOOL_EXTERNAL_AGENT"], "1"
-        )
-        stop.assert_called_once_with(process, "PC Tool agent")
+        return run_example.call_args.args[0]
 
-    def test_db_tool_starts_the_agent_and_runs_the_attack(self):
-        result, wait, run_script, stop, process = self._sandbox_example(
-            db_tool, "HACKAGENT_DB_TOOL_EXTERNAL_AGENT", 5002
-        )
-
-        self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(wait.call_args.kwargs["port"], 5002)
-        self.assertEqual(
-            run_script.call_args.kwargs["env"]["HACKAGENT_DB_TOOL_EXTERNAL_AGENT"], "1"
-        )
-        stop.assert_called_once_with(process, "DB Tool agent")
-
-    def test_sandbox_agent_is_stopped_even_when_the_attack_fails(self):
-        process = MagicMock()
-
-        with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/ex")),
-            patch.object(ex, "_start_background_python", return_value=process),
-            patch.object(ex, "_wait_for_tcp_port"),
-            patch.object(
-                ex, "_run_python_script", side_effect=click.ClickException("boom")
-            ),
-            patch.object(ex, "_stop_background_process") as stop,
-        ):
-            result = self.runner.invoke(pc_tool, [])
-
-        self.assertNotEqual(result.exit_code, 0)
-        stop.assert_called_once()
-
-    def test_port_can_be_overridden_by_the_environment(self):
-        with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/ex")),
-            patch.object(ex, "_start_background_python", return_value=MagicMock()),
-            patch.object(ex, "_wait_for_tcp_port") as wait,
-            patch.object(ex, "_run_python_script"),
-            patch.object(ex, "_stop_background_process"),
-            patch.dict("os.environ", {"PORT": "6001"}),
-        ):
-            self.runner.invoke(pc_tool, [])
-
-        self.assertEqual(wait.call_args.kwargs["port"], 6001)
+    def test_each_alias_names_an_example_that_exists(self):
+        aliases = {
+            quick_evaluation: "openai_sdk/quick_evaluation/h4rm3l-granite",
+            pc_tool: "openai_sdk/pc_tool_sandbox/pair-vaultdesk",
+            db_tool: "openai_sdk/db_tool_sandbox/flipattack-sqldesk",
+            rag_example: "rag/indirect-injection",
+        }
+        found = ex._discover_examples()
+        for command, expected in aliases.items():
+            with self.subTest(command=command.name):
+                self.assertEqual(self._alias(command), expected)
+                self.assertIn(expected, found)
 
 
 class TestWebExample(unittest.TestCase):
@@ -548,3 +507,80 @@ class TestExamplesGroup(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestExampleDiscovery(unittest.TestCase):
+    """Examples are found by looking, so a new one needs no registration."""
+
+    def setUp(self):
+        self.runner = CliRunner()
+
+    def test_every_campaign_in_the_tree_is_listed(self):
+        found = ex._discover_examples()
+        on_disk = sorted(
+            path.relative_to(ex._examples_root()).with_suffix("").as_posix()
+            for path in ex._examples_root().rglob("*.yaml")
+        )
+
+        self.assertEqual(sorted(found), on_disk)
+        self.assertTrue(on_disk, "no example campaigns found")
+
+    def test_listing_shows_each_example_and_its_description(self):
+        result = self.runner.invoke(ex.list_examples, [])
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        for name in ex._discover_examples():
+            self.assertIn(name, result.output)
+
+    def test_a_unique_last_part_is_enough_to_name_an_example(self):
+        key, path = ex._resolve_example_name("h4rm3l-demo")
+
+        self.assertEqual(key, "ollama/h4rm3l-demo")
+        self.assertTrue(path.is_file())
+
+    def test_an_ambiguous_name_says_which_ones_it_matched(self):
+        # Two folders each hold a `risk-evaluation`.
+        with self.assertRaises(click.ClickException) as caught:
+            ex._resolve_example_name("risk-evaluation")
+
+        self.assertIn("ollama/risk-evaluation", str(caught.exception))
+        self.assertIn("vllm/risk-evaluation", str(caught.exception))
+
+    def test_an_unknown_name_points_at_the_listing(self):
+        with self.assertRaises(click.ClickException) as caught:
+            ex._resolve_example_name("no-such-example")
+
+        self.assertIn("examples list", str(caught.exception))
+
+    def test_an_example_with_a_server_starts_and_stops_it(self):
+        process = MagicMock()
+        with (
+            patch.object(ex, "_start_background_python", return_value=process) as start,
+            patch.object(ex, "_wait_for_tcp_port") as wait,
+            patch.object(ex, "_run_campaign_file") as run_campaign,
+            patch.object(ex, "_stop_background_process") as stop,
+        ):
+            ex._run_example("openai_sdk/pc_tool_sandbox/pair-vaultdesk")
+
+        self.assertEqual(start.call_args.args[0].name, "agent.py")
+        self.assertEqual(wait.call_args.kwargs["port"], 5001)
+        run_campaign.assert_called_once()
+        stop.assert_called_once_with(process, "PC Tool agent")
+
+    def test_an_example_without_a_server_just_runs(self):
+        with (
+            patch.object(ex, "_start_background_python") as start,
+            patch.object(ex, "_run_campaign_file") as run_campaign,
+        ):
+            ex._run_example("claude/flipattack-ollama")
+
+        start.assert_not_called()
+        run_campaign.assert_called_once()
+
+    def test_every_target_in_the_table_exists(self):
+        """A folder renamed out from under the table would start nothing."""
+        for folder, target in ex._TARGETS.items():
+            script = ex._examples_root() / folder / target.script
+            self.assertTrue(script.is_file(), f"{folder}: no {target.script}")
+        for folder in ex._MANUAL_TARGETS:
+            self.assertTrue((ex._examples_root() / folder).is_dir(), folder)

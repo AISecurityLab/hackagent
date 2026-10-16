@@ -302,6 +302,14 @@ Run the DB Tool sandbox example: start agent, then launch attack.
 hackagent examples db-tool [OPTIONS]
 ```
 
+### `hackagent examples list`
+
+📋 List every example campaign.
+
+```text
+hackagent examples list [OPTIONS]
+```
+
 ### `hackagent examples ollama`
 
 Run the Ollama h4rm3l demo via CLI (no TUI).
@@ -328,11 +336,23 @@ hackagent examples quick-evaluation [OPTIONS]
 
 ### `hackagent examples rag`
 
-Run the RAG indirect-injection example script.
+Run the RAG indirect-injection example.
 
 ```text
 hackagent examples rag [OPTIONS]
 ```
+
+### `hackagent examples run`
+
+▶ Run one example by name, starting its target if it has one.
+
+```text
+hackagent examples run [OPTIONS] NAME
+```
+
+| Name | Kind | Required | Description |
+|---|---|---|---|
+| `NAME` | argument | yes |  |
 
 ### `hackagent examples web`
 

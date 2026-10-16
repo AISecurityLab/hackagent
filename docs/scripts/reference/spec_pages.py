@@ -355,7 +355,9 @@ def _agent_types() -> str:
         "",
         "**Chat APIs**, reached over HTTP and driven through LiteLLM: "
         f"{chat_names}. These need an `endpoint`, and an `api_key_env` when the "
-        "provider requires a key.",
+        "provider requires a key. `OLLAMA` is the exception: leave its "
+        "`endpoint` unset and HackAgent reads `OLLAMA_HOST`, so the campaign "
+        "follows whichever Ollama the machine runs.",
         "",
         "**Agents**, driven directly:",
         "",

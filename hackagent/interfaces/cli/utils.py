@@ -32,6 +32,11 @@ def handle_errors(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except (click.ClickException, click.exceptions.Exit, click.Abort):
+            # Raised deliberately, and Click already renders it. Catching it
+            # below would report the same failure a second time, as an
+            # "unexpected" one.
+            raise
         except HackAgentError as e:
             console.print(f"[bold red]❌ HackAgent Error: {str(e)}")
             if console._environ.get("HACKAGENT_DEBUG"):

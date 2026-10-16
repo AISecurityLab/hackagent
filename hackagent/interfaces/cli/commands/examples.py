@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from urllib.error import URLError
@@ -99,6 +100,17 @@ def _run_hackagent_cli_command(args: list[str]) -> None:
         raise click.ClickException(
             f"Command failed ({cmd}) with exit code {result.returncode}"
         )
+
+
+def _run_campaign_file(campaign_path: Path) -> None:
+    """Run an example's attack, which is a campaign file like any other.
+
+    No endpoint is passed: the examples leave their Ollama endpoints unset,
+    so each resolves from ``OLLAMA_HOST`` wherever it is run.
+    """
+    if not campaign_path.is_file():
+        raise click.ClickException(f"Campaign not found: {campaign_path}")
+    _run_hackagent_cli_command(["campaign", "run", str(campaign_path)])
 
 
 def _start_background_python(
@@ -299,6 +311,162 @@ def _ensure_ollama_models(models_by_role: dict[str, str]) -> None:
         installed.update(_normalize_ollama_model_aliases(model_name))
 
 
+def _ollama_models_in(campaign_path: Path) -> dict[str, str]:
+    """Every Ollama model a campaign names, keyed by where it is used.
+
+    Read from the campaign itself rather than from a second list, so adding a
+    judge or an attack role cannot leave a model unpulled.
+    """
+    import yaml
+
+    from hackagent.core.contracts import AgentType
+    from hackagent.orchestrator.campaign.preflight import campaign_models
+    from hackagent.orchestrator.campaign.spec import CampaignSpec
+
+    spec = CampaignSpec.model_validate(yaml.safe_load(campaign_path.read_text()))
+    found: dict[str, str] = {}
+    for where, config in campaign_models(spec):
+        if config.connection.type is AgentType.OLLAMA:
+            found.setdefault(where.split(".")[0].split("[")[0], config.name)
+    return found
+
+
+@dataclass(frozen=True)
+class _Target:
+    """A server an example attacks, which this command can start for you."""
+
+    script: str
+    port: int
+    label: str
+
+
+#: Examples whose target is a local server, by the folder holding the campaign.
+_TARGETS: dict[str, _Target] = {
+    "openai_sdk/pc_tool_sandbox": _Target("agent.py", 5001, "PC Tool agent"),
+    "openai_sdk/db_tool_sandbox": _Target("agent.py", 5002, "DB Tool agent"),
+    "openai_sdk/rag": _Target("agent_server.py", 8000, "Corporate policy RAG agent"),
+    "langchain/rag": _Target("agent_server.py", 8000, "LangChain RAG agent"),
+}
+
+#: Examples whose target this command will not start, and what to run instead.
+_MANUAL_TARGETS: dict[str, str] = {
+    "google_adk/jailbreak_eval": (
+        "cd hackagent/examples/google_adk && adk api_server --port 8000 ."
+    ),
+    "google_adk/multi_tool_agent": (
+        "cd hackagent/examples/google_adk && adk api_server --port 8000 ."
+    ),
+}
+
+
+def _examples_root() -> Path:
+    return _get_repo_root() / "hackagent" / "examples"
+
+
+def _discover_examples() -> dict[str, Path]:
+    """Every example campaign, keyed by ``folder/name``.
+
+    Found by looking, not listed anywhere: a campaign added to the examples
+    tree is one this command can list and run, with nothing to register.
+    """
+    root = _examples_root()
+    return {
+        path.relative_to(root).with_suffix("").as_posix(): path
+        for path in sorted(root.rglob("*.yaml"))
+    }
+
+
+def _describe(campaign_path: Path) -> str:
+    """The campaign's own one-line description."""
+    import yaml
+
+    try:
+        document = yaml.safe_load(campaign_path.read_text()) or {}
+        return str(document.get("campaign", {}).get("description") or "")
+    except (OSError, yaml.YAMLError):
+        return ""
+
+
+def _resolve_example_name(name: str) -> tuple[str, Path]:
+    """Match ``name`` against the examples, in full or by its last part."""
+    found = _discover_examples()
+    if name in found:
+        return name, found[name]
+    matches = [key for key in found if key.rsplit("/", 1)[-1] == name]
+    if len(matches) == 1:
+        return matches[0], found[matches[0]]
+    if matches:
+        raise click.ClickException(
+            f"'{name}' matches several examples: {', '.join(sorted(matches))}"
+        )
+    raise click.ClickException(
+        f"No example named '{name}'. Run `hackagent examples list` to see them."
+    )
+
+
+def _run_example(name: str) -> None:
+    """Start whatever the example needs, run its campaign, then clean up."""
+    key, campaign_path = _resolve_example_name(name)
+    folder = key.rsplit("/", 1)[0] if "/" in key else ""
+    if folder in _MANUAL_TARGETS:
+        console.print(
+            f"[yellow]This example needs its agent running first:[/yellow]\n"
+            f"    {_MANUAL_TARGETS[folder]}"
+        )
+
+    target = _TARGETS.get(folder)
+    if target is None:
+        _run_campaign_file(campaign_path)
+        return
+
+    agent_script = campaign_path.parent / target.script
+    port = int(os.environ.get("PORT", str(target.port)))
+    process = _start_background_python(agent_script, target.label)
+    try:
+        _wait_for_tcp_port(
+            host="127.0.0.1",
+            port=port,
+            timeout_seconds=30,
+            process=process,
+            process_name=target.label,
+        )
+        console.print(f"[green]✅ {target.label} ready on port {port}[/green]")
+        _run_campaign_file(campaign_path)
+    finally:
+        _stop_background_process(process, target.label)
+
+
+def _preflight_ollama_campaign(campaign_path: Path) -> None:
+    """Check Ollama is up and every model the campaign names is pulled.
+
+    The same server the run will use: an Ollama model with no endpoint
+    resolves from ``OLLAMA_HOST``, which is what this checks.
+    """
+    console.print("[bold cyan]🛠️ Running Ollama preflight checks...[/bold cyan]")
+
+    if shutil.which("ollama") is None:
+        console.print("[bold red]❌ Ollama not found in PATH[/bold red]")
+        console.print(
+            "[yellow]Install Ollama first and retry: https://ollama.ai[/yellow]"
+        )
+        raise click.ClickException("Ollama is not installed")
+
+    endpoint = resolve_ollama_base_url()
+    console.print(f"[cyan]🔎 Checking Ollama server at:[/cyan] {endpoint}")
+    if not _is_ollama_running(str(endpoint)):
+        console.print("[bold red]❌ Ollama server is not running[/bold red]")
+        console.print("[yellow]Start it and retry: ollama serve[/yellow]")
+        raise click.ClickException("Ollama server is not reachable")
+    console.print("[green]✅ Ollama server is running[/green]")
+
+    required = _ollama_models_in(campaign_path)
+    console.print("[cyan]🔎 Models this campaign needs:[/cyan]")
+    for where, model_name in sorted(required.items()):
+        console.print(f"   - {where}: {model_name}")
+    _ensure_ollama_models(required)
+    console.print("[bold green]✅ Ollama preflight checks completed[/bold green]")
+
+
 def _preflight_ollama_requirements(demo_cfg: dict) -> None:
     """Validate Ollama availability and required models before launching the TUI."""
     console.print("[bold cyan]🛠️ Running Ollama preflight checks...[/bold cyan]")
@@ -352,6 +520,45 @@ def examples():
     pass
 
 
+@examples.command(name="list")
+@handle_errors
+def list_examples():
+    """📋 List every example campaign."""
+    import textwrap
+
+    found = _discover_examples()
+    if not found:
+        raise click.ClickException(f"No examples found under {_examples_root()}")
+
+    console.print(f"[bold]{len(found)} examples[/bold]\n")
+    for name, path in found.items():
+        folder = name.rsplit("/", 1)[0] if "/" in name else ""
+        target = _TARGETS.get(folder)
+        if target is not None:
+            needs = f"  [yellow](starts {target.script})[/yellow]"
+        elif folder in _MANUAL_TARGETS:
+            needs = "  [yellow](needs adk api_server)[/yellow]"
+        else:
+            needs = ""
+        console.print(f"[cyan]{name}[/cyan]{needs}")
+        # Wrapped by hand rather than in a table: the longest name is 48
+        # characters, which leaves a table no room for the description.
+        for line in textwrap.wrap(_describe(path), width=72):
+            console.print(f"  [dim]{line}[/dim]")
+    console.print(
+        "\n[dim]Run one with:[/dim] hackagent examples run <name>\n"
+        "[dim]A name's last part is enough when it is unique.[/dim]"
+    )
+
+
+@examples.command(name="run")
+@click.argument("name")
+@handle_errors
+def run_example(name: str):
+    """▶ Run one example by name, starting its target if it has one."""
+    _run_example(name)
+
+
 @examples.command()
 @click.pass_context
 @handle_errors
@@ -360,35 +567,12 @@ def ollama(ctx):
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
 
-    demo_module = _load_ollama_demo_module()
-    if not hasattr(demo_module, "build_ollama_demo_config"):
-        raise click.ClickException(
-            "hackagent/examples/ollama/demo.py must define build_ollama_demo_config()"
-        )
+    example_dir = _resolve_example_dir("ollama", required_files=("h4rm3l-demo.yaml",))
+    campaign_path = example_dir / "h4rm3l-demo.yaml"
 
-    demo_cfg = demo_module.build_ollama_demo_config()
-    _preflight_ollama_requirements(demo_cfg)
-    if not hasattr(demo_module, "run_ollama_demo"):
-        raise click.ClickException(
-            "hackagent/examples/ollama/demo.py must define run_ollama_demo()"
-        )
-
+    _preflight_ollama_campaign(campaign_path)
     console.print("[bold cyan]🚀 Running Ollama h4rm3l example (CLI)...[/bold cyan]")
-    results = demo_module.run_ollama_demo()
-
-    if isinstance(results, list):
-        console.print(f"[cyan]Goals tested:[/cyan] {len(results)}")
-        success_values = [
-            row.get("success")
-            for row in results
-            if isinstance(row, dict) and isinstance(row.get("success"), bool)
-        ]
-        if success_values:
-            success_count = sum(1 for success in success_values if success)
-            console.print(
-                f"[cyan]Successful goals:[/cyan] {success_count}/{len(success_values)}"
-            )
-
+    _run_campaign_file(campaign_path)
     console.print("[bold green]✅ ollama example completed[/bold green]")
 
 
@@ -396,96 +580,28 @@ def ollama(ctx):
 @handle_errors
 def quick_evaluation():
     """Run the OpenRouter quick evaluation example (h4rm3l)."""
-    example_dir = _resolve_example_dir(
-        "openai_sdk/quick_evaluation", required_files=("run_h4rm3l.py",)
-    )
-    script_path = example_dir / "run_h4rm3l.py"
-
-    console.print("[bold cyan]🚀 Running quick evaluation (h4rm3l)...[/bold cyan]")
-    _run_python_script(script_path)
-    console.print("[bold green]✅ quick-evaluation completed[/bold green]")
+    _run_example("openai_sdk/quick_evaluation/h4rm3l-granite")
 
 
 @examples.command(name="pc-tool")
 @handle_errors
 def pc_tool():
     """Run the PC Tool sandbox example: start agent, then launch attack."""
-    example_dir = _resolve_example_dir(
-        "openai_sdk/pc_tool_sandbox", required_files=("agent.py", "hack.py")
-    )
-    agent_script = example_dir / "agent.py"
-    attack_script = example_dir / "hack.py"
-
-    port = int(os.environ.get("PORT", "5001"))
-    agent_process = _start_background_python(agent_script, "PC Tool agent")
-
-    try:
-        _wait_for_tcp_port(
-            host="127.0.0.1",
-            port=port,
-            timeout_seconds=30,
-            process=agent_process,
-            process_name="PC Tool agent",
-        )
-        console.print(
-            f"[green]✅ PC Tool agent ready at:[/green] http://127.0.0.1:{port}/v1/chat/completions"
-        )
-
-        attack_env = os.environ.copy()
-        attack_env["HACKAGENT_PC_TOOL_EXTERNAL_AGENT"] = "1"
-        _run_python_script(attack_script, env=attack_env)
-        console.print("[bold green]✅ pc-tool completed[/bold green]")
-    finally:
-        _stop_background_process(agent_process, "PC Tool agent")
+    _run_example("openai_sdk/pc_tool_sandbox/pair-vaultdesk")
 
 
 @examples.command(name="db-tool")
 @handle_errors
 def db_tool():
     """Run the DB Tool sandbox example: start agent, then launch attack."""
-    example_dir = _resolve_example_dir(
-        "openai_sdk/db_tool_sandbox", required_files=("agent.py", "hack.py")
-    )
-    agent_script = example_dir / "agent.py"
-    attack_script = example_dir / "hack.py"
-
-    port = int(os.environ.get("PORT", "5002"))
-    agent_process = _start_background_python(agent_script, "DB Tool agent")
-
-    try:
-        _wait_for_tcp_port(
-            host="127.0.0.1",
-            port=port,
-            timeout_seconds=30,
-            process=agent_process,
-            process_name="DB Tool agent",
-        )
-        console.print(
-            f"[green]✅ DB Tool agent ready at:[/green] http://127.0.0.1:{port}/v1/chat/completions"
-        )
-
-        attack_env = os.environ.copy()
-        attack_env["HACKAGENT_DB_TOOL_EXTERNAL_AGENT"] = "1"
-        _run_python_script(attack_script, env=attack_env)
-        console.print("[bold green]✅ db-tool completed[/bold green]")
-    finally:
-        _stop_background_process(agent_process, "DB Tool agent")
+    _run_example("openai_sdk/db_tool_sandbox/flipattack-sqldesk")
 
 
 @examples.command(name="rag")
 @handle_errors
 def rag_example():
-    """Run the RAG indirect-injection example script."""
-    example_dir = _resolve_example_dir(
-        "rag", required_files=("test_indirect_injection.py",)
-    )
-    script_path = example_dir / "test_indirect_injection.py"
-
-    console.print(
-        "[bold cyan]🚀 Running RAG indirect-injection example (test_indirect_injection.py)...[/bold cyan]"
-    )
-    _run_python_script(script_path)
-    console.print("[bold green]✅ rag example completed[/bold green]")
+    """Run the RAG indirect-injection example."""
+    _run_example("rag/indirect-injection")
 
 
 @examples.command(name="web")

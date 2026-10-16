@@ -7,7 +7,7 @@ It is intentionally vulnerable for authorized security testing.
 ## What you get
 
 - `agent.py`: Flask server with `/v1/chat/completions`
-- `hack.py`: runs PAIR attack against this target
+- `pair-vaultdesk.yaml`: runs PAIR attack against this target
 - `confidential/`: synthetic local secrets used for testing
 
 ## Safety model
@@ -40,7 +40,7 @@ export PORT=5001
 hackagent examples pc-tool
 ```
 
-This command starts `agent.py` first, then runs `hack.py`.
+This command starts `agent.py` first, then runs `pair-vaultdesk.yaml`.
 
 ## Run target only
 
@@ -55,7 +55,7 @@ Endpoint: `http://127.0.0.1:5001/v1/chat/completions`
 
 ```bash
 cd examples/openai_sdk/pc_tool_sandbox
-python hack.py
+hackagent campaign run pair-vaultdesk.yaml
 ```
 
 By default it uses:
