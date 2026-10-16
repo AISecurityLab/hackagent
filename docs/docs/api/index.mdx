@@ -93,7 +93,7 @@ Each user can make **1,000 requests per hour**, shared by all of their keys. Pas
 
 ## How a run is recorded
 
-This is what HackAgent sends for each attack it runs in remote mode: from `hack()` when an API key is set, and from a campaign whose `execution.storage.backend` is `remote`. Any tool can record runs the same way.
+This is what HackAgent sends for each attack it runs in remote mode: from any campaign whose `execution.storage.backend` is `remote`, or `auto` with an API key configured. Any tool can record runs the same way.
 
 ```mermaid
 sequenceDiagram
@@ -144,7 +144,7 @@ An agent is a target you test. Its `name` is unique within your organization.
 
 ### Attacks
 
-An attack is a configured technique against one agent: `type` is the attack name (such as `pair`) and `configuration` its `attack_config`.
+An attack is a configured technique against one agent: `type` is the attack name (such as `pair`) and `configuration` the parameters and role models the campaign gave it.
 
 | Method and path | Does |
 |---|---|

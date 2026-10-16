@@ -8,9 +8,9 @@ One screen, one job: build a campaign, check it, run it.
 
 The app opens on :class:`WelcomeScreen` — the logo, and a working campaign to
 start from — then hands over to :class:`CampaignBuilder`. The other views
-(results, targets, config) are no longer part of this app; they are still
-reachable on their own, which is what ``hackagent results`` and
-``hackagent agent`` open.
+(results, targets, config) are no longer part of that flow: each is a whole
+app of its own, opened by starting ``HackAgentTUI`` on it, which is how the
+welcome screen reaches past results.
 """
 
 from pathlib import Path
@@ -167,7 +167,7 @@ class HackAgentTUI(App):
     SUB_TITLE = "Build a campaign, check it, run it"
 
     #: The view this app shows. ``campaign`` is the app proper; the others
-    #: exist so ``hackagent results`` and ``hackagent agent`` keep working.
+    #: are opened one at a time by whoever constructs the app.
     VIEWS = ("campaign", "results", "agents", "config")
 
     BINDINGS = [

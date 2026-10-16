@@ -160,7 +160,7 @@ PAIR broke all three goals. It got the whole system prompt out in its third roun
 
 PAIR is stochastic. In the separate SDK run, the refund rule held for all six attempts while the other two goals fell in the first round. One run is a sample, not a verdict: run again, or raise `iterations` and `streams`, before concluding that a rule holds.
 
-Each row `hack()` returns carries the verdict as `success` and a 0–10 `best_score`; the campaign's JSON file records the same per attempt.
+Each attempt carries the verdict as `success` and a 0–10 `best_score`, in the result the run returns and in the campaign's JSON file alike.
 
 <Modal trigger="Show one row in full" title="An SDK row for the discount code" wide>
 

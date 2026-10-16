@@ -21,8 +21,9 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   drives every attack over every goal.
 - **Attack Framework**: Base classes, objectives, and techniques
   (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline).
-  The attack seam (`hackagent.attacks.ports`, `AttackConfig`, `BaseAttack`)
-  is documented alongside `RunSpec` and `TargetParams`.
+  The attack seam is `hackagent.attacks.techniques`: `StaticAttack` and
+  `IterativeAttack`, each attack's parameter model (its roles and
+  defaults), and the `registry` a campaign resolves names through.
   Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
   templates, progress, inline-judge adapters, `ensure_graphviz`).
   Every shipped technique constructs as `BaseAttack(config, ctx)`.
