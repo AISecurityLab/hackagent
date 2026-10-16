@@ -7,12 +7,19 @@ A campaign is what somebody ran, so a campaign is what a top-level line is.
 Expanding it shows its attacks, and expanding an attack shows the goals it
 tried and how each went. One screen, no panes: a terminal is narrow, and a
 second pane halves the width of the one thing being read.
+
+A run lives where its campaign's ``execution.storage`` put it, which is the
+account or this machine. The view opens on whichever has runs, names it, and
+reads the other on ``s``: the store being shown is a choice, never a guess
+the reader has to make about why something is missing.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 from uuid import UUID
 
 from textual.app import ComposeResult
@@ -64,6 +71,14 @@ def _outcome(broken: int, goals: int, status: str, recorded: int) -> str:
     return f"[green]0 of {total} goals jailbroken[/green]"
 
 
+@dataclass(frozen=True)
+class _Store:
+    """A place runs may have been recorded, and what to call it on screen."""
+
+    label: str
+    open: Callable[[], Any]
+
+
 class ResultsTab(ResultsExportMixin, BaseTab):
     """Campaigns, their attacks, and the goals each attack tried."""
 
@@ -77,6 +92,7 @@ class ResultsTab(ResultsExportMixin, BaseTab):
 
     BINDINGS = [
         Binding("f5", "refresh", "Refresh", show=False),
+        Binding("s", "switch_store", "Switch store", show=False),
         Binding("ctrl+e", "export_csv", "Export CSV", show=False),
         Binding("ctrl+j", "export_json", "Export JSON", show=False),
     ]
@@ -95,6 +111,12 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         self._attack_map: dict[str, str] = {}
         self._result_counts: dict[str, tuple] = {}
         self._results_of_run: dict[str, list[Any]] = {}
+        #: The store on screen. Set by every refresh, and by the switch key,
+        #: which is what makes it a choice rather than a guess.
+        self._store_label: Optional[str] = None
+        #: True once the user picked a store, after which the view stays
+        #: there — an empty account they asked for is an answer.
+        self._store_chosen = False
 
     def compose(self) -> ComposeResult:
         tree: Tree[Any] = Tree("runs", id="results-tree")
@@ -105,45 +127,169 @@ class ResultsTab(ResultsExportMixin, BaseTab):
 
     # -- loading -------------------------------------------------------------
 
+    def _stores(self) -> list["_Store"]:
+        """The stores that may hold runs, in the order they are tried.
+
+        Where a run was recorded is the campaign's choice, not the account's:
+        ``execution.storage: local`` keeps it on this machine while the
+        account is remote, and a remote account can be unreachable. So the
+        account is read first when there is one, and this machine after it.
+        """
+        stores = []
+        if getattr(self.cli_config, "api_key", None):
+            stores.append(_Store("the account", self.client))
+        stores.append(_Store("this machine", self.local_client))
+        return stores
+
     def refresh_data(self) -> None:
-        """Read the campaigns, their attacks and the results of each."""
+        """Read the store the user chose, or find one worth showing.
+
+        Until a store is chosen, this looks for one with runs in it: an
+        account that cannot be reached, or that has nothing, is no reason to
+        show an empty screen while this machine holds what was just run.
+        Once ``s`` has chosen one, that is the one read, empty or not.
+        """
         hint = self.query_one("#results-hint", Static)
-        try:
-            session = self.client()
-            self._campaigns = list(session.campaign_runs(page=1, page_size=200).items)
-            self.results_data = list(session.runs(page=1, page_size=200).items)
-
-            self._attack_map = {
-                str(attack.id): str(attack.type)
-                for attack in session.attacks(page=1, page_size=500).items
-            }
-            self._agent_map = {
-                str(agent.id): agent.name
-                for agent in session.agents(page=1, page_size=500).items
-            }
-
-            self._result_counts.clear()
-            self._results_of_run.clear()
-            for run in self.results_data:
-                try:
-                    run_id = run.id if isinstance(run.id, UUID) else UUID(str(run.id))
-                    items = session.results(run_id=run_id, page=1, page_size=500).items
-                except Exception:
-                    items = []
-                self._results_of_run[str(run.id)] = items
-                outcomes = [
-                    classify_evaluation_status(getattr(r, "evaluation_status", None))
-                    for r in items
-                ]
-                self._result_counts[str(run.id)] = (
-                    sum(1 for o in outcomes if o is VULNERABLE),
-                    sum(1 for o in outcomes if o is MITIGATED),
-                    len(items),
-                )
-        except Exception as exc:
-            hint.update(f"[$error]Could not read results: {_escape(str(exc))}[/]")
+        stores = self._stores()
+        if self._store_chosen:
+            # Asked for by name: showing a different store instead would be
+            # the very guessing the key exists to undo.
+            stores = [
+                store for store in stores if store.label == self._store_label
+            ] or stores[:1]
+        problems: list[tuple[str, str]] = []
+        empty: Optional[_Store] = None
+        for store in stores:
+            try:
+                loaded = self._read(store.open())
+            except Exception as exc:
+                problems.append((store.label, str(exc)))
+                continue
+            if loaded["campaigns"] or empty is None:
+                self._apply(loaded)
+            if loaded["campaigns"]:
+                self._show(store.label, problems)
+                return
+            empty = empty or store
+        if empty is not None:
+            self._show(empty.label, problems)
             return
-        self._build_tree()
+        # Whatever was on screen came from a store that is not being shown
+        # any more; leaving it there would credit those runs to this one.
+        self._clear()
+        said = "; ".join(f"{label}: {message}" for label, message in problems)
+        self._store_label = stores[0].label if stores else None
+        switch = self._switch_hint(problems)
+        hint.update(
+            f"[$error]Could not read results — {_escape(said)}[/]"
+            + (f" [dim]· {switch}[/dim]" if switch else "")
+        )
+
+    def _show(self, source: str, problems: Sequence[tuple[str, str]]) -> None:
+        """Draw what was read, and say what could not be."""
+        self._store_label = source
+        self._build_tree(source, problems)
+        for label, message in problems:
+            self.notify(
+                f"{label}: {message}", title="Results", severity="warning", timeout=8
+            )
+
+    def _switch_hint(self, problems: Sequence[tuple[str, str]] = ()) -> str:
+        """``s: the other store``, or empty when there is only one.
+
+        A store that failed is named here as failed, which is also why the
+        view is showing the other one: one phrase answers both questions.
+        """
+        others = [
+            store.label for store in self._stores() if store.label != self._store_label
+        ]
+        if not others:
+            return ""
+        failed = {label for label, _ in problems}
+        unread = " (could not be read)" if others[0] in failed else ""
+        return f"s: {_escape(others[0])}{unread}"
+
+    def action_switch_store(self) -> None:
+        """Read the other store — the account, or this machine."""
+        stores = self._stores()
+        if len(stores) < 2:
+            self.notify(
+                "Every run is recorded on this machine: no account is configured.",
+                title="Results",
+            )
+            return
+        labels = [store.label for store in stores]
+        at = labels.index(self._store_label) if self._store_label in labels else 0
+        self._store_label = labels[(at + 1) % len(labels)]
+        self._store_chosen = True
+        self.refresh_data()
+
+    def _read(self, session: Any) -> dict[str, Any]:
+        """Everything the tree needs from one store, or an exception.
+
+        Nothing is assigned until the whole read succeeds, so a store that
+        fails halfway cannot leave half of its runs on screen.
+        """
+        campaigns = list(session.campaign_runs(page=1, page_size=200).items)
+        runs = list(session.runs(page=1, page_size=200).items)
+        attacks = {
+            str(attack.id): str(attack.type)
+            for attack in session.attacks(page=1, page_size=500).items
+        }
+        agents = {
+            str(agent.id): agent.name
+            for agent in session.agents(page=1, page_size=500).items
+        }
+        counts: dict[str, tuple] = {}
+        results: dict[str, list[Any]] = {}
+        for run in runs:
+            try:
+                run_id = run.id if isinstance(run.id, UUID) else UUID(str(run.id))
+                items = list(
+                    session.results(run_id=run_id, page=1, page_size=500).items
+                )
+            except Exception:
+                items = []
+            results[str(run.id)] = items
+            outcomes = [
+                classify_evaluation_status(getattr(r, "evaluation_status", None))
+                for r in items
+            ]
+            counts[str(run.id)] = (
+                sum(1 for o in outcomes if o is VULNERABLE),
+                sum(1 for o in outcomes if o is MITIGATED),
+                len(items),
+            )
+        return {
+            "campaigns": campaigns,
+            "runs": runs,
+            "attacks": attacks,
+            "agents": agents,
+            "counts": counts,
+            "results": results,
+        }
+
+    def _clear(self) -> None:
+        """Show nothing: no store answered, so nothing can be attributed."""
+        self._apply(
+            {
+                "campaigns": [],
+                "runs": [],
+                "attacks": {},
+                "agents": {},
+                "counts": {},
+                "results": {},
+            }
+        )
+        self.query_one("#results-tree", Tree).clear()
+
+    def _apply(self, loaded: dict[str, Any]) -> None:
+        self._campaigns = loaded["campaigns"]
+        self.results_data = loaded["runs"]
+        self._attack_map = loaded["attacks"]
+        self._agent_map = loaded["agents"]
+        self._result_counts = loaded["counts"]
+        self._results_of_run = loaded["results"]
 
     # -- the tree ------------------------------------------------------------
 
@@ -170,7 +316,9 @@ class ResultsTab(ResultsExportMixin, BaseTab):
                 pass
         return broken, goals, recorded
 
-    def _build_tree(self) -> None:
+    def _build_tree(
+        self, source: str = "", problems: Sequence[tuple[str, str]] = ()
+    ) -> None:
         tree = self.query_one("#results-tree", Tree)
         tree.clear()
         campaigns = sorted(
@@ -183,10 +331,16 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             node = tree.root.add(self._campaign_label(campaign, runs), expand=False)
             for run in runs:
                 self._add_attack(node, run)
-        self.query_one("#results-hint", Static).update(
-            f"[dim]{len(campaigns)} campaigns · enter expands · f5 refresh · "
-            "ctrl+e CSV · ctrl+j JSON[/dim]"
-        )
+        # Which store this is, and that there is another one, are part of
+        # reading the list: runs recorded in an account that is down would
+        # otherwise look as though they never happened.
+        said = [f"{len(campaigns)} campaigns"]
+        if source:
+            said.append(_escape(source))
+        if switch := self._switch_hint(problems):
+            said.append(switch)
+        said.append("enter expands · f5 refresh · ctrl+e CSV · ctrl+j JSON")
+        self.query_one("#results-hint", Static).update(f"[dim]{' · '.join(said)}[/dim]")
 
     def _campaign_label(self, campaign: Any, runs: list[Any]) -> str:
         broken, goals, recorded = self._totals_of(runs)

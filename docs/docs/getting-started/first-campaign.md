@@ -140,7 +140,9 @@ hackagent campaign run campaign.yaml
 Then open [app.hackagent.dev](https://app.hackagent.dev). Choose
 `execution.storage.backend: local` when a particular campaign must remain on
 this machine. In the TUI, the same setting is under **Execution → Storage** and
-the Configuration view shows where `auto` will write.
+the Configuration view shows where `auto` will write. Its Results view names
+the store it is reading, and `s` switches between your account and this
+machine — a campaign stored locally is read from there, not from the account.
 
 ## 4. Make it try harder
 

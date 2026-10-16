@@ -80,6 +80,26 @@ class BaseTab(Container):
             )
         )
 
+    def local_client(self):
+        """Session over this machine's database, whatever the account is.
+
+        Where a run was recorded is the campaign's choice: ``execution.storage``
+        set to ``local`` keeps it here even while the account is remote, and
+        ``auto`` falls back here whenever no key is configured. A view that
+        only ever read the account would never show those runs.
+        """
+        from hackagent import HackAgent, Settings
+
+        settings = getattr(self.cli_config, "settings", None)
+        db_path = getattr(settings, "db_path", None)
+        # Only a real path overrides the usual resolution: a config carrying
+        # no resolved settings must not invent a database out of what it has.
+        return HackAgent(
+            Settings.resolve(
+                api_key="", db_path=db_path if isinstance(db_path, str) else None
+            )
+        )
+
     def handle_api_error(self, error: Exception, context: str = "API call") -> str:
         """Format API error messages for display.
 

@@ -4,10 +4,10 @@
 """Standalone app hosting :class:`ResultsTab`, for snapshot testing.
 
 ``ResultsTab`` deliberately does not fetch on mount (``BaseTab.on_show`` does
-the lazy first refresh), so rendering it in isolation is network-free. Its
-``client()`` is overridden below to a throwaway local database. The stub
-config carries an API key, and without the override a refresh would open
-the remote API.
+the lazy first refresh), so rendering it in isolation is network-free. Both
+of its sessions are overridden below to one throwaway database. The stub
+config carries an API key, so without the overrides a refresh would open the
+remote API, and fall back to whatever database this machine really has.
 """
 
 import tempfile
@@ -41,6 +41,7 @@ def _isolated_results_tab() -> ResultsTab:
         backend=store,
     )
     tab.client = lambda: session
+    tab.local_client = lambda: session
     return tab
 
 
