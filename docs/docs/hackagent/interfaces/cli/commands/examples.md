@@ -16,6 +16,27 @@ def examples()
 
 🧪 Launch built-in examples from the CLI
 
+#### list\_examples
+
+```python
+@examples.command(name="list")
+@handle_errors
+def list_examples()
+```
+
+📋 List every example campaign.
+
+#### run\_example
+
+```python
+@examples.command(name="run")
+@click.argument("name")
+@handle_errors
+def run_example(name: str)
+```
+
+▶ Run one example by name, starting its target if it has one.
+
 #### ollama
 
 ```python
@@ -65,7 +86,7 @@ Run the DB Tool sandbox example: start agent, then launch attack.
 def rag_example()
 ```
 
-Run the RAG indirect-injection example script.
+Run the RAG indirect-injection example.
 
 #### web\_example
 

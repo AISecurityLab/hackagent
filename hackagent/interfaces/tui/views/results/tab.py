@@ -1,22 +1,24 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+"""Past runs, as one tree you expand.
+
+A campaign is what somebody ran, so a campaign is what a top-level line is.
+Expanding it shows its attacks, and expanding an attack shows the goals it
+tried and how each went. One screen, no panes: a terminal is narrow, and a
+second pane halves the width of the one thing being read.
 """
-Results Tab
 
-View and analyze attack results.
+from __future__ import annotations
 
-Rendering helpers live in ``formatters/``; the heavier panels are split into
-mixins (``table.py``, ``details.py``, ``export.py``) that this router composes.
-"""
-
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 from uuid import UUID
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, DataTable, Label, Select, Static
+from textual.widgets import Static, Tree
+from textual.widgets.tree import TreeNode
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.base import BaseTab
@@ -25,379 +27,240 @@ from hackagent.interfaces.tui.theme import (
     VULNERABLE,
     classify_evaluation_status,
 )
-from hackagent.interfaces.tui.views.results.details import ResultsDetailsMixin
 from hackagent.interfaces.tui.views.results.export import ResultsExportMixin
-from hackagent.interfaces.tui.views.results.formatters import _escape
-from hackagent.interfaces.tui.views.results.table import ResultsTableMixin
+from hackagent.interfaces.tui.views.results.formatters import (
+    _coerce_datetime,
+    _escape,
+)
 
 
-class ResultsTab(
-    ResultsTableMixin,
-    ResultsDetailsMixin,
-    ResultsExportMixin,
-    BaseTab,
-):
-    """Results tab for viewing attack results with split view."""
+def _ago(value: Any) -> str:
+    """How long ago, in the words someone would use out loud."""
+    when = _coerce_datetime(value)
+    if when is None:
+        return "—"
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    seconds = (datetime.now(timezone.utc) - when).total_seconds()
+    if seconds < 90:
+        return "just now"
+    for size, limit, suffix in ((60, 60, "m"), (3600, 24, "h"), (86400, 7, "d")):
+        count = int(seconds // size)
+        if count < limit:
+            return f"{count}{suffix} ago"
+    return when.strftime("%d %b")
+
+
+def _outcome(broken: int, goals: int, status: str, recorded: int) -> str:
+    """What came of it, or why nothing did."""
+    state = (status or "").upper()
+    if state in {"FAILED", "CANCELLED"} and not recorded:
+        return "[yellow]did not finish[/yellow]"
+    if not recorded:
+        return "[dim]nothing recorded[/dim]"
+    total = goals or recorded
+    if broken:
+        return f"[red]{broken} of {total} goals jailbroken[/red]"
+    return f"[green]0 of {total} goals jailbroken[/green]"
+
+
+class ResultsTab(ResultsExportMixin, BaseTab):
+    """Campaigns, their attacks, and the goals each attack tried."""
 
     DEFAULT_CSS = """
-    ResultsTab {
-        layout: horizontal;
-    }
-    
-    ResultsTab #results-left-panel {
-        width: 35%;
-        border-right: solid $primary;
-    }
-    
-    ResultsTab #results-right-panel {
-        width: 65%;
-    }
-    
-    ResultsTab #results-table {
-        height: 100%;
-    }
-    
-    ResultsTab #run-header-static {
-        margin-bottom: 1;
-        padding: 0 1;
-    }
-    
-    ResultsTab #results-container {
-        height: auto;
-        padding: 0 1;
-    }
-    
-    ResultsTab .result-collapsible {
-        margin: 0 0 1 0;
-        padding: 0;
-    }
-    
-    ResultsTab .result-collapsible > CollapsibleTitle {
-        padding: 1 2;
-        background: $surface;
-    }
-    
-    ResultsTab .result-collapsible.-vulnerable > CollapsibleTitle {
-        background: $error-darken-3;
-        color: $text;
-    }
-
-    ResultsTab .result-collapsible.-mitigated > CollapsibleTitle {
-        background: $success-darken-3;
-        color: $text;
-    }
-
-    ResultsTab .result-collapsible.-errored > CollapsibleTitle {
-        background: $warning-darken-3;
-        color: $text;
-    }
-
-    ResultsTab .result-collapsible.-not-evaluated > CollapsibleTitle {
-        background: $surface-darken-1;
-        color: $text;
-    }
-    
-    ResultsTab .result-details {
-        padding: 1 2;
-        margin: 0 0 1 0;
-        background: $surface-darken-1;
-    }
-    
-    ResultsTab .stats-bar {
-        height: 3;
-        margin: 1 0;
-        padding: 0 1;
-    }
-    
-    ResultsTab .success-bar {
-        background: $success;
-        height: 1;
-    }
-    
-    ResultsTab .failed-bar {
-        background: $error;
-        height: 1;
+    ResultsTab { layout: vertical; }
+    ResultsTab #results-tree { height: 1fr; padding: 0 1; }
+    ResultsTab #results-hint {
+        height: 1; padding: 0 1; color: $text-muted; background: $panel;
     }
     """
 
     BINDINGS = [
-        Binding("enter", "view_result", "View Details"),
-        Binding("s", "show_summary", "Summary"),
-        Binding("pageup", "prev_page", "Previous Page", show=False),
-        Binding("pagedown", "next_page", "Next Page", show=False),
-        Binding("[", "prev_page", "Previous Page"),
-        Binding("]", "next_page", "Next Page"),
+        Binding("f5", "refresh", "Refresh", show=False),
+        Binding("ctrl+e", "export_csv", "Export CSV", show=False),
+        Binding("ctrl+j", "export_json", "Export JSON", show=False),
     ]
 
-    # Maximum number of results to display in detail view to prevent UI freeze
-    MAX_RESULTS_DISPLAY = 10
-    # Maximum number of traces per result to display
-    MAX_TRACES_PER_RESULT = 5
-    # Maximum content length for truncation
-    MAX_CONTENT_LENGTH = 500
+    #: Goals listed under one attack before the rest are summarised.
+    MAX_GOALS_SHOWN = 40
+    #: Lines of the target's reply shown under a goal.
+    MAX_REPLY_LINES = 6
 
-    def __init__(self, cli_config: CLIConfig):
-        """Initialize results tab.
-
-        Args:
-            cli_config: CLI configuration object
-        """
-        super().__init__(cli_config)
+    def __init__(self, cli_config: CLIConfig, **kwargs: Any) -> None:
+        super().__init__(cli_config, **kwargs)
         self.results_data: list[Any] = []
-        self.selected_result: Any = None
-        self._detail_page: int = 0  # Current page for result details pagination
-        self._run_id_map: dict[str, Any] = {}  # Map run ID strings to run objects
-        self._total_count: int = (
-            0  # Total number of runs from API (for correct numbering)
-        )
-        # Enrichment caches (populated in refresh_data)
-        self._agent_map: dict[str, str] = {}  # agent_id str -> agent name
-        self._attack_map: dict[str, str] = {}  # attack_id str -> attack type
-        self._campaign_map: dict[str, Any] = {}  # campaign_run_id -> campaign run
-        self._result_counts: dict[
-            str, tuple
-        ] = {}  # run_id str -> (success, fail, total)
+        self.selected_result: Optional[Any] = None
+        self._campaigns: list[Any] = []
+        self._agent_map: dict[str, str] = {}
+        self._attack_map: dict[str, str] = {}
+        self._result_counts: dict[str, tuple] = {}
+        self._results_of_run: dict[str, list[Any]] = {}
 
     def compose(self) -> ComposeResult:
-        """Compose the results layout with horizontal split."""
-        # Left side - Results list (30%)
-        with VerticalScroll(id="results-left-panel"):
-            yield Static(
-                "[bold cyan]🎯 Attack Results[/bold cyan]",
-                classes="section-header",
-            )
+        tree: Tree[Any] = Tree("runs", id="results-tree")
+        tree.show_root = False
+        tree.guide_depth = 2
+        yield tree
+        yield Static("", id="results-hint")
 
-            with Horizontal(classes="toolbar"):
-                yield Button("🔄 Refresh", id="refresh-results", variant="primary")
-                yield Button("📊 CSV", id="export-csv", variant="default")
-                yield Button("📄 JSON", id="export-json", variant="default")
-
-            with Horizontal(classes="toolbar"):
-                yield Label("Filter:")
-                yield Select(
-                    [
-                        ("All", "all"),
-                        ("Pending", "pending"),
-                        ("Running", "running"),
-                        ("Completed", "completed"),
-                        ("Failed", "failed"),
-                    ],
-                    id="status-filter",
-                    value="all",
-                )
-                yield Label("Limit:")
-                yield Select(
-                    [("10", "10"), ("25", "25"), ("50", "50"), ("100", "100")],
-                    id="limit-select",
-                    value="25",
-                )
-
-            # Results table
-            yield DataTable(zebra_stripes=True, cursor_type="row", id="results-table")
-
-        # Right side - Details view (70%)
-        with VerticalScroll(id="results-right-panel"):
-            yield Static(
-                "[bold cyan]📋 Result Details[/bold cyan]",
-                classes="section-header",
-            )
-            # Run header info (shows run overview when selected)
-            yield Static(
-                "[dim]💡 Select a run from the list to view details and results[/dim]",
-                id="run-header-static",
-            )
-            # Container for collapsible result items
-            yield Vertical(id="results-container")
-
-    def on_mount(self) -> None:
-        """Called when the tab is mounted."""
-        # Initialize table columns with improved headers
-        try:
-            table = self.query_one("#results-table", DataTable)
-            table.clear(columns=True)
-            table.add_columns(
-                "#",
-                "State",
-                "Campaign",
-                "Agent",
-                "Attack",
-                f"{VULNERABLE.icon}/{MITIGATED.icon}",
-                "Created",
-            )
-        except Exception as e:
-            self.app.notify(f"Failed to initialize table: {str(e)}", severity="error")
-
-        # Show loading message immediately
-        try:
-            header_widget = self.query_one("#run-header-static", Static)
-            header_widget.update("[cyan]Loading results from API...[/cyan]")
-        except Exception:
-            pass
-
-        # Do not fetch on mount; BaseTab.on_show will lazily trigger first refresh.
-        # This prevents hidden tab network calls from delaying TUI startup.
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press events."""
-        if event.button.id == "refresh-results":
-            self.refresh_data()
-        elif event.button.id == "export-csv":
-            self._export_results_csv()
-        elif event.button.id == "export-json":
-            self._export_results_json()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        """Handle select dropdown changes."""
-        if event.select.id in ["status-filter", "limit-select"]:
-            self.refresh_data()
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """Handle row selection in the results table."""
-        row_key = event.row_key
-        # The row key is the run ID string - use it to look up the run
-        run_id_str = str(row_key.value) if hasattr(row_key, "value") else str(row_key)
-
-        if run_id_str in self._run_id_map:
-            self.selected_result = self._run_id_map[run_id_str]
-            self._detail_page = 0  # Reset page when selecting new result
-            # Show summary in right panel
-            self._show_result_summary(self.selected_result)
-            self._show_result_details()
-
-    def action_show_summary(self) -> None:
-        """Show a quick summary for the selected run."""
-        if self.selected_result:
-            self._show_result_summary(self.selected_result)
-
-    def action_next_page(self) -> None:
-        """Navigate to next page of results details."""
-        if not self.selected_result:
-            return
-        run = self.selected_result
-        if hasattr(run, "results") and run.results:
-            total_results = len(run.results)
-            total_pages = (
-                total_results + self.MAX_RESULTS_DISPLAY - 1
-            ) // self.MAX_RESULTS_DISPLAY
-            if self._detail_page < total_pages - 1:
-                self._detail_page += 1
-                self._show_result_details()
-
-    def action_prev_page(self) -> None:
-        """Navigate to previous page of results details."""
-        if self._detail_page > 0:
-            self._detail_page -= 1
-            self._show_result_details()
+    # -- loading -------------------------------------------------------------
 
     def refresh_data(self) -> None:
-        """Refresh results data from API."""
+        """Read the campaigns, their attacks and the results of each."""
+        hint = self.query_one("#results-hint", Static)
         try:
-            # Get filter values
-            status_sel = self.query_one("#status-filter", Select).value
-            limit_sel = self.query_one("#limit-select", Select).value
-
-            # Ensure we have strings (Select.value can be None/NoSelection)
-            status_filter = str(status_sel) if status_sel is not None else "all"
-            limit = 25
-            if limit_sel is not None:
-                try:
-                    limit = int(str(limit_sel))
-                except (ValueError, TypeError):
-                    limit = 25
-
             session = self.client()
+            self._campaigns = list(session.campaign_runs(page=1, page_size=200).items)
+            self.results_data = list(session.runs(page=1, page_size=200).items)
 
-            runs_result = session.runs(page=1, page_size=limit)
-            all_runs = runs_result.items
+            self._attack_map = {
+                str(attack.id): str(attack.type)
+                for attack in session.attacks(page=1, page_size=500).items
+            }
+            self._agent_map = {
+                str(agent.id): agent.name
+                for agent in session.agents(page=1, page_size=500).items
+            }
 
-            # Build agent name cache (RunRecord only has agent_id)
-            self._agent_map.clear()
-            try:
-                agents_result = session.agents(page=1, page_size=500)
-                for ag in agents_result.items:
-                    self._agent_map[str(ag.id)] = ag.name
-            except Exception:
-                pass
-
-            # Campaign parents own the immutable spec and audit. Cache them so
-            # every attack row visibly retains its campaign provenance.
-            self._campaign_map.clear()
-            try:
-                campaigns_result = session.campaign_runs(page=1, page_size=500)
-                for campaign in campaigns_result.items:
-                    self._campaign_map[str(campaign.id)] = campaign
-            except Exception:
-                pass
-
-            # Build attack type cache for showing human-readable attack names
-            self._attack_map.clear()
-            try:
-                attacks_result = session.attacks(page=1, page_size=500)
-                for attack in attacks_result.items:
-                    self._attack_map[str(attack.id)] = str(attack.type)
-            except Exception:
-                pass
-
-            # Build result-count cache for runs that don't carry nested results
             self._result_counts.clear()
-            for run in all_runs:
-                if not hasattr(run, "results") or run.results is None:
-                    try:
-                        rid = run.id if isinstance(run.id, UUID) else UUID(str(run.id))
-                        res_page = session.results(run_id=rid, page=1, page_size=500)
-                        outcomes = [
-                            classify_evaluation_status(
-                                getattr(r, "evaluation_status", None)
-                            )
-                            for r in res_page.items
-                        ]
-                        self._result_counts[str(run.id)] = (
-                            sum(1 for o in outcomes if o is VULNERABLE),
-                            sum(1 for o in outcomes if o is MITIGATED),
-                            len(res_page.items),
-                        )
-                    except Exception:
-                        self._result_counts[str(run.id)] = (0, 0, 0)
-
-            # Filter by status if requested
-            if status_filter and status_filter != "all":
-                all_runs = [
-                    r
-                    for r in all_runs
-                    if str(r.status).upper() == status_filter.upper()
+            self._results_of_run.clear()
+            for run in self.results_data:
+                try:
+                    run_id = run.id if isinstance(run.id, UUID) else UUID(str(run.id))
+                    items = session.results(run_id=run_id, page=1, page_size=500).items
+                except Exception:
+                    items = []
+                self._results_of_run[str(run.id)] = items
+                outcomes = [
+                    classify_evaluation_status(getattr(r, "evaluation_status", None))
+                    for r in items
                 ]
-
-            self.results_data = all_runs if all_runs else []
-            self._total_count = len(self.results_data)
-
-            if not self.results_data:
-                self._show_empty_state(
-                    "No runs found. Execute an attack to see results here."
+                self._result_counts[str(run.id)] = (
+                    sum(1 for o in outcomes if o is VULNERABLE),
+                    sum(1 for o in outcomes if o is MITIGATED),
+                    len(items),
                 )
-            else:
-                self._update_table()
+        except Exception as exc:
+            hint.update(f"[$error]Could not read results: {_escape(str(exc))}[/]")
+            return
+        self._build_tree()
 
-        except Exception as e:
-            error_type = type(e).__name__
-            error_msg = str(e)
+    # -- the tree ------------------------------------------------------------
 
-            self._show_empty_state(f"Error loading results: {error_type}\n{error_msg}")
+    def _runs_of(self, campaign_id: str) -> list[Any]:
+        return [
+            run
+            for run in self.results_data
+            if str(getattr(run, "campaign_run_id", "") or "") == campaign_id
+        ]
 
-    def _show_empty_state(self, message: str) -> None:
-        """Show an empty state message when no data is available.
+    def _totals_of(self, runs: list[Any]) -> tuple[int, int, int]:
+        """``(jailbroken, goals, recorded)`` over these attack runs."""
+        broken = recorded = goals = 0
+        for run in runs:
+            vulnerable, _mitigated, total = self._result_counts.get(
+                str(run.id), (0, 0, 0)
+            )
+            broken += vulnerable
+            recorded += total
+            config = getattr(run, "run_config", None) or {}
+            try:
+                goals += int(config.get("expected_total_goals") or 0)
+            except (TypeError, ValueError):
+                pass
+        return broken, goals, recorded
 
-        Args:
-            message: Message to display
-        """
-        table = self.query_one("#results-table", DataTable)
-        table.clear()
-
-        # Show message in header area and clear results container
-        header_widget = self.query_one("#run-header-static", Static)
-        header_widget.update(
-            f"[yellow]{_escape(message)}[/yellow]\n\n[dim]💡 Tip: Press F5 or click 🔄 Refresh to retry[/dim]"
+    def _build_tree(self) -> None:
+        tree = self.query_one("#results-tree", Tree)
+        tree.clear()
+        campaigns = sorted(
+            self._campaigns,
+            key=lambda c: str(getattr(c, "created_at", "")),
+            reverse=True,
+        )
+        for campaign in campaigns:
+            runs = self._runs_of(str(campaign.id))
+            node = tree.root.add(self._campaign_label(campaign, runs), expand=False)
+            for run in runs:
+                self._add_attack(node, run)
+        self.query_one("#results-hint", Static).update(
+            f"[dim]{len(campaigns)} campaigns · enter expands · f5 refresh · "
+            "ctrl+e CSV · ctrl+j JSON[/dim]"
         )
 
-        # Clear results container
-        results_container = self.query_one("#results-container", Vertical)
-        results_container.remove_children()
+    def _campaign_label(self, campaign: Any, runs: list[Any]) -> str:
+        broken, goals, recorded = self._totals_of(runs)
+        name = _escape(str(getattr(campaign, "name", None) or "untitled"))
+        target = self._agent_map.get(str(getattr(campaign, "agent_id", "")), "")
+        when = _ago(getattr(campaign, "created_at", None))
+        trailer = f" · {_escape(target)}" if target else ""
+        outcome = _outcome(broken, goals, getattr(campaign, "status", ""), recorded)
+        return f"[b]{name}[/b] · {when}{trailer}   {outcome}"
+
+    def _add_attack(self, parent: TreeNode[Any], run: Any) -> None:
+        broken, goals, recorded = self._totals_of([run])
+        name = self._attack_map.get(str(getattr(run, "attack_id", "")), "attack")
+        outcome = _outcome(broken, goals, getattr(run, "status", ""), recorded)
+        results = self._results_of_run.get(str(run.id), [])
+        node = parent.add(f"{_escape(str(name)):<16}{outcome}", expand=False)
+        for result in results[: self.MAX_GOALS_SHOWN]:
+            goal = node.add(self._goal_label(result), expand=False)
+            for line in self._reply_lines(result):
+                goal.add_leaf(line)
+        if len(results) > self.MAX_GOALS_SHOWN:
+            node.add_leaf(
+                f"[dim]…{len(results) - self.MAX_GOALS_SHOWN} more, "
+                "export for the rest[/dim]"
+            )
+
+    def _goal_label(self, result: Any) -> str:
+        outcome = classify_evaluation_status(getattr(result, "evaluation_status", None))
+        # The goal is what the attack was trying to get, which is what makes
+        # the line worth reading; the prompt it built is in the export.
+        goal = str(getattr(result, "goal", "") or "").replace("\n", " ")
+        if len(goal) > 58:
+            goal = goal[:55] + "…"
+        verdict = (
+            f"[{VULNERABLE.color}]jailbroken[/{VULNERABLE.color}]"
+            if outcome is VULNERABLE
+            else f"[{MITIGATED.color}]held[/{MITIGATED.color}]"
+            if outcome is MITIGATED
+            else "[dim]not scored[/dim]"
+        )
+        return f"{verdict}  [dim]{_escape(goal)}[/dim]"
+
+    def _reply_lines(self, result: Any) -> list[str]:
+        """What the target actually said, wrapped to a few readable lines.
+
+        One level deeper than the verdict, because the verdict is a claim and
+        this is the evidence for it.
+        """
+        import textwrap
+
+        metadata = getattr(result, "metadata", None) or {}
+        reply = str(metadata.get("response") or "").strip()
+        if not reply:
+            notes = str(getattr(result, "evaluation_notes", "") or "").strip()
+            reply = notes or "nothing recorded"
+        wrapped = textwrap.wrap(reply.replace("\n", " "), width=86)
+        lines = [
+            f"[dim]{_escape(line)}[/dim]" for line in wrapped[: self.MAX_REPLY_LINES]
+        ]
+        if len(wrapped) > self.MAX_REPLY_LINES:
+            # Appended after escaping, or the ellipsis brackets escape too.
+            lines.append("[dim]…[/dim]")
+        return lines
+
+    # -- keys ----------------------------------------------------------------
+
+    def action_refresh(self) -> None:
+        self.refresh_data()
+
+    def action_export_csv(self) -> None:
+        self._export_results_csv()
+
+    def action_export_json(self) -> None:
+        self._export_results_json()
+
+
+__all__ = ["ResultsTab"]

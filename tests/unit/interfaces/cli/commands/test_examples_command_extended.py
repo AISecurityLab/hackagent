@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import click
 from click.testing import CliRunner
 
+from hackagent import examples as examples_catalog
 from hackagent.interfaces.cli.commands import examples as ex
 from hackagent.interfaces.cli.commands.examples import (
     _ensure_ollama_models,
@@ -457,7 +458,7 @@ class TestNamedExampleCommands(unittest.TestCase):
             db_tool: "openai_sdk/db_tool_sandbox/flipattack-sqldesk",
             rag_example: "rag/indirect-injection",
         }
-        found = ex._discover_examples()
+        found = examples_catalog.campaign_files()
         for command, expected in aliases.items():
             with self.subTest(command=command.name):
                 self.assertEqual(self._alias(command), expected)
@@ -516,10 +517,10 @@ class TestExampleDiscovery(unittest.TestCase):
         self.runner = CliRunner()
 
     def test_every_campaign_in_the_tree_is_listed(self):
-        found = ex._discover_examples()
+        found = examples_catalog.campaign_files()
         on_disk = sorted(
-            path.relative_to(ex._examples_root()).with_suffix("").as_posix()
-            for path in ex._examples_root().rglob("*.yaml")
+            path.relative_to(examples_catalog.EXAMPLES_DIR).with_suffix("").as_posix()
+            for path in examples_catalog.EXAMPLES_DIR.rglob("*.yaml")
         )
 
         self.assertEqual(sorted(found), on_disk)
@@ -529,7 +530,7 @@ class TestExampleDiscovery(unittest.TestCase):
         result = self.runner.invoke(ex.list_examples, [])
 
         self.assertEqual(result.exit_code, 0, result.output)
-        for name in ex._discover_examples():
+        for name in examples_catalog.campaign_files():
             self.assertIn(name, result.output)
 
     def test_a_unique_last_part_is_enough_to_name_an_example(self):
@@ -580,7 +581,7 @@ class TestExampleDiscovery(unittest.TestCase):
     def test_every_target_in_the_table_exists(self):
         """A folder renamed out from under the table would start nothing."""
         for folder, target in ex._TARGETS.items():
-            script = ex._examples_root() / folder / target.script
+            script = examples_catalog.EXAMPLES_DIR / folder / target.script
             self.assertTrue(script.is_file(), f"{folder}: no {target.script}")
         for folder in ex._MANUAL_TARGETS:
-            self.assertTrue((ex._examples_root() / folder).is_dir(), folder)
+            self.assertTrue((examples_catalog.EXAMPLES_DIR / folder).is_dir(), folder)

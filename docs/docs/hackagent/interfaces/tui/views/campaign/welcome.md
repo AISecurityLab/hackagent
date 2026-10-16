@@ -42,8 +42,8 @@ and a judge — so the first screen can be read, edited and run as it is.
 ## WelcomeScreen Objects
 
 ```python
-class WelcomeScreen(Screen[bool])
+class WelcomeScreen(Screen[str])
 ```
 
-Shows the logo and starts the builder. Dismisses with `True`.
+The logo and the ways in. Dismisses with the chosen destination.
 

@@ -22,7 +22,10 @@ from hackagent.interfaces.tui.views.campaign import CampaignBuilder
 from hackagent.interfaces.tui.views.campaign.draft import CampaignDraft
 from hackagent.interfaces.tui.views.campaign.screens import (
     ConfirmScreen,
+    ExampleScreen,
     HelpScreen,
+    PathScreen,
+    ResultsScreen,
     RunScreen,
 )
 from hackagent.interfaces.cli.banner import HACKAGENT_BANNER
@@ -144,14 +147,17 @@ class TestWelcome:
         assert TAGLINE.split()[-1] in " ".join(rows)
 
     @pytest.mark.asyncio
-    async def test_it_offers_exactly_one_way_in(self, cli_config):
-        """Several choices that all land in the same editor are noise."""
+    async def test_every_choice_lands_somewhere_different(self, cli_config):
+        """The screen once had four buttons into the same editor. Not again."""
         app = HackAgentTUI(cli_config)
         async with app.run_test(size=WIDE) as pilot:
             await pilot.pause()
-            buttons = app.screen.query(Button)
-            assert len(buttons) == 1
-            assert "Build your own campaign" in str(buttons.first().label)
+            buttons = list(app.screen.query(Button))
+            destinations = {button.id for button in buttons}
+
+            # One button per destination: no two land in the same place.
+            assert len(destinations) == len(buttons)
+            assert destinations == {"build", "example", "open", "results"}
 
     @pytest.mark.asyncio
     async def test_starting_lands_in_a_runnable_builder(self, cli_config):
@@ -293,6 +299,150 @@ class TestRemovingAttacks:
             await pilot.pause()
             assert not isinstance(app.screen, ConfirmScreen)
             assert len(builder.draft.data["attacks"]) == 2
+
+
+class TestWelcomeDestinations:
+    """Each button lands somewhere the others do not."""
+
+    async def _choose(self, app, pilot, destination):
+        await pilot.pause()
+        assert isinstance(app.screen, WelcomeScreen)
+        app.screen.dismiss(destination)
+        await pilot.pause()
+
+    @pytest.mark.asyncio
+    async def test_it_offers_four_ways_in(self, cli_config):
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            labels = {str(button.label) for button in app.screen.query(Button)}
+
+        assert labels == {
+            "Build your own campaign",
+            "Start from an example",
+            "Open a campaign file",
+            "Show results",
+        }
+
+    @pytest.mark.asyncio
+    async def test_build_lands_in_a_runnable_builder(self, cli_config):
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await self._choose(app, pilot, "build")
+
+            assert not isinstance(app.screen, WelcomeScreen)
+            assert app.query_one(CampaignBuilder).draft.validate()[0] is not None
+
+    @pytest.mark.asyncio
+    async def test_an_example_opens_in_the_builder_rather_than_running(
+        self, cli_config
+    ):
+        """You read it and can change the model before anything is attacked."""
+        from hackagent import examples as examples_catalog
+
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await self._choose(app, pilot, "example")
+            assert isinstance(app.screen, ExampleScreen)
+
+            chosen = examples_catalog.campaign_files()["ollama/h4rm3l-demo"]
+            app.screen.dismiss(chosen)
+            await pilot.pause()
+            builder = app.query_one(CampaignBuilder)
+            spec = builder.draft.validate()[0]
+
+        assert spec is not None and spec.campaign.name == "Ollama h4rm3l demo"
+        # Opened as a file, so its explanatory comments survive.
+        assert builder._has_comments
+
+    @pytest.mark.asyncio
+    async def test_open_asks_for_a_path_without_offering_to_discard(self, cli_config):
+        """Arriving from the welcome there is no draft to lose."""
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await self._choose(app, pilot, "open")
+
+            assert isinstance(app.screen, PathScreen)
+
+    @pytest.mark.asyncio
+    async def test_results_opens_and_comes_back_to_the_welcome(self, cli_config):
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await self._choose(app, pilot, "results")
+            assert isinstance(app.screen, ResultsScreen)
+
+            app.screen.dismiss(None)
+            await pilot.pause()
+            assert isinstance(app.screen, WelcomeScreen)
+
+
+class TestGoingBack:
+    @pytest.mark.asyncio
+    async def test_a_fresh_template_is_not_a_modification_of_itself(self, cli_config):
+        """The status bar claimed "modified" the moment the builder opened."""
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            app.screen.dismiss("build")
+            await pilot.pause()
+
+            assert not app.query_one(CampaignBuilder)._is_dirty()
+
+    @pytest.mark.asyncio
+    async def test_f2_goes_back_to_the_welcome(self, cli_config):
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            app.screen.dismiss("build")
+            await pilot.pause()
+            await pilot.press("f2")
+            await pilot.pause()
+
+            assert isinstance(app.screen, WelcomeScreen)
+
+    @pytest.mark.asyncio
+    async def test_f2_asks_first_when_there_is_work_to_lose(self, cli_config):
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            app.screen.dismiss("build")
+            await pilot.pause()
+            builder = app.query_one(CampaignBuilder)
+            builder.draft.set(("campaign", "name"), "edited")
+            builder._validate()
+            await pilot.press("f2")
+            await pilot.pause()
+
+            assert isinstance(app.screen, ConfirmScreen)
+
+
+class TestResultsReadAsSentences:
+    """The list answers "did anything get through", in words."""
+
+    def test_time_is_said_the_way_people_say_it(self):
+        from datetime import datetime, timedelta, timezone
+
+        from hackagent.interfaces.tui.views.results.tab import _ago
+
+        now = datetime.now(timezone.utc)
+        assert _ago(now - timedelta(seconds=10)) == "just now"
+        assert _ago(now - timedelta(minutes=9)) == "9m ago"
+        assert _ago(now - timedelta(hours=3)) == "3h ago"
+        assert _ago(now - timedelta(days=2)) == "2d ago"
+        assert _ago(None) == "—"
+
+    def test_an_outcome_is_a_sentence_not_a_ratio(self):
+        from hackagent.interfaces.tui.views.results.tab import _outcome
+
+        assert "5 of 5 goals jailbroken" in _outcome(5, 5, "COMPLETED", 5)
+        assert "0 of 10 goals jailbroken" in _outcome(0, 10, "COMPLETED", 10)
+
+    def test_a_campaign_that_never_ran_says_so(self):
+        """It used to show 0/0, which reads as a clean result."""
+        from hackagent.interfaces.tui.views.results.tab import _outcome
+
+        assert "did not finish" in _outcome(0, 0, "FAILED", 0)
+        assert "nothing recorded" in _outcome(0, 0, "COMPLETED", 0)
 
 
 class TestRunView:

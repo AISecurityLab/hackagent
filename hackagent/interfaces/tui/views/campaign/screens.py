@@ -5,14 +5,24 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Sequence
+from pathlib import Path
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 from rich.markup import escape
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Input, Label, ProgressBar, RichLog, Static
+from textual.widgets import (
+    Button,
+    Input,
+    Label,
+    OptionList,
+    ProgressBar,
+    RichLog,
+    Static,
+)
+from textual.widgets.option_list import Option
 
 _DIALOG_CSS = """
 {name} {{ align: center middle; background: $background 60%; }}
@@ -23,6 +33,79 @@ _DIALOG_CSS = """
 {name} Horizontal {{ height: auto; margin-top: 1; }}
 {name} Button {{ width: 1fr; margin: 0 1 0 0; }}
 """
+
+
+class ExampleScreen(ModalScreen[Optional[Path]]):
+    """Pick one of the shipped examples. Dismisses with its path, or None."""
+
+    DEFAULT_CSS = """
+    ExampleScreen { align: center middle; background: $background 60%; }
+    ExampleScreen > Vertical {
+        width: 92; max-width: 100%; height: auto; max-height: 80%;
+        padding: 1 2; border: round $primary; background: $panel;
+    }
+    ExampleScreen OptionList { height: auto; max-height: 24; border: none; }
+    ExampleScreen .hint { color: $text-muted; margin-top: 1; }
+    """
+
+    BINDINGS = [Binding("escape", "dismiss(None)", "Cancel")]
+
+    def __init__(self, examples: Mapping[str, Path]) -> None:
+        super().__init__()
+        self._examples = dict(examples)
+
+    def compose(self) -> ComposeResult:
+        from hackagent import examples as examples_catalog
+
+        with Vertical():
+            yield Label("[b]Start from an example[/b]")
+            options = [
+                Option(
+                    f"[cyan]{escape(name)}[/cyan]\n"
+                    f"  [dim]{escape(examples_catalog.describe(path))}[/dim]",
+                    id=name,
+                )
+                for name, path in self._examples.items()
+            ]
+            yield OptionList(*options)
+            yield Static(
+                "The campaign opens in the builder: read it, change the model, "
+                "then run it.",
+                classes="hint",
+            )
+
+    def on_mount(self) -> None:
+        self.query_one(OptionList).focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        self.dismiss(self._examples.get(str(event.option.id)))
+
+
+class ResultsScreen(Screen[None]):
+    """Past runs, on a screen of their own."""
+
+    DEFAULT_CSS = """
+    ResultsScreen { background: $surface; }
+    ResultsScreen #results-hint {
+        height: 1; padding: 0 1; color: $text-muted; background: $panel;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "close", "Back")]
+
+    def __init__(self, cli_config: Any) -> None:
+        super().__init__()
+        self._cli_config = cli_config
+
+    def compose(self) -> ComposeResult:
+        from hackagent.interfaces.tui.views.results import ResultsTab
+
+        yield ResultsTab(self._cli_config)
+        yield Static("esc back", id="results-hint")
+
+    def action_close(self) -> None:
+        self.dismiss(None)
 
 
 class RunScreen(Screen[None]):
@@ -209,4 +292,11 @@ class HelpScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
-__all__ = ["ConfirmScreen", "HelpScreen", "PathScreen", "RunScreen"]
+__all__ = [
+    "ConfirmScreen",
+    "ExampleScreen",
+    "HelpScreen",
+    "PathScreen",
+    "ResultsScreen",
+    "RunScreen",
+]

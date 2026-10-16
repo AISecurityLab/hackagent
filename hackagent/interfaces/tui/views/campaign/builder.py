@@ -100,6 +100,7 @@ class CampaignBuilder(Container):
 
     BINDINGS = [
         Binding("f1", "help", "Help", show=False),
+        Binding("f2", "welcome", "Welcome"),
         Binding("ctrl+s", "save", "Save"),
         Binding("ctrl+o", "open", "Open"),
         Binding("f4", "edit_yaml", "Edit YAML"),
@@ -147,7 +148,10 @@ class CampaignBuilder(Container):
         self.draft = CampaignDraft.from_yaml(text)
         self._path = getattr(template, "path", None)
         self._has_comments = False
-        self._saved = self.draft.to_yaml() if self._path else ""
+        # The template as given is not a modification of it. Leaving this
+        # empty made a freshly opened builder claim to be modified, and
+        # made leaving it ask what there was to discard.
+        self._saved = self.draft.to_yaml()
         self._validate()
         self._rebuild_outline(("campaign",))
         self.query_one(Tree).focus()
@@ -202,6 +206,18 @@ class CampaignBuilder(Container):
             ("attacks",) if parent == ("attacks",) else ("evaluation",)
         )
         self.query_one(Tree).focus()
+
+    def action_welcome(self) -> None:
+        """Back to the ways in. Asks first if the draft would be lost."""
+        if not self._is_dirty():
+            self.app.show_welcome()
+            return
+        self._confirm(
+            "Discard your changes?",
+            "Going back to the welcome screen replaces the form.",
+            "Discard",
+            self.app.show_welcome,
+        )
 
     def action_help(self) -> None:
         """What this screen is and how to drive it."""
@@ -793,6 +809,10 @@ class CampaignBuilder(Container):
             )
         else:
             _ask()
+
+    def open_path(self, path: FilePath) -> None:
+        """Open a campaign file, keeping the comments that explain it."""
+        self._read(path)
 
     def _read(self, path: FilePath) -> None:
         try:

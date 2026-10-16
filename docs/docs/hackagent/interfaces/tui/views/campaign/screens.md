@@ -5,6 +5,22 @@ title: hackagent.interfaces.tui.views.campaign.screens
 
 The screens the builder opens: the run view, and small dialogs.
 
+## ExampleScreen Objects
+
+```python
+class ExampleScreen(ModalScreen[Optional[Path]])
+```
+
+Pick one of the shipped examples. Dismisses with its path, or None.
+
+## ResultsScreen Objects
+
+```python
+class ResultsScreen(Screen[None])
+```
+
+Past runs, on a screen of their own.
+
 ## RunScreen Objects
 
 ```python

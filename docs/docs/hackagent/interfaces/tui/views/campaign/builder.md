@@ -39,6 +39,14 @@ Bound to Delete. A focused text editor claims that key for
 forward-delete, so the removal only happens when the cursor is not in
 one — anywhere else, Delete removes whatever the outline is on.
 
+#### action\_welcome
+
+```python
+def action_welcome() -> None
+```
+
+Back to the ways in. Asks first if the draft would be lost.
+
 #### action\_help
 
 ```python
@@ -46,6 +54,14 @@ def action_help() -> None
 ```
 
 What this screen is and how to drive it.
+
+#### open\_path
+
+```python
+def open_path(path: FilePath) -> None
+```
+
+Open a campaign file, keeping the comments that explain it.
 
 #### action\_edit\_yaml
 

@@ -13,6 +13,7 @@ reachable on their own, which is what ``hackagent results`` and
 ``hackagent agent`` open.
 """
 
+from pathlib import Path
 from typing import Any
 
 from textual.app import App, ComposeResult
@@ -230,15 +231,77 @@ class HackAgentTUI(App):
             "campaign_yaml"
         ):
             return
+        self.show_welcome()
+
+    def show_welcome(self) -> None:
+        """Offer the ways in, and take the one chosen."""
         from hackagent.interfaces.tui.views.campaign.welcome import (
+            BUILD,
+            EXAMPLE,
+            OPEN,
+            RESULTS,
             WelcomeScreen,
             starting_point,
         )
 
-        def _start(_confirmed: bool | None) -> None:
-            self.query_one(CampaignBuilder).start_from(starting_point())
+        def _chose(destination: str | None) -> None:
+            builder = self.query_one(CampaignBuilder)
+            if destination == EXAMPLE:
+                self._pick_example()
+            elif destination == OPEN:
+                self._open_campaign()
+            elif destination == RESULTS:
+                self._show_results()
+            elif destination == BUILD or destination is None:
+                builder.start_from(starting_point())
 
-        self.push_screen(WelcomeScreen(), _start)
+        self.push_screen(WelcomeScreen(), _chose)
+
+    def _open_campaign(self) -> None:
+        """Ask for a path and open it.
+
+        Not the builder's own Open, which first asks whether to discard the
+        draft: arriving from the welcome screen there is nothing to discard.
+        """
+        from hackagent.interfaces.tui.views.campaign.screens import PathScreen
+
+        def _chosen(value: Any) -> None:
+            if not value:
+                self.show_welcome()
+                return
+            self.query_one(CampaignBuilder).open_path(Path(value).expanduser())
+
+        self.push_screen(PathScreen("Open campaign", "campaign.yaml", "Open"), _chosen)
+
+    def _pick_example(self) -> None:
+        """Open one of the shipped examples in the builder, ready to read."""
+        from hackagent import examples as examples_catalog
+        from hackagent.interfaces.tui.views.campaign.screens import ExampleScreen
+
+        found = examples_catalog.campaign_files()
+        if not found:
+            self.notify(
+                "No examples found beside this install.",
+                title="Nothing to start from",
+                severity="warning",
+            )
+            self.show_welcome()
+            return
+
+        def _chosen(path: Any) -> None:
+            if path is None:
+                self.show_welcome()
+                return
+            # Read as a file, so the campaign keeps the comments explaining it.
+            self.query_one(CampaignBuilder).open_path(path)
+
+        self.push_screen(ExampleScreen(found), _chosen)
+
+    def _show_results(self) -> None:
+        """Past runs, then back to the ways in."""
+        from hackagent.interfaces.tui.views.campaign.screens import ResultsScreen
+
+        self.push_screen(ResultsScreen(self.cli_config), lambda _: self.show_welcome())
 
     def action_help(self) -> None:
         """Show the keys and what this screen is for."""

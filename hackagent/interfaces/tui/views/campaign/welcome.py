@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Center, Vertical
+from textual.containers import Center, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Static
 
@@ -75,28 +75,52 @@ def starting_point() -> Template:
     )
 
 
-class WelcomeScreen(Screen[bool]):
-    """Shows the logo and starts the builder. Dismisses with ``True``."""
+#: Where the welcome screen can send you. A choice earns a button only by
+#: landing somewhere the others do not.
+BUILD, EXAMPLE, OPEN, RESULTS = "build", "example", "open", "results"
+
+
+class WelcomeScreen(Screen[str]):
+    """The logo and the ways in. Dismisses with the chosen destination."""
 
     DEFAULT_CSS = """
-    WelcomeScreen { align: center middle; }
+    /* The screen itself must not scroll: focusing a button would scroll it
+       into view and carry the logo off the top. Only #choices scrolls. */
+    WelcomeScreen {
+        align-horizontal: center; padding-top: 1; overflow: hidden;
+    }
     /* max-width keeps the card inside a terminal narrower than it wants to
        be, so its text wraps rather than being cut off at the edge. */
-    WelcomeScreen #card { width: 84; max-width: 100%; height: auto; padding: 1 2; }
+    WelcomeScreen #card {
+        width: 84; max-width: 100%; height: auto; max-height: 100%; padding: 0 2;
+    }
+    /* Only the choices scroll. The logo stays put: on a short terminal the
+       alternative is a welcome screen with no logo on it, and a button you
+       cannot see is a button that does not exist. */
+    WelcomeScreen #choices {
+        width: 84; max-width: 100%; height: 1fr; overflow-y: auto; padding: 0 2;
+    }
     /* The logo is line art: `width: auto` sizes the widget to it so `Center`
        can centre the block. Centring the text instead would centre each line
        on its own and shear the letters apart. */
     WelcomeScreen #logo { color: $brand; text-style: bold; width: auto; height: auto; }
     WelcomeScreen #tagline {
-        color: $text-muted; width: 100%; text-align: center; margin: 1 0;
+        color: $text-muted; width: 100%; text-align: center; margin-bottom: 1;
     }
-    WelcomeScreen #start { width: 100%; margin-bottom: 1; }
+    WelcomeScreen .choice { width: 100%; }
+    /* Textual marks a focused button with `bold reverse`, which inverts it to
+       black on white and makes it read as a different kind of button. Four
+       ways in of equal standing: keep the colour, show focus with weight and
+       a tint. */
+    WelcomeScreen .choice:focus {
+        text-style: bold;
+        background-tint: $foreground 20%;
+    }
     WelcomeScreen #aside { color: $text-muted; width: 100%; text-align: center; }
     """
 
     BINDINGS = [
-        Binding("enter", "start", "Build a campaign", show=False),
-        Binding("escape", "start", "Build a campaign", show=False),
+        Binding("escape", "choose('build')", "Build a campaign", show=False),
         Binding("q", "app.quit", "Quit"),
     ]
 
@@ -105,21 +129,37 @@ class WelcomeScreen(Screen[bool]):
             with Center():
                 yield Static(LOGO, id="logo")
             yield Static(TAGLINE, id="tagline")
-            yield Button("Build your own campaign", id="start", variant="success")
+        with VerticalScroll(id="choices"):
+            for label, destination in (
+                ("Build your own campaign", BUILD),
+                ("Start from an example", EXAMPLE),
+                ("Open a campaign file", OPEN),
+                ("Show results", RESULTS),
+            ):
+                yield Button(label, id=destination, variant="success", classes="choice")
             yield Static(
-                "Already have one? Open it from the builder with ctrl+O.",
+                "Every example is a campaign you can read and edit before it runs.",
                 id="aside",
             )
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#start", Button).focus()
+        self.query_one(f"#{BUILD}", Button).focus()
 
-    def action_start(self) -> None:
-        self.dismiss(True)
+    def action_choose(self, destination: str) -> None:
+        self.dismiss(destination)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(True)
+        self.dismiss(str(event.button.id or BUILD))
 
 
-__all__ = ["LOGO", "Template", "WelcomeScreen", "starting_point"]
+__all__ = [
+    "BUILD",
+    "EXAMPLE",
+    "LOGO",
+    "OPEN",
+    "RESULTS",
+    "Template",
+    "WelcomeScreen",
+    "starting_point",
+]

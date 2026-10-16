@@ -72,6 +72,14 @@ def on_mount() -> None
 
 Open on the welcome screen, unless a campaign was handed to us.
 
+#### show\_welcome
+
+```python
+def show_welcome() -> None
+```
+
+Offer the ways in, and take the one chosen.
+
 #### action\_help
 
 ```python

@@ -28,6 +28,7 @@ from rich.console import Console
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.cli.utils import handle_errors
+from hackagent import examples as examples_catalog
 from hackagent import resolve_ollama_base_url
 
 console = Console()
@@ -359,49 +360,14 @@ _MANUAL_TARGETS: dict[str, str] = {
 }
 
 
-def _examples_root() -> Path:
-    return _get_repo_root() / "hackagent" / "examples"
-
-
-def _discover_examples() -> dict[str, Path]:
-    """Every example campaign, keyed by ``folder/name``.
-
-    Found by looking, not listed anywhere: a campaign added to the examples
-    tree is one this command can list and run, with nothing to register.
-    """
-    root = _examples_root()
-    return {
-        path.relative_to(root).with_suffix("").as_posix(): path
-        for path in sorted(root.rglob("*.yaml"))
-    }
-
-
-def _describe(campaign_path: Path) -> str:
-    """The campaign's own one-line description."""
-    import yaml
-
-    try:
-        document = yaml.safe_load(campaign_path.read_text()) or {}
-        return str(document.get("campaign", {}).get("description") or "")
-    except (OSError, yaml.YAMLError):
-        return ""
-
-
 def _resolve_example_name(name: str) -> tuple[str, Path]:
-    """Match ``name`` against the examples, in full or by its last part."""
-    found = _discover_examples()
-    if name in found:
-        return name, found[name]
-    matches = [key for key in found if key.rsplit("/", 1)[-1] == name]
-    if len(matches) == 1:
-        return matches[0], found[matches[0]]
-    if matches:
+    """Match ``name`` against the examples, as a Click error when it cannot."""
+    try:
+        return examples_catalog.resolve(name)
+    except LookupError as exc:
         raise click.ClickException(
-            f"'{name}' matches several examples: {', '.join(sorted(matches))}"
-        )
-    raise click.ClickException(
-        f"No example named '{name}'. Run `hackagent examples list` to see them."
-    )
+            f"{exc} Run `hackagent examples list` to see them."
+        ) from exc
 
 
 def _run_example(name: str) -> None:
@@ -526,9 +492,11 @@ def list_examples():
     """📋 List every example campaign."""
     import textwrap
 
-    found = _discover_examples()
+    found = examples_catalog.campaign_files()
     if not found:
-        raise click.ClickException(f"No examples found under {_examples_root()}")
+        raise click.ClickException(
+            f"No examples found under {examples_catalog.EXAMPLES_DIR}"
+        )
 
     console.print(f"[bold]{len(found)} examples[/bold]\n")
     for name, path in found.items():
@@ -543,7 +511,7 @@ def list_examples():
         console.print(f"[cyan]{name}[/cyan]{needs}")
         # Wrapped by hand rather than in a table: the longest name is 48
         # characters, which leaves a table no room for the description.
-        for line in textwrap.wrap(_describe(path), width=72):
+        for line in textwrap.wrap(examples_catalog.describe(path), width=72):
             console.print(f"  [dim]{line}[/dim]")
     console.print(
         "\n[dim]Run one with:[/dim] hackagent examples run <name>\n"
