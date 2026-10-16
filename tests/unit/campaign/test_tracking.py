@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Campaign storage selection follows the campaign policy and runtime account."""
+"""A campaign records where it says, and nowhere else."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _settings(*, api_key: str | None = None) -> Settings:
     )
 
 
-def test_auto_storage_uses_local_database_without_an_api_key():
+def test_a_campaign_records_to_this_machine_by_default():
     with patch("hackagent.storage.local.LocalBackend") as local:
         store = open_store(StorageSpec(), settings=_settings())
 
@@ -34,15 +34,22 @@ def test_auto_storage_uses_local_database_without_an_api_key():
     local.assert_called_once_with(db_path="/tmp/hackagent-test.db")
 
 
-def test_auto_storage_uses_remote_account_with_an_api_key():
-    with patch("hackagent.storage.remote.RemoteBackend.connect") as connect:
+def test_a_configured_account_does_not_divert_a_run():
+    """Being signed in is for reading past runs, not for sending new ones.
+
+    A campaign that said nothing about storage would otherwise record
+    somewhere its file never mentions, which is also somewhere the run can
+    fail to reach.
+    """
+    with patch("hackagent.storage.local.LocalBackend") as local:
         store = open_store(StorageSpec(), settings=_settings(api_key="secret"))
 
-    assert store is connect.return_value
-    connect.assert_called_once_with("https://api.example.test", "secret")
+    assert store is local.return_value
+    local.assert_called_once_with(db_path="/tmp/hackagent-test.db")
 
 
-def test_explicit_local_storage_overrides_a_remote_account():
+def test_the_database_path_comes_from_the_settings_in_hand():
+    """Whatever resolved the configuration decides where the file lives."""
     with patch("hackagent.storage.local.LocalBackend") as local:
         open_store(StorageSpec(backend="local"), settings=_settings(api_key="secret"))
 

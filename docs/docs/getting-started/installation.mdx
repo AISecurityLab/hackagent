@@ -85,7 +85,7 @@ hackagent config set --api-key YOUR_KEY
 
 `hackagent init` walks you through the same choice and saves it to `~/.config/hackagent/config.json`. [`hackagent config`](../reference/cli.md#hackagent-config) shows and changes every setting.
 
-A campaign follows that choice on its own: `execution.storage.backend` defaults to `auto`, which writes to the account when a key is configured and to this machine's SQLite when none is. Set it to `local` to keep one campaign's results here whatever the account says.
+A campaign records its own results separately: `execution.storage.backend` is `local` unless the file names a server with `remote`, so being signed in changes what you can read, not where a new run is written.
 
 ## Next steps
 

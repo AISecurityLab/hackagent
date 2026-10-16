@@ -20,8 +20,8 @@ from .fakes import campaign, model
 REPO_CAMPAIGN = Path(__file__).resolve().parents[3] / "campaign.yaml"
 
 
-def test_storage_follows_runtime_configuration_by_default():
-    assert StorageSpec().backend == "auto"
+def test_a_campaign_keeps_its_results_on_this_machine_by_default():
+    assert StorageSpec().backend == "local"
 
 
 def test_recorded_campaign_redacts_sensitive_headers_recursively():

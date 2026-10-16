@@ -65,7 +65,7 @@ Where results are recorded so they can be browsed later.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `backend` | one of `auto`, `local`, `remote` | `auto` | `auto` follows the active HackAgent configuration: an API key sends results to its remote server, otherwise results use local SQLite. `local` always uses SQLite; `remote` uses the explicit server and environment variable below. |
+| `backend` | one of `local`, `remote` | `local` | `local` writes to a SQLite file on this machine; `remote` sends results to the HackAgent server named below, authenticated with the key in the environment variable that `api_key_env` names. |
 | `base_url` | string | unset | Address of the remote server. Required when `backend` is `remote`. |
 | `api_key_env` | string | unset | Name of the environment variable holding the remote server's API key. Required when `backend` is `remote`. |
 

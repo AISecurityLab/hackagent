@@ -118,31 +118,29 @@ called a jailbreak. `0` here means the model refused, which is the result you
 want from a model that is behaving.
 
 Results are written twice: a folder per run under `./logs/runs/` (the campaign
-that ran and its results as JSON), and the configured results store. Campaign
-storage defaults to `auto`: without a HackAgent API key it uses local SQLite;
-with one it syncs each run and result to the HackAgent platform.
+that ran and its results as JSON), and a local database you can browse later.
 
 ```bash
 hackagent results list     # recent runs
 hackagent tui              # the same results in a terminal app
 ```
 
-To run models on this machine while viewing their results remotely, configure
-your account and leave `execution.storage.backend` set to `auto` (or omit the
-storage block):
+A run reaches the HackAgent platform when the campaign asks for it, which
+keeps a credential out of the file — `api_key_env` names the variable holding
+the key:
 
-```bash
-export HACKAGENT_API_KEY="your_api_key"
-hackagent config validate
-hackagent campaign run campaign.yaml
+```yaml
+execution:
+  storage:
+    backend: remote
+    base_url: https://api.hackagent.dev
+    api_key_env: HACKAGENT_API_KEY
 ```
 
-Then open [app.hackagent.dev](https://app.hackagent.dev). Choose
-`execution.storage.backend: local` when a particular campaign must remain on
-this machine. In the TUI, the same setting is under **Execution → Storage** and
-the Configuration view shows where `auto` will write. Its Results view names
-the store it is reading, and `s` switches between your account and this
-machine — a campaign stored locally is read from there, not from the account.
+In the TUI, the same setting is under **Execution → Storage**, and the
+Configuration view shows the database a run is recorded in. Its Results view
+names the store it is reading, and `s` switches between your account and this
+machine — a campaign recorded here is read from here, not from the account.
 
 ## 4. Make it try harder
 

@@ -111,16 +111,14 @@ class ConfigTab(VerticalScroll):
             )
 
     def _update_mode_indicator(self) -> None:
-        """Show where campaigns using the default ``auto`` storage are written."""
+        """Show where a run is recorded, and what the account is for.
+
+        A campaign records to this machine unless it asks for a server by
+        name, so the database comes first; the account below it is what the
+        results view reads, not where new runs go.
+        """
         try:
             mode_widget = self.query_one("#mode-indicator", Static)
-            if self.cli_config.api_key:
-                mode_widget.update(
-                    "[cyan]☁️ Mode:[/cyan] [bold]Remote[/bold] — campaigns using "
-                    f"auto storage sync to {self.cli_config.base_url}"
-                )
-                return
-
             from pathlib import Path
 
             settings = getattr(self.cli_config, "settings", None)
@@ -133,9 +131,17 @@ class ConfigTab(VerticalScroll):
                 if db_path.exists()
                 else "[yellow]not yet created[/yellow]"
             )
-            mode_widget.update(
-                f"[cyan]💾 Mode:[/cyan] [bold]Local[/bold] — SQLite at {db_path} ({db_exists})"
+            said = (
+                f"[cyan]💾 Runs:[/cyan] [bold]Local[/bold] — SQLite at {db_path} "
+                f"({db_exists})"
             )
+            if self.cli_config.api_key:
+                said += (
+                    f"\n[cyan]☁️ Account:[/cyan] {self.cli_config.base_url} — past "
+                    "results are read from here; a campaign sends new ones with "
+                    "[b]execution.storage.backend: remote[/b]"
+                )
+            mode_widget.update(said)
         except Exception:
             pass
 

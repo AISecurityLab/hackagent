@@ -1123,10 +1123,9 @@
       "description": "Where results are recorded so they can be browsed later.",
       "properties": {
         "backend": {
-          "default": "auto",
-          "description": "``auto`` follows the active HackAgent configuration: an API key sends results to its remote server, otherwise results use local SQLite. ``local`` always uses SQLite; ``remote`` uses the explicit server and environment variable below.",
+          "default": "local",
+          "description": "``local`` writes to a SQLite file on this machine; ``remote`` sends results to the HackAgent server named below, authenticated with the key in the environment variable that ``api_key_env`` names.",
           "enum": [
-            "auto",
             "local",
             "remote"
           ],

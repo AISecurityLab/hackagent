@@ -114,9 +114,9 @@ HackAgent uses a modular pipeline to test agent robustness end-to-end.
 
 HackAgent supports both local and remote reporting.
 
-- Campaign storage defaults to `auto`: it stores results in local SQLite when
-  no API key is configured and syncs runs to the HackAgent platform when one is.
-- Set `execution.storage.backend: local` on a campaign to keep that run offline.
+- A campaign records its results in local SQLite, readable offline.
+- Set `execution.storage.backend: remote` (with `base_url` and `api_key_env`) to
+  send a run to a HackAgent server instead.
 
 `hackagent web` serves the HackAgent dashboard — the same app as
 [app.hackagent.dev](https://app.hackagent.dev) — from your own machine, against

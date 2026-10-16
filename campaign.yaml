@@ -369,9 +369,9 @@ execution:
     save_responses: true
     save_traces: true
   storage:
-    # auto syncs to the configured HackAgent account when HACKAGENT_API_KEY is
-    # set, and otherwise uses local SQLite. Choose local to opt out, or remote
-    # with both fields below to pin a different server explicitly.
-    backend: auto           # auto | local | remote
-    base_url: null          # required for explicit remote
-    api_key_env: null       # required for explicit remote; env-var name, not the key
+    # Results are recorded on this machine unless the campaign names a server.
+    # Choose remote and fill both fields below to send them to one; the key
+    # itself stays in the environment variable api_key_env names.
+    backend: local          # local | remote
+    base_url: null          # required for remote
+    api_key_env: null       # required for remote; env-var name, not the key

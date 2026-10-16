@@ -61,9 +61,9 @@ def local_client()
 Session over this machine&#x27;s database, whatever the account is.
 
 Where a run was recorded is the campaign&#x27;s choice: `execution.storage`
-set to `local` keeps it here even while the account is remote, and
-`auto` falls back here whenever no key is configured. A view that
-only ever read the account would never show those runs.
+keeps it here unless the campaign names a server, which it does while
+an account is configured for reading. A view that only ever read the
+account would never show those runs.
 
 #### handle\_api\_error
 

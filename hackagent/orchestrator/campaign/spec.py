@@ -333,13 +333,12 @@ class OutputSpec(_Spec):
 class StorageSpec(_Spec):
     """Where results are recorded so they can be browsed later."""
 
-    backend: Literal["auto", "local", "remote"] = Field(
-        default="auto",
+    backend: Literal["local", "remote"] = Field(
+        default="local",
         description=(
-            "``auto`` follows the active HackAgent configuration: an API key sends "
-            "results to its remote server, otherwise results use local SQLite. "
-            "``local`` always uses SQLite; ``remote`` uses the explicit server and "
-            "environment variable below."
+            "``local`` writes to a SQLite file on this machine; ``remote`` sends "
+            "results to the HackAgent server named below, authenticated with the "
+            "key in the environment variable that ``api_key_env`` names."
         ),
     )
     base_url: Optional[str] = Field(

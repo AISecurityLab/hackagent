@@ -131,9 +131,9 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         """The stores that may hold runs, in the order they are tried.
 
         Where a run was recorded is the campaign's choice, not the account's:
-        ``execution.storage: local`` keeps it on this machine while the
-        account is remote, and a remote account can be unreachable. So the
-        account is read first when there is one, and this machine after it.
+        a campaign records here unless it names a server, and an account can
+        hold runs this machine has never seen. So the account is read first
+        when there is one, and this machine after it.
         """
         stores = []
         if getattr(self.cli_config, "api_key", None):

@@ -31,11 +31,13 @@ from hackagent.tracking.serialize import sanitize_for_json
 
 
 def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Store:
-    """Open the store selected by the campaign and active runtime settings.
+    """Open the store the campaign names.
 
-    ``auto`` is what makes a campaign launched by the CLI or TUI follow the
-    account configuration without putting a credential in the campaign file.
-    Explicit ``local`` and ``remote`` values remain deterministic overrides.
+    A campaign says where its results go, and nothing else decides it: the
+    default is this machine's SQLite, and ``remote`` names its own server
+    and the environment variable holding that server's key. ``settings``
+    supplies the database path the CLI or TUI resolved, so a run follows
+    the configuration they were started with.
     """
     if storage.backend == "remote":
         from hackagent.storage.remote import RemoteBackend
@@ -48,15 +50,10 @@ def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Sto
             )
         return RemoteBackend.connect(storage.base_url, api_key)
 
+    from hackagent.storage.local import LocalBackend
+
     runtime = settings or Settings.resolve()
-    if storage.backend == "local" or not runtime.api_key:
-        from hackagent.storage.local import LocalBackend
-
-        return LocalBackend(db_path=runtime.db_path)
-
-    from hackagent.storage.remote import RemoteBackend
-
-    return RemoteBackend.connect(runtime.base_url, runtime.api_key)
+    return LocalBackend(db_path=runtime.db_path)
 
 
 def register_target(store: Store, target: ModelConfig) -> UUID:

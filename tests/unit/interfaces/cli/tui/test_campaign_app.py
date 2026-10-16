@@ -67,13 +67,14 @@ def test_the_starting_point_can_be_judged():
     assert starting_point().document["evaluation"]["judges"]
 
 
-def test_the_starting_point_uses_account_aware_storage():
+def test_the_starting_point_keeps_its_results_on_this_machine():
+    """Nothing the welcome screen offers should need an account to record."""
     draft = CampaignDraft.from_yaml(yaml.safe_dump(starting_point().document))
     spec, issues = draft.validate()
 
     assert issues == ()
     assert spec is not None
-    assert spec.execution.storage.backend == "auto"
+    assert spec.execution.storage.backend == "local"
 
 
 LOGO_LINES = tuple(HACKAGENT_BANNER.strip("\n").splitlines())
@@ -151,14 +152,16 @@ class TestShell:
         assert captured["settings"] is cli_config.settings
 
     @pytest.mark.asyncio
-    async def test_config_view_explains_remote_auto_storage(self, cli_config):
+    async def test_config_view_says_runs_are_recorded_here(self, cli_config):
+        """A configured account is for reading, and must not look like more."""
         app = HackAgentTUI(cli_config, initial_tab="config")
         async with app.run_test(size=WIDE) as pilot:
             await pilot.pause()
             rendered = str(app.query_one("#mode-indicator", Static).render())
 
-        assert "Remote" in rendered
+        assert "Local" in rendered and "SQLite" in rendered
         assert cli_config.base_url in rendered
+        assert "storage.backend: remote" in rendered
 
 
 class TestWelcome:
