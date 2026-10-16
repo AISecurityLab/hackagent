@@ -1,22 +1,21 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-TUI Views
+"""TUI views.
 
-Tab views/panels for the HackAgent TUI application.
-Each view represents a different functional area of the interface.
+:class:`CampaignBuilder` is the app: build a campaign, check it, run it. The
+others are standalone views the CLI still opens (``hackagent results``,
+``hackagent agent``); they are no longer part of the main screen.
 """
 
 from hackagent.interfaces.tui.views.agents import AgentsTab
-from hackagent.interfaces.tui.views.attacks import AttacksTab
+from hackagent.interfaces.tui.views.campaign import CampaignBuilder
 from hackagent.interfaces.tui.views.config import ConfigTab
 from hackagent.interfaces.tui.views.results import ResultsTab
 
-__all__ = ["AgentsTab", "AttacksTab", "ConfigTab", "ResultsTab"]
-
-"""
-TUI Tabs Module
-
-Individual tab implementations for the HackAgent TUI.
-"""
+__all__ = [
+    "AgentsTab",
+    "CampaignBuilder",
+    "ConfigTab",
+    "ResultsTab",
+]

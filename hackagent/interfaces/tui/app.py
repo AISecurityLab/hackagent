@@ -4,19 +4,25 @@
 """
 Main TUI Application
 
-Full-screen tabbed interface for HackAgent.
+One screen, one job: build a campaign, check it, run it.
+
+The app opens on :class:`WelcomeScreen` — the logo, and a working campaign to
+start from — then hands over to :class:`CampaignBuilder`. The other views
+(results, targets, config) are no longer part of this app; they are still
+reachable on their own, which is what ``hackagent results`` and
+``hackagent agent`` open.
 """
 
 from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Footer, Header, TabbedContent, TabPane
+from textual.widgets import Footer, TabbedContent
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.theme import css_variables
 from hackagent.interfaces.tui.views.agents import AgentsTab
-from hackagent.interfaces.tui.views.attacks import AttacksTab
+from hackagent.interfaces.tui.views.campaign import CampaignBuilder
 from hackagent.interfaces.tui.views.config import ConfigTab
 from hackagent.interfaces.tui.views.results import ResultsTab
 
@@ -27,12 +33,6 @@ class HackAgentTUI(App):
     CSS = """
     Screen {
         background: $surface;
-    }
-
-    Header {
-        background: $brand-dark;  /* dark red - HackAgent brand color */
-        color: $brand-text;
-        height: 3;
     }
 
     Footer {
@@ -47,6 +47,11 @@ class HackAgentTUI(App):
 
     TabPane {
         padding: 1 2;
+        height: 100%;
+    }
+
+    TabbedContent > ContentSwitcher {
+        height: 1fr;
     }
 
     TabbedContent > ContentSwitcher > * > * {
@@ -158,38 +163,39 @@ class HackAgentTUI(App):
     """
 
     TITLE = "HackAgent"
-    SUB_TITLE = "AI red-team cockpit — Campaign ▸ Results ▸ Targets ▸ Config"
+    SUB_TITLE = "Build a campaign, check it, run it"
 
-    # Tab switching is on the number keys, in the order of the red-team
-    # journey (compose a campaign → read results → manage targets → config),
-    # and shown in the footer so the navigation is discoverable.
+    #: The view this app shows. ``campaign`` is the app proper; the others
+    #: exist so ``hackagent results`` and ``hackagent agent`` keep working.
+    VIEWS = ("campaign", "results", "agents", "config")
+
     BINDINGS = [
-        Binding("q", "quit", "Quit", priority=True),
-        Binding("1", "switch_tab('attacks')", "Campaign"),
-        Binding("2", "switch_tab('results')", "Results"),
-        Binding("3", "switch_tab('agents')", "Targets"),
-        Binding("4", "switch_tab('config')", "Config"),
-        Binding("f5", "refresh", "Refresh", show=True),
-        Binding("ctrl+y", "copy_selection", "Copy logs", show=True),
+        # Not a priority binding: a text field must be able to receive 'q'.
+        Binding("q", "quit", "Quit"),
+        Binding("f1", "help", "Help"),
+        Binding("f5", "refresh", "Refresh", show=False),
+        Binding("ctrl+y", "copy_selection", "Copy logs", show=False),
     ]
 
     def __init__(
         self,
         cli_config: CLIConfig,
-        initial_tab: str = "attacks",
+        initial_tab: str = "campaign",
         initial_data: dict[Any, Any] | None = None,
     ):
         """Initialize the TUI application.
 
         Args:
             cli_config: CLI configuration object
-            initial_tab: Which tab to show initially (default: "attacks", the
-                campaign composer — the cockpit's primary job)
-            initial_data: Initial data to pre-fill in the tab (default: None)
+            initial_tab: Which view to show. Defaults to the campaign builder;
+                the legacy names ``results``, ``agents`` and ``config`` open
+                that view on its own.
+            initial_data: Data to pre-fill the view with (default: None)
         """
         super().__init__()
         self.cli_config = cli_config
-        self.initial_tab = initial_tab
+        self.view = initial_tab if initial_tab in self.VIEWS else "campaign"
+        self.initial_tab = self.view
         self.initial_data = initial_data or {}
         self.dark = True  # Use dark theme by default
 
@@ -198,55 +204,57 @@ class HackAgentTUI(App):
         return {**super().get_css_variables(), **css_variables()}
 
     def compose(self) -> ComposeResult:
-        """Compose the UI layout."""
-        yield Header()
-        # Tabs follow the red-team journey left-to-right: compose a campaign,
-        # read its results, manage the targets, configure the tool.
-        with TabbedContent(initial=self.initial_tab):
-            with TabPane("⚔ Campaign", id="attacks"):
-                yield AttacksTab(self.cli_config, initial_data=self.initial_data)
+        """One view and a footer.
 
-            with TabPane("📊 Results", id="results"):
-                yield ResultsTab(self.cli_config)
-
-            with TabPane("🎯 Targets", id="agents"):
-                yield AgentsTab(self.cli_config)
-
-            with TabPane("⚙ Config", id="config"):
-                yield ConfigTab(self.cli_config)
-
+        No header bar: the view below says what it is — the builder opens on
+        the campaign's name and whether it is ready to run — so a title strip
+        above it only costs rows the form can use.
+        """
+        if self.view == "results":
+            yield ResultsTab(self.cli_config)
+        elif self.view == "agents":
+            yield AgentsTab(self.cli_config)
+        elif self.view == "config":
+            yield ConfigTab(self.cli_config)
+        else:
+            yield CampaignBuilder(self.cli_config, initial_data=self.initial_data)
         yield Footer()
 
-    def action_switch_tab(self, tab_id: str) -> None:
-        """Switch to a specific tab.
+    def on_mount(self) -> None:
+        """Open on the welcome screen, unless a campaign was handed to us."""
+        self.title = self.TITLE
+        self.sub_title = self.SUB_TITLE
+        if self.view != "campaign":
+            return
+        if self.initial_data.get("campaign_path") or self.initial_data.get(
+            "campaign_yaml"
+        ):
+            return
+        from hackagent.interfaces.tui.views.campaign.welcome import (
+            WelcomeScreen,
+            starting_point,
+        )
 
-        Args:
-            tab_id: ID of the tab to switch to
-        """
-        tabs = self.query_one(TabbedContent)
-        tabs.active = tab_id
+        def _start(_confirmed: bool | None) -> None:
+            self.query_one(CampaignBuilder).start_from(starting_point())
+
+        self.push_screen(WelcomeScreen(), _start)
+
+    def action_help(self) -> None:
+        """Show the keys and what this screen is for."""
+        builder = self.query(CampaignBuilder)
+        if builder:
+            builder.first().action_help()
 
     def action_refresh(self) -> None:
-        """Refresh the current tab's data.
-
-        Walks every descendant of the active TabPane (not just immediate
-        children) so nested tab widgets — including those that wrap their
-        body in a scroller — still receive the refresh.
-        """
-        tabs = self.query_one(TabbedContent)
-        active_pane = tabs.get_pane(tabs.active)
-        if active_pane is None:
-            return
+        """Refresh whatever view is on screen."""
         try:
-            for descendant in active_pane.query("*"):
+            for descendant in self.screen.query("*"):
                 if hasattr(descendant, "refresh_data"):
                     descendant.refresh_data()
                     return
         except Exception:
             pass
-        # Last-resort: try the pane itself.
-        if hasattr(active_pane, "refresh_data"):
-            active_pane.refresh_data()
 
     def _active_monitor_text(self) -> tuple[str, str]:
         """Return ``(text, source)`` for the active attack-monitor panel.
@@ -308,11 +316,6 @@ class HackAgentTUI(App):
             f"Copied {source} ({len(text)} characters) to the clipboard.",
             title="Copy",
         )
-
-    def on_mount(self) -> None:
-        """Called when the app is mounted."""
-        self.title = self.TITLE
-        self.sub_title = self.SUB_TITLE
 
     def show_success(self, message: str) -> None:
         """Show success notification with checkmark."""

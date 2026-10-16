@@ -48,3 +48,13 @@ The embeddings API is a different endpoint from chat, so this does not
 go through :class:`Model`; it builds a LiteLLM embedding request from the
 same connection fields and runs the blocking call off the event loop.
 
+#### embedder\_is\_reachable
+
+```python
+async def embedder_is_reachable(
+    embed: Callable[[Sequence[str]], Awaitable[list[list[float]]]]
+) -> Reachability
+```
+
+Embed one word and report whether a usable vector came back.
+

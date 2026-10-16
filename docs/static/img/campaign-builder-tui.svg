@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="948" height="856" viewBox="0 0 948 856">
+  <style>
+    text { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; fill: #c9d1d9; white-space: pre; }
+    .cap { font-size: 14px; fill: #8b949e; }
+    .bright { fill: #e6edf3; }
+    .dim { fill: #6e7681; }
+    .def { fill: #8b949e; }
+    .ghost { fill: #4d5866; font-style: italic; }
+    .ok { fill: #3fb950; }
+    .warn { fill: #d29922; }
+    .err { fill: #f85149; }
+    .acc { fill: #ff5c5c; }
+    .key { fill: #7cc7e8; font-weight: bold; }
+    .b { font-weight: bold; }
+    .small { font-size: 13px; }
+    .in { fill: #161d26; }
+    .sep { stroke: #2a3340; stroke-width: 1; }
+  </style>
+
+  <defs>
+    <!-- terminal chrome + left schema bar, shared by both frames -->
+    <g id="chrome">
+      <rect x="0" y="0" width="900" height="360" fill="#0b0f14" stroke="#2a3340" stroke-width="1.5"/>
+      <rect x="0.75" y="0.75" width="898.5" height="19.25" fill="#1b222c"/>
+      <text class="bright b" x="12" y="15">HackAgent · Campaign Builder</text>
+      <text x="450" y="15" text-anchor="middle">local-safety-evaluation <tspan class="warn">●</tspan></text>
+      <text x="888" y="15" text-anchor="end"><tspan class="err">✗ 1</tspan>  <tspan class="warn">▲ 1</tspan></text>
+
+      <line class="sep" x1="210" y1="20" x2="210" y2="316"/>
+      <line class="sep" x1="0" y1="316" x2="900" y2="316"/>
+
+      <text x="12" y="55">Overview</text><text class="ok" x="198" y="55" text-anchor="end">✓</text>
+      <text x="12" y="75">Dataset</text><text class="ok" x="198" y="75" text-anchor="end">✓</text>
+      <text x="12" y="95">Target</text><text class="ok" x="198" y="95" text-anchor="end">✓</text>
+      <text class="dim" x="12" y="115">Guardrails</text><text class="dim" x="198" y="115" text-anchor="end">off</text>
+      <text x="12" y="135">Attacks</text><text class="err" x="198" y="135" text-anchor="end">✗</text>
+      <rect x="1" y="140" width="209" height="20" fill="#2a1416"/>
+      <text x="12" y="155"><tspan class="acc">▌</tspan> <tspan class="acc b">tap</tspan></text>
+      <text x="12" y="175">  crescendo</text>
+      <text x="12" y="195">  pair</text><text class="err" x="198" y="195" text-anchor="end">✗</text>
+      <text class="ok" x="12" y="215">  + add attack</text>
+      <text x="12" y="235">Evaluation</text><text class="warn" x="198" y="235" text-anchor="end">▲</text>
+      <text x="12" y="255">Execution</text><text class="ok" x="198" y="255" text-anchor="end">✓</text>
+      <text class="dim" x="12" y="295">▶ Run</text><text class="dim small" x="198" y="295" text-anchor="end">^R</text>
+
+      <text x="226" y="55"><tspan class="bright b">Attacks › tap</tspan></text>
+      <text class="dim" x="888" y="55" text-anchor="end">iterative · Tree of Attacks with Pruning</text>
+      <line class="sep" x1="226" y1="66" x2="888" y2="66"/>
+
+      <text x="226" y="95">depth</text>
+      <rect class="in" x="388" y="81" width="234" height="18"/><text class="def" x="396" y="95">3</text>
+      <text class="ghost small" x="636" y="95">default</text>
+      <text x="226" y="115">width</text>
+      <rect class="in" x="388" y="101" width="234" height="18"/><text class="def" x="396" y="115">4</text>
+      <text class="ghost small" x="636" y="115">default</text>
+      <text x="226" y="135">branching_factor</text>
+      <rect class="in" x="388" y="121" width="234" height="18"/><text class="def" x="396" y="135">3</text>
+      <text class="ghost small" x="636" y="135">default</text>
+      <text class="bright" x="226" y="155">streams</text>
+      <rect class="in" x="388" y="141" width="234" height="18"/><rect x="388" y="141" width="3" height="18" fill="#ff5c5c"/>
+      <text class="bright b" x="396" y="155">8</text>
+      <text class="small" x="636" y="155"><tspan class="acc">●</tspan> edited · was 4</text>
+      <text x="226" y="175">attacker</text>
+      <rect class="in" x="388" y="161" width="234" height="18"/><text x="396" y="175">abliterated-qwen3-4b</text><text class="dim" x="614" y="175" text-anchor="end">▾</text>
+      <text class="dim small" x="636" y="175">required</text>
+
+      <text x="12" y="355"><tspan class="key">↑↓</tspan> move  <tspan class="key">Enter</tspan> edit  <tspan class="key">Del</tspan> reset  <tspan class="key">Space</tspan> expand  <tspan class="key">Tab</tspan> pane  <tspan class="key">^S</tspan> save  <tspan class="key">^R</tspan> run  <tspan class="key">?</tspan> help</text>
+    </g>
+  </defs>
+
+  <!-- Frame 1: advanced collapsed -->
+  <text class="cap" x="24" y="40"><tspan class="bright">1</tspan>  Fields prefilled with defaults; advanced ones collapsed</text>
+  <g transform="translate(24,56)">
+    <use href="#chrome"/>
+    <rect x="388" y="141" width="234" height="18" fill="none" stroke="#ff5c5c" stroke-width="1.5"/>
+    <rect x="406" y="143" width="2" height="14" fill="#e6edf3"/>
+    <text x="226" y="215"><tspan class="dim">▸</tspan> Advanced <tspan class="dim">(4)</tspan>  <tspan class="ghost small">on_topic · temperature · max_tokens · timeout</tspan></text>
+    <text class="dim small" x="12" y="335">streams — conversations the tree starts from · integer ≥ 1</text>
+    <text class="err small" x="888" y="335" text-anchor="end">✗ pair: attacker role required</text>
+  </g>
+
+  <!-- Frame 2: advanced expanded -->
+  <text class="cap" x="24" y="460"><tspan class="bright">2</tspan>  Space on "Advanced" expands it in place</text>
+  <g transform="translate(24,476)">
+    <use href="#chrome"/>
+    <rect x="211" y="200" width="688" height="20" fill="#161d26"/>
+    <text x="226" y="215"><tspan class="acc">▾</tspan> <tspan class="bright">Advanced</tspan> <tspan class="dim">(4)</tspan></text>
+    <text x="226" y="235">  on_topic</text>
+    <rect class="in" x="388" y="221" width="234" height="18"/><text class="def" x="396" y="235">(none)</text><text class="dim" x="614" y="235" text-anchor="end">▾</text>
+    <text class="ghost small" x="636" y="235">optional</text>
+    <text x="226" y="255">  temperature</text>
+    <rect class="in" x="388" y="241" width="234" height="18"/><text class="def" x="396" y="255">1.0</text>
+    <text class="ghost small" x="636" y="255">⇡ attacker model</text>
+    <text x="226" y="275">  max_tokens</text>
+    <rect class="in" x="388" y="261" width="234" height="18"/><text class="def" x="396" y="275">512</text>
+    <text class="ghost small" x="636" y="275">⇡ attacker model</text>
+    <text x="226" y="295">  timeout</text>
+    <rect class="in" x="388" y="281" width="234" height="18"/><text class="def" x="396" y="295">1800 s</text>
+    <text class="ghost small" x="636" y="295">default</text>
+    <text class="dim small" x="12" y="335">Space collapses · inherited values stay linked until edited</text>
+    <text class="err small" x="888" y="335" text-anchor="end">✗ pair: attacker role required</text>
+  </g>
+</svg>

@@ -62,6 +62,18 @@ def create_or_update_agent(name: str,
 
 Create a new agent or update an existing one with the same name.
 
+#### update\_campaign\_run
+
+```python
+def update_campaign_run(campaign_run_id: UUID,
+                        status: Optional[str] = None,
+                        audit: Optional[Dict[str, Any]] = None,
+                        run_notes: Optional[str] = None) -> CampaignRunRecord
+```
+
+Change what was given. `None` leaves a field as it is; pass `&quot;&quot;`
+to clear a note an earlier update wrote.
+
 #### count\_result\_buckets
 
 ```python

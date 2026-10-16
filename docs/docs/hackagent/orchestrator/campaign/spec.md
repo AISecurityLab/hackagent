@@ -167,6 +167,19 @@ through each of the `attacks` to the `target` (optionally behind
 `guardrails`), score the replies with the `evaluation` judges, and run it
 all under the `execution` policy.
 
+#### recorded
+
+```python
+def recorded() -> dict[str, Any]
+```
+
+The campaign as it is written to disk and stored with the run.
+
+The same campaign, reloadable as-is, so a run can be repeated from
+its own record. No credential passes through here: `api_key_env`
+names the variable holding the API key, and the key stays in the
+environment.
+
 #### campaign\_json\_schema
 
 ```python

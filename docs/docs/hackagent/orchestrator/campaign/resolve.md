@@ -28,6 +28,17 @@ A ready-to-run attack and the configuration it was built from.
 
 Parameters and role model names, as recorded with the run.
 
+## ResolvedCampaign Objects
+
+```python
+@dataclass(frozen=True)
+class ResolvedCampaign()
+```
+
+#### probes
+
+One reachability check per distinct model, for preflight.
+
 #### resolve\_campaign
 
 ```python

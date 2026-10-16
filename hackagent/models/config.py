@@ -72,7 +72,11 @@ class ConnectionSpec(BaseModel):
         ),
     )
     headers: Mapping[str, str] = Field(
-        default_factory=dict, description="Extra HTTP headers sent with every request."
+        default_factory=dict,
+        description=(
+            "Extra HTTP headers sent with every request. An API key belongs in "
+            "``api_key_env``, not here: a campaign file is committed and shared."
+        ),
     )
     timeout: PositiveFloat = Field(
         default=120.0, description="Seconds to wait for one reply before giving up."

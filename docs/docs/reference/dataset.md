@@ -8,7 +8,9 @@ sidebar_position: 3
 
 A **goal** is one thing you want the target to do and it should refuse, such as *Explain how to pick a lock*. The `dataset` section says where the goals come from and which of them to run.
 
-Goals arrive in three ways: from a built-in **preset**, from a **provider** such as a HuggingFace dataset or a local file, or written **inline** in the campaign file.
+Goals arrive in three ways, chosen with `source.type`: from a built-in **preset**, from a **provider** such as a HuggingFace dataset or a local file, or written **inline** in the campaign file.
+
+`source.type` decides which other fields exist — a preset source takes a `preset` and nothing else, an inline one takes `goals`. Anything belonging to another type is rejected rather than quietly ignored.
 
 ## `dataset` {#campaigndatasetspec}
 
@@ -19,25 +21,40 @@ Goals are loaded from the `source`, optionally labelled by the
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `preset` | string | unset | Name of a built-in benchmark, e.g. `harmbench` or `advbench`. Used when `source.type` is `preset` (the default). |
-| `source` | [DatasetSource](#datasetsource) | see [DatasetSource](#datasetsource) | Where to load goals from when not using a preset. |
+| `source` | [PresetSource](#presetsource) or [InlineSource](#inlinesource) or [ProviderSource](#providersource) | see [PresetSource](#presetsource) | Where to load goals from. |
 | `selection` | [DatasetSelection](#datasetselection) | see [DatasetSelection](#datasetselection) | Which of the loaded goals to run. |
 | `classifier` | [CategoryClassifierConfig](#categoryclassifierconfig) | unset | A model that labels each goal with the risk taxonomy. Only needed when `selection.filters.categories` is set. Off by default. |
 
-## `dataset.source` {#datasetsource}
+## `dataset.source (type: preset)` {#presetsource}
 
-Where goals are loaded from: a built-in preset, a provider such as
-HuggingFace or a local file, or goals written inline.
+A built-in benchmark, named by its preset.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `type` | one of `preset`, `provider`, `inline` | `preset` | `preset` loads a built-in benchmark named by `dataset.preset`; `provider` loads from `provider` with the fields below; `inline` uses the `goals` listed here. |
-| `provider` | string | unset | For `type: provider`: where to load from — `huggingface`, `file` (a local JSON/JSONL/CSV file) or `url_json` (a JSON file at a URL). |
-| `path` | string | unset | For `type: provider`: the HuggingFace dataset id (e.g. `walledai/AdvBench`), or the path of the local file. |
+| `type` | one of `preset` | `preset` | Marks this as a preset source: a built-in benchmark. |
+| `name` | string | **required** | Which built-in benchmark to load, e.g. `harmbench` or `advbench`. Run `hackagent datasets list` to see them all. |
+
+## `dataset.source (type: inline)` {#inlinesource}
+
+Goals written straight into the campaign file.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | one of `inline` | **required** | Marks this as an inline source: goals written in the file. |
+| `goals` | list of string (at least 1) | **required** | The goals themselves, one string per goal. |
+
+## `dataset.source (type: provider)` {#providersource}
+
+Goals loaded from a dataset provider: HuggingFace, a file, or a URL.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | one of `provider` | **required** | Marks this as a provider source: loaded from HuggingFace, a file or a URL. |
+| `provider` | string | **required** | Where to load from: `huggingface`, `file` (a local JSON/JSONL/CSV file) or `url_json` (a JSON file at a URL). |
+| `path` | string | unset | The HuggingFace dataset id (e.g. `walledai/AdvBench`), or the path of the local file. |
 | `name` | string | unset | For HuggingFace datasets with several configurations: which one to load. |
 | `split` | string | unset | For HuggingFace datasets: which split to read (`train`, `test`…). |
 | `goal_field` | string | unset | Name of the column or key that holds the goal text, e.g. `prompt`. |
-| `goals` | list of string | empty | For `type: inline`: the goals themselves, one string per goal. |
 | `options` | map of string to any | empty | Any other provider setting, passed through unchanged (e.g. `url` for `url_json`, `trust_remote_code` for HuggingFace). |
 
 ## `dataset.selection` {#datasetselection}
@@ -71,7 +88,7 @@ Takes every field of [ModelConfig](target.md#modelconfig) (`name`, `connection`,
 
 ## Dataset presets {#presets}
 
-Set `dataset.preset` to one of these names. Run `hackagent datasets list` to see them from the command line, or `hackagent datasets sample <name>` to print a few goals.
+Set `dataset.source.name` to one of these names, with `dataset.source.type` set to `preset`. Run `hackagent datasets list` to see them from the command line, or `hackagent datasets sample <name>` to print a few goals.
 
 | Preset | What it holds | Source |
 |---|---|---|
@@ -108,7 +125,9 @@ Set `dataset.preset` to one of these names. Run `hackagent datasets list` to see
 
 ```yaml
 dataset:
-  preset: harmbench
+  source:
+    type: preset
+    name: harmbench
   selection:
     limit: 10
     shuffle: true

@@ -5,6 +5,19 @@ title: hackagent.models.model
 
 Common configuration, response, and execution contracts for models.
 
+#### PING
+
+The smallest request that still exercises a model&#x27;s whole request path.
+
+## Reachability Objects
+
+```python
+@dataclass(frozen=True)
+class Reachability()
+```
+
+Whether a model answered, why not, and how long it took.
+
 ## Model Objects
 
 ```python
@@ -12,6 +25,17 @@ class Model(ABC)
 ```
 
 Common interface implemented by every model backend.
+
+#### is\_reachable
+
+```python
+async def is_reachable() -> Reachability
+```
+
+Send :data:`PING` and report whether a usable reply came back.
+
+Backends where a request is costly or intrusive override this with a
+check that sends nothing.
 
 #### complete
 

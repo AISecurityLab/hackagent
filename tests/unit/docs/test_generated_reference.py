@@ -122,3 +122,56 @@ def test_the_published_schema_matches_the_spec(generated):
 
     path = ROOT / "docs" / "static" / "schema" / "campaign.schema.json"
     assert json.loads(path.read_text(encoding="utf-8")) == campaign_json_schema()
+
+
+# The SDK reference under docs/docs/hackagent is written by
+# ``docs/scripts/generate_docs.py``, which runs pydoc-markdown over the whole
+# package — too slow for a unit test to reproduce. What it can check cheaply is
+# the half that goes stale silently: a page left behind by a module that no
+# longer exists still publishes, and still documents code that is gone.
+SDK_REFERENCE = ROOT / "docs" / "docs" / "hackagent"
+
+#: Mirrors ``generate_docs._EXCLUDE_PREFIXES``.
+_PRIVATE = ("hackagent/storage/_http", "hackagent/attacks/_lib/legacy_seams")
+
+#: Mirrors ``generate_docs._SIDEBAR_ID_REWRITES``: the web package publishes
+#: its private helpers under public names.
+_RENAMED = {
+    "interfaces/web/__init__": "interfaces/web/index",
+    "interfaces/web/_local_api": "interfaces/web/local_api",
+    "interfaces/web/_proxy": "interfaces/web/proxy",
+    "interfaces/web/_serializers": "interfaces/web/serializers",
+    "interfaces/web/_static": "interfaces/web/static",
+}
+
+
+def _documentable_modules() -> set[str]:
+    """Every module the SDK reference is allowed to have a page for."""
+    package = ROOT / "hackagent"
+    found = set()
+    for source in package.rglob("*.py"):
+        if "__pycache__" in source.parts:
+            continue
+        name = source.relative_to(package).with_suffix("").as_posix()
+        if any(f"hackagent/{name}".startswith(prefix) for prefix in _PRIVATE):
+            continue
+        found.add(_RENAMED.get(name, name))
+    return found
+
+
+def test_no_sdk_reference_page_outlives_its_module():
+    """A page with no module behind it documents code that no longer exists.
+
+    The other direction is not checked: pydoc-markdown writes no page for a
+    module with nothing to render (a table of prompts, say), so a missing page
+    is normal.
+    """
+    pages = {
+        path.relative_to(SDK_REFERENCE).with_suffix("").as_posix()
+        for path in SDK_REFERENCE.rglob("*.md")
+    } - {"index"}
+    orphans = sorted(pages - _documentable_modules())
+    assert orphans == [], (
+        "docs/docs/hackagent has pages for modules that are gone: "
+        f"{orphans}. Run `python docs/scripts/generate_docs.py`."
+    )

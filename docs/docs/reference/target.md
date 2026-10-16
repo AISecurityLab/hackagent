@@ -36,7 +36,7 @@ authenticate.
 | `type` | [agent type](#agent-types) | **required** | Which client talks to the model. This is the field that matters: it decides whether HackAgent calls a chat API (`OPENAI`, `OLLAMA`, `LITELLM`…) or drives an agent directly (`CLAUDE_CODE`, `GOOGLE_ADK`, `WEB`…). |
 | `endpoint` | string | unset | Base URL of the model's API, e.g. `http://localhost:11434` for Ollama. Leave unset for local agents such as `CLAUDE_CODE`, which run on this machine. |
 | `api_key_env` | string | unset | Name of the environment variable that holds the API key, e.g. `OPENAI_API_KEY`. The key itself never goes in the campaign file. |
-| `headers` | map of string to string | empty | Extra HTTP headers sent with every request. |
+| `headers` | map of string to string | empty | Extra HTTP headers sent with every request. An API key belongs in `api_key_env`, not here: a campaign file is committed and shared. |
 | `timeout` | number (> 0) | `120.0` | Seconds to wait for one reply before giving up. |
 
 ## `target.generation` {#generationspec}

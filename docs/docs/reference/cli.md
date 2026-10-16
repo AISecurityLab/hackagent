@@ -18,7 +18,7 @@ Every command the `hackagent` executable offers. Run any of them with `--help` t
 | `hackagent examples` | 🧪 Launch built-in examples from the CLI |
 | `hackagent init` | 🚀 Initialize HackAgent CLI configuration |
 | `hackagent results` | 📊 View and manage attack results |
-| `hackagent tui` | 🖥️ Launch full-screen Terminal User Interface |
+| `hackagent tui` | 🖥️ Launch the campaign builder |
 | `hackagent version` | 📋 Show version information |
 | `hackagent web` | 🌐 Launch the web dashboard. |
 
@@ -402,7 +402,7 @@ hackagent results summary [OPTIONS]
 
 ## `hackagent tui`
 
-🖥️ Launch full-screen Terminal User Interface
+🖥️ Launch the campaign builder
 
 ```text
 hackagent tui [OPTIONS]

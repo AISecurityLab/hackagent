@@ -5,14 +5,35 @@ title: hackagent.datasets.config
 
 Declarative dataset sources and selection settings.
 
-## DatasetSource Objects
+## PresetSource Objects
 
 ```python
-class DatasetSource(DatasetModel)
+class PresetSource(DatasetModel)
 ```
 
-Where goals are loaded from: a built-in preset, a provider such as
-HuggingFace or a local file, or goals written inline.
+A built-in benchmark, named by its preset.
+
+## InlineSource Objects
+
+```python
+class InlineSource(DatasetModel)
+```
+
+Goals written straight into the campaign file.
+
+## ProviderSource Objects
+
+```python
+class ProviderSource(DatasetModel)
+```
+
+Goals loaded from a dataset provider: HuggingFace, a file, or a URL.
+
+#### DatasetSource
+
+Where goals come from. `type` picks the shape, so only the fields that
+belong to that shape exist — a preset source has no `goals`, an inline one
+has no `split`.
 
 ## DatasetFilters Objects
 
@@ -37,6 +58,33 @@ class DatasetSpec(DatasetModel)
 ```
 
 Where goals come from and which of them to run.
+
+#### normalise\_source
+
+```python
+@model_validator(mode="before")
+@classmethod
+def normalise_source(cls, data: Any) -> Any
+```
+
+Accept older and shorter spellings of the source.
+
+`dataset.preset` used to sit beside `dataset.source`, so the two
+could disagree and every source carried every other source&#x27;s fields;
+files written that way still load, with the preset moved inside.
+
+A source that omits `type` is also read rather than refused: the
+fields it does carry say which kind it is, and without that a document
+can only report that it cannot find the tag.
+
+#### preset
+
+```python
+@property
+def preset() -> Optional[str]
+```
+
+The preset this dataset loads, when it loads one.
 
 #### to\_provider\_config
 

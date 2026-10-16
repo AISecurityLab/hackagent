@@ -75,19 +75,16 @@ Optional config:
     - `llm_fallback_model`: LiteLLM model used to read the reply only when
       the heuristics find nothing.
 
-#### probe\_ready
+#### is\_reachable
 
 ```python
-def probe_ready() -> Optional[str]
+async def is_reachable() -> Reachability
 ```
 
-Non-invasive reachability check for preflight.
+Open the page and locate the chat input, without sending anything.
 
-Starts the browser session and confirms the chat input is locatable
-WITHOUT sending a message — so the availability probe never types a
-junk &quot;healthcheck&quot; into the live chatbot (which would contaminate the
-real conversation and the recorded transcript). Returns None when the
-widget is reachable, or an error string otherwise.
+A ping would type a junk message into a live, person-facing chatbot
+and pollute the conversation the attack then records.
 
 #### complete
 

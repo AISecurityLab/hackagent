@@ -148,22 +148,28 @@
       "additionalProperties": false,
       "description": "Where the goals come from and which of them to run.\n\nGoals are loaded from the ``source``, optionally labelled by the\n``classifier``, then narrowed down by the ``selection``.",
       "properties": {
-        "preset": {
-          "anyOf": [
+        "source": {
+          "description": "Where to load goals from.",
+          "discriminator": {
+            "mapping": {
+              "inline": "#/$defs/InlineSource",
+              "preset": "#/$defs/PresetSource",
+              "provider": "#/$defs/ProviderSource"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/PresetSource"
             },
             {
-              "type": "null"
+              "$ref": "#/$defs/InlineSource"
+            },
+            {
+              "$ref": "#/$defs/ProviderSource"
             }
           ],
-          "default": null,
-          "description": "Name of a built-in benchmark, e.g. ``harmbench`` or ``advbench``. Used when ``source.type`` is ``preset`` (the default).",
-          "title": "Preset"
-        },
-        "source": {
-          "$ref": "#/$defs/DatasetSource",
-          "description": "Where to load goals from when not using a preset."
+          "title": "Source"
         },
         "selection": {
           "$ref": "#/$defs/DatasetSelection",
@@ -327,7 +333,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Extra HTTP headers sent with every request.",
+          "description": "Extra HTTP headers sent with every request. An API key belongs in ``api_key_env``, not here: a campaign file is committed and shared.",
           "title": "Headers",
           "type": "object"
         },
@@ -352,7 +358,7 @@
       "properties": {
         "categories": {
           "default": [],
-          "description": "Risk taxonomy categories or subcategories to keep, as a code (``E``, ``E2``) or a name (``Cybersecurity Threats``). Matched on each goal's labels, so it needs ``dataset.classifier``.",
+          "description": "Risk taxonomy categories or subcategories to keep, as a code (`E`, `E2`) or a name (`Cybersecurity Threats`). Matched on each goal's labels, so it needs `dataset.classifier`.",
           "items": {
             "type": "string"
           },
@@ -383,7 +389,7 @@
         },
         "shuffle": {
           "default": false,
-          "description": "Shuffle the goals before applying ``limit``, so a limited run is a random sample instead of the first goals in the file.",
+          "description": "Shuffle the goals before applying `limit`, so a limited run is a random sample instead of the first goals in the file.",
           "title": "Shuffle",
           "type": "boolean"
         },
@@ -397,7 +403,7 @@
             }
           ],
           "default": null,
-          "description": "Random seed for ``shuffle``, so the same sample is drawn every run.",
+          "description": "Random seed for `shuffle`, so the same sample is drawn every run.",
           "title": "Seed"
         },
         "filters": {
@@ -405,105 +411,6 @@
         }
       },
       "title": "DatasetSelection",
-      "type": "object"
-    },
-    "DatasetSource": {
-      "additionalProperties": false,
-      "description": "Where goals are loaded from: a built-in preset, a provider such as\nHuggingFace or a local file, or goals written inline.",
-      "properties": {
-        "type": {
-          "default": "preset",
-          "description": "``preset`` loads a built-in benchmark named by ``dataset.preset``; ``provider`` loads from ``provider`` with the fields below; ``inline`` uses the ``goals`` listed here.",
-          "enum": [
-            "preset",
-            "provider",
-            "inline"
-          ],
-          "title": "Type",
-          "type": "string"
-        },
-        "provider": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "For ``type: provider``: where to load from \u2014 ``huggingface``, ``file`` (a local JSON/JSONL/CSV file) or ``url_json`` (a JSON file at a URL).",
-          "title": "Provider"
-        },
-        "path": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "For ``type: provider``: the HuggingFace dataset id (e.g. ``walledai/AdvBench``), or the path of the local file.",
-          "title": "Path"
-        },
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "For HuggingFace datasets with several configurations: which one to load.",
-          "title": "Name"
-        },
-        "split": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "For HuggingFace datasets: which split to read (``train``, ``test``\u2026).",
-          "title": "Split"
-        },
-        "goal_field": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Name of the column or key that holds the goal text, e.g. ``prompt``.",
-          "title": "Goal Field"
-        },
-        "goals": {
-          "default": [],
-          "description": "For ``type: inline``: the goals themselves, one string per goal.",
-          "items": {
-            "type": "string"
-          },
-          "title": "Goals",
-          "type": "array"
-        },
-        "options": {
-          "additionalProperties": true,
-          "description": "Any other provider setting, passed through unchanged (e.g. ``url`` for ``url_json``, ``trust_remote_code`` for HuggingFace).",
-          "title": "Options",
-          "type": "object"
-        }
-      },
-      "title": "DatasetSource",
       "type": "object"
     },
     "EvaluationSpec": {
@@ -574,8 +481,8 @@
           "type": "boolean"
         },
         "preflight": {
-          "default": false,
-          "description": "Ping the target and each judge before attacking, so an unreachable endpoint fails fast with a clear message instead of mid-run.",
+          "default": true,
+          "description": "Check every model the campaign uses (target, guardrails, attack roles and embedders, judges, goal classifier) before attacking, so an unreachable endpoint fails fast with a clear message instead of mid-run. Turn it off to let a run proceed and record such failures as attempt errors.",
           "title": "Preflight",
           "type": "boolean"
         },
@@ -861,6 +768,33 @@
       "title": "GuardrailsSpec",
       "type": "object"
     },
+    "InlineSource": {
+      "additionalProperties": false,
+      "description": "Goals written straight into the campaign file.",
+      "properties": {
+        "type": {
+          "const": "inline",
+          "description": "Marks this as an inline source: goals written in the file.",
+          "title": "Type",
+          "type": "string"
+        },
+        "goals": {
+          "description": "The goals themselves, one string per goal.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Goals",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "goals"
+      ],
+      "title": "InlineSource",
+      "type": "object"
+    },
     "JudgeSpec": {
       "additionalProperties": false,
       "description": "A judge: a model that reads the target's reply and decides whether the\nattack succeeded, plus how its answer is scored.",
@@ -935,7 +869,7 @@
       "properties": {
         "directory": {
           "default": "./logs/runs",
-          "description": "Folder where run files are written.",
+          "description": "Folder where runs are written, each in a subfolder named after its run id.",
           "title": "Directory",
           "type": "string"
         },
@@ -987,6 +921,110 @@
         }
       },
       "title": "OutputSpec",
+      "type": "object"
+    },
+    "PresetSource": {
+      "additionalProperties": false,
+      "description": "A built-in benchmark, named by its preset.",
+      "properties": {
+        "type": {
+          "const": "preset",
+          "default": "preset",
+          "description": "Marks this as a preset source: a built-in benchmark.",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "description": "Which built-in benchmark to load, e.g. `harmbench` or `advbench`. Run `hackagent datasets list` to see them all.",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "PresetSource",
+      "type": "object"
+    },
+    "ProviderSource": {
+      "additionalProperties": false,
+      "description": "Goals loaded from a dataset provider: HuggingFace, a file, or a URL.",
+      "properties": {
+        "type": {
+          "const": "provider",
+          "description": "Marks this as a provider source: loaded from HuggingFace, a file or a URL.",
+          "title": "Type",
+          "type": "string"
+        },
+        "provider": {
+          "description": "Where to load from: `huggingface`, `file` (a local JSON/JSONL/CSV file) or `url_json` (a JSON file at a URL).",
+          "title": "Provider",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The HuggingFace dataset id (e.g. `walledai/AdvBench`), or the path of the local file.",
+          "title": "Path"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For HuggingFace datasets with several configurations: which one to load.",
+          "title": "Name"
+        },
+        "split": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For HuggingFace datasets: which split to read (`train`, `test`\u2026).",
+          "title": "Split"
+        },
+        "goal_field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the column or key that holds the goal text, e.g. `prompt`.",
+          "title": "Goal Field"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Any other provider setting, passed through unchanged (e.g. `url` for `url_json`, `trust_remote_code` for HuggingFace).",
+          "title": "Options",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "provider"
+      ],
+      "title": "ProviderSource",
       "type": "object"
     },
     "RetrySpec": {

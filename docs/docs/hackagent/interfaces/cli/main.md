@@ -40,24 +40,17 @@ def version(ctx)
 def tui(ctx)
 ```
 
-🖥️ Launch full-screen Terminal User Interface
+🖥️ Launch the campaign builder
 
-Opens an interactive tabbed interface that occupies the whole terminal.
-Navigate between tabs to manage agents, execute attacks, view results, and configure settings.
-
-
-Features:
-  • Dashboard - Overview and statistics
-  • Agents - Manage AI agents
-  • Attacks - Execute security attacks
-  • Results - View attack results
-  • Config - Configuration management
+Opens a full-screen app that builds a campaign, checks it as you type, and
+runs it. Start from a template or open an existing campaign.yaml.
 
 
-Keyboard Shortcuts:
-  q - Quit
-  F5 - Refresh current tab
-  Tab - Navigate between UI elements
+Keys:
+  F1      what this screen is, and every key
+  ctrl+r  run the campaign
+  ctrl+s  save it to a file
+  q       quit
 
 #### doctor
 

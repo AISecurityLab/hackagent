@@ -41,6 +41,15 @@ def prompt() -> str
 
 Text of the last user message, the part the judges see.
 
+#### errors
+
+```python
+@property
+def errors() -> tuple[str, ...]
+```
+
+Every problem the attempt hit: its own, the panel&#x27;s, each judge&#x27;s.
+
 #### user\_text
 
 ```python
@@ -69,6 +78,11 @@ single goal. Empty unless the attack did such work.
 @dataclass(frozen=True)
 class CampaignResult()
 ```
+
+#### campaign\_run\_id
+
+Primary key of the normalized campaign run in storage. `None` for a
+dry run, which deliberately creates no storage records.
 
 #### audit
 
@@ -130,15 +144,19 @@ that has a faithful member.
 #### write\_outputs
 
 ```python
-def write_outputs(result: CampaignResult,
-                  output: OutputSpec) -> tuple[Path, ...]
+def write_outputs(
+        result: CampaignResult,
+        output: OutputSpec,
+        campaign: Optional[Mapping[str, Any]] = None) -> tuple[Path, ...]
 ```
 
-Write every attempt as one row per configured format.
+Write a run&#x27;s files into `&lt;directory&gt;/&lt;run_id&gt;/`.
 
-Search traces of iterative attacks go to `<run_id>.traces.jsonl`, one
-line per attempt, so the result rows stay readable. A judge audit goes
-to `<run_id>.audit.json`, beside the results it qualifies.
+`campaign.yaml` is the campaign that ran, so the run can be reproduced
+even when it was never saved as a file. `results.json` and/or
+`results.jsonl` hold one row per attempt. Search traces of iterative
+attacks go to `traces.jsonl`, one line per attempt, so the result rows
+stay readable, and a judge audit goes to `audit.json`.
 
 #### summary
 

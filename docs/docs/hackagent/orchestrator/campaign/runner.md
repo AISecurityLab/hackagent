@@ -30,10 +30,12 @@ setup failures and the per-attack timeout fail an attack.
 
 #### EventCallback
 
-Receives `(event_name, **payload)`. A run emits `attack_started`
-(`attack`, `run_id`, `expected_goals`), a `goal_finished` per goal
-(`attack`, `run_id`, `goal_index`, `success`, `attempts`,
-`elapsed_s`), and `attack_finished` (`attack`, `run_id`, `error`).
+Receives `(event_name, **payload)`. An audited run first emits
+`audit_finished` (`audit`), then `attack_started` (`attack`,
+`run_id`, `expected_goals`), a `goal_finished` per goal (`attack`,
+`run_id`, `goal_index`, `success`, `attempts`, `errors` (distinct
+messages of its failed attempts and abstaining judges), `elapsed_s`), and
+`attack_finished` (`attack`, `run_id`, `error`).
 
 #### run\_campaign
 

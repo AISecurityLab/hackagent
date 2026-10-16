@@ -5,7 +5,13 @@ title: hackagent.interfaces.tui.app
 
 Main TUI Application
 
-Full-screen tabbed interface for HackAgent.
+One screen, one job: build a campaign, check it, run it.
+
+The app opens on :class:`WelcomeScreen` — the logo, and a working campaign to
+start from — then hands over to :class:`CampaignBuilder`. The other views
+(results, targets, config) are no longer part of this app; they are still
+reachable on their own, which is what `hackagent results` and
+`hackagent agent` open.
 
 ## HackAgentTUI Objects
 
@@ -15,11 +21,16 @@ class HackAgentTUI(App)
 
 HackAgent Terminal User Interface Application
 
+#### VIEWS
+
+The view this app shows. `campaign` is the app proper; the others
+exist so `hackagent results` and `hackagent agent` keep working.
+
 #### \_\_init\_\_
 
 ```python
 def __init__(cli_config: CLIConfig,
-             initial_tab: str = "attacks",
+             initial_tab: str = "campaign",
              initial_data: dict[Any, Any] | None = None)
 ```
 
@@ -28,9 +39,10 @@ Initialize the TUI application.
 **Arguments**:
 
 - `cli_config` - CLI configuration object
-- `initial_tab` - Which tab to show initially (default: &quot;attacks&quot;, the
-  campaign composer — the cockpit&#x27;s primary job)
-- `initial_data` - Initial data to pre-fill in the tab (default: None)
+- `initial_tab` - Which view to show. Defaults to the campaign builder;
+  the legacy names `results`, `agents` and `config` open
+  that view on its own.
+- `initial_data` - Data to pre-fill the view with (default: None)
 
 #### get\_css\_variables
 
@@ -46,19 +58,23 @@ Expose the HackAgent brand palette as CSS variables.
 def compose() -> ComposeResult
 ```
 
-Compose the UI layout.
+One header, one view, one footer.
 
-#### action\_switch\_tab
+#### on\_mount
 
 ```python
-def action_switch_tab(tab_id: str) -> None
+def on_mount() -> None
 ```
 
-Switch to a specific tab.
+Open on the welcome screen, unless a campaign was handed to us.
 
-**Arguments**:
+#### action\_help
 
-- `tab_id` - ID of the tab to switch to
+```python
+def action_help() -> None
+```
+
+Show the keys and what this screen is for.
 
 #### action\_refresh
 
@@ -66,11 +82,7 @@ Switch to a specific tab.
 def action_refresh() -> None
 ```
 
-Refresh the current tab&#x27;s data.
-
-Walks every descendant of the active TabPane (not just immediate
-children) so nested tab widgets — including those that wrap their
-body in a scroller — still receive the refresh.
+Refresh whatever view is on screen.
 
 #### action\_copy\_selection
 
@@ -84,14 +96,6 @@ If you&#x27;ve dragged to select text, that selection is copied. Otherwise it
 copies the whole visible Logs (or Actions) panel — so you can copy
 without needing the mouse at all. Uses Textual&#x27;s terminal-native
 clipboard (OSC 52), which works locally and over SSH.
-
-#### on\_mount
-
-```python
-def on_mount() -> None
-```
-
-Called when the app is mounted.
 
 #### show\_success
 

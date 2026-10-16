@@ -17,7 +17,7 @@ Every field has a safe default.
 |---|---|---|---|
 | `mode` | one of `sequential`, `parallel` | `sequential` | Run attacks one after another, or all at once within the shared limits. |
 | `dry_run` | boolean | `false` | Validate and build everything, but send no request. |
-| `preflight` | boolean | `false` | Ping the target and each judge before attacking, so an unreachable endpoint fails fast with a clear message instead of mid-run. |
+| `preflight` | boolean | `true` | Check every model the campaign uses (target, guardrails, attack roles and embedders, judges, goal classifier) before attacking, so an unreachable endpoint fails fast with a clear message instead of mid-run. Turn it off to let a run proceed and record such failures as attempt errors. |
 | `on_error` | one of `continue`, `stop` | `continue` | After an attack fails, run the remaining ones or stop. |
 | `escalate` | boolean | `false` | Run attacks in order and drop a goal once an attack jailbreaks it, so later attacks only face the goals still standing. Implies sequential order; the remaining attacks are skipped once every goal has fallen. |
 | `per_attack_timeout` | `typing.Annotated[float, Gt(gt=0)]` | unset | Maximum seconds a single attack may run before it is stopped and marked failed. Leave unset for no limit. |
@@ -52,7 +52,7 @@ Files written for each run, next to the results stored in the database.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `directory` | string | `./logs/runs` | Folder where run files are written. |
+| `directory` | string | `./logs/runs` | Folder where runs are written, each in a subfolder named after its run id. |
 | `run_id` | string | unset | Fixed id for the run. Leave unset to generate a new one each time. |
 | `formats` | list of one of `json`, `jsonl` | `["json"]` | File formats to write: `json` (one document) and/or `jsonl` (one line per attempt). |
 | `save_prompts` | boolean | `true` | Include the prompts sent to the target. |

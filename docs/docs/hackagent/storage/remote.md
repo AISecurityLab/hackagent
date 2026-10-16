@@ -72,6 +72,19 @@ def get_context() -> OrganizationContext
 
 Fetch org_id and user_id from the first agent (cached after first call).
 
+#### create\_campaign\_run
+
+```python
+def create_campaign_run(agent_id: UUID, name: str,
+                        campaign_config: Dict[str, Any]) -> CampaignRunRecord
+```
+
+Persist a campaign through the existing remote run endpoint.
+
+The hosted API does not yet expose a dedicated campaign-run resource,
+so a marker distinguishes this parent record from attack runs. Local
+SQLite uses the normalized table and foreign key directly.
+
 #### count\_result\_buckets
 
 ```python

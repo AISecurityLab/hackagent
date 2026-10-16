@@ -188,6 +188,22 @@ def target(endpoint: str,
 
 Bind `endpoint` and return an object with `hack` and `hack_chain`.
 
+#### campaign\_runs
+
+```python
+def campaign_runs(*, page: int = 1, page_size: int = 100) -> Any
+```
+
+List campaign-level runs, including their audit reports.
+
+#### campaign\_run
+
+```python
+def campaign_run(campaign_run_id: Any) -> Any
+```
+
+Retrieve one campaign run and its immutable specification/audit.
+
 #### delete\_run
 
 ```python

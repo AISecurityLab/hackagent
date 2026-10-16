@@ -3,9 +3,9 @@
 
 """Textual snapshot tests for the TUI views extracted into packages.
 
-These lock the rendered output of ``AttacksTab`` and ``ResultsTab`` so that
-future refactors of ``hackagent.interfaces.tui.views.*`` cannot silently change the
-layout. Regenerate the snapshots with::
+These lock the rendered output of ``ResultsTab`` so that future refactors of
+``hackagent.interfaces.tui.views.*`` cannot silently change the layout.
+Regenerate the snapshots with::
 
     uv run pytest tests/unit/interfaces/cli/tui --snapshot-update
 
@@ -25,11 +25,9 @@ import pytest
 
 _APPS = Path(__file__).parent / "snapshot_apps"
 
-# Both tabs render tall panels (the Attacks strategy form, the Results detail
-# pane); the large terminal makes the snapshots cover them rather than just the
-# top few rows. The narrow size additionally locks the responsive layout.
+# The Results detail pane is tall; the large terminal makes the snapshot cover
+# it rather than just the top few rows.
 _LARGE_TERMINAL = (140, 50)
-_NARROW_TERMINAL = (80, 24)
 
 
 def _load_app_instance(app_file: str, class_name: str):
@@ -58,25 +56,11 @@ _KNOWN_SNAPSHOT_MISMATCH = pytest.mark.xfail(
     ("app_file", "class_name", "terminal_size"),
     [
         pytest.param(
-            "attacks_tab_app.py",
-            "AttacksTabApp",
-            _LARGE_TERMINAL,
-            marks=_KNOWN_SNAPSHOT_MISMATCH,
-            id="attacks-large",
-        ),
-        pytest.param(
             "results_tab_app.py",
             "ResultsTabApp",
             _LARGE_TERMINAL,
             marks=_KNOWN_SNAPSHOT_MISMATCH,
             id="results-large",
-        ),
-        pytest.param(
-            "attacks_tab_app.py",
-            "AttacksTabApp",
-            _NARROW_TERMINAL,
-            marks=_KNOWN_SNAPSHOT_MISMATCH,
-            id="attacks-narrow",
         ),
     ],
 )
