@@ -198,6 +198,7 @@ class RemoteBackend:
             maxsize=_WRITE_QUEUE_MAXSIZE
         )
         self._writer_failures = 0
+        self._failures_lock = threading.Lock()
         self._closed = False
         self._writer = threading.Thread(
             target=self._writer_loop,
@@ -219,7 +220,7 @@ class RemoteBackend:
                 fn, args, kwargs = item
                 fn(*args, **kwargs)
             except Exception:  # noqa: BLE001 - one bad write must not stop the stream
-                self._writer_failures += 1
+                self._count_failure()
                 logger.warning("RemoteBackend: background write failed", exc_info=True)
             finally:
                 self._write_queue.task_done()
@@ -232,7 +233,7 @@ class RemoteBackend:
             try:
                 fn(*args, **kwargs)
             except Exception:  # noqa: BLE001
-                self._writer_failures += 1
+                self._count_failure()
                 logger.error(
                     "RemoteBackend: synchronous fallback write failed", exc_info=True
                 )
@@ -248,11 +249,22 @@ class RemoteBackend:
         """
         if not self._closed:
             self._write_queue.join()
-        if self._writer_failures:
+        # Each failure is reported once: a later flush that finds nothing new
+        # must not fail again over a write that was already reported.
+        failures = self._take_failures()
+        if failures:
             raise RuntimeError(
-                "RemoteBackend: "
-                f"{self._writer_failures} background audit write(s) failed"
+                f"RemoteBackend: {failures} background audit write(s) failed"
             )
+
+    def _count_failure(self) -> None:
+        with self._failures_lock:
+            self._writer_failures += 1
+
+    def _take_failures(self) -> int:
+        with self._failures_lock:
+            failures, self._writer_failures = self._writer_failures, 0
+        return failures
 
     def close(self) -> None:
         """Drain the queue, stop the worker, and report any write failures."""
@@ -261,10 +273,11 @@ class RemoteBackend:
         self._closed = True
         self._write_queue.put(_STOP)
         self._writer.join()
-        if self._writer_failures:
+        failures = self._take_failures()
+        if failures:
             logger.warning(
-                "RemoteBackend: %d background write(s) failed during this session",
-                self._writer_failures,
+                "RemoteBackend: %d background write(s) failed and were never flushed",
+                failures,
             )
 
     # ── Context ──────────────────────────────────────────────────────────────
