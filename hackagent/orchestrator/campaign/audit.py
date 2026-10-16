@@ -28,12 +28,12 @@ each other.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.core.contracts import LabelledSample
 from hackagent.core.logging import get_logger
 from hackagent.datasets.calibration import CalibrationSpec, load_calibration
@@ -74,6 +74,22 @@ def audit_configured_panel(
     concurrency: int = 1,
     load: CalibrationLoader = load_calibration,
 ) -> Optional[AuditReport]:
+    """Synchronous form of :func:`aaudit_configured_panel`.
+
+    Safe to call while an event loop is already running.
+    """
+    return run_coroutine_blocking(
+        lambda: aaudit_configured_panel(panel, spec, concurrency=concurrency, load=load)
+    )
+
+
+async def aaudit_configured_panel(
+    panel: Optional[Panel],
+    spec: AuditSpec,
+    *,
+    concurrency: int = 1,
+    load: CalibrationLoader = load_calibration,
+) -> Optional[AuditReport]:
     """Run the audit a campaign configured. ``None`` when it configured none.
 
     Raises :class:`AuditFailed` when a judge fails its robustness check
@@ -95,13 +111,11 @@ def audit_configured_panel(
         len(panel.judges),
         passes,
     )
-    report = asyncio.run(
-        audit_panel(
-            panel,
-            samples,
-            robustness=spec.robustness,
-            concurrency=concurrency,
-        )
+    report = await audit_panel(
+        panel,
+        samples,
+        robustness=spec.robustness,
+        concurrency=concurrency,
     )
     _log(report)
     if report.passed is False and spec.on_failure == "stop":
@@ -206,6 +220,7 @@ def _log(report: AuditReport) -> None:
 __all__ = [
     "AuditFailed",
     "CalibrationLoader",
+    "aaudit_configured_panel",
     "audit_configured_panel",
     "format_report",
     "read_report",

@@ -40,19 +40,25 @@ from hackagent.orchestrator.campaign.results import (
     CampaignResult,
     summary,
 )
-from hackagent.orchestrator.campaign.runner import run_campaign
+from hackagent.orchestrator.campaign.runner import (
+    CampaignCancelled,
+    arun_campaign,
+    run_campaign,
+)
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 __all__ = [
     "AuditFailed",
     "Attempt",
     "AttackOutcome",
+    "CampaignCancelled",
     "CampaignResult",
     "CampaignSpec",
     "EndpointOverrides",
     "ResolvedCampaign",
     "ServerReadiness",
     "apply_endpoint_overrides",
+    "arun_campaign",
     "campaign_models",
     "format_report",
     "installed_models",

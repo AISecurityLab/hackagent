@@ -47,7 +47,7 @@ from textual.widgets.tree import TreeNode
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.views.audit import audit_markup
-from hackagent.orchestrator.campaign import CampaignSpec
+from hackagent.orchestrator.campaign import CampaignCancelled, CampaignSpec
 
 from .draft import CampaignDraft, Issue
 from .form import FieldRow
@@ -1047,7 +1047,7 @@ class CampaignBuilder(Container):
         self._validate()
 
 
-class _Cancelled(RuntimeError):
+class _Cancelled(CampaignCancelled):
     """Raised from the event callback to stop a run cooperatively."""
 
 
