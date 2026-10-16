@@ -241,6 +241,25 @@ def build_panel(
     return Panel(judges, aggregation=spec.aggregation, threshold=spec.threshold)
 
 
+def resolution_summary(resolved: ResolvedCampaign) -> dict[str, str]:
+    """What resolving the campaign found, as label-value rows.
+
+    The facts a run is about to act on: how many goals were loaded, which
+    attacks were built, and which optional parts are switched on. The CLI
+    prints them as a table and the builder logs them before it starts, so
+    they are written once here and cannot drift apart.
+    """
+    spec = resolved.spec
+    return {
+        "Goals": str(len(resolved.goals)),
+        "Attacks": ", ".join(attack.name for attack in resolved.attacks) or "—",
+        "Judges": str(len(spec.evaluation.judges)),
+        "Guardrails": "on" if spec.guardrails.active else "off",
+        "Classifier": "on" if resolved.classifier is not None else "off",
+        "Escalate": "on" if spec.execution.escalate else "off",
+    }
+
+
 def _model_label(model: ModelConfig) -> dict[str, Any]:
     return {
         "name": model.name,
@@ -253,6 +272,7 @@ __all__ = [
     "ResolvedAttack",
     "ResolvedCampaign",
     "build_panel",
+    "resolution_summary",
     "resolve_attack",
     "resolve_campaign",
 ]

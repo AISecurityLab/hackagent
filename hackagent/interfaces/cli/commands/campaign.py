@@ -223,7 +223,11 @@ def run(
 @handle_errors
 def validate(file: str) -> None:
     """Resolve a campaign (goals, models, judges) without attacking it."""
-    from hackagent.orchestrator.campaign import load_campaign, resolve_campaign
+    from hackagent.orchestrator.campaign import (
+        load_campaign,
+        resolution_summary,
+        resolve_campaign,
+    )
 
     try:
         spec = load_campaign(Path(file))
@@ -233,12 +237,8 @@ def validate(file: str) -> None:
         raise SystemExit(1) from exc
 
     table = Table(title=f"Campaign: {spec.campaign.name}", show_header=False)
-    table.add_row("Goals", str(len(resolved.goals)))
-    table.add_row("Attacks", ", ".join(a.name for a in resolved.attacks) or "—")
-    table.add_row("Judges", str(len(spec.evaluation.judges)))
-    table.add_row("Guardrails", "on" if spec.guardrails.active else "off")
-    table.add_row("Classifier", "on" if resolved.classifier is not None else "off")
-    table.add_row("Escalate", "on" if spec.execution.escalate else "off")
+    for label, value in resolution_summary(resolved).items():
+        table.add_row(label, value)
     console.print(table)
     display_success("Campaign is valid.")
 

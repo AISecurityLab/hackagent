@@ -17,7 +17,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from hackagent.orchestrator.campaign import load_campaign, run_campaign, summary
+from hackagent.orchestrator.campaign import (
+    CampaignSpec,
+    load_campaign,
+    resolve_campaign,
+    run_campaign,
+    summary,
+)
 
 from .fakes import FakeBuilder, ScriptedModel, campaign, goals, model
 
@@ -522,3 +528,44 @@ def test_a_run_scoped_prepare_runs_once_and_is_traced(tmp_path):
     assert all(node.scope == "run" for node in outcome.run_trace)
     # Two warm-up goals plus lifelong epochs reached the target.
     assert len(builder.models["target"].requests) >= 2
+
+
+# --- a resolution the caller already made -----------------------------------
+
+
+def test_a_resolution_handed_in_is_the_one_that_runs(tmp_path):
+    """A UI that reported what the run will do must run exactly that.
+
+    Resolving again would load the goals a second time, so the report could
+    describe one set of goals and the run attack another.
+    """
+    values = campaign(execution={"output": {"directory": str(tmp_path)}})
+    spec = CampaignSpec.model_validate(values)
+    builder = FakeBuilder(models_for())
+    loads = []
+
+    def load(dataset):
+        loads.append(dataset)
+        return goals("goal one")(dataset)
+
+    resolved = resolve_campaign(spec, build=builder, load=load)
+    result = run_campaign(spec, resolved=resolved, store=_store())
+
+    assert len(loads) == 1
+    assert [goal.text for goal in resolved.goals] == ["goal one"]
+    assert [attempt.response.text for attempt in attempts_of(result)] == [TARGET_REPLY]
+
+
+def test_a_resolution_of_a_different_campaign_is_refused(tmp_path):
+    spec = CampaignSpec.model_validate(
+        campaign(execution={"output": {"directory": str(tmp_path)}})
+    )
+    other = spec.model_copy(
+        update={
+            "campaign": spec.campaign.model_copy(update={"name": "another campaign"})
+        }
+    )
+    resolved = resolve_campaign(other, build=FakeBuilder(), load=goals("goal one"))
+
+    with pytest.raises(ValueError, match="different campaign"):
+        run_campaign(spec, resolved=resolved, store=_store())

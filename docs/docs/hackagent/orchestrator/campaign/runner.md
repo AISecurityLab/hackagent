@@ -40,15 +40,17 @@ messages of its failed attempts and abstaining judges), `elapsed_s`), and
 #### run\_campaign
 
 ```python
-def run_campaign(source: str | Path | Mapping[str, Any] | CampaignSpec,
-                 *,
-                 on_event: Optional[EventCallback] = None,
-                 build: ModelBuilder = build_model,
-                 load: GoalLoader = load_goals,
-                 store: Optional[Store] = None,
-                 calibration: CalibrationLoader = load_calibration,
-                 build_embed: EmbedderBuilder = build_embedder,
-                 settings: Optional[Settings] = None) -> CampaignResult
+def run_campaign(
+        source: str | Path | Mapping[str, Any] | CampaignSpec,
+        *,
+        on_event: Optional[EventCallback] = None,
+        build: ModelBuilder = build_model,
+        load: GoalLoader = load_goals,
+        store: Optional[Store] = None,
+        calibration: CalibrationLoader = load_calibration,
+        build_embed: EmbedderBuilder = build_embedder,
+        settings: Optional[Settings] = None,
+        resolved: Optional[ResolvedCampaign] = None) -> CampaignResult
 ```
 
 Load, resolve, audit, and execute a campaign, then write its outputs.
@@ -57,4 +59,9 @@ A supplied `store` stays owned by the caller; one opened here is
 closed before returning. When `evaluation.audit` says `stop`, a
 panel that fails raises :class:`~.audit.AuditFailed` and nothing is
 attacked.
+
+A caller that already resolved the campaign — to report what the run
+will do before starting it — passes it as `resolved`, and the goals
+and models it checked are the ones the run uses. It has to come from
+the same campaign, or the report would describe a different run.
 

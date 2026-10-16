@@ -29,7 +29,11 @@ from hackagent.orchestrator.campaign.overrides import (
     wait_for_servers,
 )
 from hackagent.orchestrator.campaign.preflight import PreflightError, preflight
-from hackagent.orchestrator.campaign.resolve import ResolvedCampaign, resolve_campaign
+from hackagent.orchestrator.campaign.resolve import (
+    ResolvedCampaign,
+    resolution_summary,
+    resolve_campaign,
+)
 from hackagent.orchestrator.campaign.results import (
     Attempt,
     AttackOutcome,
@@ -56,6 +60,7 @@ __all__ = [
     "load_campaign",
     "preflight",
     "read_report",
+    "resolution_summary",
     "resolve_campaign",
     "run_audit",
     "run_campaign",

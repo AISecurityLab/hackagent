@@ -79,3 +79,16 @@ def build_panel(spec: EvaluationSpec,
 
 Bind every judge to its model. `None` when no judge is configured.
 
+#### resolution\_summary
+
+```python
+def resolution_summary(resolved: ResolvedCampaign) -> dict[str, str]
+```
+
+What resolving the campaign found, as label-value rows.
+
+The facts a run is about to act on: how many goals were loaded, which
+attacks were built, and which optional parts are switched on. The CLI
+prints them as a table and the builder logs them before it starts, so
+they are written once here and cannot drift apart.
+

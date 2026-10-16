@@ -104,6 +104,7 @@ def run_campaign(
     calibration: CalibrationLoader = load_calibration,
     build_embed: EmbedderBuilder = build_embedder,
     settings: Optional[Settings] = None,
+    resolved: Optional[ResolvedCampaign] = None,
 ) -> CampaignResult:
     """Load, resolve, audit, and execute a campaign, then write its outputs.
 
@@ -111,10 +112,19 @@ def run_campaign(
     closed before returning. When ``evaluation.audit`` says ``stop``, a
     panel that fails raises :class:`~.audit.AuditFailed` and nothing is
     attacked.
+
+    A caller that already resolved the campaign — to report what the run
+    will do before starting it — passes it as ``resolved``, and the goals
+    and models it checked are the ones the run uses. It has to come from
+    the same campaign, or the report would describe a different run.
     """
     spec = source if isinstance(source, CampaignSpec) else load_campaign(source)
     run_id = spec.execution.output.run_id or str(uuid4())
-    resolved = resolve_campaign(spec, build=build, load=load, build_embed=build_embed)
+    if resolved is not None and resolved.spec != spec:
+        raise ValueError("The resolved campaign was built from a different campaign.")
+    resolved = resolved or resolve_campaign(
+        spec, build=build, load=load, build_embed=build_embed
+    )
     logger.info(
         "campaign %s | resolved %d goals, %d attacks, %d judges",
         spec.campaign.name,

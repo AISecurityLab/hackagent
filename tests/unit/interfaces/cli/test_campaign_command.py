@@ -49,8 +49,9 @@ def _spec() -> CampaignSpec:
     return CampaignSpec.model_validate(MIN)
 
 
-def _resolved():
+def _resolved(spec: CampaignSpec | None = None):
     return SimpleNamespace(
+        spec=spec or _spec(),
         goals=(1, 2, 3),
         attacks=(SimpleNamespace(name="baseline"),),
         panel=None,
@@ -71,7 +72,10 @@ def test_validate_reports_the_resolved_plan():
 
     assert result.exit_code == 0, result.output
     assert "valid" in result.output.lower()
+    # Every row of the shared resolution summary, the builder shows too.
     assert "baseline" in result.output
+    assert "Goals" in result.output and "3" in result.output
+    assert "Guardrails" in result.output and "Escalate" in result.output
 
 
 def test_validate_reports_a_broken_campaign():

@@ -276,7 +276,8 @@ class HelpScreen(ModalScreen[None]):
             yield Static(
                 "[dim]Every field starts at its default, shown dimmed. Problems "
                 "appear on the field they concern, and Run stays disabled until "
-                "there are none.[/dim]"
+                "there are none. Running then loads the goals and builds every "
+                "model before the first attack, and says what it found.[/dim]"
             )
             for title, rows in self.SECTIONS:
                 yield Static(f"\n[b]{title}[/b]")

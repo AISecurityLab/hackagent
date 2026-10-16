@@ -10,6 +10,7 @@ run, and that handing the app a campaign skips the welcome entirely.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,6 +38,11 @@ from hackagent.interfaces.tui.views.campaign.welcome import (
 )
 
 WIDE = (120, 40)
+
+
+def _resolution(spec):
+    """What ``resolve_campaign`` hands back, with nothing actually built."""
+    return SimpleNamespace(spec=spec, goals=(), attacks=(), panel=None, classifier=None)
 
 
 @pytest.fixture
@@ -128,6 +134,12 @@ class TestShell:
             builder = app.query_one(CampaignBuilder)
             builder._snapshot = builder.draft.validate()[0]
             with (
+                # The run resolves the campaign first; that is covered on its
+                # own, and doing it here would load a dataset for nothing.
+                patch(
+                    "hackagent.orchestrator.campaign.resolve_campaign",
+                    return_value=_resolution(builder._snapshot),
+                ),
                 patch(
                     "hackagent.orchestrator.campaign.run_campaign",
                     side_effect=fake_run,

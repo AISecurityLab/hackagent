@@ -6,8 +6,9 @@
 Every field starts at its schema default, shown dimmed; typing overrides it and
 clearing it (or ``ctrl+t``) goes back to the default. Only overrides are saved.
 Rarely changed fields wait under *Advanced*. Problems are shown on the field
-they concern and flagged in the outline, and *Run* executes a frozen snapshot
-of the campaign while editing carries on.
+they concern and flagged in the outline. *Run* resolves the campaign first —
+the goals, models and judges ``hackagent campaign validate`` checks — reports
+what it found, then executes that frozen snapshot while editing carries on.
 """
 
 from __future__ import annotations
@@ -51,6 +52,7 @@ from hackagent.orchestrator.campaign import CampaignSpec
 from .draft import CampaignDraft, Issue
 from .form import FieldRow
 from .outline import Group, Node, Outline, build_outline, issue_matches
+from .report import attacks_markup, check_markup
 from .screens import ConfirmScreen, HelpScreen, PathScreen, RunScreen
 
 _OUTLINE_HINT = (
@@ -897,7 +899,12 @@ class CampaignBuilder(Container):
         self.run_worker(self._execute, thread=True, exclusive=True, name="campaign-run")
 
     def _execute(self) -> None:
-        from hackagent.orchestrator.campaign import run_campaign
+        from hackagent.orchestrator.campaign import (
+            resolution_summary,
+            resolve_campaign,
+            run_campaign,
+            summary,
+        )
 
         spec = self._snapshot
         if spec is None:
@@ -909,11 +916,31 @@ class CampaignBuilder(Container):
             if self._cancel.is_set():
                 raise _Cancelled("Stopped by the user")
 
+        # The checks ``hackagent campaign validate`` runs, before anything is
+        # attacked: the form only knows the file is well formed, while this
+        # loads the goals and builds every model. What it resolved is what the
+        # run then uses, so the report describes the run that follows.
+        self.app.call_from_thread(self._log, "[dim]Checking the campaign…[/dim]")
+        try:
+            resolved = resolve_campaign(spec)
+        except Exception as exc:
+            self.app.call_from_thread(
+                self._finish, "[red]Campaign rejected[/]", str(exc), None
+            )
+            return
+        check = check_markup(resolution_summary(resolved))
+        # A blank line after it: what follows is the run, not the check.
+        self.app.call_from_thread(self._log, f"{check}\n")
+        if self._cancel.is_set():
+            self.app.call_from_thread(self._finish, "[yellow]Stopped[/]", None, None)
+            return
+
         try:
             result = run_campaign(
                 spec,
                 on_event=on_event,
                 settings=getattr(self.cli_config, "settings", None),
+                resolved=resolved,
             )
         except Exception as exc:
             audit = getattr(exc, "report", None)
@@ -926,14 +953,11 @@ class CampaignBuilder(Container):
                     self._finish, "[red]Failed[/]", str(exc), audit
                 )
             return
-        attempts = sum(len(outcome.attempts) for outcome in result.attacks)
-        broken = sum(
-            bool(attempt.verdict and attempt.verdict.success)
-            for outcome in result.attacks
-            for attempt in outcome.attempts
-        )
+        report = summary(result)
+        attempts = sum(attack["attempts"] for attack in report["attacks"])
+        broken = sum(attack["successes"] for attack in report["attacks"])
         errored = result.attempt_errors
-        summary = (
+        headline = (
             f"[green]Done[/] · {attempts} attempts · [red]{broken} jailbroken[/] · "
             + (f"[yellow]{errored} with errors[/] · " if errored else "")
             + f"{monotonic() - started:.0f}s · run {escape(result.run_id)}"
@@ -945,12 +969,14 @@ class CampaignBuilder(Container):
             for message in attempt.errors
         )
         for message, count in messages.most_common(5):
-            summary += f"\n  [yellow]! ×{count}[/] {escape(message)}"
+            headline += f"\n  [yellow]! ×{count}[/] {escape(message)}"
         if len(messages) > 5:
-            summary += (
+            headline += (
                 f"\n  [dim]…{len(messages) - 5} more kinds, see the result file[/]"
             )
-        self.app.call_from_thread(self._finish, summary, None, result.audit)
+        table = attacks_markup(report)
+        closing = f"\n{table}\n\n{headline}" if table else headline
+        self.app.call_from_thread(self._finish, closing, None, result.audit)
 
     def _on_run_event(self, event_type: str, payload: dict[str, Any]) -> None:
         if event_type == "audit_finished":

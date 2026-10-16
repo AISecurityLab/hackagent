@@ -8,8 +8,9 @@ Campaign builder: an outline of the schema on the left, its fields on the right.
 Every field starts at its schema default, shown dimmed; typing overrides it and
 clearing it (or `ctrl+t`) goes back to the default. Only overrides are saved.
 Rarely changed fields wait under *Advanced*. Problems are shown on the field
-they concern and flagged in the outline, and *Run* executes a frozen snapshot
-of the campaign while editing carries on.
+they concern and flagged in the outline. *Run* resolves the campaign first —
+the goals, models and judges `hackagent campaign validate` checks — reports
+what it found, then executes that frozen snapshot while editing carries on.
 
 ## CampaignBuilder Objects
 
