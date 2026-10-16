@@ -112,6 +112,15 @@ def test_api_key_priority(tmp_path, explicit, env, file_value, expected, source)
     assert settings.api_key_source is source
 
 
+def test_the_api_key_never_appears_when_settings_are_printed(tmp_path):
+    """Settings reach logs and tracebacks; the key must not go with them."""
+    settings = _resolve(tmp_path, api_key="sk-do-not-print")
+
+    assert settings.api_key == "sk-do-not-print"
+    assert "sk-do-not-print" not in repr(settings)
+    assert "sk-do-not-print" not in str(settings)
+
+
 def test_explicit_empty_api_key_forces_local_mode(tmp_path):
     settings = _resolve(
         tmp_path,

@@ -65,6 +65,92 @@ def test_recorded_campaign_redacts_sensitive_headers_recursively():
     }
 
 
+def test_recorded_campaign_redacts_credentials_wherever_they_are_written():
+    values = campaign(
+        target={
+            **model("target"),
+            "connection": {
+                "provider": "azure",
+                "type": "OPENAI_SDK",
+                "endpoint": "https://user:hunter2@target/v1?api-key=k1&deployment=d",
+                "headers": {
+                    "x-goog-api-key": "k2",
+                    "Ocp-Apim-Subscription-Key": "k3",
+                    "Accept": "application/json",
+                },
+            },
+            "generation": {"max_tokens": 64, "extra_body": {"api_key": "k4"}},
+            "options": {"password": "k5", "session_token": "k6", "url": "u"},
+        },
+    )
+
+    recorded = load_campaign(values).recorded()
+    target = recorded["target"]
+
+    assert "k1" not in str(recorded) and "hunter2" not in str(recorded)
+    assert "deployment=d" in target["connection"]["endpoint"]
+    assert target["connection"]["headers"] == {
+        "x-goog-api-key": "[REDACTED]",
+        "Ocp-Apim-Subscription-Key": "[REDACTED]",
+        "Accept": "application/json",
+    }
+    assert target["generation"] == {
+        "max_tokens": 64,
+        "extra_body": {"api_key": "[REDACTED]"},
+    }
+    assert target["options"] == {
+        "password": "[REDACTED]",
+        "session_token": "[REDACTED]",
+        "url": "u",
+    }
+
+
+def test_recorded_campaign_keeps_references_to_credentials():
+    """An environment variable's name is how a repeated run finds the key."""
+    values = campaign(
+        execution={
+            "storage": {
+                "backend": "remote",
+                "base_url": "https://api.example",
+                "api_key_env": "HACKAGENT_API_KEY",
+            }
+        }
+    )
+
+    recorded = load_campaign(values).recorded()
+
+    assert recorded["execution"]["storage"]["api_key_env"] == "HACKAGENT_API_KEY"
+
+
+def test_no_campaign_setting_is_mistaken_for_a_credential():
+    """A setting redacted by name would be lost from every recorded run."""
+    import typing
+
+    from pydantic import BaseModel
+
+    from hackagent.orchestrator.campaign.spec import CampaignSpec, _is_credential_name
+
+    seen: set[type[BaseModel]] = set()
+    mistaken: list[str] = []
+
+    def walk(model: type[BaseModel]) -> None:
+        if model in seen:
+            return
+        seen.add(model)
+        for name, field in model.model_fields.items():
+            if _is_credential_name(name):
+                mistaken.append(f"{model.__name__}.{name}")
+            for outer in (field.annotation, *typing.get_args(field.annotation)):
+                for inner in (outer, *typing.get_args(outer)):
+                    if isinstance(inner, type) and issubclass(inner, BaseModel):
+                        walk(inner)
+
+    walk(CampaignSpec)
+    for name in ATTACKS:
+        walk(get_attack_class(name).params_type)
+    assert mistaken == []
+
+
 def test_repository_campaign_loads():
     """The campaign in the repository stays loadable, whatever it enables."""
     spec = load_campaign(REPO_CAMPAIGN)

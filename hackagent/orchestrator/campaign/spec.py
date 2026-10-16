@@ -13,7 +13,9 @@ is resolved.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, model_validator
 
@@ -453,47 +455,69 @@ class CampaignSpec(_Spec):
     def recorded(self) -> dict[str, Any]:
         """The campaign as it is written to disk and stored with the run.
 
-        Environment-backed credentials remain references. Sensitive values
-        placed in extra HTTP headers are replaced before the document crosses
-        the storage boundary; such campaigns must restore those values from a
+        Environment-backed credentials remain references. Credentials written
+        into the file itself — in headers, ``options``, ``extra_body`` or a
+        URL — are replaced before the document crosses the storage boundary;
+        such campaigns must restore those values from a
         trusted source before they can be repeated.
         """
-        document = self.model_dump(mode="json", exclude_none=True)
-        _redact_sensitive_headers(document)
-        return document
+        return _redacted(self.model_dump(mode="json", exclude_none=True))
 
 
-_SENSITIVE_HEADER_NAMES = frozenset(
-    {
-        "api-key",
-        "authorization",
-        "cookie",
-        "proxy-authorization",
-        "set-cookie",
-        "x-api-key",
-        "x-auth-token",
-    }
+_REDACTED = "[REDACTED]"
+
+#: A name that holds a credential: ``api_key``, ``x-goog-api-key``,
+#: ``session_token``, ``password``. A word only counts whole, so
+#: ``max_tokens`` and ``keyword`` are kept; a name ending in ``_env`` is a
+#: reference to a credential, not one, and is kept so the run can be repeated.
+_CREDENTIAL_NAME = re.compile(
+    r"(?:^|[^a-z])(?:[a-z]*key|token|secret|password|passwd|auth|authorization"
+    r"|cookie|credentials?|signature|session)(?:$|[^a-z])"
 )
 
 
-def _redact_sensitive_headers(value: Any) -> None:
-    """Redact credential-like HTTP headers in a dumped campaign in place."""
+def _is_credential_name(name: str) -> bool:
+    normalized = str(name).strip().lower()
+    return not normalized.endswith("_env") and bool(_CREDENTIAL_NAME.search(normalized))
+
+
+def _redacted(value: Any) -> Any:
+    """A dumped campaign with every credential it spells out replaced.
+
+    Values are judged by the name they are stored under, in headers and in
+    free-form mappings such as ``options`` and ``extra_body`` alike, and
+    URLs lose any user info and credential-named query parameters.
+    """
     if isinstance(value, dict):
-        for key, child in value.items():
-            if key == "headers" and isinstance(child, dict):
-                for header in child:
-                    normalized = str(header).strip().lower()
-                    if (
-                        normalized in _SENSITIVE_HEADER_NAMES
-                        or "token" in normalized
-                        or "secret" in normalized
-                    ):
-                        child[header] = "[REDACTED]"
-            else:
-                _redact_sensitive_headers(child)
-    elif isinstance(value, list):
-        for child in value:
-            _redact_sensitive_headers(child)
+        return {
+            key: _REDACTED if _is_credential_name(key) else _redacted(child)
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [_redacted(child) for child in value]
+    if isinstance(value, str):
+        return _redacted_url(value)
+    return value
+
+
+def _redacted_url(text: str) -> str:
+    try:
+        parts = urlsplit(text)
+    except ValueError:
+        return text
+    if not (parts.scheme and parts.netloc):
+        return text
+    netloc = parts.netloc
+    if "@" in netloc:
+        netloc = f"{_REDACTED}@{netloc.rsplit('@', 1)[1]}"
+    query = urlencode(
+        [
+            (name, _REDACTED if _is_credential_name(name) else item)
+            for name, item in parse_qsl(parts.query, keep_blank_values=True)
+        ],
+        safe="[]",
+    )
+    return urlunsplit(parts._replace(netloc=netloc, query=query))
 
 
 def campaign_json_schema() -> dict[str, Any]:
