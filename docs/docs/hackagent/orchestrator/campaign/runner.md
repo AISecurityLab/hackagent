@@ -25,8 +25,13 @@ spent cannot stop anything.
 
 Shared semaphores cap how many goals are attacked, how many requests reach
 the target, and how many samples are judged at once, across all attacks. An
-error in one goal or request becomes an attempt with `error` set; only
-setup failures and the per-attack timeout fail an attack.
+error in one goal or request becomes an attempt with `error` set; setup
+failures, a store that refuses a write, and the per-attack timeout fail an
+attack, and stop its other goals so nothing writes into a finished run.
+
+An `on_event` listener that raises stops the whole campaign; raising
+:class:`CampaignCancelled` records the runs as cancelled rather than
+failed. Cancelling the task that runs :func:`arun_campaign` does the same.
 
 #### EventCallback
 
@@ -37,10 +42,40 @@ Receives `(event_name, **payload)`. An audited run first emits
 messages of its failed attempts and abstaining judges), `elapsed_s`), and
 `attack_finished` (`attack`, `run_id`, `error`).
 
+## CampaignCancelled Objects
+
+```python
+class CampaignCancelled(Exception)
+```
+
+Raised by an `on_event` listener to stop a campaign.
+
+The runs it leaves are recorded as cancelled, not failed.
+
 #### run\_campaign
 
 ```python
 def run_campaign(
+        source: str | Path | Mapping[str, Any] | CampaignSpec,
+        *,
+        on_event: Optional[EventCallback] = None,
+        build: ModelBuilder = build_model,
+        load: GoalLoader = load_goals,
+        store: Optional[Store] = None,
+        calibration: CalibrationLoader = load_calibration,
+        build_embed: EmbedderBuilder = build_embedder,
+        settings: Optional[Settings] = None,
+        resolved: Optional[ResolvedCampaign] = None) -> CampaignResult
+```
+
+Synchronous form of :func:`arun_campaign`.
+
+Safe to call while an event loop is already running, as in a notebook.
+
+#### arun\_campaign
+
+```python
+async def arun_campaign(
         source: str | Path | Mapping[str, Any] | CampaignSpec,
         *,
         on_event: Optional[EventCallback] = None,
