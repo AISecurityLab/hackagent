@@ -48,6 +48,7 @@ from hackagent.attacks.techniques.trace import (
 )
 from hackagent.core.contracts import Goal, RunStatus, Sample, Verdict
 from hackagent.core.logging import get_logger
+from hackagent.core.settings import Settings
 from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals, select_goals
 from hackagent.datasets.labelling import label_goals
@@ -102,6 +103,7 @@ def run_campaign(
     store: Optional[Store] = None,
     calibration: CalibrationLoader = load_calibration,
     build_embed: EmbedderBuilder = build_embedder,
+    settings: Optional[Settings] = None,
 ) -> CampaignResult:
     """Load, resolve, audit, and execute a campaign, then write its outputs.
 
@@ -126,7 +128,7 @@ def run_campaign(
         )
 
     owns_store = store is None
-    store = store or open_store(spec.execution.storage)
+    store = store or open_store(spec.execution.storage, settings=settings)
     # Written to the run folder and stored with the record, so the run can be
     # repeated; credentials in connection headers are redacted on the way out.
     recorded_spec = spec.recorded()

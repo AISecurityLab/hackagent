@@ -55,6 +55,9 @@ def test_a_panel_boxes_its_nested_models() -> None:
     assert ("concurrency", "target") in {
         field.path for field in boxed["Concurrency"].fields
     }
+    storage = {field.path[-1]: field for field in boxed["Storage"].fields}
+    assert storage["backend"].default == "auto"
+    assert storage["backend"].choices == ("auto", "local", "remote")
 
 
 def test_an_optional_nested_model_is_a_box_you_can_switch_on() -> None:

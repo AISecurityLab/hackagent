@@ -13,10 +13,15 @@ exchange), and the final run status.
 #### open\_store
 
 ```python
-def open_store(storage: StorageSpec) -> Store
+def open_store(storage: StorageSpec,
+               settings: Optional[Settings] = None) -> Store
 ```
 
-Open the local database or connect to the remote API.
+Open the store selected by the campaign and active runtime settings.
+
+`auto` is what makes a campaign launched by the CLI or TUI follow the
+account configuration without putting a credential in the campaign file.
+Explicit `local` and `remote` values remain deterministic overrides.
 
 #### register\_target
 

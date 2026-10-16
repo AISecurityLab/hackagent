@@ -175,10 +175,10 @@ def recorded() -> dict[str, Any]
 
 The campaign as it is written to disk and stored with the run.
 
-The same campaign, reloadable as-is, so a run can be repeated from
-its own record. No credential passes through here: `api_key_env`
-names the variable holding the API key, and the key stays in the
-environment.
+Environment-backed credentials remain references. Sensitive values
+placed in extra HTTP headers are replaced before the document crosses
+the storage boundary; such campaigns must restore those values from a
+trusted source before they can be repeated.
 
 #### campaign\_json\_schema
 

@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
+from hackagent.interfaces.cli.main import cli
 from hackagent.interfaces.cli.commands.campaign import campaign
 from hackagent.orchestrator.campaign import CampaignResult, CampaignSpec
 
@@ -119,6 +120,38 @@ def test_run_applies_an_endpoint_override_and_reports_the_summary():
     report = json.loads(result.output.strip().splitlines()[-1])
     assert report["campaign"] == "demo"
     assert report["succeeded"] is True
+
+
+def test_main_cli_passes_its_remote_settings_to_the_campaign_runner():
+    runner = CliRunner()
+    captured = {}
+
+    def fake_run(spec, **kwargs):
+        captured["settings"] = kwargs["settings"]
+        return CampaignResult(campaign_name="demo", run_id="r1", dry_run=True)
+
+    with (
+        patch("hackagent.orchestrator.campaign.load_campaign", return_value=_spec()),
+        patch("hackagent.orchestrator.campaign.run_campaign", side_effect=fake_run),
+    ):
+        result = runner.invoke(
+            cli,
+            [
+                "--api-key",
+                "dashboard-key",
+                "--base-url",
+                "https://api.example.test",
+                "campaign",
+                "run",
+                "campaign.yaml",
+                "--dry-run",
+                "--json",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert captured["settings"].api_key == "dashboard-key"
+    assert captured["settings"].base_url == "https://api.example.test"
 
 
 def test_run_rejects_an_incompatible_override():

@@ -58,7 +58,7 @@ class ConfigTab(VerticalScroll):
             )
 
             yield Static(
-                "[green]🗄️ Mode:[/green] [bold]Local[/bold] — results stored in local SQLite database",
+                "[dim]Storage mode: checking...[/dim]",
                 classes="status-indicator",
                 id="mode-indicator",
             )
@@ -111,12 +111,23 @@ class ConfigTab(VerticalScroll):
             )
 
     def _update_mode_indicator(self) -> None:
-        """Show storage mode — always local."""
+        """Show where campaigns using the default ``auto`` storage are written."""
         try:
             mode_widget = self.query_one("#mode-indicator", Static)
+            if self.cli_config.api_key:
+                mode_widget.update(
+                    "[cyan]☁️ Mode:[/cyan] [bold]Remote[/bold] — campaigns using "
+                    f"auto storage sync to {self.cli_config.base_url}"
+                )
+                return
+
             from pathlib import Path
 
-            db_path = Path("~/.local/share/hackagent/hackagent.db").expanduser()
+            settings = getattr(self.cli_config, "settings", None)
+            configured_path = getattr(
+                settings, "db_path", "~/.local/share/hackagent/hackagent.db"
+            )
+            db_path = Path(configured_path).expanduser()
             db_exists = (
                 "[green]✓ exists[/green]"
                 if db_path.exists()

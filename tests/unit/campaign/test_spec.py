@@ -13,10 +13,56 @@ from pydantic import ValidationError
 from hackagent.attacks.techniques.registry import ATTACKS, get_attack_class
 from hackagent.core.contracts import AgentType
 from hackagent.orchestrator.campaign import load_campaign
+from hackagent.orchestrator.campaign.spec import StorageSpec
 
 from .fakes import campaign, model
 
 REPO_CAMPAIGN = Path(__file__).resolve().parents[3] / "campaign.yaml"
+
+
+def test_storage_follows_runtime_configuration_by_default():
+    assert StorageSpec().backend == "auto"
+
+
+def test_recorded_campaign_redacts_sensitive_headers_recursively():
+    values = campaign(
+        target={
+            **model("target"),
+            "connection": {
+                "provider": "vllm",
+                "type": "OPENAI_SDK",
+                "endpoint": "http://target/v1",
+                "headers": {
+                    "Authorization": "Bearer target-secret",
+                    "X-Request-ID": "safe-to-record",
+                },
+            },
+        },
+        evaluation={
+            "judges": [
+                {
+                    **model("judge"),
+                    "connection": {
+                        "provider": "vllm",
+                        "type": "OPENAI_SDK",
+                        "endpoint": "http://judge/v1",
+                        "headers": {"X-Auth-Token": "judge-secret"},
+                    },
+                    "scoring": {"type": "harmbench"},
+                }
+            ]
+        },
+    )
+
+    recorded = load_campaign(values).recorded()
+
+    assert recorded["target"]["connection"]["headers"] == {
+        "Authorization": "[REDACTED]",
+        "X-Request-ID": "safe-to-record",
+    }
+    assert recorded["evaluation"]["judges"][0]["connection"]["headers"] == {
+        "X-Auth-Token": "[REDACTED]"
+    }
 
 
 def test_repository_campaign_loads():

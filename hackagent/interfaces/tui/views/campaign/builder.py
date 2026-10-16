@@ -910,7 +910,11 @@ class CampaignBuilder(Container):
                 raise _Cancelled("Stopped by the user")
 
         try:
-            result = run_campaign(spec, on_event=on_event)
+            result = run_campaign(
+                spec,
+                on_event=on_event,
+                settings=getattr(self.cli_config, "settings", None),
+            )
         except Exception as exc:
             audit = getattr(exc, "report", None)
             if self._cancel.is_set():

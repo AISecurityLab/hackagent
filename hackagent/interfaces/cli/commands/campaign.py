@@ -31,6 +31,20 @@ def campaign() -> None:
     """🎯 Run declarative campaign files (campaign.yaml)."""
 
 
+def _runtime_settings():
+    """Return settings resolved by the root CLI, when invoked through it.
+
+    The campaign command is also tested and usable as a standalone Click group,
+    where no root ``CLIConfig`` exists; the runner then resolves settings itself.
+    """
+    ctx = click.get_current_context(silent=True)
+    if ctx is None:
+        return None
+    root = ctx.find_root()
+    config = (root.obj or {}).get("config") if isinstance(root.obj, dict) else None
+    return getattr(config, "settings", None)
+
+
 def _endpoint_options(func):
     """Attach the run-time endpoint/server options shared by ``run``."""
     options = [
@@ -190,7 +204,11 @@ def run(
             mark = "[red]✗[/red]" if error else "[green]✓[/green]"
             console.print(f"{mark} {payload.get('attack')} finished")
 
-    result = run_campaign(spec, on_event=on_event)
+    result = run_campaign(
+        spec,
+        on_event=on_event,
+        settings=_runtime_settings(),
+    )
     report = summary(result)
     report["output_directory"] = spec.execution.output.directory
     if as_json:

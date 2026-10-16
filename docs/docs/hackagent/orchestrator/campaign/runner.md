@@ -40,15 +40,15 @@ messages of its failed attempts and abstaining judges), `elapsed_s`), and
 #### run\_campaign
 
 ```python
-def run_campaign(
-        source: str | Path | Mapping[str, Any] | CampaignSpec,
-        *,
-        on_event: Optional[EventCallback] = None,
-        build: ModelBuilder = build_model,
-        load: GoalLoader = load_goals,
-        store: Optional[Store] = None,
-        calibration: CalibrationLoader = load_calibration,
-        build_embed: EmbedderBuilder = build_embedder) -> CampaignResult
+def run_campaign(source: str | Path | Mapping[str, Any] | CampaignSpec,
+                 *,
+                 on_event: Optional[EventCallback] = None,
+                 build: ModelBuilder = build_model,
+                 load: GoalLoader = load_goals,
+                 store: Optional[Store] = None,
+                 calibration: CalibrationLoader = load_calibration,
+                 build_embed: EmbedderBuilder = build_embedder,
+                 settings: Optional[Settings] = None) -> CampaignResult
 ```
 
 Load, resolve, audit, and execute a campaign, then write its outputs.

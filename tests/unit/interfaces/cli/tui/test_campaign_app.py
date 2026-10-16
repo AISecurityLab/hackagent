@@ -10,16 +10,17 @@ run, and that handing the app a campaign skips the welcome entirely.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from textual.widgets import Button, Input, Tree
+from textual.widgets import Button, Input, Static, Tree
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.app import HackAgentTUI
 from hackagent.interfaces.tui.views.campaign import CampaignBuilder
 from hackagent.interfaces.tui.views.campaign.draft import CampaignDraft
+from hackagent.orchestrator.campaign import CampaignResult
 from hackagent.interfaces.tui.views.campaign.screens import (
     ConfirmScreen,
     ExampleScreen,
@@ -43,6 +44,7 @@ def cli_config():
     config = MagicMock(spec=CLIConfig)
     config.api_key = "test-key"
     config.base_url = "https://api.test.hackagent.dev"
+    config.settings = MagicMock(name="resolved-settings")
     return config
 
 
@@ -57,6 +59,15 @@ def test_the_starting_point_is_a_campaign_that_runs():
 def test_the_starting_point_can_be_judged():
     """Without a judge a run records replies but scores nothing."""
     assert starting_point().document["evaluation"]["judges"]
+
+
+def test_the_starting_point_uses_account_aware_storage():
+    draft = CampaignDraft.from_yaml(yaml.safe_dump(starting_point().document))
+    spec, issues = draft.validate()
+
+    assert issues == ()
+    assert spec is not None
+    assert spec.execution.storage.backend == "auto"
 
 
 LOGO_LINES = tuple(HACKAGENT_BANNER.strip("\n").splitlines())
@@ -97,6 +108,45 @@ class TestShell:
             rows = _rendered(app)
 
         assert "ready to run" in rows[0]
+
+    @pytest.mark.asyncio
+    async def test_campaign_execution_receives_the_tui_account_settings(
+        self, cli_config
+    ):
+        captured = {}
+
+        def fake_run(_spec, **kwargs):
+            captured["settings"] = kwargs["settings"]
+            return CampaignResult(campaign_name="test", run_id="run-1", dry_run=True)
+
+        app = HackAgentTUI(
+            cli_config,
+            initial_data={"campaign_yaml": yaml.safe_dump(starting_point().document)},
+        )
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            builder = app.query_one(CampaignBuilder)
+            builder._snapshot = builder.draft.validate()[0]
+            with (
+                patch(
+                    "hackagent.orchestrator.campaign.run_campaign",
+                    side_effect=fake_run,
+                ),
+                patch.object(app, "call_from_thread"),
+            ):
+                builder._execute()
+
+        assert captured["settings"] is cli_config.settings
+
+    @pytest.mark.asyncio
+    async def test_config_view_explains_remote_auto_storage(self, cli_config):
+        app = HackAgentTUI(cli_config, initial_tab="config")
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            rendered = str(app.query_one("#mode-indicator", Static).render())
+
+        assert "Remote" in rendered
+        assert cli_config.base_url in rendered
 
 
 class TestWelcome:

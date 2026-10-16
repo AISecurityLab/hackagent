@@ -30,22 +30,33 @@ from hackagent.tracking.evaluation import eval_columns
 from hackagent.tracking.serialize import sanitize_for_json
 
 
-def open_store(storage: StorageSpec) -> Store:
-    """Open the local database or connect to the remote API."""
-    if storage.backend == "local":
+def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Store:
+    """Open the store selected by the campaign and active runtime settings.
+
+    ``auto`` is what makes a campaign launched by the CLI or TUI follow the
+    account configuration without putting a credential in the campaign file.
+    Explicit ``local`` and ``remote`` values remain deterministic overrides.
+    """
+    if storage.backend == "remote":
+        from hackagent.storage.remote import RemoteBackend
+
+        assert storage.base_url and storage.api_key_env  # enforced by StorageSpec
+        api_key = os.environ.get(storage.api_key_env, "").strip()
+        if not api_key:
+            raise ValueError(
+                f"Environment variable {storage.api_key_env!r} required for remote storage is not set."
+            )
+        return RemoteBackend.connect(storage.base_url, api_key)
+
+    runtime = settings or Settings.resolve()
+    if storage.backend == "local" or not runtime.api_key:
         from hackagent.storage.local import LocalBackend
 
-        return LocalBackend(db_path=Settings.resolve(api_key="").db_path)
+        return LocalBackend(db_path=runtime.db_path)
 
     from hackagent.storage.remote import RemoteBackend
 
-    assert storage.base_url and storage.api_key_env  # enforced by StorageSpec
-    api_key = os.environ.get(storage.api_key_env, "").strip()
-    if not api_key:
-        raise ValueError(
-            f"Environment variable {storage.api_key_env!r} required for remote storage is not set."
-        )
-    return RemoteBackend.connect(storage.base_url, api_key)
+    return RemoteBackend.connect(runtime.base_url, runtime.api_key)
 
 
 def register_target(store: Store, target: ModelConfig) -> UUID:

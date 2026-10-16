@@ -333,11 +333,13 @@ class OutputSpec(_Spec):
 class StorageSpec(_Spec):
     """Where results are recorded so they can be browsed later."""
 
-    backend: Literal["local", "remote"] = Field(
-        default="local",
+    backend: Literal["auto", "local", "remote"] = Field(
+        default="auto",
         description=(
-            "``local`` writes to a SQLite file on this machine; ``remote`` sends "
-            "results to a HackAgent server."
+            "``auto`` follows the active HackAgent configuration: an API key sends "
+            "results to its remote server, otherwise results use local SQLite. "
+            "``local`` always uses SQLite; ``remote`` uses the explicit server and "
+            "environment variable below."
         ),
     )
     base_url: Optional[str] = Field(
@@ -452,12 +454,47 @@ class CampaignSpec(_Spec):
     def recorded(self) -> dict[str, Any]:
         """The campaign as it is written to disk and stored with the run.
 
-        The same campaign, reloadable as-is, so a run can be repeated from
-        its own record. No credential passes through here: ``api_key_env``
-        names the variable holding the API key, and the key stays in the
-        environment.
+        Environment-backed credentials remain references. Sensitive values
+        placed in extra HTTP headers are replaced before the document crosses
+        the storage boundary; such campaigns must restore those values from a
+        trusted source before they can be repeated.
         """
-        return self.model_dump(mode="json", exclude_none=True)
+        document = self.model_dump(mode="json", exclude_none=True)
+        _redact_sensitive_headers(document)
+        return document
+
+
+_SENSITIVE_HEADER_NAMES = frozenset(
+    {
+        "api-key",
+        "authorization",
+        "cookie",
+        "proxy-authorization",
+        "set-cookie",
+        "x-api-key",
+        "x-auth-token",
+    }
+)
+
+
+def _redact_sensitive_headers(value: Any) -> None:
+    """Redact credential-like HTTP headers in a dumped campaign in place."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "headers" and isinstance(child, dict):
+                for header in child:
+                    normalized = str(header).strip().lower()
+                    if (
+                        normalized in _SENSITIVE_HEADER_NAMES
+                        or "token" in normalized
+                        or "secret" in normalized
+                    ):
+                        child[header] = "[REDACTED]"
+            else:
+                _redact_sensitive_headers(child)
+    elif isinstance(value, list):
+        for child in value:
+            _redact_sensitive_headers(child)
 
 
 def campaign_json_schema() -> dict[str, Any]:
