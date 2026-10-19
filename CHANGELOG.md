@@ -1,3 +1,83 @@
+## v0.15.0 (2026-10-19)
+
+### BREAKING CHANGE
+
+- `execution.storage.backend: auto` is no longer a valid
+value. A campaign file that names it must say `local` or `remote`.
+- a campaign that relied on the old `local` default now
+records to the account whenever an API key is configured. Set
+`execution.storage.backend: local` to keep a run on this machine.
+
+### Feat
+
+- record the target's latency on each stored result
+- **storage**: a campaign records where it says, and that is here
+- **tui**: a run says what it will do, and then what it did
+- **storage**: a campaign follows the account unless it says otherwise
+- **tui**: a welcome screen to start from, and results as one tree
+- the campaign workflow underneath — datasets, preflight, storage, runs
+
+### Fix
+
+- **campaign**: keep waiting for a run being created through a second cancel
+- **campaign**: record a run cancelled while it is being created
+- **cli**: report an API error as one
+- **cipherchat**: split demonstrations a missing comma had merged
+- never count a refused Crescendo turn as a success
+- send the goal and evaluation metrics with each stored result
+- keep credentials out of recorded campaigns and printed settings
+- **release**: smoke-test the binary with every attack, not a removed command
+- **campaign**: finish every run, and run a campaign on one event loop
+- **storage**: report a failed background write once
+- follow the renamed OPENAI agent type, and regenerate the docs
+- **tui**: read results from the store that holds them
+- apply the dataset offset option in every provider
+- send the API key when checking a vLLM server is ready
+- port example scripts to the client facade
+- **cli**: allow --version without rag/vision extras
+- **attacks**: read technique prompt and response keys into AttackResult
+- **orchestrator**: majority panel by default, and never shrink it silently
+- **evaluation**: judges that fail abstain instead of voting safe
+- **evaluation**: stop reading "cannot" and "unknown" as a no
+- **orchestrator**: stop merging the storage key into non-gateway roles (#640)
+- latent bugs found during the restructure survey (#640)
+- drop Intel macOS from the release binary matrix
+
+### Refactor
+
+- remove the pre-campaign run path and the CLI that fronted it
+- **examples**: every example is a campaign file, and follows OLLAMA_HOST
+- **tui**: the attacks tab becomes a campaign builder
+- make openai the agent type for OpenAI-compatible endpoints
+- migrate to the campaign workflow
+- **tracking**: group modules into goals, steps and sinks
+- **orchestrator**: group modules into execution, setup, results and planning
+- **core**: split contracts into a package by topic
+- **attacks**: drop the shared, generator, objectives and router shims
+- **evaluation**: never guess a yes/no answer from the reply text
+- **attacks**: group techniques into category folders
+- **client**: add facade and route interfaces through it (#640)
+- **orchestrator**: stand up orchestrator/ as the run composition root (#640)
+- **evaluation**: stand up evaluation/ and tracking/ (#640)
+- **attacks**: migrate custom-loop techniques onto RunContext (#640)
+- **attacks**: migrate inline-judge techniques onto ctx.judge (#640)
+- **attacks**: migrate post-hoc techniques onto BaseAttack(config, ctx) (#640)
+- **attacks**: extract shared helpers into attacks/_lib (#640)
+- **attacks**: fold DEFAULT_PAIR_CONFIG into PairConfig (#640)
+- **attacks**: BaseAttack(config, ctx) and typed Step (#640)
+- **attacks**: AttackConfig with roles() and forbid extras (#640)
+- **attacks**: add ports (RunContext, Judge, Events, Workspace) (#640)
+- move callers off AgentRouter onto connect() (#640)
+- **models**: storage-free connect(), guardrails and factory (#640)
+- **models**: share one base for the CLI-driven adapters (#640)
+- **models**: move model access from router/ to models/ (#640)
+- **datasets**: resolve goal sources into typed Goal values (#640)
+- **storage**: move persistence into storage/ with a private HTTP client (#640)
+- **catalog**: move taxonomy, risks and attack labels into catalog/ (#640)
+- **core**: add core/contracts with the shared vocabulary (#640)
+- **core**: add core package with a single settings resolver (#640)
+- remove dead, unreachable and compatibility-only code (#640)
+
 ## v0.14.0 (2026-09-21)
 
 ### Feat
