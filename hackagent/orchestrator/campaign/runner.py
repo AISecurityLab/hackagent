@@ -586,8 +586,7 @@ class _AttackRunner:
             goal.index, request_index, goal.text, messages=tuple(messages)
         )
         try:
-            async with self.limits.target:
-                response = await self.resolved.target.acomplete(messages)
+            response = await self._complete(messages)
         except Exception as exc:
             # A provider error arrives as a response; a transport failure
             # arrives as an exception, and is this request's alone.
@@ -715,8 +714,7 @@ class _AttackRunner:
         """
         started = monotonic()
         try:
-            async with self.limits.target:
-                response = await self.resolved.target.acomplete(messages, **overrides)
+            response = await self._complete(messages, **overrides)
         except Exception as exc:
             # A provider error arrives as a response; a transport failure
             # arrives as an exception, and the trace should show both.
@@ -730,6 +728,18 @@ class _AttackRunner:
             raise
         record_target_call(messages, response, monotonic() - started)
         return response
+
+    async def _complete(self, messages: Messages, **overrides: Any) -> ModelResponse:
+        """One call to the target, with the time it took to answer.
+
+        The clock starts once the call holds its slot, so the latency is the
+        target's and not the time spent queueing behind other requests.
+        """
+        async with self.limits.target:
+            started = monotonic()
+            response = await self.resolved.target.acomplete(messages, **overrides)
+            elapsed = monotonic() - started
+        return replace(response, latency_ms=round(elapsed * 1000))
 
     async def _judge(self, sample: Sample) -> Optional[Verdict]:
         panel = self.resolved.panel

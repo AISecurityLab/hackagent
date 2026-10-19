@@ -149,6 +149,7 @@ class RunTracker:
         if self.output.save_responses and attempt.response is not None:
             details["response"] = attempt.response.text
             details["decoded_response"] = attempt.decoded
+        response = attempt.response
         self.store.update_result(
             record.id,
             evaluation_status=_evaluation_status(attempt),
@@ -161,6 +162,10 @@ class RunTracker:
                 if key.startswith(("eval_", "explanation_"))
             },
             agent_specific_data=sanitize_for_json(details),
+            latency_ms=response.latency_ms if response else None,
+            response_status_code=response.error.status_code
+            if response and response.error
+            else None,
         )
 
     def complete(self) -> None:

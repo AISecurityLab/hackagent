@@ -66,6 +66,8 @@ class ModelResponse:
     metadata: Dict[str, Any] = field(default_factory=dict)
     error: Optional[LLMError] = None
     guardrail: Optional[GuardrailInfo] = None
+    #: How long the call took, in milliseconds, when its caller timed it.
+    latency_ms: Optional[int] = None
 
     @property
     def ok(self) -> bool:

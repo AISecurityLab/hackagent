@@ -314,12 +314,18 @@ class RecordingStore:
         evaluation_notes: Optional[str] = None,
         evaluation_metrics: Optional[Dict[str, Any]] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        response_status_code: Optional[int] = None,
     ) -> ResultRecord:
         self._note("update_result", result_id, evaluation_status=evaluation_status)
         record = self.get_result(result_id)
         metadata = dict(record.metadata)
         if agent_specific_data:
             metadata.update(agent_specific_data)
+        if latency_ms is not None:
+            metadata["latency_ms"] = latency_ms
+        if response_status_code is not None:
+            metadata["response_status_code"] = response_status_code
         updated = record.model_copy(
             update={
                 "evaluation_status": evaluation_status or record.evaluation_status,

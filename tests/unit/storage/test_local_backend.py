@@ -447,6 +447,28 @@ class TestLocalBackendResult(unittest.TestCase):
         )
         self.assertEqual(updated.evaluation_metrics["score"], 0.9)
 
+    def test_update_result_keeps_the_target_latency_in_the_metadata(self):
+        # There are no columns for these; the web layer reads them from the
+        # metadata, as it does the other response fields.
+        rec = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        updated = self.backend.update_result(
+            rec.id,
+            agent_specific_data={"request_index": 0},
+            latency_ms=1250,
+            response_status_code=429,
+        )
+        self.assertEqual(
+            updated.metadata,
+            {"request_index": 0, "latency_ms": 1250, "response_status_code": 429},
+        )
+
+    def test_update_result_adds_the_latency_to_the_stored_metadata(self):
+        rec = self.backend.create_result(
+            self.run.id, "goal", 0, {}, {"request_index": 0}
+        )
+        updated = self.backend.update_result(rec.id, latency_ms=80)
+        self.assertEqual(updated.metadata, {"request_index": 0, "latency_ms": 80})
+
     def test_get_result(self):
         rec = self.backend.create_result(self.run.id, "goal", 0, {}, {})
         fetched = self.backend.get_result(rec.id)
