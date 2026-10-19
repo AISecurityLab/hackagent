@@ -562,7 +562,14 @@ def adk_campaign(
             },
             "attacks": attacks,
             "evaluation": {"judges": judges if judged else []},
-            "execution": {"output": {"directory": str(tmp_path / "out")}},
+            # The ADK server answers 500 now and then when its own model is
+            # busy with parallel tests. Preflight would fail the whole run
+            # over one; without it a 500 is that request's error, retried.
+            "execution": {
+                "preflight": False,
+                "retries": {"target": 2},
+                "output": {"directory": str(tmp_path / "out")},
+            },
         }
 
     return _campaign

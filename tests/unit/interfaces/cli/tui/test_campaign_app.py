@@ -585,9 +585,15 @@ class TestKeysThatMustNotBeShadowed:
             await pilot.press("enter")  # into the builder
             await pilot.pause()
             # Focus a text field directly: this is about what a focused
-            # editor swallows, not about where Tab happens to land.
-            app.query(Input).first().focus()
-            await pilot.pause()
+            # editor swallows, not about where Tab happens to land. On a slow
+            # runner the builder's own first focus can land after ours, so
+            # focus until it holds.
+            field = app.query(Input).first()
+            for _ in range(10):
+                field.focus()
+                await pilot.pause()
+                if app.focused is field:
+                    break
 
             assert isinstance(app.focused, Input)
             claimed = set(app.focused._bindings.key_to_bindings)

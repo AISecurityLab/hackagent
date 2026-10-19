@@ -446,9 +446,13 @@ def test_every_trace_step_is_stored_with_its_result(tmp_path):
 
 
 class SlowModel(ScriptedModel):
-    """A target that takes ``delay`` seconds to answer."""
+    """A target that takes ``delay`` seconds to answer.
 
-    def __init__(self, reply="a slow reply", delay: float = 0.05) -> None:
+    The delay is twice the 50 ms the tests assert: Windows timers are coarse
+    enough that a 50 ms sleep can measure 46.
+    """
+
+    def __init__(self, reply="a slow reply", delay: float = 0.1) -> None:
         super().__init__(reply)
         self.delay = delay
 
@@ -465,9 +469,7 @@ def test_each_result_records_how_long_the_target_took(tmp_path):
         execution={"output": {"directory": str(tmp_path)}},
     )
     store = in_memory_store()
-    result, _builder = run(
-        values, models=models_for(target=SlowModel(delay=0.05)), store=store
-    )
+    result, _builder = run(values, models=models_for(target=SlowModel()), store=store)
 
     [attempt] = attempts_of(result)
     assert isinstance(attempt.response.latency_ms, int)
@@ -484,7 +486,7 @@ def test_each_iterative_attempt_records_its_own_target_call(tmp_path):
     store = in_memory_store()
     result, _builder = run(
         values,
-        models=models_for(judge="no", target=SlowModel(delay=0.05)),
+        models=models_for(judge="no", target=SlowModel()),
         store=store,
     )
 
