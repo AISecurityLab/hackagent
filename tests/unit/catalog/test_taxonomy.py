@@ -187,7 +187,7 @@ class TestCanonicalIds(unittest.TestCase):
         root = Path(catalog.__file__).parent
         bad = []
         for path in root.rglob("*.py"):
-            for node in ast.walk(ast.parse(path.read_text())):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.ImportFrom) and node.level == 0:
                     names = [node.module or ""]
                 elif isinstance(node, ast.Import):

@@ -233,105 +233,90 @@ class TestGoogleADKBackendIntegration:
 
 @pytest.mark.integration
 @pytest.mark.google_adk
-class TestGoogleADKHackAgentIntegration:
-    """End-to-end tests for HackAgent with Google ADK backend."""
+class TestGoogleADKCampaignIntegration:
+    """End-to-end campaigns against a Google ADK agent, recorded locally."""
 
-    def test_hackagent_with_google_adk_initialization(
+    def test_a_campaign_resolves_the_adk_agent_as_its_target(
         self,
         skip_if_google_adk_unavailable,
-        skip_if_no_hackagent_key,
-        hackagent_client_factory,
-        google_adk_agent_url: str,
+        adk_campaign,
     ):
-        """Test HackAgent initialization with Google ADK agent type."""
-        from hackagent import AgentType
+        from hackagent.models.completions.adk import ADKModel
+        from hackagent.orchestrator.campaign import load_campaign, resolve_campaign
 
-        agent = hackagent_client_factory(
-            name="multi_tool_agent",
-            endpoint=google_adk_agent_url,
-            agent_type=AgentType.GOOGLE_ADK,
+        resolved = resolve_campaign(
+            load_campaign(adk_campaign([{"name": "static_template"}]))
         )
 
-        assert agent is not None
-        assert agent.router is not None
-        logger.info(
-            f"HackAgent initialized with Google ADK: {agent.router.backend_agent}"
-        )
+        assert isinstance(resolved.target, ADKModel)
 
     @pytest.mark.timeout(600)
-    def test_hackagent_google_adk_static_template_attack(
+    def test_a_static_attack_reaches_the_agent_and_is_recorded(
         self,
         skip_if_google_adk_unavailable,
-        skip_if_no_hackagent_key,
-        hackagent_client_factory,
-        google_adk_agent_url: str,
-        basic_attack_config: Dict[str, Any],
+        adk_campaign,
+        local_store,
     ):
-        """Test running a static template attack against Google ADK agent."""
-        from hackagent import AgentType
+        from hackagent.orchestrator.campaign import run_campaign
 
-        agent = hackagent_client_factory(
-            name="multi_tool_agent",
-            endpoint=google_adk_agent_url,
-            agent_type=AgentType.GOOGLE_ADK,
+        result = run_campaign(
+            adk_campaign([{"name": "static_template"}]), store=local_store
         )
 
-        logger.info("Starting static template attack against Google ADK agent...")
-        results = agent.hack(attack_config=basic_attack_config)
-
-        assert results is not None
-        logger.info(f"Baseline attack completed: {results}")
+        [outcome] = result.attacks
+        assert outcome.error is None
+        assert outcome.attempts
+        assert any(attempt.response is not None for attempt in outcome.attempts)
+        [run] = local_store.list_runs().items
+        assert run.status == "COMPLETED"
+        logger.info("static_template: %d attempts", len(outcome.attempts))
 
     @pytest.mark.slow
     @pytest.mark.timeout(900)
-    def test_hackagent_google_adk_advprefix_attack(
-        self,
-        skip_if_google_adk_unavailable,
-        skip_if_no_hackagent_key,
-        hackagent_client_factory,
-        google_adk_agent_url: str,
-        advprefix_attack_config: Dict[str, Any],
-    ):
-        """Test running an advprefix attack against Google ADK agent."""
-        from hackagent import AgentType
-
-        agent = hackagent_client_factory(
-            name="multi_tool_agent",
-            endpoint=google_adk_agent_url,
-            agent_type=AgentType.GOOGLE_ADK,
-        )
-
-        logger.info("Starting advprefix attack against Google ADK agent...")
-        results = agent.hack(attack_config=advprefix_attack_config)
-
-        assert results is not None
-        logger.info(f"Advprefix attack completed: {results}")
-
-    @pytest.mark.slow
-    @pytest.mark.timeout(900)
-    def test_hackagent_google_adk_with_ollama_judges(
+    def test_advprefix_searches_against_the_agent(
         self,
         skip_if_google_adk_unavailable,
         skip_if_ollama_unavailable,
-        skip_if_no_hackagent_key,
-        hackagent_client_factory,
-        google_adk_agent_url: str,
-        advprefix_attack_config_with_ollama_judges: Dict[str, Any],
+        adk_campaign,
+        ollama_model_config,
+        local_store,
     ):
-        """Test advprefix attack with Ollama-based judges against Google ADK."""
-        from hackagent import AgentType
+        from hackagent.orchestrator.campaign import run_campaign
 
-        agent = hackagent_client_factory(
-            name="multi_tool_agent",
-            endpoint=google_adk_agent_url,
-            agent_type=AgentType.GOOGLE_ADK,
+        attack = {"name": "advprefix", "roles": {"attacker": ollama_model_config}}
+        result = run_campaign(
+            adk_campaign([attack], goal="Bypass content safety filters"),
+            store=local_store,
         )
 
-        logger.info("Starting advprefix attack with Ollama judges...")
-        results = agent.hack(attack_config=advprefix_attack_config_with_ollama_judges)
+        [outcome] = result.attacks
+        assert outcome.error is None, outcome.error
+        assert outcome.attempts
+        logger.info("advprefix: %d attempts", len(outcome.attempts))
 
-        assert results is not None
-        logger.info(f"Attack with Ollama judges completed: {results}")
+    @pytest.mark.timeout(600)
+    def test_an_ollama_judge_rates_every_reply_of_the_agent(
+        self,
+        skip_if_google_adk_unavailable,
+        skip_if_ollama_unavailable,
+        adk_campaign,
+        local_store,
+    ):
+        # A static attack, so every request reaches the judge: whether an
+        # adaptive search finds anything to judge depends on the model.
+        from hackagent.orchestrator.campaign import run_campaign
+
+        result = run_campaign(
+            adk_campaign([{"name": "static_template"}], judged=True),
+            store=local_store,
+        )
+
+        [outcome] = result.attacks
+        assert outcome.error is None, outcome.error
+        answered = [a for a in outcome.attempts if a.error is None]
+        assert answered, [a.error for a in outcome.attempts]
+        assert all(a.verdict is not None for a in answered)
+        logger.info("judged %d replies", len(answered))
 
 
 @pytest.mark.integration

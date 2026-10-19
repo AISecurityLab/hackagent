@@ -114,7 +114,9 @@ DOCS = Path(__file__).resolve().parents[3] / "docs" / "docs"
 def documented_campaigns():
     """Every campaign literal in the docs, with the page it came from."""
     for path in sorted(DOCS.rglob("*.md")):
-        for block in re.findall(r"```python\n(.*?)```", path.read_text(), re.S):
+        for block in re.findall(
+            r"```python\n(.*?)```", path.read_text(encoding="utf-8"), re.S
+        ):
             for snippet in campaigns(block):
                 yield path.relative_to(DOCS).as_posix(), snippet
 

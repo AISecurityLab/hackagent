@@ -46,7 +46,7 @@ def test_there_are_example_campaigns():
 
 @pytest.mark.parametrize("path", CAMPAIGNS, ids=lambda p: p.stem)
 def test_the_example_resolves(path: Path):
-    spec = CampaignSpec.model_validate(yaml.safe_load(path.read_text()))
+    spec = CampaignSpec.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
     resolved = resolve_campaign(
         spec,
         build=lambda config, retries=0: _Fake(),
@@ -59,11 +59,11 @@ def test_the_example_resolves(path: Path):
 @pytest.mark.parametrize("path", CAMPAIGNS, ids=lambda p: p.stem)
 def test_the_example_says_what_it_is(path: Path):
     """An example nobody can read is not an example."""
-    document = yaml.safe_load(path.read_text())
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert document["campaign"].get("description"), (
         f"{path.name}: give `campaign.description` a line saying what this attacks"
     )
-    assert path.read_text().lstrip().startswith("#"), (
+    assert path.read_text(encoding="utf-8").lstrip().startswith("#"), (
         f"{path.name}: open with a comment covering prerequisites and how to run it"
     )
 
@@ -80,7 +80,7 @@ def test_the_example_lets_ollama_be_where_it_is(path: Path):
     from hackagent.core.contracts import AgentType
     from hackagent.orchestrator.campaign.preflight import campaign_models
 
-    spec = CampaignSpec.model_validate(yaml.safe_load(path.read_text()))
+    spec = CampaignSpec.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
     pinned = [
         f"{where} ({config.connection.endpoint})"
         for where, config in campaign_models(spec)

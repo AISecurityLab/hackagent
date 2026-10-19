@@ -9,6 +9,7 @@ and wiring without reaching any provider.
 
 from __future__ import annotations
 
+import importlib
 import unittest
 from unittest.mock import patch
 
@@ -47,7 +48,10 @@ class TestConnectProvider(unittest.TestCase):
         self.assertIsInstance(model, Model)
 
     def test_generation_knobs_are_carried(self):
-        with patch("hackagent.models.connect.build_model") as build:
+        # ``hackagent.models.connect`` names the function as well as the module,
+        # and Python 3.10's ``patch`` resolves the dotted path to the function.
+        module = importlib.import_module("hackagent.models.connect")
+        with patch.object(module, "build_model") as build:
             connect(
                 ModelSpec(
                     identifier="gpt-4",

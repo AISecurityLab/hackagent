@@ -46,6 +46,22 @@ class TestErrorHandling:
         with pytest.raises(click.ClickException):
             failing_function()
 
+    def test_an_api_error_is_reported_as_one(self):
+        """ApiError is a HackAgentError, so its handler must come first."""
+        import click
+
+        from hackagent.core.errors import ApiError
+
+        @handle_errors
+        def failing_function():
+            raise ApiError("server said no")
+
+        with patch.object(console, "print") as printed:
+            with pytest.raises(click.ClickException):
+                failing_function()
+
+        assert "API Error: server said no" in str(printed.call_args_list[0])
+
     def test_handle_errors_debug_mode(self):
         """Test error handler shows traceback in debug mode"""
         import click

@@ -90,7 +90,7 @@ def test_the_run_folder_replays(campaign, run_live, tmp_path):
     )
     assert (folder / "results.json").is_file()
 
-    written = yaml.safe_load((folder / "campaign.yaml").read_text())
+    written = yaml.safe_load((folder / "campaign.yaml").read_text(encoding="utf-8"))
     assert load_campaign(written) == load_campaign(campaign)
 
 
