@@ -171,6 +171,20 @@ def test_cipherchat_validates_encoding():
         CipherChatParams(encode_method="rot47")
 
 
+def test_each_cipherchat_demonstration_is_one_exchange():
+    """A missing comma between two entries silently merges them into one."""
+    from hackagent.attacks.techniques.static.cipherchat import demonstrations
+
+    merged = [
+        f"{name}: {text[:30]!r}"
+        for name, entries in vars(demonstrations).items()
+        if name.startswith("toxic_demons")
+        for text in entries
+        if text.lower().count("user:") + text.count("用户：") != 1
+    ]
+    assert merged == []
+
+
 def test_tfc_serializes_a_text_flowchart():
     requests = generate(tFCAttack(tFCParams(text_format="mermaid")))
     assert "```mermaid" in requests[0][-1]["content"]
