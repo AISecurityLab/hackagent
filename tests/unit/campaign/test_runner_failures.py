@@ -231,6 +231,58 @@ def test_a_run_cancelled_while_it_is_being_created_is_recorded_as_cancelled(
     assert _statuses(store) == {RunStatus.CANCELLED.value}
 
 
+def test_a_parallel_run_still_being_created_survives_a_second_cancel(tmp_path):
+    """Parallel attacks are cancelled once by gather and again by _all_or_none.
+
+    One attack is busy with its goal; the other is still creating its run in
+    a worker thread, and must record it as cancelled despite both cancels.
+    """
+    import time
+
+    store = _store()
+    second_creating = asyncio.Event()
+    update_run = store.update_run
+    marked_running = 0
+
+    def slow_second_update_run(run_id, *args, **kwargs):
+        nonlocal marked_running
+        if kwargs.get("status") == RunStatus.RUNNING.value:
+            marked_running += 1
+            if marked_running == 2:
+                loop.call_soon_threadsafe(second_creating.set)
+                time.sleep(0.3)
+        return update_run(run_id, *args, **kwargs)
+
+    store.update_run = slow_second_update_run
+    target = _Target(delays={"goal one": [30, 30]})
+    values = campaign(
+        attacks=[{"name": "baseline"}, {"name": "baseline"}],
+        execution={"mode": "parallel", "output": {"directory": str(tmp_path)}},
+    )
+
+    async def cancel_while_one_is_created() -> None:
+        nonlocal loop
+        loop = asyncio.get_running_loop()
+        task = asyncio.create_task(
+            arun_campaign(
+                values,
+                build=FakeBuilder({"target": target, "judge": ScriptedModel("yes")}),
+                load=goals("goal one"),
+                store=store,
+            )
+        )
+        await asyncio.wait_for(second_creating.wait(), timeout=5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    loop = None
+    asyncio.run(cancel_while_one_is_created())
+
+    assert len(store.runs) == 2
+    assert _statuses(store) == {RunStatus.CANCELLED.value}
+
+
 def test_the_synchronous_api_runs_inside_an_event_loop(tmp_path):
     """A notebook already has a loop running when it calls ``run_campaign``."""
 
