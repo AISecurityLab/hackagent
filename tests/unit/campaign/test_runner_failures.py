@@ -190,6 +190,47 @@ def test_a_cancelled_run_is_recorded_as_cancelled(tmp_path):
     assert campaign_run.status == RunStatus.CANCELLED.value
 
 
+def test_a_run_cancelled_while_it_is_being_created_is_recorded_as_cancelled(
+    tmp_path,
+):
+    """The run is created in a worker thread; a cancel can land meanwhile."""
+    import time
+
+    store = _store()
+    created = asyncio.Event()
+    update_run = store.update_run
+
+    def slow_update_run(run_id, *args, **kwargs):
+        # Marking the new run RUNNING is the last step of creating it.
+        if kwargs.get("status") == RunStatus.RUNNING.value:
+            loop.call_soon_threadsafe(created.set)
+            time.sleep(0.3)
+        return update_run(run_id, *args, **kwargs)
+
+    store.update_run = slow_update_run
+
+    async def cancel_during_creation() -> None:
+        nonlocal loop
+        loop = asyncio.get_running_loop()
+        task = asyncio.create_task(
+            arun_campaign(
+                _baseline(tmp_path),
+                build=FakeBuilder({"judge": ScriptedModel("yes")}),
+                load=goals("goal one"),
+                store=store,
+            )
+        )
+        await asyncio.wait_for(created.wait(), timeout=5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    loop = None
+    asyncio.run(cancel_during_creation())
+
+    assert _statuses(store) == {RunStatus.CANCELLED.value}
+
+
 def test_the_synchronous_api_runs_inside_an_event_loop(tmp_path):
     """A notebook already has a loop running when it calls ``run_campaign``."""
 

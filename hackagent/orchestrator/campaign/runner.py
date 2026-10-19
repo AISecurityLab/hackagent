@@ -427,16 +427,29 @@ class _AttackRunner:
         self, attack: ResolvedAttack, goals: Optional[tuple[Goal, ...]] = None
     ) -> AttackOutcome:
         goals = self.resolved.goals if goals is None else goals
-        tracker = await asyncio.to_thread(
-            RunTracker,
-            self.store,
-            agent_id=self.agent_id,
-            attack_name=attack.name,
-            configuration=attack.configuration,
-            expected_goals=len(goals),
-            output=self.execution.output,
-            campaign_run_id=self.campaign_run_id,
+        creating = asyncio.ensure_future(
+            asyncio.to_thread(
+                RunTracker,
+                self.store,
+                agent_id=self.agent_id,
+                attack_name=attack.name,
+                configuration=attack.configuration,
+                expected_goals=len(goals),
+                output=self.execution.output,
+                campaign_run_id=self.campaign_run_id,
+            )
         )
+        try:
+            tracker = await asyncio.shield(creating)
+        except asyncio.CancelledError:
+            # The thread creates the run whatever happens here, so wait for
+            # it and record the run as cancelled instead of leaving it RUNNING.
+            try:
+                tracker = await creating
+            except Exception:
+                raise asyncio.CancelledError() from None
+            _record_quietly(self.store, tracker.cancel)
+            raise
         run_id = str(tracker.run_id)
         logger.info("%s | started | run=%s | goals=%d", attack.name, run_id, len(goals))
 
