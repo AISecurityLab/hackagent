@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=../../../docs/static/schema/campaign.schema.json
+#
+# The smallest real run: five HarmBench goals against a local Ollama model,
+# judged by the same model. Nothing leaves your machine and nothing costs
+# anything, so it is the one to start with.
+#
+#   1. ollama pull gemma3:4b
+#   2. ollama serve
+#   3. hackagent campaign run h4rm3l-demo.yaml
+#
+# Or `hackagent examples ollama`, which checks Ollama is up and pulls the
+# model for you first.
+version: 1
+
+campaign:
+  name: Ollama h4rm3l demo
+  description: h4rm3l over five HarmBench goals against a local Ollama model.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 5
+    shuffle: false
+    seed: 42
+
+target:
+  name: gemma3:4b
+  connection:
+    provider: ollama
+    type: OLLAMA
+  generation:
+    max_tokens: 400
+
+attacks:
+  # Three decorators in a row: pretend to be DAN, suppress the refusal, then
+  # ask for a style that makes complying feel like following instructions.
+  - name: h4rm3l
+    parameters:
+      program: DANDecorator().then(RefusalSuppressionDecorator()).then(StyleInjectionShortDecorator())
+      syntax_version: 2
+
+evaluation:
+  judges:
+    - name: gemma3:4b
+      connection:
+        provider: ollama
+        type: OLLAMA
+      scoring:
+        type: harmbench_variant

@@ -2,66 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Attack module for HackAgent security assessment framework.
+Attack techniques for the HackAgent security assessment framework.
 
-This package contains various attack implementations designed to test the security
-and robustness of AI agents and language models.
-
-Architecture:
-    - evaluator/: Reusable evaluation components (judge evaluators, pattern
-      evaluators, metrics, server sync)
-    - generator/: Reusable generation components (attack templates, patterns)
-    - objectives/: Define WHAT vulnerability we test (metadata/config)
-    - techniques/: Define HOW we generate attacks (implementation)
-        - advprefix/: Prefix optimization technique
-        - static_template/: Static template prompt injection
-        - pair/: LLM-driven iterative refinement
-    - shared/: Cross-cutting infrastructure (progress, response utils,
-      router factory, TUI) — legacy evaluator/generator shims re-export
-      from evaluator/ and generator/ for backward compatibility
-    - orchestrator.py: Attack orchestration for server integration
-    - registry.py: Attack registration and discovery
-
-Available attacks:
-- AdvPrefixOrchestrator: Adversarial prefix generation orchestrator
-- StaticTemplateOrchestrator: Static template prompt injection orchestrator
-- PAIROrchestrator: Prompt Automatic Iterative Refinement orchestrator
-
-The module integrates with the HackAgent backend for result tracking and reporting.
+Techniques live under ``techniques/``. The composition root that runs them
+is :mod:`hackagent.orchestrator`. Judges live in ``hackagent.evaluation``.
+Run records live in ``hackagent.tracking``.
 """
 
-from .registry import (
-    ATTACK_REGISTRY,
-    AdvPrefixOrchestrator,
-    AutoDANTurboOrchestrator,
-    BaselineOrchestrator,
-    StaticTemplateOrchestrator,
-    CipherChatOrchestrator,
-    PAIROrchestrator,
-    FlipAttackOrchestrator,
-    TAPOrchestrator,
-)
-from .taxonomy import (
-    ATTACK_TAXONOMY,
-    AttackCategory,
-    AttackTag,
-    AttackTaxonomy,
-    get_attack_taxonomy,
-)
-
-__all__ = [
-    "ATTACK_REGISTRY",
-    "ATTACK_TAXONOMY",
-    "AttackCategory",
-    "AttackTag",
-    "AttackTaxonomy",
-    "AdvPrefixOrchestrator",
-    "AutoDANTurboOrchestrator",
-    "BaselineOrchestrator",
-    "StaticTemplateOrchestrator",
-    "CipherChatOrchestrator",
-    "PAIROrchestrator",
-    "FlipAttackOrchestrator",
-    "TAPOrchestrator",
-    "get_attack_taxonomy",
-]
+__all__: list[str] = []

@@ -56,3 +56,6 @@ website/bundler-cpu-profile.json
 .env.local
 .env.development.local
 .env.test.local
+
+# pydoc-markdown's scratch render directory
+.pydoc-build/

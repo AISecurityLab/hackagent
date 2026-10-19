@@ -1,0 +1,60 @@
+# Responsible Disclosure
+
+This page covers what to do when HackAgent finds a weakness in a system you test. How to run the tests themselves is in [Ethical Guidelines](./ethical-guidelines.mdx).
+
+:::info Found a vulnerability in HackAgent itself?
+Report it privately to [ais@ai4i.it](mailto:ais@ai4i.it). The [security policy](https://github.com/AISecurityLab/hackagent/blob/main/SECURITY.md) gives the scope and response times.
+:::
+
+## Before you test
+
+Only test systems you own or have written permission to test, and keep that permission on file. Agree on the scope in advance: which endpoints, which attacks, for how long, and who to call if something breaks. If you cannot name the person you would report a finding to, you are not ready to test.
+
+## When you find something
+
+Stop at the smallest proof that the weakness is real. One successful prompt and its reply is usually enough; do not keep attacking to see how far it goes, and do not look at data the proof does not need. Record the target, the attack configuration, the prompt and the response, which HackAgent already stores with each run.
+
+## Reporting it
+
+Send the report to the owner's security contact: their `security.txt` file, bug bounty program or security address, in that order of preference. Describe the affected system, the kind of weakness, its impact and how to reproduce it, and offer to share the full details over a secure channel. Keep the first message short and ask for an acknowledgement within five business days.
+
+<Modal trigger="Show a first-contact email" title="First-contact email">
+
+```text
+Subject: Security vulnerability report: [short description]
+
+Hello,
+
+While running authorized security tests with HackAgent, an open-source
+AI red-teaming tool, I found a potential vulnerability in [system or URL].
+
+Type:     [e.g. prompt injection, system prompt leakage]
+Severity: [your assessment]
+Found on: [date]
+Impact:   [one or two sentences]
+
+I can share reproduction steps and the full test record once we have a
+secure channel. Please acknowledge this report within five business days.
+
+[Name, affiliation, contact]
+```
+
+</Modal>
+
+## Timeline
+
+Give the owner time to fix the issue before anything is public. The common default is 90 days from the first report: an acknowledgement within a week, a fix plan within about a month, and publication once the fix ships or the 90 days run out. Shorten it when the weakness is being exploited in the wild, and extend it when the owner is working in good faith on a hard fix.
+
+## Publishing
+
+When you publish, describe the class of weakness, its impact, the timeline and how to defend against it, and credit the owner if they cooperated. Leave out step-by-step exploitation and anything that identifies systems which are still unpatched.
+
+## If something goes wrong
+
+If a test exposes personal or sensitive data, stop, do not copy or keep it, delete anything cached, and tell the owner at once, describing what happened without repeating the data. If you cause an outage or other harm, stop and notify the owner immediately so they can recover. If you notice that someone else is actively attacking the system, tell the owner right away; that is not the moment to wait for a disclosure timeline.
+
+## Law
+
+Unauthorized testing can be a crime even when your intent is good: under the Computer Fraud and Abuse Act in the US, the Computer Misuse Act in the UK, and similar laws elsewhere, while data protection law such as the GDPR applies to any personal data you touch. Written permission is your main protection. When the scope or the jurisdiction is unclear, ask a lawyer before you start.
+
+For more on coordinated disclosure, see the [CERT/CC guide](https://certcc.github.io/CERT-Guide-to-CVD/) and [FIRST](https://www.first.org/). Questions about using HackAgent responsibly: [ais@ai4i.it](mailto:ais@ai4i.it).

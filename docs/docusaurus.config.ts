@@ -2,6 +2,105 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
+// API pages that moved when their modules moved: new path -> old paths.
+// core/contracts was one page; its old URL opens the first topic page.
+// Pages that moved when the docs followed the campaign workflow, and older
+// moves, mapped to where their content lives now.
+const PAGE_REDIRECTS: Record<string, string> = {
+  '/agents': '/reference/target#agent-types',
+  '/agents/claude-code': '/reference/target#agent-types',
+  '/agents/codex': '/reference/target#agent-types',
+  '/agents/google-adk': '/reference/target#agent-types',
+  '/agents/hermes': '/reference/target#agent-types',
+  '/agents/ollama': '/reference/target#agent-types',
+  '/agents/openai': '/reference/target#agent-types',
+  '/agents/openai-sdk': '/reference/target#agent-types',
+  '/agents/web': '/reference/target#agent-types',
+  '/agents/guardrails': '/reference/guardrails',
+  '/architecture/system-overview': '/concepts/code-map',
+  '/attacks': '/reference/attacks',
+  '/attacks/advprefix': '/reference/attacks/advprefix',
+  '/attacks/autodan_turbo': '/reference/attacks/autodan_turbo',
+  '/attacks/baseline': '/reference/attacks/baseline',
+  '/attacks/bon': '/reference/attacks/bon',
+  '/attacks/cipherchat': '/reference/attacks/cipherchat',
+  '/attacks/crescendo': '/reference/attacks/crescendo',
+  '/attacks/fc': '/reference/attacks/fc',
+  '/attacks/flipattack': '/reference/attacks/flipattack',
+  '/attacks/h4rm3l': '/reference/attacks/h4rm3l',
+  '/attacks/mml': '/reference/attacks/mml',
+  '/attacks/pair': '/reference/attacks/pair',
+  '/attacks/pap': '/reference/attacks/pap',
+  '/attacks/rag': '/reference/attacks/rag',
+  '/attacks/tap': '/reference/attacks/tap',
+  '/attacks/tfc': '/reference/attacks/tfc',
+  '/attacks/tool_output_ipi': '/reference/attacks/tool_output_ipi',
+  '/attacks/static-template': '/reference/attacks/static_template',
+  '/attacks/seam': '/concepts/code-map',
+  '/attacks/shared-args': '/reference/campaign',
+  '/attacks/taxonomy': '/reference/attacks',
+  '/cli/overview': '/reference/cli',
+  '/cli/agent': '/reference/cli#hackagent-agent',
+  '/cli/config': '/reference/cli#hackagent-config',
+  '/cli/datasets': '/reference/cli#hackagent-datasets',
+  '/cli/eval': '/reference/cli#hackagent-campaign',
+  '/cli/attack': '/reference/cli#hackagent-campaign',
+  '/cli/initialization': '/reference/cli#hackagent-init',
+  '/cli/results': '/reference/cli#hackagent-results',
+  '/cli/scan': '/reference/cli',
+  '/cli/web': '/getting-started/dashboard',
+  '/client': '/hackagent/client',
+  '/datasets': '/reference/dataset',
+  '/datasets/custom-providers': '/reference/dataset',
+  '/datasets/file': '/reference/dataset',
+  '/datasets/huggingface': '/reference/dataset',
+  '/datasets/omnisafebench': '/reference/dataset',
+  '/datasets/troubleshooting': '/reference/dataset',
+  '/datasets/url-json': '/reference/dataset',
+  '/datasets/selecting-intent-categories': '/reference/dataset',
+  '/datasets/presets': '/reference/dataset#presets',
+  '/getting-started/datasets-tutorial': '/reference/dataset',
+  '/evaluation': '/concepts/judges',
+  '/getting-started/quick-start': '/getting-started/first-campaign',
+  '/getting-started/attack-tutorial': '/getting-started/first-campaign',
+  '/getting-started/quick-security-scan': '/risks/evaluation-campaigns/quick-scan',
+  '/orchestrator': '/concepts/code-map',
+  '/tracking': '/concepts/how-a-run-works',
+  '/sdk/python-quickstart': '/api-index',
+  '/guides/overview': '/',
+  '/guides/choose-an-interface': '/',
+  '/hackagent/attacks/_lib/objectives/base': '/reference/attacks',
+  '/hackagent/attacks/orchestrator': '/reference',
+  '/hackagent/attacks/registry': '/reference/attacks',
+  '/hackagent/router/discovery/scanner': '/hackagent/orchestrator/planning/planner',
+  '/hackagent/agent': '/hackagent/client',
+};
+
+const MOVED_API_PAGES: Record<string, string[]> = {
+  '/hackagent/orchestrator/execution/chain': ['/hackagent/orchestrator/chain'],
+  '/hackagent/orchestrator/execution/context': ['/hackagent/orchestrator/context'],
+  '/hackagent/orchestrator/execution/runner': ['/hackagent/orchestrator/runner'],
+  '/hackagent/orchestrator/execution/scheduling': ['/hackagent/orchestrator/scheduling'],
+  '/hackagent/orchestrator/execution/spec': ['/hackagent/orchestrator/run_spec'],
+  '/hackagent/orchestrator/setup/defaults': ['/hackagent/orchestrator/defaults'],
+  '/hackagent/orchestrator/setup/goals': ['/hackagent/orchestrator/goals'],
+  '/hackagent/orchestrator/setup/preflight': ['/hackagent/orchestrator/preflight'],
+  '/hackagent/orchestrator/setup/registry': ['/hackagent/orchestrator/registry'],
+  '/hackagent/orchestrator/results/mapping': ['/hackagent/orchestrator/mapping'],
+  '/hackagent/orchestrator/results/persistence': ['/hackagent/orchestrator/persistence'],
+  '/hackagent/orchestrator/planning/planner': ['/hackagent/orchestrator/planning'],
+  '/hackagent/tracking/goals/tracker': ['/hackagent/tracking/tracker'],
+  '/hackagent/tracking/steps/tracker': ['/hackagent/tracking/step'],
+  '/hackagent/tracking/steps/context': ['/hackagent/tracking/context'],
+  '/hackagent/tracking/steps/decorators': ['/hackagent/tracking/decorators'],
+  '/hackagent/tracking/sinks/sink': ['/hackagent/tracking/sink'],
+  '/hackagent/tracking/sinks/listeners': ['/hackagent/tracking/listeners'],
+  '/hackagent/tracking/sinks/audit': ['/hackagent/tracking/audit'],
+  '/hackagent/tracking/serialize': ['/hackagent/tracking/utils'],
+  '/hackagent/core/contracts/enums': ['/hackagent/core/contracts'],
+  '/hackagent/datasets/providers/omnisafebench': ['/hackagent/datasets/intents'],
+};
+
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
@@ -10,7 +109,7 @@ const config: Config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://animated-guide-g46k62k.pages.github.io',
+  url: 'https://docs.hackagent.dev',
   // Set the /<baseUrl>/ pathname under which your site is served
   baseUrl: '/',
   trailingSlash: false,
@@ -20,6 +119,8 @@ const config: Config = {
   projectName: 'HackAgent', // Must match the GitHub repo name exactly (case-sensitive).
 
   onBrokenLinks: 'throw',
+  // Default is warn. Throw so a broken heading anchor fails the docs build.
+  onBrokenAnchors: 'throw',
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -37,7 +138,8 @@ const config: Config = {
     // for authored pages explicitly saved as .mdx.
     format: 'detect',
     hooks: {
-      onBrokenMarkdownLinks: 'warn',
+      // Default is warn. Throw so an unresolved .md/.mdx link fails the docs build.
+      onBrokenMarkdownLinks: 'throw',
     },
   },
   themes: [
@@ -66,15 +168,11 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           routeBasePath: '/',
           editUrl: 'https://github.com/AISecurityLab/hackagent/edit/main/docs/',
-          // Enable versioning for API docs
-          includeCurrentVersion: true,
-          lastVersion: 'current',
-          versions: {
-            current: {
-              label: 'Latest (Development)',
-              path: '/',
-            },
-          },
+          // The docs plugin passes `exclude` to globby `ignore`, which does
+          // not honor `!` negation. Drop the default `**/_*/**` rule so the
+          // generated `hackagent/attacks/_lib` pages are published. Files
+          // named `_*.md` (partials, `_version.md`) stay excluded.
+          exclude: ['**/_*.{js,jsx,ts,tsx,md,mdx}'],
         },
         blog: false,
         theme: {
@@ -88,7 +186,91 @@ const config: Config = {
     ],
   ],
 
-  plugins: [],
+  plugins: [
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        // Technique API pages moved under their category folder
+        // (static/, adaptive/, multi_turn/, indirect/); other moved API
+        // pages are listed in MOVED_API_PAGES.
+        createRedirects(existingPath: string) {
+          const moved = existingPath.match(
+            /^\/hackagent\/attacks\/techniques\/(?:static|adaptive|multi_turn|indirect)\/(.+)$/,
+          );
+          if (moved) {
+            return [`/hackagent/attacks/techniques/${moved[1]}`];
+          }
+          return MOVED_API_PAGES[existingPath];
+        },
+        redirects: [
+          {
+            from: '/hackagent/attacks/evaluator/base',
+            to: '/hackagent/evaluation/base',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/judge_evaluators',
+            to: '/hackagent/evaluation/judges',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/pattern_evaluators',
+            to: '/hackagent/evaluation/patterns',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/metrics',
+            to: '/hackagent/evaluation/metrics',
+          },
+          {
+            from: [
+              '/hackagent/attacks/evaluator/evaluation_step',
+              '/hackagent/attacks/evaluator/sync',
+            ],
+            to: '/reference/evaluation',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/inline_step_judge',
+            to: '/reference/evaluation',
+          },
+          {
+            from: '/hackagent/router/tracking/tracker',
+            to: '/api-index',
+          },
+          {
+            from: '/hackagent/router/tracking/coordinator',
+            to: '/api-index',
+          },
+          {
+            from: '/hackagent/router/tracking/context',
+            to: '/api-index',
+          },
+          {
+            from: '/hackagent/router/tracking/step',
+            to: '/api-index',
+          },
+          {
+            from: '/hackagent/router/tracking/decorators',
+            to: '/api-index',
+          },
+          {
+            from: '/hackagent/router/tracking/utils',
+            to: '/hackagent/tracking/serialize',
+          },
+          {
+            from: '/hackagent/router/tracking/audit',
+            to: '/api-index',
+          },
+          {
+            from: '/hackagent/router/tracking/category_classifier',
+            to: '/reference/execution',
+          },
+          // The six HTTP API pages became sections of /api.
+          ...['first-request', 'authentication', 'runs', 'results', 'errors'].map(
+            (page) => ({from: `/api/${page}`, to: `/api#${page}`}),
+          ),
+          ...Object.entries(PAGE_REDIRECTS).map(([from, to]) => ({from, to})),
+        ],
+      },
+    ],
+  ],
 
   themeConfig: {
     // Color mode configuration
@@ -119,8 +301,8 @@ const config: Config = {
       textColor: '#000000', // Adjust text color for contrast if needed (e.g., black)
       isCloseable: true, // Defaults to `true`
     },
-    // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    // Social card for link previews (og:image / twitter:image), 1200x630.
+    image: 'img/social-card.png',
     navbar: {
       title: 'HackAgent',
       logo: {
@@ -131,9 +313,27 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          sidebarId: 'guidesSidebar',
           position: 'left',
-          label: 'Docs',
+          label: 'Guides',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'referenceSidebar',
+          position: 'left',
+          label: 'Reference',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'sdkSidebar',
+          position: 'left',
+          label: 'SDK',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'apiSidebar',
+          position: 'left',
+          label: 'API',
         },
         {
           href: 'https://github.com/AISecurityLab/hackagent',
@@ -177,7 +377,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} [AI4I](https://ai4i.it).`,
+      copyright: `Copyright © ${new Date().getFullYear()} <a href="https://ai4i.it">AI4I</a>.`,
     },
     prism: {
       theme: prismThemes.github,

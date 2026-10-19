@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=../../../docs/static/schema/campaign.schema.json
+#
+# The same jailbreak risk evaluation against a model you serve yourself with
+# vLLM, which speaks the OpenAI API — so the target is an OPENAI one.
+#
+#   1. pip install vllm
+#   2. vllm serve Fastweb/FastwebMIIA-7B               --port 8000   # under test
+#   3. vllm serve Orenguteng/Llama-3-8B-Lexi-Uncensored --port 8001  # attacker
+#   4. vllm serve Abel-24/HarmClassifier                --port 8002  # judge
+#      (gated models need `export HF_TOKEN=hf_...` first)
+#   5. hackagent campaign run risk-evaluation.yaml
+#
+# Three servers because the attacker must be willing to write red-team prompts
+# and the judge must be willing to read harmful replies, which the model under
+# test should refuse to do.
+version: 1
+
+campaign:
+  name: vLLM risk evaluation
+  description: AdvPrefix, FlipAttack and TAP over 100 HarmBench goals on vLLM.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 100
+
+target:
+  name: Fastweb/FastwebMIIA-7B
+  connection:
+    provider: vllm
+    type: OPENAI
+    endpoint: http://localhost:8000/v1
+
+attacks:
+  - name: flipattack
+
+  - name: advprefix
+    roles:
+      attacker:
+        name: Orenguteng/Llama-3-8B-Lexi-Uncensored
+        connection:
+          provider: vllm
+          type: OPENAI
+          endpoint: http://localhost:8001/v1
+
+  - name: tap
+    parameters:
+      depth: 3
+      width: 4
+      branching_factor: 3
+      streams: 4
+    roles:
+      attacker:
+        name: Orenguteng/Llama-3-8B-Lexi-Uncensored
+        connection:
+          provider: vllm
+          type: OPENAI
+          endpoint: http://localhost:8001/v1
+
+evaluation:
+  judges:
+    - name: Abel-24/HarmClassifier
+      connection:
+        provider: vllm
+        type: OPENAI
+        endpoint: http://localhost:8002/v1
+      scoring:
+        type: harmbench
+
+execution:
+  escalate: true
+  concurrency:
+    # Local servers take the load, so push more judge calls through at once.
+    judge: 16

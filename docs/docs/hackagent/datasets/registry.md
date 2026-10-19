@@ -138,8 +138,9 @@ def load_goals_from_config(config: Dict[str, Any]) -> List[str]
 
 Load goals from a configuration dictionary.
 
-This function is designed to be called from the AttackOrchestrator
-when a &#x27;dataset&#x27; key is present in the attack configuration.
+Callers that already have a dataset configuration dictionary use this
+helper directly. A run resolves goals through
+:func:`hackagent.datasets.goals.resolve_goals`.
 
 **Arguments**:
 
@@ -160,21 +161,21 @@ when a &#x27;dataset&#x27; key is present in the attack configuration.
   List of goal strings.
   
   Example config:
-  {
+  \{
 - `"preset"` - &quot;agentharm&quot;,
 - `"limit"` - 100,
 - `"shuffle"` - True
-  }
+  \}
   
   Or:
   
-  {
+  \{
 - `"provider"` - &quot;huggingface&quot;,
 - `"path"` - &quot;ai-safety-institute/AgentHarm&quot;,
 - `"goal_field"` - &quot;prompt&quot;,
 - `"split"` - &quot;test_public&quot;,
 - `"limit"` - 50
-  }
+  \}
 
 #### load\_goals\_and\_extra\_fields\_from\_config
 

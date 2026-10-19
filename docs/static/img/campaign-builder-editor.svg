@@ -1,0 +1,189 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1672" height="942" viewBox="0 0 1672 942">
+  <style>
+    text { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; fill: #c9d1d9; white-space: pre; }
+    .title { font-size: 15px; letter-spacing: 1.5px; fill: #e6edf3; }
+    .h1 { font-size: 18px; fill: #e6edf3; }
+    .dim { fill: #6e7681; }
+    .ghost { fill: #4d5866; font-style: italic; }
+    .k { fill: #7cc7e8; }
+    .s { fill: #e6c07b; }
+    .n { fill: #d19a66; }
+    .p { fill: #8b949e; }
+    .fold { fill: #8b949e; }
+    .ok { fill: #3fb950; }
+    .warn { fill: #d29922; }
+    .err { fill: #f85149; }
+    .acc { fill: #ff5c5c; }
+    .key { fill: #7cc7e8; font-weight: bold; }
+    .small { font-size: 13px; }
+    .ln { fill: #4d5866; text-anchor: end; }
+    .panel { fill: #10151c; stroke: #2a3340; stroke-width: 1.5; }
+    .sep { stroke: #2a3340; stroke-width: 1.5; }
+  </style>
+
+  <rect width="1672" height="942" fill="#0a0e13"/>
+
+  <!-- Header -->
+  <rect class="panel" x="12" y="10" width="1648" height="46"/>
+  <text class="h1" x="36" y="40">HackAgent  <tspan class="dim">/</tspan>  Campaign Builder</text>
+  <text x="836" y="39" text-anchor="middle">campaign.yaml <tspan class="warn">●</tspan> <tspan class="dim">modified</tspan></text>
+  <text x="1636" y="39" text-anchor="end"><tspan class="dim">Draft · </tspan><tspan class="err">1 error</tspan><tspan class="dim"> · </tspan><tspan class="warn">1 warning</tspan></text>
+
+  <!-- ============ LEFT: outline / insert / templates ============ -->
+  <rect class="panel" x="12" y="70" width="298" height="802"/>
+  <text class="title" x="36" y="96">CAMPAIGN</text>
+  <text class="dim small" x="286" y="96" text-anchor="end">jump to section</text>
+  <line class="sep" x1="12" y1="112" x2="310" y2="112"/>
+
+  <text x="36" y="140"><tspan class="dim">1</tspan>  Overview</text><text class="ok" x="286" y="140" text-anchor="end">✓</text>
+  <text x="36" y="174"><tspan class="dim">2</tspan>  Dataset</text><text x="286" y="174" text-anchor="end"><tspan class="dim">25 </tspan><tspan class="ok">✓</tspan></text>
+  <text x="36" y="208"><tspan class="dim">3</tspan>  Target</text><text class="ok" x="286" y="208" text-anchor="end">✓</text>
+  <text class="dim" x="36" y="242">4  Guardrails</text><text class="dim" x="286" y="242" text-anchor="end">off</text>
+  <rect x="20" y="256" width="282" height="30" fill="#2a1416" stroke="#ff5c5c" stroke-width="1.5"/>
+  <text x="36" y="276"><tspan class="acc">5</tspan>  <tspan class="acc">Attacks</tspan></text><text x="286" y="276" text-anchor="end"><tspan class="acc">3 </tspan><tspan class="err">✗</tspan></text>
+  <text x="36" y="310"><tspan class="dim">6</tspan>  Evaluation</text><text x="286" y="310" text-anchor="end"><tspan class="dim">2 </tspan><tspan class="warn">⚠</tspan></text>
+  <text x="36" y="344"><tspan class="dim">7</tspan>  Execution</text><text class="ok" x="286" y="344" text-anchor="end">✓</text>
+
+  <line class="sep" x1="12" y1="372" x2="310" y2="372"/>
+  <text class="title" x="36" y="398">INSERT</text><text class="key small" x="286" y="398" text-anchor="end">Ctrl+I</text>
+  <text x="36" y="426"><tspan class="ok">+</tspan> attack…</text>
+  <text x="36" y="450"><tspan class="ok">+</tspan> judge…</text>
+  <text x="36" y="474"><tspan class="ok">+</tspan> guardrail…</text>
+  <text x="36" y="498"><tspan class="ok">+</tspan> dataset filter…</text>
+
+  <line class="sep" x1="12" y1="520" x2="310" y2="520"/>
+  <text class="title" x="36" y="546">TEMPLATES</text>
+  <text x="36" y="574">Minimal <tspan class="dim">· baseline</tspan></text>
+  <text x="36" y="598">Local vLLM</text>
+  <text x="36" y="622">Ollama</text>
+  <text x="36" y="646">Escalation ladder</text>
+  <text class="err small" x="36" y="676">↺ Reset to template…</text>
+
+  <line class="sep" x1="12" y1="700" x2="310" y2="700"/>
+  <text class="title" x="36" y="726">VIEW</text>
+  <text x="36" y="754"><tspan class="acc">(●)</tspan> Concise</text>
+  <text x="36" y="778"><tspan class="dim">( )</tspan> Expand defaults</text>
+  <text class="key small" x="286" y="778" text-anchor="end">Ctrl+E</text>
+  <text x="36" y="806"><tspan class="dim">[x]</tspan> Fold role models</text>
+
+  <!-- ============ CENTER: YAML editor ============ -->
+  <rect class="panel" x="322" y="70" width="840" height="802"/>
+  <text class="title" x="346" y="96">CAMPAIGN.YAML</text>
+  <text x="1140" y="96" text-anchor="end"><tspan class="acc">Concise</tspan><tspan class="dim">  │  Expanded</tspan></text>
+  <line class="sep" x1="322" y1="112" x2="1162" y2="112"/>
+  <rect x="323.5" y="113" width="56" height="757.5" fill="#0d1218"/>
+
+  <!-- current-section bar + current line -->
+  <rect x="376" y="447" width="3" height="168" fill="#ff5c5c"/>
+  <rect x="380" y="594" width="780" height="21" fill="#161d26"/>
+
+  <!-- line numbers -->
+  <g class="ln small">
+    <text x="366" y="147">1</text><text x="366" y="168">2</text><text x="366" y="189">3</text><text x="366" y="210">4</text>
+    <text x="366" y="231">5</text><text x="366" y="252">6</text><text x="366" y="273">7</text><text x="366" y="294">8</text>
+    <text x="366" y="315">9</text><text x="366" y="336">10</text><text x="366" y="357">11</text><text x="366" y="378">12</text>
+    <text x="366" y="399">13</text><text x="366" y="420">14</text><text x="366" y="441">15</text><text x="366" y="462">16</text>
+    <text x="366" y="483">17</text><text x="366" y="504">18</text><text x="366" y="525">19</text><text x="366" y="546">20</text>
+    <text x="366" y="567">21</text><text x="366" y="588">22</text><text x="366" y="609" style="fill:#e6edf3">23</text><text x="366" y="630">24</text>
+    <text x="366" y="651">25</text><text x="366" y="672">26</text><text x="366" y="693">27</text><text x="366" y="714">28</text>
+    <text x="366" y="735">29</text><text x="366" y="756">30</text><text x="366" y="777">31</text><text x="366" y="798">32</text>
+    <text x="366" y="819">33</text><text x="366" y="840">34</text>
+  </g>
+  <text class="err small" x="331" y="609">●</text>
+  <text class="warn small" x="331" y="756">▲</text>
+
+  <!-- code -->
+  <text x="392" y="147"><tspan class="k">version</tspan><tspan class="p">: </tspan><tspan class="n">1</tspan></text>
+  <text x="392" y="168"><tspan class="k">campaign</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="189">  <tspan class="k">name</tspan><tspan class="p">: </tspan><tspan class="s">local-safety-evaluation</tspan></text>
+
+  <text x="392" y="231"><tspan class="k">dataset</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="252">  <tspan class="k">preset</tspan><tspan class="p">: </tspan><tspan class="s">harmbench</tspan></text>
+  <text x="392" y="273">  <tspan class="k">selection</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="294">    <tspan class="k">limit</tspan><tspan class="p">: </tspan><tspan class="n">25</tspan></text>
+  <text class="ghost" x="392" y="315">    shuffle: false                    ◦ default, safe to delete</text>
+
+  <text x="392" y="357"><tspan class="k">target</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="378">  <tspan class="k">name</tspan><tspan class="p">: </tspan><tspan class="s">google/gemma-3-4b-it</tspan></text>
+  <text x="392" y="399">  <tspan class="k">connection</tspan><tspan class="p">: </tspan><tspan class="fold">▸ vllm · OPENAI_SDK · 127.0.0.1:8000</tspan><tspan class="ghost">   ⋯ 4 lines</tspan></text>
+  <text x="392" y="420">  <tspan class="k">generation</tspan><tspan class="p">: { </tspan><tspan class="k">max_tokens</tspan><tspan class="p">: </tspan><tspan class="n">512</tspan><tspan class="p">, </tspan><tspan class="k">temperature</tspan><tspan class="p">: </tspan><tspan class="n">0.6</tspan><tspan class="p"> }</tspan></text>
+
+  <text x="392" y="462"><tspan class="k">attacks</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="483">  <tspan class="p">- </tspan><tspan class="k">name</tspan><tspan class="p">: </tspan><tspan class="s">tap</tspan></text>
+  <text x="392" y="504">    <tspan class="k">parameters</tspan><tspan class="p">: { </tspan><tspan class="k">depth</tspan><tspan class="p">: </tspan><tspan class="n">3</tspan><tspan class="p">, </tspan><tspan class="k">width</tspan><tspan class="p">: </tspan><tspan class="n">4</tspan><tspan class="p">, </tspan><tspan class="k">branching_factor</tspan><tspan class="p">: </tspan><tspan class="n">3</tspan><tspan class="p"> }</tspan></text>
+  <text x="392" y="525">    <tspan class="k">roles</tspan><tspan class="p">: </tspan><tspan class="fold">▸ attacker, on_topic</tspan><tspan class="ghost">   ⋯ 16 lines</tspan></text>
+  <text x="392" y="546">  <tspan class="p">- </tspan><tspan class="k">name</tspan><tspan class="p">: </tspan><tspan class="s">crescendo</tspan></text>
+  <text x="392" y="567">    <tspan class="k">parameters</tspan><tspan class="p">: { </tspan><tspan class="k">max_turns</tspan><tspan class="p">: </tspan><tspan class="n">10</tspan><tspan class="p">, </tspan><tspan class="k">max_backtracks</tspan><tspan class="p">: </tspan><tspan class="n">10</tspan><tspan class="p"> }</tspan></text>
+  <text x="392" y="588">    <tspan class="k">roles</tspan><tspan class="p">: </tspan><tspan class="fold">▸ attacker</tspan><tspan class="ghost">   ⋯ 8 lines</tspan></text>
+  <text x="392" y="609">  <tspan class="p">- </tspan><tspan class="k">name</tspan><tspan class="p">: </tspan><tspan class="s">pa</tspan></text>
+  <path d="M482 614 l3 -3 l3 3 l3 -3 l3 3 l3 -3 l3 3" fill="none" stroke="#f85149" stroke-width="1.5"/>
+  <rect x="501" y="595" width="2" height="19" fill="#e6edf3"/>
+
+  <text x="392" y="651"><tspan class="k">evaluation</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="672">  <tspan class="k">aggregation</tspan><tspan class="p">: </tspan><tspan class="s">majority</tspan></text>
+  <text x="392" y="693">  <tspan class="k">threshold</tspan><tspan class="p">: </tspan><tspan class="n">7.0</tspan></text>
+  <text x="392" y="714">  <tspan class="k">judges</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="735">    <tspan class="p">- </tspan><tspan class="k">name</tspan><tspan class="p">: </tspan><tspan class="s">cais/HarmBench-Mistral-7b-val-cls</tspan><tspan class="ghost">   ⋯ 12 lines</tspan></text>
+  <text x="392" y="756">    <tspan class="p">- </tspan><tspan class="k">name</tspan><tspan class="p">: </tspan><tspan class="s">google/gemma-3-4b-it</tspan><tspan class="ghost">   ⋯ 12 lines   </tspan><tspan class="warn small">▲ same endpoint as target</tspan></text>
+  <path d="M500 761 h180" stroke="#d29922" stroke-width="1.5" stroke-dasharray="3 3"/>
+
+  <text x="392" y="798"><tspan class="k">execution</tspan><tspan class="p">:</tspan></text>
+  <text x="392" y="819">  <tspan class="k">on_error</tspan><tspan class="p">: </tspan><tspan class="s">continue</tspan></text>
+  <text x="392" y="840">  <tspan class="k">per_attack_timeout</tspan><tspan class="p">: </tspan><tspan class="n">1800</tspan><tspan class="ghost">        + 14 defaults hidden · Ctrl+E</tspan></text>
+
+  <!-- completion popup -->
+  <rect x="486" y="622" width="400" height="122" fill="#000" opacity="0.45"/>
+  <rect x="482" y="618" width="400" height="122" fill="#151b23" stroke="#3b4757" stroke-width="1.5"/>
+  <rect x="483" y="623" width="398" height="21" fill="#23303f"/>
+  <text x="494" y="638"><tspan class="s">pair</tspan></text><text class="dim small" x="870" y="638" text-anchor="end">iterative · attacker, scorer?</text>
+  <text x="494" y="660"><tspan class="s">pap</tspan></text><text class="dim small" x="870" y="660" text-anchor="end">iterative · attacker</text>
+  <line x1="483" y1="670" x2="881" y2="670" stroke="#2a3340"/>
+  <text class="small" x="494" y="690">Refines prompts over rounds; stops at the</text>
+  <text class="small" x="494" y="708">first exchange the panel judges a success.</text>
+  <text class="dim small" x="494" y="730"><tspan class="key">Tab</tspan> insert block  <tspan class="key">Enter</tspan> name only  <tspan class="key">Esc</tspan></text>
+
+  <!-- ============ RIGHT: validation / plan / help / run ============ -->
+  <rect class="panel" x="1176" y="70" width="484" height="248"/>
+  <text class="title" x="1196" y="96">VALIDATION</text>
+  <text class="dim small" x="1640" y="96" text-anchor="end">300 ms after typing</text>
+  <line class="sep" x1="1176" y1="112" x2="1660" y2="112"/>
+  <text x="1196" y="140"><tspan class="err">✗ 1 error</tspan><tspan class="dim">  ·  </tspan><tspan class="warn">▲ 1 warning</tspan></text>
+  <text x="1196" y="172"><tspan class="err">✗ L23:11</tspan>  unknown attack <tspan class="s">'pa'</tspan></text>
+  <text class="dim" x="1196" y="194">           did you mean pair, pap?</text>
+  <text x="1196" y="224"><tspan class="warn">▲ L30</tspan>     judge reuses target endpoint</text>
+  <text class="dim" x="1196" y="246">           :8000 — self-judging bias</text>
+  <text class="ok" x="1196" y="278">✓ dataset · target · execution</text>
+  <text class="dim small" x="1196" y="302">click an issue to jump to its line</text>
+
+  <rect class="panel" x="1176" y="330" width="484" height="210"/>
+  <text class="title" x="1196" y="356">RUN PLAN</text>
+  <text class="dim small" x="1640" y="356" text-anchor="end">last valid · 4 s ago</text>
+  <line class="sep" x1="1176" y1="372" x2="1660" y2="372"/>
+  <text x="1196" y="398"><tspan class="n">25</tspan>     goals    <tspan class="dim">harmbench · limit 25</tspan></text>
+  <text x="1196" y="422"><tspan class="n">2</tspan>      attacks  <tspan class="dim">tap, crescendo</tspan></text>
+  <text x="1196" y="446"><tspan class="n">2</tspan>      judges   <tspan class="dim">majority ≥ 7.0</tspan></text>
+  <text x="1196" y="470"><tspan class="n">50</tspan>     goal × attack searches</text>
+  <text x="1196" y="494"><tspan class="n">3</tspan>      endpoints <tspan class="dim">:8000 :8001 :8002</tspan></text>
+  <text x="1196" y="518"><tspan class="dim">→ ./logs/runs  json, jsonl</tspan></text>
+
+  <rect class="panel" x="1176" y="552" width="484" height="208"/>
+  <text class="title" x="1196" y="578">AT CURSOR</text>
+  <text class="k small" x="1640" y="578" text-anchor="end">attacks[2].name</text>
+  <line class="sep" x1="1176" y1="594" x2="1660" y2="594"/>
+  <text x="1196" y="620">Attack technique. Iterative ones search</text>
+  <text x="1196" y="642">against the target and need an</text>
+  <text x="1196" y="664"><tspan class="k">attacker</tspan> role.</text>
+  <text class="dim small" x="1196" y="694">baseline  bon  cipherchat  crescendo</text>
+  <text class="dim small" x="1196" y="714">flipattack  h4rm3l  pair  pap  tap</text>
+  <text class="dim small" x="1196" y="734">advprefix  rag  autodan_turbo  …</text>
+
+  <rect x="1188" y="774" width="212" height="40" fill="#10151c" stroke="#6e7681" stroke-width="1.5"/>
+  <text x="1294" y="799" text-anchor="middle">Save</text>
+  <rect x="1412" y="774" width="236" height="40" fill="#1c1f24" stroke="#3b3f45" stroke-width="1.5"/>
+  <text class="dim" x="1530" y="799" text-anchor="middle">Run Campaign</text>
+  <text class="dim small" x="1418" y="846" text-anchor="middle">fix 1 error to enable run · runs a frozen snapshot</text>
+
+  <!-- Footer -->
+  <rect class="panel" x="12" y="886" width="1648" height="44"/>
+  <text x="36" y="913"><tspan class="key">Ctrl+S</tspan> Save   <tspan class="key">Ctrl+Space</tspan> Complete   <tspan class="key">Ctrl+I</tspan> Insert   <tspan class="key">F2</tspan> Format   <tspan class="key">Ctrl+E</tspan> Expand defaults   <tspan class="key">F8</tspan> Next issue   <tspan class="key">Ctrl+R</tspan> Run   <tspan class="key">Esc</tspan> Outline   <tspan class="key">Q</tspan> Quit</text>
+</svg>

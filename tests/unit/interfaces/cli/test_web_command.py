@@ -1,0 +1,270 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Unit tests for the `hackagent web` CLI command."""
+
+import unittest
+from unittest.mock import MagicMock, patch
+
+from click.testing import CliRunner
+
+from hackagent.interfaces.cli.commands.web import (
+    _free_port,
+    _is_hackagent_process,
+    _listener_pids,
+    web,
+)
+
+
+class _Closer:
+    """Store double that records whether the facade closed it."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def _open_with(store):
+    """Patch the facade opener and remember the settings it was given."""
+    seen = {}
+
+    def _open(settings, *, backend, timeout, raise_on_unexpected_status):
+        seen["settings"] = settings
+        return store
+
+    return seen, patch("hackagent.client._open_store", side_effect=_open)
+
+
+class TestWebCommand(unittest.TestCase):
+    """Test mode selection and command execution for the web CLI."""
+
+    def _free_port_socket(self):
+        mock_socket = MagicMock()
+        mock_socket.__enter__.return_value.connect_ex.return_value = 1
+        return mock_socket
+
+    def test_web_remote_mode_proxies_with_api_key(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = "test-key"
+        config.base_url = "https://api.hackagent.dev"
+        app = MagicMock()
+        store = _Closer()
+        seen, opener = _open_with(store)
+
+        with (
+            patch(
+                "hackagent.interfaces.web.create_app", return_value=app
+            ) as mock_create,
+            opener,
+            patch("socket.socket", return_value=self._free_port_socket()),
+        ):
+            result = runner.invoke(web, ["--no-browser"], obj={"config": config})
+
+        self.assertEqual(result.exit_code, 0)
+        mock_create.assert_called_once()
+        session = mock_create.call_args.args[0]
+        self.assertIs(session.backend, store)
+        self.assertEqual(seen["settings"].api_key, "test-key")
+        self.assertEqual(session.settings.base_url, "https://api.hackagent.dev")
+        app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
+
+    def test_web_local_mode_serves_from_local_backend(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = None
+        config.base_url = "https://api.hackagent.dev"
+
+        store = _Closer()
+        seen, opener = _open_with(store)
+        app = MagicMock()
+
+        with (
+            opener,
+            patch(
+                "hackagent.interfaces.web.create_app", return_value=app
+            ) as mock_create,
+            patch("socket.socket", return_value=self._free_port_socket()),
+        ):
+            result = runner.invoke(
+                web,
+                ["--db-path", "/tmp/test-dashboard.db", "--no-browser"],
+                obj={"config": config},
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(seen["settings"].db_path, "/tmp/test-dashboard.db")
+        mock_create.assert_called_once()
+        session = mock_create.call_args.args[0]
+        self.assertIs(session.backend, store)
+        self.assertFalse(session.settings.api_key)
+        app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
+        self.assertTrue(store.closed)
+
+    def test_web_local_flag_overrides_configured_api_key(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = "test-key"
+        config.base_url = "https://api.hackagent.dev"
+
+        store = _Closer()
+        seen, opener = _open_with(store)
+        app = MagicMock()
+
+        with (
+            opener,
+            patch(
+                "hackagent.interfaces.web.create_app", return_value=app
+            ) as mock_create,
+            patch("socket.socket", return_value=self._free_port_socket()),
+        ):
+            result = runner.invoke(
+                web, ["--local", "--no-browser"], obj={"config": config}
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        session = mock_create.call_args.args[0]
+        self.assertFalse(seen["settings"].api_key)
+        self.assertFalse(session.settings.api_key)
+
+    def test_web_without_bundle_exits_with_guidance(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = None
+        config.base_url = "https://api.hackagent.dev"
+
+        from hackagent.interfaces.web import MissingBundleError
+
+        _seen, opener = _open_with(_Closer())
+        with (
+            opener,
+            patch(
+                "hackagent.interfaces.web.create_app",
+                side_effect=MissingBundleError(),
+            ),
+        ):
+            result = runner.invoke(web, ["--no-browser"], obj={"config": config})
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("No web UI bundle", result.output)
+
+    def test_web_opens_browser_once_the_server_is_up(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = "test-key"
+        config.base_url = "https://api.hackagent.dev"
+
+        with (
+            patch("hackagent.interfaces.web.create_app", return_value=MagicMock()),
+            patch("socket.socket", return_value=self._free_port_socket()),
+            patch(
+                "hackagent.interfaces.cli.commands.web._open_browser_when_up"
+            ) as mock_open_browser,
+        ):
+            result = runner.invoke(web, [], obj={"config": config})
+
+        self.assertEqual(result.exit_code, 0)
+        mock_open_browser.assert_called_once_with(
+            "http://127.0.0.1:7860", "127.0.0.1", 7860
+        )
+
+
+class TestFreePort(unittest.TestCase):
+    """Test the safe port-reclaim behaviour of the web command."""
+
+    def test_free_port_returns_true_when_port_is_free(self):
+        with patch(
+            "hackagent.interfaces.cli.commands.web._port_in_use", return_value=False
+        ):
+            self.assertTrue(_free_port("127.0.0.1", 7860))
+
+    def test_free_port_kills_only_hackagent_listener(self):
+        with (
+            patch(
+                "hackagent.interfaces.cli.commands.web._port_in_use", return_value=True
+            ),
+            patch(
+                "hackagent.interfaces.cli.commands.web._listener_pids",
+                return_value=["4242"],
+            ),
+            patch(
+                "hackagent.interfaces.cli.commands.web._is_hackagent_process",
+                return_value=True,
+            ),
+            patch("hackagent.interfaces.cli.commands.web.os.kill") as mock_kill,
+            patch("hackagent.interfaces.cli.commands.web.time.sleep"),
+        ):
+            self.assertTrue(_free_port("127.0.0.1", 7860))
+            mock_kill.assert_called_once_with(4242, 15)
+
+    def test_free_port_refuses_foreign_listener(self):
+        with (
+            patch(
+                "hackagent.interfaces.cli.commands.web._port_in_use", return_value=True
+            ),
+            patch(
+                "hackagent.interfaces.cli.commands.web._listener_pids",
+                return_value=["4242"],
+            ),
+            patch(
+                "hackagent.interfaces.cli.commands.web._is_hackagent_process",
+                return_value=False,
+            ),
+            patch("hackagent.interfaces.cli.commands.web.os.kill") as mock_kill,
+        ):
+            self.assertFalse(_free_port("127.0.0.1", 7860))
+            mock_kill.assert_not_called()
+
+    def test_free_port_refuses_when_listener_unknown(self):
+        with (
+            patch(
+                "hackagent.interfaces.cli.commands.web._port_in_use", return_value=True
+            ),
+            patch(
+                "hackagent.interfaces.cli.commands.web._listener_pids", return_value=[]
+            ),
+            patch("hackagent.interfaces.cli.commands.web.os.kill") as mock_kill,
+        ):
+            self.assertFalse(_free_port("127.0.0.1", 7860))
+            mock_kill.assert_not_called()
+
+    def test_is_hackagent_process_matches_command_line(self):
+        with patch(
+            "hackagent.interfaces.cli.commands.web.subprocess.check_output",
+            return_value="hackagent web --port 7860\n",
+        ):
+            self.assertTrue(_is_hackagent_process("4242"))
+
+    def test_listener_pids_ignores_non_numeric_lines(self):
+        with patch(
+            "hackagent.interfaces.cli.commands.web.subprocess.check_output",
+            return_value="4242\nnot-a-pid\n7777\n",
+        ):
+            self.assertEqual(_listener_pids(7860), ["4242", "7777"])
+
+    def test_web_local_mode_foreign_port_exits_without_running(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = None
+        config.base_url = "https://api.hackagent.dev"
+
+        app = MagicMock()
+        _seen, opener = _open_with(_Closer())
+        with (
+            opener,
+            patch("hackagent.interfaces.web.create_app", return_value=app),
+            patch(
+                "hackagent.interfaces.cli.commands.web._free_port", return_value=False
+            ),
+        ):
+            result = runner.invoke(web, ["--no-browser"], obj={"config": config})
+
+        self.assertNotEqual(result.exit_code, 0)
+        app.run.assert_not_called()
+        self.assertIn("already in use", result.output)
+
+
+if __name__ == "__main__":
+    unittest.main()

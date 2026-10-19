@@ -1,0 +1,99 @@
+# The risk taxonomy goals are labelled with, and that
+# dataset.selection.filters.categories accepts: a category code (E), a
+# subcategory code (E2), or either's name ("Cybersecurity Threats").
+# Codes follow OmniSafeBench, whose intents are filed under these subcategories.
+
+A:
+  label: Ethical and Social Risks
+  subcategories:
+    A1: Bias and Discrimination
+    A2: Insulting or Harassing Speech
+    A3: Hate Speech
+    A4: Discriminatory Behavior
+
+B:
+  label: Privacy and Data Risks
+  subcategories:
+    B1: Personal Data Leakage
+    B2: Biometric or Health Data Exposure
+    B3: Doxxing or Tracking
+    B4: Surveillance Misuse
+    B5: Training Data Leakage
+
+C:
+  label: Safety and Physical Harm
+  subcategories:
+    C1: Dangerous Instructions
+    C2: Self-harm Promotion
+    C3: Physical Harm
+    C4: Human Trafficking
+    C5: Animal Abuse
+    C6: Drug Guidance
+    C7: Environmental Damage
+
+D:
+  label: Criminal and Economic Risks
+  subcategories:
+    D1: Fraud or Scams
+    D2: Economic Crime
+    D3: White-Collar Crime
+    D4: Illegal Activity
+    D5: Evasion of Law
+
+E:
+  label: Cybersecurity Threats
+  subcategories:
+    E1: Malware Generation
+    E2: Exploit Development
+    E3: Phishing or Ransomware
+    E4: Jailbreak or Prompt Injection
+    E5: Cross-modal Attack
+    E6: Data Poisoning
+    E7: Unauthorized Model Access
+
+F:
+  label: Information and Political Manipulation
+  subcategories:
+    F1: Misinformation or Disinformation
+    F2: Deepfakes or Synthetic Media
+    F3: Political Propaganda
+    F4: Election Interference
+    F5: Public Order Disruption
+    F6: National Security Threat
+
+G:
+  label: Content and Cultural Safety
+  subcategories:
+    G1: Pornography or Nudity
+    G2: Sexual Content
+    G3: Violence or Gore
+    G4: Cultural or Religious Offense
+
+H:
+  label: Intellectual Property and Ownership
+  subcategories:
+    H1: Copyright Infringement
+    H2: Trademark or Brand Misuse
+    H3: Proprietary Data Leakage
+    H4: Unauthorized Style or Persona Imitation
+
+I:
+  label: Decision and Cognitive Risks
+  subcategories:
+    I1: Medical Advice
+    I2: Health Misguidance
+    I3: Legal Advice
+    I4: Government Decision Support
+    I5: Financial Advice
+    I6: Market Manipulation
+    I7: Psychological Manipulation
+    I8: Cognitive Bias or Overreliance
+
+J:
+  label: Child Safety
+  subcategories:
+    J1: CSAM & Sexualization
+    J2: Grooming & Enticement
+    J3: Child Trafficking
+    J4: Harmful Content Targeting Minors
+    J5: Age Verification Evasion

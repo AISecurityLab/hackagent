@@ -56,7 +56,17 @@ source .venv/bin/activate
 pip install hackagent
 ```
 
-No API key required: HackAgent works locally out of the box.
+No API key required: HackAgent works locally out of the box. The base install
+imports without the interface and technique extras:
+
+```bash
+pip install 'hackagent[tui]'      # textual
+pip install 'hackagent[web]'      # flask and the dashboard bundle
+pip install 'hackagent[browser]'  # playwright
+pip install 'hackagent[rag]'      # faiss and numpy
+pip install 'hackagent[vision]'   # Pillow
+pip install 'hackagent[hf]'       # HuggingFace datasets
+```
 
 ### Standalone binary (no Python required)
 
@@ -73,10 +83,10 @@ Extract the archive and run the `hackagent` launcher inside it — no Python, `p
 or `uv` install needed. Keep the extracted folder intact; the launcher loads the
 libraries next to it.
 
-> **Note:** the `WEB` provider drives a real browser through Playwright, whose
-> browser binaries cannot be embedded in the archive (or in the PyPI package).
-> Before using `hackagent web`-based targets, install them once with
-> `playwright install`.
+> **Note:** the `WEB` provider drives a real browser through Playwright
+> (`pip install 'hackagent[browser]'`). The browser binaries cannot be embedded
+> in the archive (or in the PyPI package). Before using `hackagent web`-based
+> targets, install them once with `playwright install`.
 
 
 Questions? Join [community discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.
@@ -104,8 +114,9 @@ HackAgent uses a modular pipeline to test agent robustness end-to-end.
 
 HackAgent supports both local and remote reporting.
 
-- Local mode stores test results in SQLite, readable offline.
-- Cloud mode syncs runs to the HackAgent remote platform when an API key is configured.
+- A campaign records its results in local SQLite, readable offline.
+- Set `execution.storage.backend: remote` (with `base_url` and `api_key_env`) to
+  send a run to a HackAgent server instead.
 
 `hackagent web` serves the HackAgent dashboard — the same app as
 [app.hackagent.dev](https://app.hackagent.dev) — from your own machine, against
@@ -117,7 +128,7 @@ is never exposed to the browser.
 hackagent web
 ```
 
-Install it with `pip install 'hackagent[web]'`; see the [web command docs](docs/docs/cli/web.md) for modes and options.
+Install it with `pip install 'hackagent[web]'`; see the [web command docs](docs/docs/getting-started/dashboard.mdx) for modes and options.
 
 ## Responsible Use
 

@@ -1,13 +1,26 @@
----
-sidebar_position: 1
----
-
 # Quick Security Scan
 
 A **quick security scan** focuses on the highest-impact vulnerabilities with fast Static Template attacks, typically completing in 10-15 minutes.
 
-:::note
-`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::note Reading ASR
+`run_campaign(spec)` returns a `CampaignResult` holding one attempt per request. Every campaign below uses these definitions: without a judge, replies are recorded but never scored.
+
+```python
+# The models every campaign below uses: the target under test, the judge
+# that scores each reply, and an attacker for adaptive attacks (static
+# ones need none).
+OLLAMA = {"provider": "ollama", "type": "OLLAMA"}
+TARGET = {"name": "my-agent", "connection": {
+    "provider": "local", "type": "OPENAI", "endpoint": "http://localhost:8000/v1"}}
+JUDGE = {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
+ATTACKER = {"name": "llama3.2", "connection": OLLAMA}
+
+def asr(result):
+    """Fraction of attempts the judges marked successful."""
+    attempts = [a for outcome in result.attacks for a in outcome.attempts]
+    scored = sum(bool(a.verdict and a.verdict.success) for a in attempts)
+    return scored / max(len(attempts), 1)
+```
 :::
 
 ## When to Use
@@ -27,16 +40,10 @@ Focus on 3-5 critical vulnerabilities using:
 ## Example Implementation
 
 ```python
-from hackagent import HackAgent
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
-
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
-    name="quick-scan",
-    api_key="your-api-key",
-)
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.orchestrator.campaign import run_campaign
 
 quick_profiles = [
     PROMPT_INJECTION_PROFILE,
@@ -46,13 +53,15 @@ quick_profiles = [
 
 for profile in quick_profiles:
     ds = profile.primary_datasets[0].preset
-    attack_config = {
-        "attack_type": "static_template",
-        "dataset": {"preset": ds},
-        "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
-    }
-    result = agent.hack(attack_config=attack_config)
-    print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
+    result = run_campaign({
+        "version": 1,
+        "campaign": {"name": f"quick scan · {profile.name}"},
+        "dataset": {"source": {"type": "preset", "name": ds}},
+        "target": TARGET,
+        "attacks": [{"name": "static_template"}],
+        "evaluation": {"judges": [JUDGE]},
+    })
+    print(f"{profile.name}: ASR = {asr(result):.0%}")
 ```
 
 ## Typical Coverage

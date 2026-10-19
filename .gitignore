@@ -1,5 +1,6 @@
 # Custom
 logs/
+.logs/
 *.sbatch
 .ruff_cache/
 reports/
@@ -147,5 +148,5 @@ tests/e2e/attacks/
 snapshot_report.html
 
 # Web UI bundle (built by scripts/build_webui.sh)
-hackagent/server/webui/static/*
-!hackagent/server/webui/static/.gitignore
+hackagent/interfaces/web/static/*
+!hackagent/interfaces/web/static/.gitignore

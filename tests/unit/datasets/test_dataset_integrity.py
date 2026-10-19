@@ -25,7 +25,9 @@ class TestDatasetProfileIntegrity(unittest.TestCase):
 
     def _extract_datasets_from_profiles(self) -> Dict[str, Set[str]]:
         """Extract all dataset names referenced in threat profiles."""
-        profile_files = glob.glob("hackagent/risks/**/profile.py", recursive=True)
+        profile_files = glob.glob(
+            "hackagent/catalog/risks/**/profile.py", recursive=True
+        )
         datasets_by_profile = {}
 
         for profile_file in profile_files:

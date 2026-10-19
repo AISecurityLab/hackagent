@@ -58,7 +58,7 @@ def _free_port() -> int:
 
 def seed(db_path: Path) -> None:
     """Write one completed run with a mix of outcomes and a couple of traces."""
-    from hackagent.server.storage.local import LocalBackend
+    from hackagent.storage.local import LocalBackend
 
     backend = LocalBackend(str(db_path))
     try:
@@ -154,7 +154,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    from hackagent.server.webui import _static
+    from hackagent.interfaces.web import _static
 
     bundle = _static.find_bundle()
     if bundle is None:
@@ -180,7 +180,7 @@ def main() -> int:
         [
             sys.executable,
             "-m",
-            "hackagent.cli.main",
+            "hackagent.interfaces.cli.main",
             "web",
             "--no-browser",
             "--port",

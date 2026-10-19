@@ -3,7 +3,7 @@
 
 """HuggingFace dataset provider for loading goals from HuggingFace Hub."""
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import Any, Dict, List, Optional
 
 from hackagent.datasets.base import DatasetProvider
@@ -123,6 +123,7 @@ class HuggingFaceDatasetProvider(DatasetProvider):
 
         goals = []
         count = 0
+        offset, skipped = self._offset(), 0
 
         self.last_extracted_extras = []
         return_dicts = kwargs.get("return_dicts", False)
@@ -138,6 +139,9 @@ class HuggingFaceDatasetProvider(DatasetProvider):
             )
 
             if goal:
+                if skipped < offset:
+                    skipped += 1
+                    continue
                 extra_data = (
                     {f: record.get(f) for f in self.extra_fields}
                     if self.extra_fields

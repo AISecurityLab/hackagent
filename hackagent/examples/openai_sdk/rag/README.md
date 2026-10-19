@@ -27,16 +27,20 @@ python ingest.py
 # 4. Run the OpenAI-compatible RAG server
 python agent_server.py
 
-# 5. Run attack example
-python hack.py
+# 5. Run the attack
+hackagent campaign run h4rm3l-corpbot.yaml
 ```
 
+The attack is a campaign file, so you can read it end to end and change the
+goals, the decorator program or the judge without touching Python.
+`hackagent campaign validate h4rm3l-corpbot.yaml` checks it without attacking.
+
 Note: `hackagent examples rag` runs a different, fully-local example (no API key
-required) — see `hackagent/examples/rag/test_indirect_injection.py`. Run this
-example's scripts manually as shown above.
+required) — see `hackagent/examples/rag/indirect-injection.yaml`. Start this
+example's server as shown above, then run its campaign.
 
 ## Files
 
 - **`agent_server.py`** — OpenAI-compatible RAG server using IBM Granite on OpenRouter
 - **`ingest.py`** — Creates local FAISS index from `policies.pdf`
-- **`hack.py`** — Attack driver example against the local RAG endpoint
+- **`h4rm3l-corpbot.yaml`** — The attack: h4rm3l against the local RAG endpoint

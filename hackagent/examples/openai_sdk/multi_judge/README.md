@@ -19,7 +19,7 @@ All judges use:
 
 ```bash
 export OPENROUTER_API_KEY="..."
-python examples/openai_sdk/ibm_multi_judge/run_flipattack_multi_judge.py
+python examples/openai_sdk/ibm_multi_judge/flipattack-multi-judge.yaml
 ```
 
 Optional for remote HackAgent backend tracking:

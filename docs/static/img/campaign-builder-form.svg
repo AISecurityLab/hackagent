@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1672" height="942" viewBox="0 0 1672 942">
+  <style>
+    text { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; fill: #c9d1d9; white-space: pre; }
+    .title { letter-spacing: 1.5px; fill: #e6edf3; }
+    .h1 { font-size: 18px; fill: #e6edf3; }
+    .bright { fill: #e6edf3; }
+    .dim { fill: #6e7681; }
+    .def { fill: #8b949e; }
+    .ghost { fill: #4d5866; font-style: italic; }
+    .k { fill: #7cc7e8; }
+    .s { fill: #e6c07b; }
+    .n { fill: #d19a66; }
+    .ok { fill: #3fb950; }
+    .warn { fill: #d29922; }
+    .err { fill: #f85149; }
+    .acc { fill: #ff5c5c; }
+    .key { fill: #7cc7e8; font-weight: bold; }
+    .b { font-weight: bold; }
+    .small { font-size: 13px; }
+    .panel { fill: #10151c; stroke: #2a3340; stroke-width: 1.5; }
+    .card { fill: #121922; stroke: #2a3340; stroke-width: 1.5; }
+    .sep { stroke: #2a3340; stroke-width: 1.5; }
+    .in { fill: #0b1016; stroke: #2a3340; stroke-width: 1.5; }
+    .infocus { fill: #0b1016; stroke: #ff5c5c; stroke-width: 2; }
+    .inerr { fill: #0b1016; stroke: #f85149; stroke-width: 1.5; stroke-dasharray: 4 3; }
+  </style>
+
+  <rect width="1672" height="942" fill="#0a0e13"/>
+
+  <!-- Header -->
+  <rect class="panel" x="12" y="10" width="1648" height="46"/>
+  <text class="h1" x="36" y="40">HackAgent  <tspan class="dim">/</tspan>  Campaign Builder</text>
+  <text x="836" y="39" text-anchor="middle">local-safety-evaluation <tspan class="warn">●</tspan> <tspan class="dim">2 edits from template "Local vLLM"</tspan></text>
+  <text x="1636" y="39" text-anchor="end"><tspan class="err">1 error</tspan><tspan class="dim"> · </tspan><tspan class="warn">1 warning</tspan></text>
+
+  <!-- ============ LEFT ============ -->
+  <rect class="panel" x="12" y="70" width="298" height="802"/>
+  <text class="title" x="36" y="96">CAMPAIGN</text>
+  <line class="sep" x1="12" y1="112" x2="310" y2="112"/>
+  <text x="36" y="140"><tspan class="dim">1</tspan>  Overview</text><text class="ok" x="286" y="140" text-anchor="end">✓</text>
+  <text x="36" y="174"><tspan class="dim">2</tspan>  Dataset</text><text x="286" y="174" text-anchor="end"><tspan class="dim">25 </tspan><tspan class="ok">✓</tspan></text>
+  <text x="36" y="208"><tspan class="dim">3</tspan>  Target</text><text class="ok" x="286" y="208" text-anchor="end">✓</text>
+  <text x="36" y="242"><tspan class="dim">4</tspan>  Models</text><text x="286" y="242" text-anchor="end"><tspan class="dim">3 </tspan><tspan class="ok">✓</tspan></text>
+  <text class="dim" x="36" y="276">5  Guardrails</text><text class="dim" x="286" y="276" text-anchor="end">off</text>
+  <rect x="20" y="290" width="282" height="30" fill="#2a1416" stroke="#ff5c5c" stroke-width="1.5"/>
+  <text x="36" y="310"><tspan class="acc">6  Attacks</tspan></text><text x="286" y="310" text-anchor="end"><tspan class="acc">3 </tspan><tspan class="err">✗</tspan></text>
+  <text x="36" y="344"><tspan class="dim">7</tspan>  Evaluation</text><text x="286" y="344" text-anchor="end"><tspan class="dim">2 </tspan><tspan class="warn">▲</tspan></text>
+  <text x="36" y="378"><tspan class="dim">8</tspan>  Execution</text><text class="ok" x="286" y="378" text-anchor="end">✓</text>
+
+  <line class="sep" x1="12" y1="404" x2="310" y2="404"/>
+  <text class="title" x="36" y="430">MODELS</text><text class="ok" x="286" y="430" text-anchor="end">+ new</text>
+  <text x="36" y="458">abliterated-qwen3-4b</text><text class="dim small" x="286" y="458" text-anchor="end">:8002</text>
+  <text x="36" y="482">gemma-3-4b-it</text><text class="dim small" x="286" y="482" text-anchor="end">:8000</text>
+  <text x="36" y="506">harmbench-cls</text><text class="dim small" x="286" y="506" text-anchor="end">:8001</text>
+  <text class="ghost small" x="36" y="530">defined once, picked from lists</text>
+
+  <line class="sep" x1="12" y1="552" x2="310" y2="552"/>
+  <text class="title" x="36" y="578">TEMPLATES</text>
+  <text x="36" y="606">Minimal <tspan class="dim">· baseline</tspan></text>
+  <text x="36" y="630"><tspan class="acc">●</tspan> Local vLLM</text>
+  <text x="36" y="654">Escalation ladder</text>
+  <text class="err small" x="36" y="684">↺ Reset all to template…</text>
+
+  <line class="sep" x1="12" y1="708" x2="310" y2="708"/>
+  <text class="title" x="36" y="734">VIEW</text>
+  <text x="36" y="762"><tspan class="acc">(●)</tspan> Form</text>
+  <text x="36" y="786"><tspan class="dim">( )</tspan> YAML</text><text class="key small" x="286" y="786" text-anchor="end">Ctrl+Y</text>
+  <text x="36" y="810"><tspan class="dim">[ ]</tspan> Show advanced</text>
+
+  <!-- ============ CENTER: form ============ -->
+  <rect class="panel" x="322" y="70" width="840" height="802"/>
+  <text class="title" x="346" y="96">ATTACKS</text>
+  <text class="dim" x="444" y="96">3 attacks · all iterative</text>
+  <rect x="1004" y="80" width="140" height="24" fill="#132015" stroke="#3fb950" stroke-width="1.2"/>
+  <text class="ok" x="1074" y="97" text-anchor="middle">+ Add attack ▾</text>
+  <line class="sep" x1="322" y1="112" x2="1162" y2="112"/>
+
+  <!-- card: tap (expanded) -->
+  <rect class="card" x="340" y="128" width="804" height="384"/>
+  <rect x="340" y="128" width="3" height="384" fill="#ff5c5c"/>
+  <text x="364" y="154"><tspan class="s b">▾ tap</tspan><tspan class="dim">   Tree of Attacks with Pruning · iterative</tspan></text>
+  <text class="dim small" x="1128" y="154" text-anchor="end">Ctrl+↑↓ reorder   ✕ remove</text>
+  <line x1="352" y1="168" x2="1132" y2="168" stroke="#222b36"/>
+
+  <text class="dim small" x="364" y="194">PARAMETERS</text>
+  <text x="364" y="225">depth</text>
+  <rect class="in" x="560" y="206" width="180" height="28"/><text class="def" x="572" y="225">3</text>
+  <text class="ghost small" x="756" y="225">default</text>
+
+  <text x="364" y="261">width</text>
+  <rect class="in" x="560" y="242" width="180" height="28"/><text class="def" x="572" y="261">4</text>
+  <text class="ghost small" x="756" y="261">default</text>
+
+  <text x="364" y="297">branching_factor</text>
+  <rect class="in" x="560" y="278" width="180" height="28"/><text class="def" x="572" y="297">3</text>
+  <text class="ghost small" x="756" y="297">default</text>
+
+  <text class="bright" x="364" y="333">streams</text>
+  <rect class="infocus" x="560" y="314" width="180" height="28"/><text class="bright b" x="572" y="333">8</text>
+  <rect x="583" y="319" width="2" height="18" fill="#e6edf3"/>
+  <text x="756" y="333"><tspan class="acc">●</tspan><tspan class="small"> edited · was 4   </tspan><tspan class="key small">Del</tspan><tspan class="dim small"> ↺ reset</tspan></text>
+  <text class="dim small" x="560" y="362">conversations the tree starts from · integer ≥ 1</text>
+
+  <text class="dim small" x="364" y="392">ROLES</text>
+  <text x="364" y="423">attacker</text>
+  <rect class="in" x="560" y="404" width="300" height="28"/><text x="572" y="423">abliterated-qwen3-4b</text><text class="dim" x="846" y="423" text-anchor="end">▾</text>
+  <text class="dim small" x="876" y="423">required · vllm :8002</text>
+
+  <text x="364" y="459">on_topic</text>
+  <rect class="in" x="560" y="440" width="300" height="28"/><text class="def" x="572" y="459">(none)</text><text class="dim" x="846" y="459" text-anchor="end">▾</text>
+  <text class="ghost small" x="876" y="459">optional · prunes off-topic branches</text>
+
+  <text class="dim small" x="364" y="496">▸ Advanced   generation overrides · per-attack timeout</text>
+
+  <!-- card: crescendo (collapsed) -->
+  <rect class="card" x="340" y="524" width="804" height="38"/>
+  <text x="364" y="548"><tspan class="s">▸ crescendo</tspan><tspan class="dim">   max_turns 10 · max_backtracks 10 · attacker abliterated-qwen3-4b</tspan></text>
+  <text class="ok" x="1128" y="548" text-anchor="end">✓</text>
+
+  <!-- card: pair (collapsed, error) -->
+  <rect class="card" x="340" y="574" width="804" height="38" style="stroke:#f85149"/>
+  <text x="364" y="598"><tspan class="s">▸ pair</tspan><tspan class="dim">        iterations 5 · streams 5</tspan></text>
+  <text class="err" x="1128" y="598" text-anchor="end">✗ attacker role required</text>
+
+  <!-- add -->
+  <rect x="340" y="624" width="804" height="38" fill="none" stroke="#3b4757" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="364" y="648"><tspan class="ok">+ Add attack…</tspan><tspan class="dim">   baseline · bon · pap · advprefix · h4rm3l · flipattack · …</tspan></text>
+
+  <!-- legend -->
+  <text class="dim small" x="346" y="712">FIELD STATES</text>
+  <rect class="in" x="346" y="726" width="64" height="26"/><text class="def" x="358" y="744">3</text>
+  <text class="small" x="422" y="744">default <tspan class="dim">— from template or schema</tspan></text>
+  <rect class="in" x="756" y="726" width="64" height="26"/><rect x="756" y="726" width="3" height="26" fill="#ff5c5c"/><text class="bright b" x="770" y="744">8</text>
+  <text class="small" x="832" y="744">edited <tspan class="dim">— Del resets it</tspan></text>
+  <rect class="inerr" x="346" y="764" width="64" height="26"/>
+  <text class="small" x="422" y="782">required <tspan class="dim">— no usable default</tspan></text>
+  <rect class="in" x="756" y="764" width="64" height="26"/><text class="def" x="768" y="782">⇡42</text>
+  <text class="small" x="832" y="782">inherited <tspan class="dim">— e.g. seed from target</tspan></text>
+
+  <line class="sep" x1="322" y1="824" x2="1162" y2="824"/>
+  <text class="dim" x="346" y="852">◂ Guardrails</text>
+  <text class="dim" x="1140" y="852" text-anchor="end">Evaluation ▸</text>
+
+  <!-- ============ RIGHT ============ -->
+  <rect class="panel" x="1176" y="70" width="484" height="192"/>
+  <text class="title" x="1196" y="96">VALIDATION</text>
+  <text class="dim small" x="1640" y="96" text-anchor="end">on every change</text>
+  <line class="sep" x1="1176" y1="112" x2="1660" y2="112"/>
+  <text x="1196" y="140"><tspan class="err">✗ 1 error</tspan><tspan class="dim">  ·  </tspan><tspan class="warn">▲ 1 warning</tspan></text>
+  <text x="1196" y="170"><tspan class="err">✗</tspan> Attacks › pair › roles</text>
+  <text class="dim" x="1196" y="192">  attacker is required — pick a model</text>
+  <text x="1196" y="222"><tspan class="warn">▲</tspan> Evaluation › judge 2</text>
+  <text class="dim" x="1196" y="244">  same endpoint as the target (:8000)</text>
+
+  <rect class="panel" x="1176" y="274" width="484" height="178"/>
+  <text class="title" x="1196" y="300">RUN PLAN</text>
+  <line class="sep" x1="1176" y1="316" x2="1660" y2="316"/>
+  <text x="1196" y="342"><tspan class="n">25</tspan>   goals    <tspan class="dim">harmbench · limit 25</tspan></text>
+  <text x="1196" y="366"><tspan class="n">3</tspan>    attacks  <tspan class="dim">tap, crescendo, pair</tspan></text>
+  <text x="1196" y="390"><tspan class="n">2</tspan>    judges   <tspan class="dim">majority ≥ 7.0</tspan></text>
+  <text x="1196" y="414"><tspan class="n">75</tspan>   goal × attack searches</text>
+  <text class="dim" x="1196" y="438">→ ./logs/runs  json, jsonl</text>
+
+  <rect class="panel" x="1176" y="464" width="484" height="296"/>
+  <text class="title" x="1196" y="490">YAML</text>
+  <text class="dim small" x="1640" y="490" text-anchor="end">tap · edited fields only</text>
+  <line class="sep" x1="1176" y1="506" x2="1660" y2="506"/>
+  <text x="1196" y="534"><tspan class="dim">- </tspan><tspan class="k">name</tspan><tspan class="dim">: </tspan><tspan class="s">tap</tspan></text>
+  <text x="1196" y="556">  <tspan class="k">parameters</tspan><tspan class="dim">:</tspan></text>
+  <rect x="1188" y="563" width="460" height="20" fill="#2a1416"/>
+  <text x="1196" y="578">    <tspan class="k">streams</tspan><tspan class="dim">: </tspan><tspan class="n">8</tspan></text>
+  <text x="1196" y="600">  <tspan class="k">roles</tspan><tspan class="dim">:</tspan></text>
+  <text x="1196" y="622">    <tspan class="k">attacker</tspan><tspan class="dim">: </tspan><tspan class="s">abliterated-qwen3-4b</tspan></text>
+  <text class="ghost small" x="1196" y="660">depth, width, branching_factor omitted:</text>
+  <text class="ghost small" x="1196" y="680">they equal the defaults</text>
+  <text class="dim small" x="1196" y="740"><tspan class="key">Ctrl+Y</tspan> edit the whole campaign as YAML</text>
+
+  <rect x="1188" y="774" width="212" height="40" fill="#10151c" stroke="#6e7681" stroke-width="1.5"/>
+  <text x="1294" y="799" text-anchor="middle">Save</text>
+  <rect x="1412" y="774" width="236" height="40" fill="#1c1f24" stroke="#3b3f45" stroke-width="1.5"/>
+  <text class="dim" x="1530" y="799" text-anchor="middle">Run Campaign</text>
+  <text class="dim small" x="1418" y="846" text-anchor="middle">fix 1 error to enable run · runs a frozen snapshot</text>
+
+  <!-- Footer -->
+  <rect class="panel" x="12" y="886" width="1648" height="44"/>
+  <text x="36" y="913"><tspan class="key">Tab/↑↓</tspan> Move   <tspan class="key">Enter</tspan> Edit/expand   <tspan class="key">Del</tspan> Reset to default   <tspan class="key">A</tspan> Add   <tspan class="key">Ctrl+Z</tspan> Undo   <tspan class="key">Ctrl+Y</tspan> YAML   <tspan class="key">Ctrl+S</tspan> Save   <tspan class="key">Ctrl+R</tspan> Run   <tspan class="key">Q</tspan> Quit</text>
+</svg>

@@ -34,7 +34,7 @@ Export an Anthropic API key. This is used by the attacker/judge model, not by th
 
 Then run:
 
-    python hack_hermes.py
+    hackagent campaign run flipattack-hermes.yaml
 
 ---
 
@@ -93,5 +93,5 @@ For stronger separation still, point `cwd` at a scratch directory and/or run the
 
 | File | Purpose |
 |---|---|
-| `hack_hermes.py` | Red-teams local Hermes Agent using an Anthropic/LiteLLM judge |
+| `flipattack-hermes.yaml` | Red-teams local Hermes Agent using an Anthropic/LiteLLM judge |
 | `README.md` | Explains the scenario and how to run it |
