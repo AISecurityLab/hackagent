@@ -944,6 +944,27 @@ def test_a_refused_turn_does_not_end_the_search():
     assert len(target.requests) == 3
 
 
+def test_a_refused_turn_is_never_a_success():
+    writer = Escalator()
+    attack = CrescendoAttack(
+        CrescendoParams(
+            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
+        )
+    )
+    # The panel passes every reply, refusals included.
+    findings, _target = search(
+        attack, target=Target(REFUSAL, REFUSAL, "sure"), judge=Panel(9.0)
+    )
+
+    # Backtracked, accepted once the budget ran out, then a real answer.
+    assert [f.metadata["refused"] for f in findings] == [True, True, False]
+    assert [f.metadata["backtracked"] for f in findings] == [True, False, False]
+    assert [f.verdict.success for f in findings] == [False, False, True]
+    # What the panel scored is kept; only the outcome is overruled.
+    assert [f.verdict.score for f in findings] == [9.0, 9.0, 9.0]
+    assert [f.metadata["score"] for f in findings] == [9.0, 9.0, 9.0]
+
+
 def test_crescendo_reports_every_turn_that_reached_the_target():
     writer = Escalator()
     attack = CrescendoAttack(

@@ -743,6 +743,8 @@ class LocalBackend:
         evaluation_notes: Optional[str] = None,
         evaluation_metrics: Optional[Dict[str, Any]] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        response_status_code: Optional[int] = None,
     ) -> ResultRecord:
         now = _now_str()
         updates: Dict[str, Any] = {"updated_at": now}
@@ -752,12 +754,31 @@ class LocalBackend:
             updates["evaluation_notes"] = evaluation_notes
         if evaluation_metrics is not None:
             updates["metrics_json"] = json.dumps(evaluation_metrics)
-        if agent_specific_data is not None:
-            updates["metadata_json"] = json.dumps(agent_specific_data)
+        # There are no columns for the target's latency and status code; the
+        # web layer reads them from the metadata, as it does the other
+        # response fields.
+        response = {
+            key: value
+            for key, value in (
+                ("latency_ms", latency_ms),
+                ("response_status_code", response_status_code),
+            )
+            if value is not None
+        }
 
-        set_clause = ", ".join(f"{k}=?" for k in updates)
-        values = list(updates.values()) + [str(result_id)]
         with self._lock:
+            if response and agent_specific_data is None:
+                row = self._conn.execute(
+                    "SELECT metadata_json FROM results WHERE id=? LIMIT 1",
+                    (str(result_id),),
+                ).fetchone()
+                agent_specific_data = json.loads(row["metadata_json"] if row else "{}")
+            if agent_specific_data is not None:
+                updates["metadata_json"] = json.dumps(
+                    {**agent_specific_data, **response}
+                )
+            set_clause = ", ".join(f"{k}=?" for k in updates)
+            values = list(updates.values()) + [str(result_id)]
             self._conn.execute(f"UPDATE results SET {set_clause} WHERE id=?", values)
             self._conn.commit()
             row = self._conn.execute(

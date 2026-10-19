@@ -354,6 +354,8 @@ class PatchedResultRequest(BaseModel):
     evaluation_notes: str | None = None
     evaluation_metrics: Any | None = None
     agent_specific_data: Any | None = None
+    goal: str | None = None
+    goal_index: Annotated[int | None, Field(ge=-2147483648, le=2147483647)] = None
 
 
 class PatchedUserProfileRequest(BaseModel):
@@ -387,6 +389,8 @@ class ResultRequest(BaseModel):
     evaluation_notes: str | None = None
     evaluation_metrics: Any | None = None
     agent_specific_data: Any | None = None
+    goal: str | None = None
+    goal_index: Annotated[int | None, Field(ge=-2147483648, le=2147483647)] = None
 
 
 class RunStatus(Enum):
@@ -682,6 +686,8 @@ class Result(BaseModel):
     evaluation_notes: str | None = None
     evaluation_metrics: Any | None = None
     agent_specific_data: Any | None = None
+    goal: str | None = None
+    goal_index: Annotated[int | None, Field(ge=-2147483648, le=2147483647)] = None
     timestamp: AwareDatetime
     traces: list[Trace]
 
