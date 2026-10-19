@@ -13,6 +13,15 @@ import pytest
 from hackagent.interfaces.cli.config import CLIConfig
 
 
+def _env(home=Path("/fake/home"), **variables: str) -> dict:
+    """An environment that names ``home`` as the home directory everywhere.
+
+    ``~`` expands from HOME on POSIX but from USERPROFILE on Windows, so a
+    test that replaces the environment has to set both.
+    """
+    return {"HOME": str(home), "USERPROFILE": str(home), **variables}
+
+
 class TestCLIConfig:
     """Test CLI configuration management"""
 
@@ -22,7 +31,7 @@ class TestCLIConfig:
         with (
             patch("pathlib.Path.exists", return_value=False),
             patch("pathlib.Path.home", return_value=Path("/fake/home")),
-            patch.dict("os.environ", {}, clear=True),
+            patch.dict("os.environ", _env(), clear=True),
         ):
             config = CLIConfig()
 
@@ -35,7 +44,7 @@ class TestCLIConfig:
         with (
             patch("pathlib.Path.exists", return_value=False),
             patch("pathlib.Path.home", return_value=Path("/fake/home")),
-            patch.dict("os.environ", {}, clear=True),
+            patch.dict("os.environ", _env(), clear=True),
         ):
             config = CLIConfig(
                 config_file=None, api_key=None, base_url=None, verbose=None
@@ -74,7 +83,7 @@ class TestCLIConfig:
 
         try:
             # Clear env vars to ensure we're only testing file loading
-            with patch.dict("os.environ", {}, clear=True):
+            with patch.dict("os.environ", _env(), clear=True):
                 config = CLIConfig(config_file=config_file)
 
                 assert config.api_key == "file-key"
@@ -173,14 +182,14 @@ class TestCLIConfig:
 
             with patch.dict(
                 "os.environ",
-                {"HOME": str(fake_home), "HACKAGENT_API_KEY": "env-wins"},
+                _env(fake_home, HACKAGENT_API_KEY="env-wins"),
             ):
                 config = CLIConfig()
 
                 assert config.default_config_path == config_dir / "config.json"
                 assert config.api_key == "env-wins"
 
-            with patch.dict("os.environ", {"HOME": str(fake_home)}, clear=True):
+            with patch.dict("os.environ", _env(fake_home), clear=True):
                 assert CLIConfig().api_key == "default-config-key"
 
     def test_env_only_when_no_config_and_no_cli(self):
@@ -207,9 +216,7 @@ class TestCLIConfig:
         try:
             with patch.dict(
                 "os.environ",
-                {
-                    "HACKAGENT_BASE_URL": "https://env.example.com",
-                },
+                _env(HACKAGENT_BASE_URL="https://env.example.com"),
                 clear=True,
             ):
                 config = CLIConfig(config_file=config_file)
@@ -275,7 +282,7 @@ class TestCLIConfig:
         with (
             patch("pathlib.Path.exists", return_value=False),
             patch("pathlib.Path.home", return_value=Path("/fake/home")),
-            patch.dict("os.environ", {}, clear=True),
+            patch.dict("os.environ", _env(), clear=True),
         ):
             config = CLIConfig(base_url="https://example.com")
 
@@ -290,7 +297,7 @@ class TestCLIConfig:
     def test_default_config_path(self):
         """Test default configuration path"""
         fake_home = Path("/fake/home")
-        with patch.dict("os.environ", {"HOME": str(fake_home)}, clear=True):
+        with patch.dict("os.environ", _env(fake_home), clear=True):
             config = CLIConfig()
 
             expected_path = fake_home / ".config" / "hackagent" / "config.json"
@@ -314,7 +321,7 @@ base_url: https://yaml.example.com
                 yaml_spec = importlib.util.find_spec("yaml")
                 if yaml_spec is not None:
                     # Clear env vars to ensure we're only testing file loading
-                    with patch.dict("os.environ", {}, clear=True):
+                    with patch.dict("os.environ", _env(), clear=True):
                         config = CLIConfig(config_file=config_file)
 
                     assert config.api_key == "yaml-key"
@@ -333,7 +340,7 @@ base_url: https://yaml.example.com
             config_file = f.name
 
         try:
-            with patch.dict("os.environ", {}, clear=True):
+            with patch.dict("os.environ", _env(), clear=True):
                 with pytest.raises(ValueError, match="Failed to load config file"):
                     CLIConfig(config_file=config_file)
         finally:
@@ -342,7 +349,7 @@ base_url: https://yaml.example.com
     def test_nonexistent_config_file(self):
         """Test handling of non-existent configuration file"""
         # Should not raise an error, just continue with defaults
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", _env(), clear=True):
             config = CLIConfig(config_file="/nonexistent/config.json")
 
             # Should use defaults
@@ -394,7 +401,7 @@ base_url: https://yaml.example.com
             config_file = f.name
 
         try:
-            with patch.dict("os.environ", {}, clear=True):
+            with patch.dict("os.environ", _env(), clear=True):
                 config = CLIConfig(config_file=config_file)
 
                 # Known field should be loaded
@@ -431,7 +438,7 @@ base_url: https://yaml.example.com
 
             try:
                 env_dict = {"HACKAGENT_API_KEY": env_value} if env_value else {}
-                with patch.dict("os.environ", env_dict, clear=True):
+                with patch.dict("os.environ", _env(**env_dict), clear=True):
                     if cli_arg is not None:
                         config = CLIConfig(config_file=config_file, api_key=cli_arg)
                     else:

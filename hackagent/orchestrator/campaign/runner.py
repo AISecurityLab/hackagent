@@ -427,16 +427,27 @@ class _AttackRunner:
         self, attack: ResolvedAttack, goals: Optional[tuple[Goal, ...]] = None
     ) -> AttackOutcome:
         goals = self.resolved.goals if goals is None else goals
-        tracker = await asyncio.to_thread(
-            RunTracker,
-            self.store,
-            agent_id=self.agent_id,
-            attack_name=attack.name,
-            configuration=attack.configuration,
-            expected_goals=len(goals),
-            output=self.execution.output,
-            campaign_run_id=self.campaign_run_id,
+        creating = asyncio.ensure_future(
+            asyncio.to_thread(
+                RunTracker,
+                self.store,
+                agent_id=self.agent_id,
+                attack_name=attack.name,
+                configuration=attack.configuration,
+                expected_goals=len(goals),
+                output=self.execution.output,
+                campaign_run_id=self.campaign_run_id,
+            )
         )
+        try:
+            tracker = await asyncio.shield(creating)
+        except asyncio.CancelledError:
+            # The thread creates the run whatever happens here, so wait for
+            # it and record the run as cancelled instead of leaving it RUNNING.
+            created = await _outlasting_cancels(creating)
+            if created is not None:
+                _record_quietly(self.store, created.cancel)
+            raise
         run_id = str(tracker.run_id)
         logger.info("%s | started | run=%s | goals=%d", attack.name, run_id, len(goals))
 
@@ -779,6 +790,23 @@ async def _all_or_none(coros: Iterable[Awaitable[T]]) -> list[T]:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         raise
+
+
+async def _outlasting_cancels(work: asyncio.Future[T]) -> Optional[T]:
+    """Wait for ``work`` however many more cancels arrive meanwhile.
+
+    For work running in a thread, which cancelling cannot stop: in parallel
+    mode a task is cancelled once through ``gather`` and again by
+    :func:`_all_or_none`, and giving up on the second would leave behind
+    whatever the thread went on to create. ``None`` if the work failed.
+    """
+    while True:
+        try:
+            return await asyncio.shield(work)
+        except asyncio.CancelledError:
+            continue
+        except Exception:
+            return None
 
 
 def _is_cancellation(exc: BaseException) -> bool:

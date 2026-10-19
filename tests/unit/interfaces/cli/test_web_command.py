@@ -4,6 +4,7 @@
 """Unit tests for the `hackagent web` CLI command."""
 
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
@@ -95,7 +96,8 @@ class TestWebCommand(unittest.TestCase):
             )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(seen["settings"].db_path, "/tmp/test-dashboard.db")
+        # Expanded to a native path: backslashes on Windows.
+        self.assertEqual(seen["settings"].db_path, str(Path("/tmp/test-dashboard.db")))
         mock_create.assert_called_once()
         session = mock_create.call_args.args[0]
         self.assertIs(session.backend, store)
