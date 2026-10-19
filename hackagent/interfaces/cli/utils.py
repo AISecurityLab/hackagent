@@ -37,13 +37,14 @@ def handle_errors(func):
             # below would report the same failure a second time, as an
             # "unexpected" one.
             raise
-        except HackAgentError as e:
-            console.print(f"[bold red]❌ HackAgent Error: {str(e)}")
+        # ApiError is a HackAgentError, so it is caught first.
+        except ApiError as e:
+            console.print(f"[bold red]❌ API Error: {str(e)}")
             if console._environ.get("HACKAGENT_DEBUG"):
                 console.print(Traceback())
             raise click.ClickException(str(e))
-        except ApiError as e:
-            console.print(f"[bold red]❌ API Error: {str(e)}")
+        except HackAgentError as e:
+            console.print(f"[bold red]❌ HackAgent Error: {str(e)}")
             if console._environ.get("HACKAGENT_DEBUG"):
                 console.print(Traceback())
             raise click.ClickException(str(e))
