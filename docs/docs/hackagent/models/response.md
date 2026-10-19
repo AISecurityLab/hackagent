@@ -14,6 +14,10 @@ class ModelResponse()
 
 Backend-independent view of a model completion response.
 
+#### latency\_ms
+
+How long the call took, in milliseconds, when its caller timed it.
+
 #### failed
 
 ```python
