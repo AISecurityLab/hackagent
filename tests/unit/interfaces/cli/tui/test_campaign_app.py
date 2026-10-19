@@ -586,16 +586,17 @@ class TestKeysThatMustNotBeShadowed:
             await pilot.pause()
             # Focus a text field directly: this is about what a focused
             # editor swallows, not about where Tab happens to land. On a slow
-            # runner the builder's own first focus can land after ours, so
-            # focus until it holds.
-            field = app.query(Input).first()
-            for _ in range(10):
-                field.focus()
-                await pilot.pause()
-                if app.focused is field:
+            # runner the builder can still be rendering its form, replacing
+            # the fields, so look the field up afresh until focusing it holds.
+            for _ in range(20):
+                fields = [field for field in app.query(Input) if field.focusable]
+                if fields:
+                    fields[0].focus()
+                await pilot.pause(0.05)
+                if isinstance(app.focused, Input):
                     break
 
-            assert isinstance(app.focused, Input)
+            assert isinstance(app.focused, Input), app.focused
             claimed = set(app.focused._bindings.key_to_bindings)
             builder = app.query_one(CampaignBuilder)
             advertised = {

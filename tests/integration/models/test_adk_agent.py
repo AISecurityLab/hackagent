@@ -33,6 +33,13 @@ import pytest
 
 logger = logging.getLogger(__name__)
 
+#: One static request: each is a full round trip through the agent's own
+#: model, and the tests only need one to reach the agent and be judged.
+ONE_TEMPLATE = {
+    "name": "static_template",
+    "parameters": {"template_categories": ["role_play"], "templates_per_category": 1},
+}
+
 ADK_TEST_TIMEOUT_SECONDS = 45
 
 
@@ -245,9 +252,7 @@ class TestGoogleADKCampaignIntegration:
         from hackagent.models.retry import RetryingModel
         from hackagent.orchestrator.campaign import load_campaign, resolve_campaign
 
-        resolved = resolve_campaign(
-            load_campaign(adk_campaign([{"name": "static_template"}]))
-        )
+        resolved = resolve_campaign(load_campaign(adk_campaign([ONE_TEMPLATE])))
 
         # The campaign retries the target, so the ADK model comes wrapped.
         assert isinstance(resolved.target, RetryingModel)
@@ -262,9 +267,7 @@ class TestGoogleADKCampaignIntegration:
     ):
         from hackagent.orchestrator.campaign import run_campaign
 
-        result = run_campaign(
-            adk_campaign([{"name": "static_template"}]), store=local_store
-        )
+        result = run_campaign(adk_campaign([ONE_TEMPLATE]), store=local_store)
 
         [outcome] = result.attacks
         assert outcome.error is None
@@ -310,7 +313,7 @@ class TestGoogleADKCampaignIntegration:
         from hackagent.orchestrator.campaign import run_campaign
 
         result = run_campaign(
-            adk_campaign([{"name": "static_template"}], judged=True),
+            adk_campaign([ONE_TEMPLATE], judged=True),
             store=local_store,
         )
 
