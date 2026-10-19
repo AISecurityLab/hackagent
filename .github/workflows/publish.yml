@@ -70,7 +70,7 @@ jobs:
           import os, shutil, sys
           sys.path.insert(0, os.path.join(os.environ["RUNNER_TEMP"], "webui"))
           from hackagent_webui import __version__, bundle_path
-          dest = os.path.join("hackagent", "server", "webui", "static")
+          dest = os.path.join("hackagent", "interfaces", "web", "static")
           shutil.copytree(bundle_path(), dest, dirs_exist_ok=True)
           print(f"staged hackagent-webui {__version__} into {dest}")
           PY
@@ -106,9 +106,6 @@ jobs:
             archive: tar.gz
           - os: macos-latest
             target: macos-arm64
-            archive: tar.gz
-          - os: macos-13
-            target: macos-x86_64
             archive: tar.gz
           - os: windows-latest
             target: windows-x86_64
@@ -148,7 +145,7 @@ jobs:
           import os, shutil, sys
           sys.path.insert(0, os.path.join(os.environ["RUNNER_TEMP"], "webui"))
           from hackagent_webui import __version__, bundle_path
-          dest = os.path.join("hackagent", "server", "webui", "static")
+          dest = os.path.join("hackagent", "interfaces", "web", "static")
           shutil.copytree(bundle_path(), dest, dirs_exist_ok=True)
           print(f"staged hackagent-webui {__version__} into {dest}")
           PY
@@ -166,7 +163,8 @@ jobs:
         run: |
           ./dist/hackagent/hackagent --version
           ./dist/hackagent/hackagent version
-          ./dist/hackagent/hackagent scan --help
+          # Builds every model and attack, and sends nothing.
+          ./dist/hackagent/hackagent campaign validate packaging/smoke-campaign.yaml
           # The dashboard must be inside the archive, not rebuilt at runtime.
           ./dist/hackagent/hackagent web --no-browser --port 7871 &
           pid=$!
@@ -193,8 +191,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "hackagent --version exited $LASTEXITCODE" }
           & .\dist\hackagent\hackagent.exe version
           if ($LASTEXITCODE -ne 0) { throw "hackagent version exited $LASTEXITCODE" }
-          & .\dist\hackagent\hackagent.exe scan --help
-          if ($LASTEXITCODE -ne 0) { throw "hackagent scan --help exited $LASTEXITCODE" }
+          & .\dist\hackagent\hackagent.exe campaign validate packaging\smoke-campaign.yaml
+          if ($LASTEXITCODE -ne 0) { throw "hackagent campaign validate exited $LASTEXITCODE" }
 
       - name: Smoke test TUI launch (Unix)
         if: runner.os != 'Windows'

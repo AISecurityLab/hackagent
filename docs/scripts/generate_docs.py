@@ -21,10 +21,16 @@ try:
 except ImportError:
     tomllib = None  # Python < 3.11 fallback handled in get_current_version()
 
-# Prefixes excluded from API docs (CLI internals, web UI serving layer)
+# Private modules and compatibility shims are not public API pages.
+# hackagent.client and hackagent.interfaces (cli, tui, web) are documented.
+# storage._http is private to storage.remote. legacy_seams is the ignored
+# sibling-import pocket. router and attacks.{shared,generator} remain
+# import shims and are deferred, not documented here.
+# examples are runnable scripts, not API; the agent guides link them.
 _EXCLUDE_PREFIXES = (
-    "hackagent.cli",
-    "hackagent.server.webui",
+    "hackagent.storage._http",
+    "hackagent.attacks._lib.legacy_seams",
+    "hackagent.examples",
 )
 
 
@@ -81,6 +87,38 @@ def _sanitize_mdx(text: str) -> str:
         result.append("".join(escaped_parts))
 
     return "\n".join(result)
+
+
+def _remove_generated_sidebar(docs_dir: Path) -> None:
+    """Delete the ``sidebar.json`` pydoc-markdown writes.
+
+    ``sidebars.ts`` autogenerates the SDK sidebar from ``docs/hackagent/``,
+    so the renderer's own sidebar file is never read.
+    """
+    (docs_dir / "sidebar.json").unlink(missing_ok=True)
+
+
+def _publish_interface_pages(docs_dir: Path) -> None:
+    """Give web package pages names the docs plugin does not exclude.
+
+    ``exclude`` drops ``_*.md`` (partials and ``_version.md``). The web
+    package page is ``__init__.md`` and its helpers are ``_*.md``.
+    """
+    web = docs_dir / "hackagent" / "interfaces" / "web"
+    if not web.is_dir():
+        return
+    init = web / "__init__.md"
+    if init.exists():
+        init.replace(web / "index.md")
+    for path in sorted(web.glob("_*.md")):
+        target = web / path.name[1:]
+        path.replace(target)
+        # The sidebar shows sidebar_label; drop the underscore there too.
+        text = target.read_text(encoding="utf-8")
+        target.write_text(
+            re.sub(r"^sidebar_label: _", "sidebar_label: ", text, count=1, flags=re.M),
+            encoding="utf-8",
+        )
 
 
 def _sanitize_generated_docs(docs_dir: Path) -> None:
@@ -174,8 +212,14 @@ import pydoc_markdown.contrib.renderers.markdown as _md
 
 def escape_except_blockquotes(string):
     single_quote_pattern = r"`[^`]*`"
+    # RST ``code`` spans; without this, `[^`]*` reads them as two empty spans
+    # and escapes the code between them (``'x'`` -> &#x27;x&#x27;).
+    double_quote_pattern = r"``[^`]+``"
     triple_quote_pattern = r"```[\\s\\S]*?```"
-    matches = re.findall(f"({triple_quote_pattern}|{single_quote_pattern})", string)
+    matches = re.findall(
+        f"({triple_quote_pattern}|{double_quote_pattern}|{single_quote_pattern})",
+        string,
+    )
     for i, match in enumerate(matches):
         string = string.replace(match, f"\\x00BQ{i}\\x00", 1)
     string = html.escape(string)
@@ -205,6 +249,10 @@ def create_pydoc_wrapper() -> str:
         return f.name
 
 
+# Where pydoc-markdown writes before the pages are moved into docs/docs/.
+SDK_STAGING = "_sdk_staging"
+
+
 def create_pydoc_config(output_dir: str, modules: list[str]) -> str:
     """Write a pydoc-markdown YAML config to a temp file and return its path."""
     module_lines = "\n".join(f"              - {m}" for m in modules)
@@ -225,7 +273,7 @@ def create_pydoc_config(output_dir: str, modules: list[str]) -> str:
         renderer:
           type: docusaurus
           docs_base_path: {output_dir}
-          sidebar_top_level_label: "🔗 SDK Reference"
+          relative_output_path: {SDK_STAGING}
         """
     ).strip()
 
@@ -312,28 +360,41 @@ def generate_docs(version: str) -> None:
             description="Generating documentation",
         )
 
-        # Fix MDX incompatibilities in generated files
-        _sanitize_generated_docs(docs_dir)
-
-        index_content = f"""---
-sidebar_position: 1
----
-
-# Python SDK Reference
+        index_content = f"""# Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
 in the HackAgent Python SDK, auto-generated from source-code docstrings.
 
 ## What's Included
 
-- **Core**: `HackAgent` agent class, errors, and utilities
-- **Router**: Adapters for OpenAI, Ollama, LiteLLM, Google ADK, and call tracking
-- **Attack Framework**: Base classes, objectives, evaluators, and techniques
-  (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline)
+- **Client**: Depth-2 `hackagent.client`. `HackAgent(Settings)` reads what
+  past runs recorded — campaigns, runs, results, agents — and carries the
+  catalogs, `presets`, `plan_attack`, `doctor` and `check_connection`.
+  Running an attack is a campaign: `hackagent.orchestrator.campaign.run_campaign`.
+- **Interfaces**: Depth-3 `hackagent.interfaces` (CLI, TUI, web). They talk
+  only to the facade. The web UI is `hackagent.interfaces.web`.
+- **Core**: Settings, contracts, errors, and utilities
+- **Evaluation**: Depth-0 `hackagent.evaluation`. `Panel` scores a `Sample`
+  into a `Verdict`. Judges, pattern evaluators, and verdict metrics live here.
+- **Tracking**: Depth-0 `hackagent.tracking`. `Tracker` implements the
+  `Events` port and writes through `RunSink`.
+- **Orchestrator**: Depth-1 `hackagent.orchestrator`. `run_campaign(spec)` is
+  the only way an attack runs: it resolves the goals, models and judges, then
+  drives every attack over every goal.
+- **Attack Framework**: Base classes, objectives, and techniques
+  (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline).
+  The attack seam is `hackagent.attacks.techniques`: `StaticAttack` and
+  `IterativeAttack`, each attack's parameter model (its roles and
+  defaults), and the `registry` a campaign resolves names through.
+  Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
+  templates, progress, inline-judge adapters, `ensure_graphviz`).
+  Every shipped technique constructs as `BaseAttack(config, ctx)`.
+  Private modules are omitted from these pages: `storage._http` and
+  `attacks._lib.legacy_seams`.
 - **Datasets**: Built-in providers and dataset registry
 - **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 
-For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quickstart.md).
+For a worked example, see [Your first campaign](./getting-started/first-campaign.md); for the campaign format itself, see the [Campaign reference](./reference/index.md).
 
 ---
 
@@ -341,8 +402,9 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
 """
         (docs_dir / "api-index.md").write_text(index_content, encoding="utf-8")
 
-        # Flatten pydoc-markdown's reference/ subdirectory when present
-        reference_dir = docs_dir / "reference"
+        # Move pydoc-markdown's output up from its staging folder. It is not
+        # reference/, which holds the generated campaign reference.
+        reference_dir = docs_dir / SDK_STAGING
         if reference_dir.exists():
             for item in reference_dir.iterdir():
                 target = docs_dir / item.name
@@ -355,6 +417,17 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
                 else:
                     shutil.copy2(item, target)
             shutil.rmtree(reference_dir)
+
+        # pydoc-markdown writes under its staging folder and the copy above lands
+        # after the first pass. Sanitize once the pages are in place.
+        _sanitize_generated_docs(docs_dir)
+        _publish_interface_pages(docs_dir)
+        _remove_generated_sidebar(docs_dir)
+        run_command(
+            ["uv", "run", "python", str(script_dir / "risk_pages.py"), str(docs_dir)],
+            cwd=project_root,
+            description="Writing risk pages from the catalog",
+        )
 
         print(f"✅ Documentation generated in {docs_dir}")
         print("\n🔧 To view: cd docs && npm start")

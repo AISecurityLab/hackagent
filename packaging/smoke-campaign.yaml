@@ -1,0 +1,52 @@
+# Smoke test for the frozen binary: `hackagent campaign validate` on this file.
+#
+# Attacks are imported by name at run time, which PyInstaller cannot see, so a
+# binary that is missing one still starts and only fails when a campaign names
+# it. Validating builds every model and constructs every attack, and sends
+# nothing, so this needs no model server. It names every registered attack;
+# tests/unit/packaging/test_smoke_campaign.py keeps it that way.
+version: 1
+
+campaign:
+  name: binary smoke test
+
+dataset:
+  source:
+    type: inline
+    goals: [a goal]
+
+target:
+  name: smoke-target
+  connection: &ollama
+    provider: ollama
+    type: OLLAMA
+
+attacks:
+  - name: baseline
+  - name: static_template
+  - name: flipattack
+  - name: cipherchat
+  - name: h4rm3l
+  - name: mml
+  - name: fc
+  - name: tfc
+  - name: bon
+  - name: pap
+    roles:
+      attacker: &role {name: smoke-role, connection: *ollama}
+  - name: pair
+    roles: {attacker: *role}
+  - name: tap
+    roles: {attacker: *role}
+  - name: crescendo
+    roles: {attacker: *role}
+  - name: advprefix
+    roles: {attacker: *role}
+  - name: tool_output_ipi
+  - name: rag
+    parameters:
+      documents: [A document.]
+      benign_queries: [a question]
+    roles: {attacker: *role, embedder: *role}
+  - name: autodan_turbo
+    roles: {attacker: *role, embedder: *role, summarizer: *role}

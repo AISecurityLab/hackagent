@@ -7,7 +7,7 @@ Registry and factory functions for dataset providers.
 This module provides the main entry point for loading goals from various sources.
 """
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import Any, Dict, List, Optional, Type
 
 from hackagent.datasets.base import DatasetProvider
@@ -254,8 +254,9 @@ def load_goals_from_config(config: Dict[str, Any]) -> List[str]:
     """
     Load goals from a configuration dictionary.
 
-    This function is designed to be called from the AttackOrchestrator
-    when a 'dataset' key is present in the attack configuration.
+    Callers that already have a dataset configuration dictionary use this
+    helper directly. A run resolves goals through
+    :func:`hackagent.datasets.goals.resolve_goals`.
 
     Args:
         config: Dataset configuration dictionary with keys:

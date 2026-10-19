@@ -1,25 +1,33 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""A client library for HackAgent — AI Agent Security Testing"""
+"""A client library for HackAgent — AI Agent Security Testing.
 
-from .agent import HackAgent
-from .server.client import AuthenticatedClient, Client
-from .logger import setup_package_logging
-from .router.types import AgentTypeEnum
-from .server.storage.base import StorageBackend
-from .server.storage.local import LocalBackend
-from .server.storage.remote import RemoteBackend
+The package root exports the facade and public types only. Importing it does
+not install a logging handler and does not import interface toolkits.
+"""
 
-# Configure RichHandler for all hackagent.* loggers on first import.
-setup_package_logging()
+from hackagent.client import HackAgent
+from hackagent.core.contracts import AgentType
+from hackagent.core.errors import ApiError, HackAgentError
+from hackagent.core.settings import (
+    DEFAULT_REMOTE_BASE_URL,
+    Settings,
+    Source,
+    read_config_file,
+    resolve_ollama_base_url,
+    resolve_remote_base_url,
+)
 
 __all__ = (
-    "AgentTypeEnum",
-    "AuthenticatedClient",
-    "Client",
+    "AgentType",
+    "ApiError",
+    "DEFAULT_REMOTE_BASE_URL",
     "HackAgent",
-    "LocalBackend",
-    "RemoteBackend",
-    "StorageBackend",
+    "HackAgentError",
+    "Settings",
+    "Source",
+    "read_config_file",
+    "resolve_ollama_base_url",
+    "resolve_remote_base_url",
 )

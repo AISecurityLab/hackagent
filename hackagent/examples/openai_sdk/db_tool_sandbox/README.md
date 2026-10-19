@@ -11,7 +11,7 @@ It is designed for authorized red-team testing of:
 ## What you get
 
 - `agent.py`: Flask server with `/v1/chat/completions`
-- `hack.py`: runs PAIR against this target
+- `flipattack-sqldesk.yaml`: runs PAIR against this target
 - `sandbox.db`: local SQLite test database (auto-created and seeded)
 
 ## Architecture
@@ -49,7 +49,7 @@ Endpoint: `http://127.0.0.1:5002/v1/chat/completions`
 
 ```bash
 cd hackagent/examples/openai_sdk/db_tool_sandbox
-python hack.py
+hackagent campaign run flipattack-sqldesk.yaml
 ```
 
 ## Environment variables

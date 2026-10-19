@@ -1,12 +1,11 @@
 ---
-sidebar_position: 3
 sidebar_label: Vulnerabilities
 title: Vulnerabilities
 ---
 
 # Vulnerabilities
 
-HackAgent ships with **13 built-in vulnerability classes** covering the input, model, data, and agent layers of an AI system. Each one extends `BaseVulnerability` (`hackagent.risks.base`), defines an `Enum` of testable sub-types, and has a matching **threat profile** — recommended datasets, attack techniques, objective, and metrics — documented inline on its own page.
+HackAgent ships with **13 built-in vulnerability classes** covering the input, model, data, and agent layers of an AI system. Each one extends `BaseVulnerability` (`hackagent.catalog.risks.base`), defines an `Enum` of testable sub-types, and has a matching **threat profile** — recommended datasets, attack techniques, and metrics — documented inline on its own page.
 
 ## Reference
 
@@ -29,8 +28,8 @@ HackAgent ships with **13 built-in vulnerability classes** covering the input, m
 ## Using a Vulnerability
 
 ```python
-from hackagent.risks import Jailbreak
-from hackagent.risks.jailbreak.types import JailbreakType
+from hackagent.catalog.risks import Jailbreak
+from hackagent.catalog.risks.jailbreak.types import JailbreakType
 
 # Use all sub-types
 vuln = Jailbreak()
@@ -48,7 +47,7 @@ Don't see a category that fits your use case? See [Custom Vulnerabilities](./cus
 
 A **threat profile** maps a vulnerability to recommended evaluation parameters:
 
-> _"Given vulnerability **X**, which datasets, attack techniques, objective, and metrics should an evaluation campaign use?"_
+> _"Given vulnerability **X**, which datasets, attack techniques, and metrics should an evaluation campaign use?"_
 
 Each of the 13 built-in vulnerabilities above has a matching threat profile — see the "Threat Profile" section on its own page for the concrete values. This section explains the shared anatomy behind every one of them.
 
@@ -57,7 +56,6 @@ graph LR
     V[Vulnerability Class] --> TP[ThreatProfile]
     TP --> D[DatasetRecommendation]
     TP --> A[AttackRecommendation]
-    TP --> O[Objective]
     TP --> M[Metrics]
 
     D --> |preset| DS[Dataset Preset Key]
@@ -73,7 +71,6 @@ Each `ThreatProfile` is a frozen dataclass with these fields:
 | `vulnerability` | `type[BaseVulnerability]` | The vulnerability class this profile maps |
 | `datasets` | `list[DatasetRecommendation]` | Recommended datasets with relevance tags |
 | `attacks` | `list[AttackRecommendation]` | Compatible attack techniques |
-| `objective` | `str` | Default attack objective (`"jailbreak"`, `"harmful_behavior"`, `"policy_violation"`) |
 | `metrics` | `list[str]` | Relevant metric names (`"asr"`, `"toxicity_score"`, `"judge_score"`) |
 | `description` | `str` | Human-readable summary |
 
@@ -85,14 +82,6 @@ Every dataset and attack recommendation carries a **relevance** tag:
 |-------|---------|-------------|
 | **PRIMARY** | Directly designed to test this vulnerability | Always include in evaluation |
 | **SECONDARY** | Useful for broader coverage or baseline comparison | Include for comprehensive audits |
-
-### Objectives
-
-| Objective | Description | Example Vulnerabilities |
-|-----------|------------|------------------------|
-| `jailbreak` | Bypass safety mechanisms to produce forbidden output | PromptInjection, Jailbreak, SystemPromptLeakage |
-| `harmful_behavior` | Generate harmful, toxic, or dangerous content | Misinformation |
-| `policy_violation` | Violate organizational policies or access controls | ExcessiveAgency, CredentialExposure |
 
 ### Metrics
 
@@ -108,7 +97,7 @@ Common metric names used across profiles:
 Each vulnerability has an associated profile constant in its module:
 
 ```python
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 print(JAILBREAK_PROFILE.description)
 # "Tests resistance to multi-turn, roleplay, encoding, and authority-based bypass."
@@ -117,9 +106,8 @@ print(JAILBREAK_PROFILE.dataset_presets)
 # ['strongreject', 'harmbench', 'advbench', 'jailbreakbench', ...]
 
 print(JAILBREAK_PROFILE.attack_techniques)
-# ['h4rm3l', 'TAP', 'PAIR']
+# ['h4rm3l', 'tap', 'pair']
 
-print(JAILBREAK_PROFILE.objective)   # 'jailbreak'
 print(JAILBREAK_PROFILE.metrics)     # ['asr', 'judge_score']
 
 # Primary datasets — core evaluation

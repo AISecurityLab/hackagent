@@ -1,0 +1,516 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Agent Actions Viewer Component
+
+A reusable Textual widget for displaying agent tool calls, function executions,
+and web interactions in a structured, visual format.
+"""
+
+import json
+from typing import Any, Dict, List, Optional
+
+from textual.app import ComposeResult
+from textual.containers import Container
+from textual.widgets import Button, RichLog, Static
+
+from hackagent.interfaces.tui.theme import MITIGATED, VULNERABLE
+
+
+def _escape(value: Any) -> str:
+    """Escape a value for safe Rich markup rendering.
+
+    Args:
+        value: Any value to escape
+
+    Returns:
+        String with Rich markup characters escaped
+
+    Note:
+        We escape ALL square brackets, not just tag-like patterns,
+        because Rich's markup parser can get confused by unescaped
+        brackets in certain contexts (e.g., JSON arrays inside colored text).
+    """
+    if value is None:
+        return ""
+    # Escape ALL square brackets to prevent any markup interpretation issues
+    text = str(value)
+    return text.replace("[", "\\[").replace("]", "\\]")
+
+
+class AgentActionsViewer(Container):
+    """
+    A container widget for displaying agent actions (tool calls, HTTP requests, etc.)
+    in a visual, inspector-like format.
+
+    This component provides:
+    - Visual representation of tool/function calls
+    - HTTP request/response display
+    - Agent reasoning steps (for ADK agents)
+    - JSON payload inspector
+    - Collapsible action details
+    """
+
+    DEFAULT_CSS = """
+    AgentActionsViewer {
+        border: solid $primary;
+        padding: 0;
+    }
+
+    AgentActionsViewer .actions-header {
+        dock: top;
+        height: 3;
+        background: $panel;
+        padding: 0 1;
+        content-align: center middle;
+    }
+
+    AgentActionsViewer .actions-controls {
+        dock: top;
+        height: 3;
+        background: $surface;
+        padding: 0 1;
+        layout: horizontal;
+    }
+
+    AgentActionsViewer RichLog {
+        background: $surface;
+        border: none;
+        padding: 1;
+        height: 1fr;
+        width: 100%;
+    }
+
+    AgentActionsViewer Button {
+        margin: 0 1;
+    }
+
+    AgentActionsViewer .action-card {
+        background: $panel;
+        border: solid $primary-darken-1;
+        padding: 1;
+        margin: 0 0 1 0;
+    }
+    """
+
+    def __init__(
+        self,
+        title: str = "Agent Actions Inspector",
+        show_controls: bool = True,
+        **kwargs,
+    ):
+        """
+        Initialize the actions viewer.
+
+        Args:
+            title: Title to display in the header
+            show_controls: Whether to show control buttons
+            **kwargs: Additional keyword arguments for Container
+        """
+        super().__init__(**kwargs)
+        self.actions_title = title
+        self.show_controls = show_controls
+        self._action_count = 0
+        self._actions_buffer: List[Dict[str, Any]] = []
+
+    def compose(self) -> ComposeResult:
+        """Compose the actions viewer layout."""
+        # Header
+        yield Static(
+            f"[bold cyan]{self.actions_title}[/bold cyan]",
+            classes="actions-header",
+        )
+
+        # Control buttons (optional)
+        if self.show_controls:
+            with Container(classes="actions-controls"):
+                yield Button("Clear Actions", id="clear-actions", variant="default")
+                yield Button("Copy", id="copy-actions", variant="default")
+                yield Static("", id="action-count")
+
+        # Actions display area
+        rich_log = RichLog(
+            highlight=True,
+            markup=True,
+            max_lines=1000,
+            wrap=False,
+            id="actions-display",
+        )
+        yield rich_log
+
+    def on_mount(self) -> None:
+        """Called when the widget is mounted."""
+        self.update_action_count(0)
+        self.add_info_message("Waiting for agent actions...")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
+        if event.button.id == "clear-actions":
+            self.clear_actions()
+        elif event.button.id == "copy-actions":
+            ok = self.copy_actions()
+            self.notify(
+                "Actions copied to clipboard!" if ok else "Nothing to copy",
+                title="Copy",
+                severity="information" if ok else "warning",
+            )
+
+    def get_actions_text(self) -> str:
+        """Return the plain text currently shown in the actions log."""
+        from hackagent.interfaces.tui.widgets.clipboard import richlog_plaintext
+
+        try:
+            log = self.query_one("#actions-display", RichLog)
+        except Exception:
+            return ""
+        return richlog_plaintext(log) or ""
+
+    def copy_actions(self) -> bool:
+        """Copy all currently shown agent actions to the clipboard."""
+        from hackagent.interfaces.tui.widgets.clipboard import copy_to_clipboard
+
+        text = self.get_actions_text()
+        if not text:
+            return False
+        try:
+            app = self.app
+        except Exception:
+            app = None
+        return copy_to_clipboard(app, text)
+
+    def add_info_message(self, message: str) -> None:
+        """Add an informational message to the viewer."""
+        actions_widget = self.query_one("#actions-display", RichLog)
+        actions_widget.write(f"[dim italic]{_escape(message)}[/dim italic]")
+
+    def add_http_request(
+        self,
+        method: str,
+        url: str,
+        headers: Optional[Dict[str, Any]] = None,
+        payload: Optional[Dict[str, Any]] = None,
+        step_number: Optional[int] = None,
+    ) -> None:
+        """
+        Add an HTTP request action to the viewer.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: Request URL
+            headers: Request headers
+            payload: Request payload
+            step_number: Optional step number
+        """
+        actions_widget = self.query_one("#actions-display", RichLog)
+
+        self._action_count += 1
+        prefix = f"[{step_number}] " if step_number else f"[{self._action_count}] "
+
+        # Header
+        actions_widget.write(f"\n[bold yellow]{'─' * 80}[/bold yellow]")
+        actions_widget.write(
+            f"[bold cyan]{prefix}HTTP {_escape(method)}[/bold cyan] [blue]{_escape(url)}[/blue]"
+        )
+
+        # Headers
+        if headers:
+            actions_widget.write("[dim]Headers:[/dim]")
+            for key, value in list(headers.items())[:3]:  # Show first 3 headers
+                actions_widget.write(
+                    f"  [green]{_escape(key)}:[/green] {_escape(value)}"
+                )
+            if len(headers) > 3:
+                actions_widget.write(f"  [dim]... and {len(headers) - 3} more[/dim]")
+
+        # Payload
+        if payload:
+            actions_widget.write("[dim]Payload:[/dim]")
+            payload_str = json.dumps(payload, indent=2)
+            # Truncate if too long
+            if len(payload_str) > 500:
+                payload_str = payload_str[:500] + "\n  ..."
+            actions_widget.write(f"[yellow]{_escape(payload_str)}[/yellow]")
+
+        actions_widget.write(f"[bold yellow]{'─' * 80}[/bold yellow]\n")
+        self.update_action_count(self._action_count)
+
+    def add_tool_call(
+        self,
+        tool_name: str,
+        arguments: Optional[Dict[str, Any]] = None,
+        result: Optional[str] = None,
+        step_number: Optional[int] = None,
+    ) -> None:
+        """
+        Add a tool/function call action to the viewer.
+
+        Args:
+            tool_name: Name of the tool/function
+            arguments: Tool arguments
+            result: Tool execution result
+            step_number: Optional step number
+        """
+        actions_widget = self.query_one("#actions-display", RichLog)
+
+        self._action_count += 1
+        prefix = f"[{step_number}] " if step_number else f"[{self._action_count}] "
+
+        # Header
+        actions_widget.write(f"\n[bold magenta]{'─' * 80}[/bold magenta]")
+        actions_widget.write(
+            f"[bold green]{prefix}🔧 TOOL CALL:[/bold green] [bold cyan]{_escape(tool_name)}[/bold cyan]"
+        )
+
+        # Arguments
+        if arguments:
+            actions_widget.write("[dim]Arguments:[/dim]")
+            args_str = json.dumps(arguments, indent=2)
+            if len(args_str) > 400:
+                args_str = args_str[:400] + "\n  ..."
+            actions_widget.write(f"[yellow]{_escape(args_str)}[/yellow]")
+
+        # Result
+        if result:
+            actions_widget.write("[dim]Result:[/dim]")
+            result_preview = str(result)[:300]
+            if len(str(result)) > 300:
+                result_preview += "..."
+            actions_widget.write(f"[green]{_escape(result_preview)}[/green]")
+
+        actions_widget.write(f"[bold magenta]{'─' * 80}[/bold magenta]\n")
+        self.update_action_count(self._action_count)
+
+    def add_adk_event(
+        self,
+        event_type: str,
+        event_data: Dict[str, Any],
+        step_number: Optional[int] = None,
+    ) -> None:
+        """
+        Add an ADK agent event to the viewer.
+
+        Args:
+            event_type: Type of event (tool_call, tool_result, llm_response, etc.)
+            event_data: Event data dictionary
+            step_number: Optional step number
+        """
+        actions_widget = self.query_one("#actions-display", RichLog)
+
+        self._action_count += 1
+        prefix = f"[{step_number}] " if step_number else f"[{self._action_count}] "
+
+        # Header
+        actions_widget.write(f"\n[bold blue]{'─' * 80}[/bold blue]")
+
+        if event_type == "tool_call":
+            tool_name = event_data.get("tool_name", "unknown")
+            tool_input = event_data.get("tool_input", {})
+            actions_widget.write(
+                f"[bold green]{prefix}🤖 ADK TOOL CALL:[/bold green] [bold cyan]{_escape(tool_name)}[/bold cyan]"
+            )
+            if tool_input:
+                input_str = json.dumps(tool_input, indent=2)
+                if len(input_str) > 400:
+                    input_str = input_str[:400] + "\n  ..."
+                actions_widget.write(f"[yellow]{_escape(input_str)}[/yellow]")
+
+        elif event_type == "tool_result":
+            tool_name = event_data.get("tool_name", "unknown")
+            result = event_data.get("result", "")
+            actions_widget.write(
+                f"[bold green]{prefix}📤 ADK TOOL RESULT:[/bold green] [bold cyan]{_escape(tool_name)}[/bold cyan]"
+            )
+            result_preview = str(result)[:300]
+            if len(str(result)) > 300:
+                result_preview += "..."
+            actions_widget.write(f"[green]{_escape(result_preview)}[/green]")
+
+        elif event_type == "llm_response":
+            content = event_data.get("content", "")
+            actions_widget.write(
+                f"[bold green]{prefix}💬 ADK LLM RESPONSE[/bold green]"
+            )
+            content_preview = str(content)[:400]
+            if len(str(content)) > 400:
+                content_preview += "..."
+            actions_widget.write(f"[cyan]{_escape(content_preview)}[/cyan]")
+
+        else:
+            actions_widget.write(
+                f"[bold green]{prefix}📋 ADK EVENT:[/bold green] [cyan]{_escape(event_type)}[/cyan]"
+            )
+            if "content" in event_data:
+                content_preview = str(event_data["content"])[:300]
+                actions_widget.write(f"[dim]{_escape(content_preview)}[/dim]")
+
+        actions_widget.write(f"[bold blue]{'─' * 80}[/bold blue]\n")
+        self.update_action_count(self._action_count)
+
+    def add_step_separator(self, step_name: str, step_number: int = 0) -> None:
+        """
+        Add a visual separator for pipeline steps.
+
+        Args:
+            step_name: Name of the step
+            step_number: Step number (0 for no number)
+        """
+        actions_widget = self.query_one("#actions-display", RichLog)
+
+        separator = "═" * 80
+        if step_number > 0:
+            header = f"\n[bold bright_cyan]▌ STEP {step_number}: {_escape(step_name)} [/bold bright_cyan]"
+        else:
+            header = f"\n[bold bright_cyan]▌ {_escape(step_name)} [/bold bright_cyan]"
+
+        actions_widget.write(f"\n[bold blue]{separator}[/bold blue]")
+        actions_widget.write(header)
+        actions_widget.write(f"[bold blue]{separator}[/bold blue]\n")
+
+    def clear_actions(self) -> None:
+        """Clear all actions from the viewer."""
+        actions_widget = self.query_one("#actions-display", RichLog)
+        actions_widget.clear()
+        self._action_count = 0
+        self._actions_buffer.clear()
+        self.update_action_count(0)
+        self.add_info_message("Actions cleared. Waiting for new agent actions...")
+
+    def update_action_count(self, count: int) -> None:
+        """
+        Update the action count display.
+
+        Args:
+            count: Number of actions
+        """
+        if self.show_controls:
+            try:
+                count_widget = self.query_one("#action-count", Static)
+                count_widget.update(f"[bold]Actions:[/bold] {count}")
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
+    # Event bus integration
+    # ------------------------------------------------------------------
+
+    def subscribe_to_bus(self, bus: Any, app: Any) -> None:
+        """Subscribe this viewer to a :class:`TUIEventBus`.
+
+        Events arrive on the emitting (worker) thread, so each handler
+        marshals back onto the Textual UI thread via ``app.call_from_thread``.
+        """
+
+        def _on_event(event: Any) -> None:
+            try:
+                app.call_from_thread(self._handle_event, event)
+            except Exception:
+                pass
+
+        bus.subscribe(_on_event)
+
+    def _handle_event(self, event: Any) -> None:
+        """Translate a TUI bus event into a row in the actions viewer."""
+        et = event.event_type
+        payload = event.payload or {}
+
+        if et == "step_started":
+            self.add_step_separator(
+                payload.get("step_name", "Step"),
+                payload.get("step_number", 0) or 0,
+            )
+
+        elif et == "goal_started":
+            goal_index = payload.get("goal_index", 0)
+            goal = (payload.get("goal") or "")[:120]
+            attack_type = (payload.get("attack_type") or "").upper()
+            label = f"Goal #{goal_index + 1}"
+            if attack_type:
+                label = f"{attack_type} — {label}"
+            if goal:
+                label += f": {goal}"
+            self.add_step_separator(label, goal_index + 1)
+
+        elif et == "goal_finalized":
+            success = bool(payload.get("success"))
+            actions_widget = self.query_one("#actions-display", RichLog)
+            outcome_markup = VULNERABLE.render() if success else MITIGATED.render()
+            elapsed = payload.get("elapsed_s")
+            elapsed_s = (
+                f"  [dim]({elapsed:.1f}s)[/dim]"
+                if isinstance(elapsed, (int, float))
+                else ""
+            )
+            actions_widget.write(
+                f"[dim]── Goal #{payload.get('goal_index', '?') + 1 if isinstance(payload.get('goal_index'), int) else '?'} {outcome_markup}{elapsed_s} ──[/dim]"
+            )
+
+        elif et == "trace_added":
+            self._render_trace(payload)
+
+    def _render_trace(self, payload: Dict[str, Any]) -> None:
+        """Render a `trace_added` payload using the existing add_* helpers."""
+        step_type = (payload.get("step_type") or "").upper()
+        step_name = payload.get("step_name") or step_type or "Trace"
+        content = payload.get("content") or {}
+        sequence = payload.get("sequence")
+
+        # Tool call / response → use add_tool_call so we get the structured
+        # arguments + result layout.
+        if step_type == "TOOL_CALL":
+            tool_name = (
+                content.get("name")
+                or content.get("tool")
+                or content.get("function", {}).get("name")
+                or "unknown"
+            )
+            args = (
+                content.get("arguments")
+                or content.get("input")
+                or content.get("parameters")
+            )
+            self.add_tool_call(
+                tool_name=tool_name,
+                arguments=args if isinstance(args, dict) else None,
+                step_number=sequence,
+            )
+            return
+
+        if step_type == "TOOL_RESPONSE":
+            tool_name = content.get("tool") or content.get("name") or "tool"
+            result = (
+                content.get("result")
+                or content.get("output")
+                or content.get("response")
+            )
+            self.add_tool_call(
+                tool_name=tool_name,
+                result=str(result) if result is not None else None,
+                step_number=sequence,
+            )
+            return
+
+        # Evaluation / scorer steps — render as a small card.
+        if step_name == "Evaluation" or content.get("evaluator"):
+            actions_widget = self.query_one("#actions-display", RichLog)
+            score = content.get("score")
+            evaluator = content.get("evaluator") or "evaluator"
+            actions_widget.write(
+                f"[bold yellow]⚖ {_escape(evaluator)}[/bold yellow]"
+                + (
+                    f"  score=[bright_white]{score}[/bright_white]"
+                    if score is not None
+                    else ""
+                )
+            )
+            return
+
+        # Generic interaction — show key/value-style summary.
+        actions_widget = self.query_one("#actions-display", RichLog)
+        actions_widget.write(
+            f"[dim]· {sequence or self._action_count + 1}[/dim]  "
+            f"[bold cyan]{_escape(step_name)}[/bold cyan] "
+            f"[dim]{_escape(step_type)}[/dim]"
+        )
+        self._action_count += 1
+        self.update_action_count(self._action_count)

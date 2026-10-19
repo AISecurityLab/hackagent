@@ -13,14 +13,14 @@
 # unreleased dashboard change against the CLI, or working offline.
 #
 # Produces a static export of the hackagent-webapp single-page app into
-# hackagent/server/webui/static/, where the package finds it at runtime and
+# hackagent/interfaces/web/static/, where the package finds it at runtime and
 # takes precedence over any installed hackagent-webui.
 #
 # The webapp checkout is never modified: the sources are copied to a scratch
 # directory and the export is configured there. That matters because the webapp
 # is built for a Node deployment — it ships server route handlers for its API
 # proxy and its runtime config, and `output: 'export'` rejects those. The CLI
-# serves both of those itself (hackagent/server/webui/_proxy.py and
+# serves both of those itself (hackagent/interfaces/web/_proxy.py and
 # /config.json), so the routes are simply left out of this build.
 #
 # Usage:
@@ -33,7 +33,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST="${REPO_ROOT}/hackagent/server/webui/static"
+DEST="${REPO_ROOT}/hackagent/interfaces/web/static"
 
 WEBAPP_REPO="${HACKAGENT_WEBAPP_REPO:-https://github.com/AISecurityLab/hackagent-webapp.git}"
 # Pinned tag rather than a branch, so a clone-and-build is reproducible. Must be

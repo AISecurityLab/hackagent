@@ -4,12 +4,12 @@ This example red-teams a locally installed Claude Code instance using HackAgent.
 
 The repo includes two execution modes:
 
-| Script | Target | Judge / Attacker | Notes |
+| File | Target | Judge / Attacker | Notes |
 |---|---|---|---|
-| `hack_claude.py` | Local Claude Code via `claude -p` | Anthropic API via LiteLLM | Requires `ANTHROPIC_API_KEY` |
-| `hack_ollama.py` | Local Claude Code launched through Ollama | Local Ollama model | Fully local setup |
+| `flipattack-claude.yaml` | Local Claude Code via `claude -p` | Anthropic API via LiteLLM | Requires `ANTHROPIC_API_KEY` |
+| `flipattack-ollama.yaml` | Local Claude Code launched through Ollama | Local Ollama model | Fully local setup |
 
-Both scripts use the `claude-code` agent type, so HackAgent drives Claude Code natively through a local CLI. No HTTP endpoint or bridge is required.
+Both use the `CLAUDE_CODE` agent type, so HackAgent drives Claude Code natively through a local CLI. No HTTP endpoint or bridge is required.
 
 ---
 
@@ -35,19 +35,19 @@ Install Claude Code and confirm it runs:
 
     claude --version
 
-#### For `hack_claude.py`
+#### For `flipattack-claude.yaml`
 
 Export an Anthropic API key. This is used by the attacker/judge model, not by the local Claude Code target:
 
     export ANTHROPIC_API_KEY="sk-ant-..."
 
-#### For `hack_ollama.py`
+#### For `flipattack-ollama.yaml`
 
 Install Ollama and confirm it runs:
 
     ollama --version
 
-Make sure the Ollama model configured in the script is available locally.
+Make sure the model named in the campaign file is available locally.
 
 ---
 
@@ -55,11 +55,15 @@ Make sure the Ollama model configured in the script is available locally.
 
 Run the Claude/API-backed version:
 
-    python hack_claude.py
+    hackagent campaign run flipattack-claude.yaml
 
 Run the Ollama/local version:
 
-    python hack_ollama.py
+    hackagent campaign run flipattack-ollama.yaml
+
+It is a campaign file, so you can read the whole attack without reading any
+Python, and change the target, the goals or the judge by editing it. Check it
+first with `hackagent campaign validate flipattack-ollama.yaml`.
 
 Or use the interactive TUI preset:
 
@@ -75,7 +79,7 @@ Both scripts create a `HackAgent` with:
 
 The difference is the local binary used to launch the target.
 
-#### `hack_claude.py`
+#### `flipattack-claude.yaml`
 
 Uses the Claude Code CLI directly:
 
@@ -86,16 +90,19 @@ Uses the Claude Code CLI directly:
 
 The configured model name is passed to Claude Code.
 
-#### `hack_ollama.py`
+#### `flipattack-ollama.yaml`
 
 Uses Ollama as the launcher:
 
-    adapter_operational_config={
-        "name": TARGET_MODEL,
-        "binary": "ollama",
-    }
+    target:
+      name: llama3.2:3b
+      connection:
+        provider: local
+        type: CLAUDE_CODE
+      options:
+        binary: ollama
 
-The configured model name is passed to Ollama.
+`name` is passed to Ollama; `options.binary` is the executable to launch.
 
 ---
 
@@ -113,6 +120,6 @@ The configured model name is passed to Ollama.
 
 | File | Purpose |
 |---|---|
-| `hack_claude.py` | Red-teams local Claude Code using an Anthropic/LiteLLM judge |
-| `hack_ollama.py` | Red-teams local Claude Code using a local Ollama-backed setup |
+| `flipattack-claude.yaml` | Red-teams local Claude Code using an Anthropic/LiteLLM judge |
+| `flipattack-ollama.yaml` | Red-teams local Claude Code using a local Ollama-backed setup |
 | `README.md` | Explains the scenarios and how to run them |

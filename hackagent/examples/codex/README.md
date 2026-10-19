@@ -6,8 +6,8 @@ The repo includes two execution modes:
 
 | Script | Target | Judge / Attacker | Notes |
 |---|---|---|---|
-| `hack_codex.py` | Local Codex via `codex exec` | OpenAI via LiteLLM | Requires `OPENAI_API_KEY` |
-| `hack_ollama.py` | Local Codex launched through Ollama | Local Ollama model | Fully local setup |
+| `h4rm3l-codex.yaml` | Local Codex via `codex exec` | OpenAI via LiteLLM | Requires `OPENAI_API_KEY` |
+| `h4rm3l-ollama.yaml` | Local Codex launched through Ollama | Local Ollama model | Fully local setup |
 
 Both scripts use the `codex` agent type, so HackAgent drives Codex natively through a local CLI. No HTTP endpoint or bridge is required.
 
@@ -35,13 +35,13 @@ Install Codex CLI and confirm it runs:
 
     codex --version
 
-#### For `hack_codex.py`
+#### For `h4rm3l-codex.yaml`
 
 Export an OPENAI API key. This is used by the attacker/judge model, not by the local Codex target:
 
     export OPENAI_API_KEY="sk-..."
 
-#### For `hack_ollama.py`
+#### For `h4rm3l-ollama.yaml`
 
 Install Ollama and confirm it runs:
 
@@ -55,11 +55,11 @@ Make sure the Ollama model configured in the script is available locally.
 
 Run the Codex/API-backed version:
 
-    python hack_codex.py
+    hackagent campaign run h4rm3l-codex.yaml
 
 Run the Ollama/local version:
 
-    python hack_ollama.py
+    hackagent campaign run h4rm3l-ollama.yaml
 
 Or use the interactive TUI preset:
 
@@ -75,7 +75,7 @@ Both scripts create a `HackAgent` with:
 
 The difference is the local binary used to launch the target.
 
-#### `hack_codex.py`
+#### `h4rm3l-codex.yaml`
 
 Uses the Codex CLI directly:
 
@@ -86,7 +86,7 @@ Uses the Codex CLI directly:
 
 The configured model name is passed to Codex.
 
-#### `hack_ollama.py`
+#### `h4rm3l-ollama.yaml`
 
 Uses Ollama as the launcher:
 
@@ -113,6 +113,6 @@ The configured model name is passed to Ollama.
 
 | File | Purpose |
 |---|---|
-| `hack_codex.py` | Red-teams local Codex using an OpenAI/LiteLLM judge |
-| `hack_ollama.py` | Red-teams local Codex using a local Ollama-backed setup |
+| `h4rm3l-codex.yaml` | Red-teams local Codex using an OpenAI/LiteLLM judge |
+| `h4rm3l-ollama.yaml` | Red-teams local Codex using a local Ollama-backed setup |
 | `README.md` | Explains the scenarios and how to run them |

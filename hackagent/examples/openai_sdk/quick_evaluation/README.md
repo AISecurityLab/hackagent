@@ -2,7 +2,7 @@
 
 This example runs a single h4rm3l evaluation against IBM Granite on OpenRouter.
 
-Configuration used by `run_h4rm3l.py`:
+Configuration used by `h4rm3l-granite.yaml`:
 
 - Target model: `ibm-granite/granite-4.1-8b`
 - Attacker model: `mistralai/mixtral-8x22b-instruct`
@@ -22,11 +22,11 @@ export OPENROUTER_API_KEY="..."
 hackagent examples quick-evaluation
 ```
 
-This command launches the same attack defined in `run_h4rm3l.py`.
+This command launches the same attack defined in `h4rm3l-granite.yaml`.
 
 ## Run directly (equivalent)
 
 ```bash
 cd examples/openai_sdk/quick_evaluation
-python run_h4rm3l.py
+hackagent campaign run h4rm3l-granite.yaml
 ```

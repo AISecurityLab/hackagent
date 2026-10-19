@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=../../../docs/static/schema/campaign.schema.json
+#
+# The smallest fully local run: an Ollama model attacked and judged on your
+# own machine, with no API key and nothing leaving it.
+#
+#   1. ollama pull Almawave/Velvet:2b
+#   2. ollama pull huihui_ai/lfm2.5-abliterated:latest
+#   3. hackagent campaign run flipattack-local.yaml
+version: 1
+
+campaign:
+  name: Local Ollama
+  description: FlipAttack over ten HarmBench goals, judged by a local model.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 10
+
+target:
+  name: Almawave/Velvet:2b
+  connection:
+    provider: ollama
+    type: OLLAMA
+
+attacks:
+  - name: flipattack
+    parameters:
+      flip_mode: FCS          # flip the characters in each word
+      cot: false              # no chain-of-thought preamble
+
+evaluation:
+  judges:
+    # Abliterated, so the judge will read a harmful reply and score it rather
+    # than refusing to look at it.
+    - name: huihui_ai/lfm2.5-abliterated:latest
+      connection:
+        provider: ollama
+        type: OLLAMA
+      scoring:
+        type: harmbench

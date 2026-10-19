@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=../../../docs/static/schema/campaign.schema.json
+#
+# A jailbreak risk evaluation of an Ollama model: a hundred HarmBench goals
+# through three attacks of rising cost, all on your own machine.
+#
+#   1. ollama pull Almawave/Velvet:2b     # the model under test
+#   2. ollama pull llama2-uncensored      # attacker and judge
+#   3. ollama serve
+#   4. hackagent campaign run risk-evaluation.yaml
+#
+# `execution.escalate` makes the three attacks a ladder: a goal that falls to
+# FlipAttack is never handed to TAP, so the expensive search is spent on the
+# goals that are still standing.
+version: 1
+
+campaign:
+  name: Ollama risk evaluation
+  description: AdvPrefix, FlipAttack and TAP over 100 HarmBench goals, fully local.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 100
+
+target:
+  name: Almawave/Velvet:2b
+  connection:
+    provider: ollama
+    type: OLLAMA
+
+attacks:
+  # Cheapest first: a static transform of the goal, no model of its own.
+  - name: flipattack
+    parameters:
+      flip_mode: FCS
+      cot: false
+      lang_gpt: false
+      few_shot: false
+
+  # AdvPrefix searches for a prefix that makes the model start complying.
+  - name: advprefix
+    roles:
+      attacker:
+        name: llama2-uncensored
+        connection:
+          provider: ollama
+          type: OLLAMA
+
+  # TAP grows a tree of rewritten prompts and prunes the branches going nowhere.
+  - name: tap
+    parameters:
+      depth: 3
+      width: 4
+      branching_factor: 3
+      streams: 4
+      early_stop: true
+    roles:
+      attacker:
+        name: llama2-uncensored
+        connection:
+          provider: ollama
+          type: OLLAMA
+
+evaluation:
+  judges:
+    # Uncensored, so it will read a harmful reply and score it rather than
+    # refusing to look at it.
+    - name: llama2-uncensored
+      connection:
+        provider: ollama
+        type: OLLAMA
+      scoring:
+        type: harmbench
+
+execution:
+  escalate: true

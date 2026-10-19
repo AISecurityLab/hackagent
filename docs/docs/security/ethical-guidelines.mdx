@@ -1,0 +1,31 @@
+# Ethical Guidelines
+
+HackAgent generates attacks at scale and stores what the target says back. This page covers running it responsibly; what to do once you find a weakness is in [Responsible Disclosure](./responsible-disclosure.mdx).
+
+## Principles
+
+Test only with permission, and only to make the system safer. Cause no harm to the system or its users, keep any data you come across private, and report what you find to the people who can fix it before anyone else hears about it.
+
+## Test in a safe place
+
+Point HackAgent at a staging copy or a local deployment rather than production, and give it test accounts and keys that can be revoked afterwards. Be most careful with agents that call tools: a successful attack on an agent that can send email, run commands or write to a database does those things for real. Connect such agents to sandboxed tools while you test them, as the `db_tool_sandbox` and `pc_tool_sandbox` examples in `hackagent/examples/openai_sdk` do.
+
+## Keep the load reasonable
+
+A single attack can send many requests. With its defaults, PAIR sends up to 25 prompts per goal to the target, plus the attacker and judge calls, so a benchmark of a few hundred goals quickly adds up to thousands of requests and, with hosted models, real cost. Start with a small `dataset.selection.limit` and raise it once a run behaves as expected. The [`execution.concurrency`](../reference/execution.md#concurrencyspec) settings `attack`, `target` and `judge` all default to 1; raise them only as far as the target's rate limits and your budget allow.
+
+## Handle results with care
+
+Results contain whatever the target produced, including harmful text and any data it leaked. By default they stay on your machine in `~/.local/share/hackagent/hackagent.db`; with an API key they also sync to the HackAgent platform, so for a sensitive target run without one. The attacker and judge default to a local Ollama model. If you configure hosted models instead, your goals and the target's replies go to that provider, which matters when either is confidential.
+
+## Research and publication
+
+If your research involves people or their data, even indirectly, get ethics review, for example from your institution's IRB, before you start. When you publish, explain the weakness and how to defend against it, and hold back working exploit details until the affected systems are fixed; [Responsible Disclosure](./responsible-disclosure.mdx#publishing) has the timeline.
+
+## Contributing
+
+HackAgent welcomes attack techniques from published research, better judges and evaluation, detection and defences, and documentation. It does not accept exploits aimed at specific organizations, techniques with no defensive value, or code you do not have the right to share. The [contributing guide](https://github.com/AISecurityLab/hackagent/blob/main/CONTRIBUTING.md) covers the process.
+
+## Getting help
+
+When you are unsure whether a test is in scope or allowed, stop and ask before you run it: your security team or the system owner for authorization, a lawyer for legal questions, and the HackAgent community in [GitHub Discussions](https://github.com/AISecurityLab/hackagent/discussions) or at [ais@ai4i.it](mailto:ais@ai4i.it) for anything about the tool.

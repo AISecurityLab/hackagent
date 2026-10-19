@@ -1,0 +1,116 @@
+---
+description: Browse runs, results and traces in the local dashboard.
+---
+
+# Dashboard
+
+`hackagent web` serves the HackAgent dashboard from your own machine: the same
+application as [app.hackagent.dev](https://app.hackagent.dev), served by the CLI,
+with no Node runtime, Docker or database server involved.
+
+<video controls muted playsInline preload="metadata" poster="/img/dashboard/home.png" style={{width: '100%', borderRadius: '8px', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+  <source src="/videos/dashboard-tour.mp4" type="video/mp4" />
+</video>
+
+The recording shows the runs of the [example run](./example-run.mdx) against a small support bot.
+
+- **Local mode** (no API key): reads the runs recorded in your SQLite database. Read-only, apart from deleting a run.
+- **Remote mode** (API key configured): shows your hosted HackAgent data.
+
+Your API key never reaches the browser. It stays in the CLI process, which
+attaches it to each request it proxies; the page itself runs with authentication
+disabled and only ever talks to `127.0.0.1`.
+
+## What each page shows
+
+Click a screenshot to open it full size.
+
+<ScreenshotGrid>
+  <Screenshot src="/img/dashboard/home.png" alt="Home: one target, two runs, five jailbreaks and a 38% risk overview" title="Home">
+
+Totals across your targets, and the risk overview of the latest one: the share of its results that were jailbreaks, next to how many were mitigated, errored or are still pending.
+
+  </Screenshot>
+  <Screenshot src="/img/dashboard/runs.png" alt="Stats: the PAIR run expanded into its ten results" title="Stats">
+
+Every run, newest first. Expand one to list its results, one per attempt, with the risk category of the goal, the verdict and the judge's note. **Success** means the attack worked.
+
+  </Screenshot>
+  <Screenshot src="/img/dashboard/leak.png" alt="A result: the reply in which the target recites its system prompt" title="Result">
+
+Open a result for everything stored with it: the verdict, the judge's scores, the category and subcategory, and the prompt and reply. This is the PAIR attempt that made the target recite its system prompt.
+
+  </Screenshot>
+  <Screenshot src="/img/dashboard/config.png" alt="Config: the attack's parameters and its attacker model" title="Config">
+
+The Config tab shows the attack's parameters and the model in each of its roles.
+
+  </Screenshot>
+  <Screenshot src="/img/dashboard/reports.png" alt="Reports: one agent rated high, with two reports" title="Reports">
+
+One entry per agent, with a severity and a risk score for each of its reports.
+
+  </Screenshot>
+  <Screenshot src="/img/dashboard/report.png" alt="Report details: 40% risk score and robustness per risk category" title="Report details">
+
+The eye icon on a report opens it: the risk score, robustness per risk category (100 minus the share of results that were jailbreaks) and a PDF export.
+
+  </Screenshot>
+</ScreenshotGrid>
+
+## Getting the dashboard
+
+The dashboard ships separately from the CLI, so an install that never opens it
+does not carry the frontend assets:
+
+```bash
+pip install 'hackagent[web]'
+```
+
+That extra installs Flask and the dashboard bundle. A bare `pip install hackagent` does not. Release binaries already include it. If `hackagent web` reports that no bundle was found, add the extra above. The bundle is served from `hackagent/interfaces/web/static`.
+
+## Usage
+
+```bash
+hackagent web                    # http://127.0.0.1:7860 (default)
+hackagent web --port 8080        # custom port
+hackagent web --local            # ignore the API key, read local runs
+hackagent web --no-browser       # skip opening a browser tab
+```
+
+Every option is in the [CLI reference](../reference/cli.md#hackagent-web).
+
+:::warning Binding beyond localhost
+`--host 0.0.0.0` exposes the dashboard, and in remote mode anyone who can reach
+the port can act with your API key: the proxy attaches it to every request and
+the page requires no login. Bind it only on a trusted network, and prefer an SSH
+tunnel (`ssh -L 7860:127.0.0.1:7860 host`) for remote access.
+:::
+
+## Local mode is read-only
+
+Local mode renders agents, attacks, runs, results and traces, but does not
+launch attacks. Run a campaign from the CLI, then refresh the dashboard:
+
+```bash
+hackagent campaign run campaign.yaml
+hackagent web
+```
+
+## Troubleshooting
+
+`GET /healthz` reports the active mode, the upstream API in remote mode, and
+which dashboard bundle is in use — the first things to include in a bug report.
+
+| Symptom | Cause |
+|---|---|
+| "No web UI bundle found …" | Nothing supplied a dashboard: `pip install 'hackagent[web]'`, or use a release binary |
+| "Port 7860 is already in use by another process" | An unrelated process holds the port — a previous HackAgent dashboard is reclaimed automatically, anything else never is. Use `--port` |
+| Every panel is empty (local mode) | No runs recorded in that database yet, or they went to another one. Check `hackagent results list` |
+| Creating or launching returns "read-only" | Expected in local mode — see above |
+| 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `hackagent config show` |
+
+## See also
+
+- [`hackagent results`](../reference/cli.md#hackagent-results): the same data from the command line.
+- [`hackagent config`](../reference/cli.md#hackagent-config): switch between local and remote mode.

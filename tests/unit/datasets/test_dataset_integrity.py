@@ -25,12 +25,14 @@ class TestDatasetProfileIntegrity(unittest.TestCase):
 
     def _extract_datasets_from_profiles(self) -> Dict[str, Set[str]]:
         """Extract all dataset names referenced in threat profiles."""
-        profile_files = glob.glob("hackagent/risks/**/profile.py", recursive=True)
+        profile_files = glob.glob(
+            "hackagent/catalog/risks/**/profile.py", recursive=True
+        )
         datasets_by_profile = {}
 
         for profile_file in profile_files:
             vulnerability = profile_file.split("/")[-2]
-            with open(profile_file, "r") as f:
+            with open(profile_file, "r", encoding="utf-8") as f:
                 content = f.read()
                 # Find ds("name", ...) patterns
                 pattern = r'ds\(\s*["\'](\w+)["\']\s*,'
@@ -366,7 +368,7 @@ class TestDatasetDocumentation(unittest.TestCase):
         import hackagent.datasets.presets as presets_module
 
         # Read the presets.py file
-        with open(presets_module.__file__, "r") as f:
+        with open(presets_module.__file__, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Each preset should be documented - check for the key name itself
@@ -383,7 +385,7 @@ class TestDatasetDocumentation(unittest.TestCase):
         """Test that presets based on published papers have arxiv links."""
         import hackagent.datasets.presets as presets_module
 
-        with open(presets_module.__file__, "r") as f:
+        with open(presets_module.__file__, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Count how many have arxiv references

@@ -1,0 +1,24 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+/* Two classes, so it outranks the theme's `.markdown li + li` spacing. */
+.grid .item {
+  margin: 0;
+}
+
+.cardTitle {
+  color: var(--ifm-color-primary);
+  font-weight: 700;
+}
+
+.cardSummary {
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
