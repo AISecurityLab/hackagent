@@ -6,6 +6,7 @@
 import json
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -154,7 +155,8 @@ def test_empty_explicit_base_url_is_an_error(tmp_path):
 
 
 def test_db_path_from_env_including_memory(tmp_path):
-    assert _resolve(tmp_path).db_path.endswith(".local/share/hackagent/hackagent.db")
+    default = Path(_resolve(tmp_path).db_path)
+    assert default.parts[-4:] == (".local", "share", "hackagent", "hackagent.db")
     assert (
         _resolve(tmp_path, env={"HACKAGENT_DB_PATH": ":memory:"}).db_path == ":memory:"
     )

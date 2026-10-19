@@ -10,6 +10,7 @@ deliver ``on_event``. Reads and ``delete_run`` go through the injected store.
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from hackagent import HackAgent, Settings
@@ -56,7 +57,8 @@ class TestSettingsOnlyConstruction(unittest.TestCase):
     def test_empty_key_opens_the_local_store_at_the_configured_path(self):
         with patch("hackagent.storage.local.LocalBackend") as local:
             HackAgent(_settings(api_key="", db_path="/tmp/phase8-facade.db"))
-        local.assert_called_once_with(db_path="/tmp/phase8-facade.db")
+        # Expanded to a native path: backslashes on Windows.
+        local.assert_called_once_with(db_path=str(Path("/tmp/phase8-facade.db")))
 
     def test_close_reaches_the_store(self):
         store = RecordingStore()
