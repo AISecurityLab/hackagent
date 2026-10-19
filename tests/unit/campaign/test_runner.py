@@ -370,7 +370,9 @@ def test_retention_settings_apply_to_traces(tmp_path):
     result, _builder = run(values, models=models_for())
 
     traces = next(path for path in result.outputs if path.name == "traces.jsonl")
-    rows = [json.loads(line) for line in traces.read_text().splitlines()]
+    rows = [
+        json.loads(line) for line in traces.read_text(encoding="utf-8").splitlines()
+    ]
     calls = [n for row in rows for n in row["nodes"] if n["node"] == "call"]
     assert calls
     for node in calls:
@@ -385,7 +387,9 @@ def test_traces_are_written_beside_the_results(tmp_path):
 
     written = {path.relative_to(tmp_path) for path in result.outputs}
     traces = next(path for path in result.outputs if path.name == "traces.jsonl")
-    [row] = [json.loads(line) for line in traces.read_text().splitlines()]
+    [row] = [
+        json.loads(line) for line in traces.read_text(encoding="utf-8").splitlines()
+    ]
     run_dir = Path(result.run_id)
     assert {run_dir / "results.json", run_dir / "traces.jsonl"} <= written
     assert row["attack"] == "bon" and row["goal_index"] == 0
@@ -415,7 +419,7 @@ def test_the_campaign_that_ran_is_written_beside_the_results(tmp_path):
 
     path = tmp_path / result.run_id / "campaign.yaml"
     assert path in result.outputs
-    written = yaml.safe_load(path.read_text())
+    written = yaml.safe_load(path.read_text(encoding="utf-8"))
     # It replays: the same campaign, with every default made explicit.
     assert load_campaign(written) == load_campaign(values)
     assert written["execution"]["concurrency"]["target"] == 1

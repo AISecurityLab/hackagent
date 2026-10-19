@@ -19,12 +19,15 @@ from pathlib import Path
 def modal_links(docs_dir: Path) -> list[tuple[str, str]]:
     terms = docs_dir / "src" / "components" / "Glossary" / "terms.tsx"
     links = [
-        (href, str(terms)) for href in re.findall(r"href: '([^']+)'", terms.read_text())
+        (href, str(terms))
+        for href in re.findall(r"href: '([^']+)'", terms.read_text(encoding="utf-8"))
     ]
     for page in (docs_dir / "docs").rglob("*.mdx"):
         if "hackagent" in page.relative_to(docs_dir / "docs").parts[:1]:
             continue
-        for href in re.findall(r'<Modal[^>]*\bhref="([^"]+)"', page.read_text()):
+        for href in re.findall(
+            r'<Modal[^>]*\bhref="([^"]+)"', page.read_text(encoding="utf-8")
+        ):
             links.append((href, str(page.relative_to(docs_dir))))
     return links
 

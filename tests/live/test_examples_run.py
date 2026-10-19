@@ -27,7 +27,9 @@ pytestmark = pytest.mark.live
 def _needs_only_ollama(path: Path) -> bool:
     """Whether every model this example names is one Ollama serves."""
     try:
-        spec = CampaignSpec.model_validate(yaml.safe_load(path.read_text()))
+        spec = CampaignSpec.model_validate(
+            yaml.safe_load(path.read_text(encoding="utf-8"))
+        )
     except Exception:
         return False
     kinds = {config.connection.type for _where, config in campaign_models(spec)}
@@ -50,7 +52,7 @@ def test_some_examples_need_nothing_but_ollama():
 @pytest.mark.timeout(900)
 def test_the_example_reaches_its_target(name, run_live, tmp_path, available_models):
     path = examples_catalog.campaign_files()[name]
-    values = yaml.safe_load(path.read_text())
+    values = yaml.safe_load(path.read_text(encoding="utf-8"))
 
     missing = {
         config.name

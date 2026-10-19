@@ -121,7 +121,7 @@ class TestAttackLogViewerFilters:
         path = v.save_logs_to_file()
         assert path is not None
         assert path.startswith(str(tmp_path))
-        content = open(path).read()
+        content = open(path, encoding="utf-8").read()
         assert "kept" in content
         assert "muted" not in content
 

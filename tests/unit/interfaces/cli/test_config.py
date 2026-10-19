@@ -257,7 +257,7 @@ class TestCLIConfig:
             assert config_path.exists()
 
             # Load and verify
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 saved_data = json.load(f)
 
             assert saved_data["api_key"] == "test-key"
