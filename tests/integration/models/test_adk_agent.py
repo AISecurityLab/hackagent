@@ -242,13 +242,16 @@ class TestGoogleADKCampaignIntegration:
         adk_campaign,
     ):
         from hackagent.models.completions.adk import ADKModel
+        from hackagent.models.retry import RetryingModel
         from hackagent.orchestrator.campaign import load_campaign, resolve_campaign
 
         resolved = resolve_campaign(
             load_campaign(adk_campaign([{"name": "static_template"}]))
         )
 
-        assert isinstance(resolved.target, ADKModel)
+        # The campaign retries the target, so the ADK model comes wrapped.
+        assert isinstance(resolved.target, RetryingModel)
+        assert isinstance(resolved.target.model, ADKModel)
 
     @pytest.mark.timeout(600)
     def test_a_static_attack_reaches_the_agent_and_is_recorded(
