@@ -62,7 +62,7 @@ dev = [
     "faiss-cpu>=1.13.2",
     "numpy>=1.26",
     "Pillow>=10.0.0",
-    "datasets>=2.14.0",
+    "datasets>=5.0",
 ]
 docs = [
     "pydoc-markdown>=4.8.2",
@@ -78,7 +78,7 @@ binaries = [
     "faiss-cpu>=1.13.2",
     "numpy>=1.26",
     "Pillow>=10.0.0",
-    "datasets>=2.14.0",
+    "datasets>=5.0",
 ]
 
 [project.optional-dependencies]
@@ -108,7 +108,7 @@ rag = [
     "numpy>=1.26",
 ]
 vision = ["Pillow>=10.0.0"]
-hf = ["datasets>=2.14.0"]
+hf = ["datasets>=5.0"]
 
 [project.scripts]
 hackagent = "hackagent.interfaces.cli.main:main"
