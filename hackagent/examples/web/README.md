@@ -17,7 +17,7 @@ engagement, or written permission. Edit the `endpoint` and `url` in
 ## Install
 
 ```bash
-pip install hackagent      # Playwright is included; Chromium auto-fetched on first run
+pip install 'hackagent[browser]'   # Playwright; Chromium is fetched on first run
 ```
 
 The planner and the example attacker/judge default to a **local Ollama** model —
@@ -27,46 +27,24 @@ no API key. Pull it once:
 ollama pull Librellama/gemma4:e2b-Uncensored   # uncensored → won't refuse to plan red-team prompts
 ```
 
-## Two ways in
+## Run it
 
-`hackagent examples web` is a zero-setup demo: it scans a public chatbot
-with its own inline config, so it needs no site of your own and is not one of
-the campaigns below.
-
-`tap-site-chatbot.yaml` is the example proper — a campaign you point at a site
-you are authorized to test, and edit like any other.
-
-## One command (CLI)
+`tap-site-chatbot.yaml` is a campaign file: copy it, set the site in it, check
+it, run it. `hackagent examples web` prints where the bundled copy is. The
+attacker and judge run on local Ollama, so no API key is needed.
 
 ```bash
-hackagent scan https://www.example.com                 # drive the page + attack (TUI)
-hackagent scan https://www.example.com --plan          # + an LLM picks the strategy
-hackagent scan https://www.example.com --no-attack     # just show the target config
-hackagent scan https://www.example.com --headed --no-tui   # watch it, run headless
+hackagent campaign validate tap-site-chatbot.yaml   # resolves everything, attacks nothing
+hackagent campaign run tap-site-chatbot.yaml
 ```
 
-When the input/reply heuristics miss a site's widget, pin them:
-
-```bash
-hackagent scan https://www.example.com \
-  --input-selector 'textarea' \
-  --reply-selector '.bot-message:last-child'
-```
-
-## Programmatic
+When the input/reply heuristics miss a site's widget, pin them with
+`input_selector` and `reply_selector` under `target.options` (see below).
 
 Plan a strategy (read-only — does not touch the target):
 
 ```bash
 python plan.py https://www.example.com
-```
-
-Run an authorized attack (attacker/judge run on local Ollama — no API key).
-`tap-site-chatbot.yaml` is a campaign file: set the site in it, check it, run it.
-
-```bash
-hackagent campaign validate tap-site-chatbot.yaml   # resolves everything, attacks nothing
-hackagent campaign run tap-site-chatbot.yaml
 ```
 
 Wiring the target by hand:

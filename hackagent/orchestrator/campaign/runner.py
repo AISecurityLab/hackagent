@@ -23,18 +23,23 @@ spent cannot stop anything.
 
 Shared semaphores cap how many goals are attacked, how many requests reach
 the target, and how many samples are judged at once, across all attacks. An
-error in one goal or request becomes an attempt with ``error`` set; only
-setup failures and the per-attack timeout fail an attack.
+error in one goal or request becomes an attempt with ``error`` set; setup
+failures, a store that refuses a write, and the per-attack timeout fail an
+attack, and stop its other goals so nothing writes into a finished run.
+
+An ``on_event`` listener that raises stops the whole campaign; raising
+:class:`CampaignCancelled` records the runs as cancelled rather than
+failed. Cancelling the task that runs :func:`arun_campaign` does the same.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from time import monotonic
-from typing import Any, Optional, cast
+from typing import Any, Optional, TypeVar, cast
 from uuid import UUID, uuid4
 
 from hackagent.attacks.techniques.contract import Messages
@@ -46,6 +51,7 @@ from hackagent.attacks.techniques.trace import (
     record_target_call,
     recording,
 )
+from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.core.contracts import Goal, RunStatus, Sample, Verdict
 from hackagent.core.logging import get_logger
 from hackagent.core.settings import Settings
@@ -56,7 +62,7 @@ from hackagent.models import ModelResponse, build_embedder, build_model
 from hackagent.orchestrator.campaign.audit import (
     AuditFailed,
     CalibrationLoader,
-    audit_configured_panel,
+    aaudit_configured_panel,
 )
 from hackagent.orchestrator.campaign.loader import load_campaign
 from hackagent.orchestrator.campaign.preflight import preflight
@@ -85,6 +91,8 @@ from hackagent.storage.store import Store
 
 logger = get_logger(__name__)
 
+T = TypeVar("T")
+
 #: Receives ``(event_name, **payload)``. An audited run first emits
 #: ``audit_finished`` (``audit``), then ``attack_started`` (``attack``,
 #: ``run_id``, ``expected_goals``), a ``goal_finished`` per goal (``attack``,
@@ -94,7 +102,53 @@ logger = get_logger(__name__)
 EventCallback = Callable[..., None]
 
 
+class CampaignCancelled(Exception):
+    """Raised by an ``on_event`` listener to stop a campaign.
+
+    The runs it leaves are recorded as cancelled, not failed.
+    """
+
+
+class _ListenerStopped(Exception):
+    """An ``on_event`` listener raised; carries what it raised."""
+
+    def __init__(self, cause: Exception) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+
+
 def run_campaign(
+    source: str | Path | Mapping[str, Any] | CampaignSpec,
+    *,
+    on_event: Optional[EventCallback] = None,
+    build: ModelBuilder = build_model,
+    load: GoalLoader = load_goals,
+    store: Optional[Store] = None,
+    calibration: CalibrationLoader = load_calibration,
+    build_embed: EmbedderBuilder = build_embedder,
+    settings: Optional[Settings] = None,
+    resolved: Optional[ResolvedCampaign] = None,
+) -> CampaignResult:
+    """Synchronous form of :func:`arun_campaign`.
+
+    Safe to call while an event loop is already running, as in a notebook.
+    """
+    return run_coroutine_blocking(
+        lambda: arun_campaign(
+            source,
+            on_event=on_event,
+            build=build,
+            load=load,
+            store=store,
+            calibration=calibration,
+            build_embed=build_embed,
+            settings=settings,
+            resolved=resolved,
+        )
+    )
+
+
+async def arun_campaign(
     source: str | Path | Mapping[str, Any] | CampaignSpec,
     *,
     on_event: Optional[EventCallback] = None,
@@ -155,13 +209,13 @@ def run_campaign(
         if spec.execution.preflight:
             # Fail fast on an unreachable model, before any attack
             # has started recording against it.
-            asyncio.run(preflight(resolved))
+            await preflight(resolved)
 
         # Before the first attack: a failing panel should cost one audit, not a
         # whole run whose numbers then mean nothing. The report belongs to the
         # campaign run; attack runs reference that parent through a foreign key.
         try:
-            audit = audit_configured_panel(
+            audit = await aaudit_configured_panel(
                 resolved.panel,
                 spec.evaluation.audit,
                 concurrency=spec.execution.concurrency.judge,
@@ -187,14 +241,12 @@ def run_campaign(
             )
             if on_event is not None:
                 on_event("audit_finished", audit=audit_payload)
-        outcomes = asyncio.run(
-            _execute(
-                resolved,
-                store,
-                on_event,
-                agent_id=agent_id,
-                campaign_run_id=campaign_record.id,
-            )
+        outcomes = await _execute(
+            resolved,
+            store,
+            on_event,
+            agent_id=agent_id,
+            campaign_run_id=campaign_record.id,
         )
         failed = [outcome.name for outcome in outcomes if outcome.error is not None]
         store.update_campaign_run(
@@ -205,14 +257,23 @@ def run_campaign(
             run_notes=(f"Attack runs failed: {', '.join(failed)}" if failed else ""),
         )
         store.flush()
-    except Exception as exc:
-        if campaign_record is not None and not isinstance(exc, AuditFailed):
-            store.update_campaign_run(
+    except BaseException as exc:
+        cause = exc.cause if isinstance(exc, _ListenerStopped) else exc
+        if campaign_record is not None and not isinstance(cause, AuditFailed):
+            cancelled = _is_cancellation(cause)
+            _record_quietly(
+                store,
+                store.update_campaign_run,
                 campaign_record.id,
-                status=RunStatus.FAILED.value,
-                run_notes=f"Campaign failed: {exc}",
+                status=(
+                    RunStatus.CANCELLED.value if cancelled else RunStatus.FAILED.value
+                ),
+                run_notes=(
+                    "Campaign cancelled" if cancelled else f"Campaign failed: {cause}"
+                ),
             )
-            store.flush()
+        if cause is not exc:
+            raise cause from None
         raise
     finally:
         if owns_store:
@@ -275,7 +336,7 @@ async def _execute(
         return await _escalate(resolved, execution, runner)
     if execution.mode == "parallel":
         return tuple(
-            await asyncio.gather(*(runner.run(attack) for attack in resolved.attacks))
+            await _all_or_none(runner.run(attack) for attack in resolved.attacks)
         )
 
     outcomes = []
@@ -378,39 +439,54 @@ class _AttackRunner:
         )
         run_id = str(tracker.run_id)
         logger.info("%s | started | run=%s | goals=%d", attack.name, run_id, len(goals))
-        self._emit(
-            "attack_started",
-            attack=attack.name,
-            run_id=run_id,
-            expected_goals=len(goals),
-        )
 
         attempts: list[Attempt] = []
         run_trace: tuple[TraceNode, ...] = ()
         started = monotonic()
+        # Every way out of this block leaves the run finished in the store:
+        # completed, failed, or cancelled. Nothing stays RUNNING.
         try:
+            self._emit(
+                "attack_started",
+                attack=attack.name,
+                run_id=run_id,
+                expected_goals=len(goals),
+            )
             run_trace = await self._prepare(attack, goals)
             await asyncio.wait_for(
-                asyncio.gather(
-                    *(
-                        self._run_goal(attack, goal, tracker, attempts, run_id)
-                        for goal in goals
-                    )
+                _all_or_none(
+                    self._run_goal(attack, goal, tracker, attempts, run_id)
+                    for goal in goals
                 ),
                 timeout=self.execution.per_attack_timeout,
             )
+            await asyncio.to_thread(tracker.complete)
+        except _ListenerStopped as stop:
+            # The caller asked to stop: this run ends, and so does the campaign.
+            if _is_cancellation(stop.cause):
+                await asyncio.to_thread(_record_quietly, self.store, tracker.cancel)
+            else:
+                await asyncio.to_thread(
+                    _record_quietly, self.store, tracker.fail, stop.cause
+                )
+            raise
         except Exception as exc:
-            error = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+            error = _describe(exc)
             logger.error("%s | failed | run=%s | %s", attack.name, run_id, error)
-            await asyncio.to_thread(tracker.fail, exc)
+            await asyncio.to_thread(_record_quietly, self.store, tracker.fail, exc)
             self._emit(
                 "attack_finished", attack=attack.name, run_id=run_id, error=error
             )
             return AttackOutcome(
                 attack.name, run_id, _ordered(attempts), error, run_trace
             )
+        except BaseException:
+            # Cancelled or interrupted. The loop may be going away, so record
+            # it here and now rather than through another thread.
+            logger.warning("%s | cancelled | run=%s", attack.name, run_id)
+            _record_quietly(self.store, tracker.cancel)
+            raise
 
-        await asyncio.to_thread(tracker.complete)
         successes = sum(
             bool(item.verdict and item.verdict.success) for item in attempts
         )
@@ -509,7 +585,12 @@ class _AttackRunner:
         attempt = Attempt(
             goal.index, request_index, goal.text, messages=tuple(messages)
         )
-        response = await self._complete(messages)
+        try:
+            response = await self._complete(messages)
+        except Exception as exc:
+            # A provider error arrives as a response; a transport failure
+            # arrives as an exception, and is this request's alone.
+            return replace(attempt, error=f"target call failed: {_describe(exc)}")
         if response.error is not None:
             return replace(
                 attempt,
@@ -528,14 +609,27 @@ class _AttackRunner:
                     "guardrail": response.guardrail.model_dump(exclude_none=True)
                 },
             )
-        decoded = attack.attack.decode(response.text)
-        verdict = await self._judge(
-            Sample(
-                goal=attempt.goal,
-                prompt=user_text(attempt.messages),
-                response=decoded,
+        try:
+            decoded = attack.attack.decode(response.text)
+        except Exception as exc:
+            return replace(
+                attempt, response=response, error=f"decoding failed: {_describe(exc)}"
             )
-        )
+        try:
+            verdict = await self._judge(
+                Sample(
+                    goal=attempt.goal,
+                    prompt=user_text(attempt.messages),
+                    response=decoded,
+                )
+            )
+        except Exception as exc:
+            return replace(
+                attempt,
+                response=response,
+                decoded=decoded,
+                error=f"judging failed: {_describe(exc)}",
+            )
         return replace(attempt, response=response, decoded=decoded, verdict=verdict)
 
     async def _search(self, attack: ResolvedAttack, goal: Goal) -> list[Attempt]:
@@ -588,17 +682,20 @@ class _AttackRunner:
         """One attempt per judged exchange, carrying the search that made it."""
         # The finding's reply is one that _send returned.
         response = cast(ModelResponse, finding.response)
-        return Attempt(
+        attempt = Attempt(
             goal.index,
             index,
             goal.text,
             messages=tuple(finding.messages),
             response=response,
-            decoded=attack.attack.decode(response.text),
             verdict=finding.verdict,
             metadata=dict(finding.metadata),
             trace=trace,
         )
+        try:
+            return replace(attempt, decoded=attack.attack.decode(response.text))
+        except Exception as exc:
+            return replace(attempt, error=f"decoding failed: {_describe(exc)}")
 
     async def _ask_panel(self, sample: Sample) -> Verdict:
         """The panel as an iterative attack sees it: limited and traced."""
@@ -660,8 +757,53 @@ class _AttackRunner:
         return verdict
 
     def _emit(self, event: str, **payload: Any) -> None:
-        if self.on_event is not None:
+        if self.on_event is None:
+            return
+        try:
             self.on_event(event, **payload)
+        except Exception as exc:
+            raise _ListenerStopped(exc) from exc
+
+
+async def _all_or_none(coros: Iterable[Awaitable[T]]) -> list[T]:
+    """Await every coroutine; when one raises, cancel the rest, then re-raise.
+
+    ``asyncio.gather`` alone leaves the others running, and they would go on
+    writing into a run that was already recorded as failed.
+    """
+    tasks = [asyncio.ensure_future(coro) for coro in coros]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+
+
+def _is_cancellation(exc: BaseException) -> bool:
+    return isinstance(
+        exc, (asyncio.CancelledError, KeyboardInterrupt, CampaignCancelled)
+    )
+
+
+def _record_quietly(
+    store: Store, write: Callable[..., Any], *args: Any, **kwargs: Any
+) -> None:
+    """Record how a run ended without hiding why it ended.
+
+    Called while an error is already on its way out; a store that fails
+    here too is logged, so the error the caller sees is the first one.
+    """
+    try:
+        write(*args, **kwargs)
+        store.flush()
+    except Exception:
+        logger.exception("could not record how the run ended")
+
+
+def _describe(exc: BaseException) -> str:
+    return f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
 
 
 def _slices(
@@ -708,4 +850,4 @@ def _ordered(attempts: list[Attempt]) -> tuple[Attempt, ...]:
     )
 
 
-__all__ = ["EventCallback", "run_campaign"]
+__all__ = ["CampaignCancelled", "EventCallback", "arun_campaign", "run_campaign"]

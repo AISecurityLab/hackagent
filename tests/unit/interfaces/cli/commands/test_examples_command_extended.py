@@ -112,7 +112,7 @@ class TestScriptRunners(unittest.TestCase):
 
     def test_cli_command_is_invoked_as_a_module(self):
         with patch("subprocess.run", return_value=_completed()) as run:
-            _run_hackagent_cli_command(["scan", "http://x"])
+            _run_hackagent_cli_command(["campaign", "run", "x.yaml"])
 
         self.assertEqual(
             run.call_args.args[0][1:3], ["-m", "hackagent.interfaces.cli.main"]
@@ -121,9 +121,9 @@ class TestScriptRunners(unittest.TestCase):
     def test_failing_cli_command_is_reported(self):
         with patch("subprocess.run", return_value=_completed(returncode=1)):
             with self.assertRaises(click.ClickException) as ctx:
-                _run_hackagent_cli_command(["scan"])
+                _run_hackagent_cli_command(["campaign", "run"])
 
-        self.assertIn("hackagent scan", str(ctx.exception))
+        self.assertIn("hackagent campaign run", str(ctx.exception))
 
 
 class TestBackgroundProcesses(unittest.TestCase):
@@ -466,35 +466,24 @@ class TestNamedExampleCommands(unittest.TestCase):
 
 
 class TestWebExample(unittest.TestCase):
-    def test_scan_is_invoked_with_a_temporary_config(self):
-        captured = {}
-
-        def _capture(args):
-            captured["args"] = args
-            captured["exists"] = Path(args[-1]).exists()
-
-        with patch.object(ex, "_run_hackagent_cli_command", side_effect=_capture):
+    def test_it_attacks_nothing_and_points_at_the_campaign_to_edit(self):
+        with (
+            patch.object(ex, "_run_hackagent_cli_command") as cli,
+            patch.object(ex, "_run_campaign_file") as run_campaign,
+        ):
             result = CliRunner().invoke(web_example, [])
 
         self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(captured["args"][:2], ["scan", "https://deepai.org/chat"])
-        self.assertIn("--headed", captured["args"])
-        self.assertTrue(captured["exists"])
-        # The temp config is removed once the scan finishes.
-        self.assertFalse(Path(captured["args"][-1]).exists())
+        cli.assert_not_called()
+        run_campaign.assert_not_called()
+        self.assertIn("tap-site-chatbot.yaml", result.output)
+        self.assertIn("hackagent campaign run", result.output)
 
-    def test_temporary_config_is_removed_on_failure(self):
-        captured = {}
+    def test_every_command_it_suggests_exists(self):
+        from hackagent.interfaces.cli.main import cli
 
-        def _fail(args):
-            captured["path"] = Path(args[-1])
-            raise click.ClickException("scan failed")
-
-        with patch.object(ex, "_run_hackagent_cli_command", side_effect=_fail):
-            result = CliRunner().invoke(web_example, [])
-
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertFalse(captured["path"].exists())
+        self.assertIn("campaign", cli.commands)
+        self.assertIn("run", cli.commands["campaign"].commands)
 
 
 class TestExamplesGroup(unittest.TestCase):

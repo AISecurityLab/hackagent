@@ -49,6 +49,21 @@ def audit_configured_panel(
         load: CalibrationLoader = load_calibration) -> Optional[AuditReport]
 ```
 
+Synchronous form of :func:`aaudit_configured_panel`.
+
+Safe to call while an event loop is already running.
+
+#### aaudit\_configured\_panel
+
+```python
+async def aaudit_configured_panel(
+        panel: Optional[Panel],
+        spec: AuditSpec,
+        *,
+        concurrency: int = 1,
+        load: CalibrationLoader = load_calibration) -> Optional[AuditReport]
+```
+
 Run the audit a campaign configured. `None` when it configured none.
 
 Raises :class:`AuditFailed` when a judge fails its robustness check

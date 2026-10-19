@@ -675,6 +675,22 @@ class TestRemoteBackendResult(unittest.TestCase):
                 self.backend.flush()
             self.backend.close()
 
+    def test_a_failed_write_is_reported_once(self):
+        """Later flushes report later failures, not the same one again."""
+        with (
+            patch("hackagent.storage.remote.result_partial_update") as mock_patch,
+            patch("hackagent.storage.remote.logger"),
+        ):
+            mock_patch.sync_detailed.return_value = _mock_response(500)
+            self.backend.update_result(_uid(), evaluation_status="FAILED_JAILBREAK")
+            with self.assertRaisesRegex(RuntimeError, "1 background"):
+                self.backend.flush()
+
+            mock_patch.sync_detailed.return_value = _mock_response(200)
+            self.backend.update_result(_uid(), evaluation_status="FAILED_JAILBREAK")
+            self.backend.flush()
+            self.backend.close()
+
     def test_create_trace_success(self):
         result_id = _uid()
         trace_id = _uid()

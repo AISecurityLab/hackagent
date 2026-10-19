@@ -44,6 +44,9 @@ hiddenimports = ["faiss", "flask", "playwright", "PIL", "datasets", "numpy"]
 # TUI views are imported by name, so static analysis never sees either of them.
 hiddenimports += collect_submodules("textual")
 hiddenimports += collect_submodules("hackagent.interfaces.tui")
+# The attack registry imports each technique by name when a campaign asks
+# for it, so static analysis never reaches them either.
+hiddenimports += collect_submodules("hackagent.attacks.techniques")
 
 _build_version = os.environ.get("HACKAGENT_BUILD_VERSION", "")
 _runtime_hook = BUILD_DIR / "hackagent_runtime_version.py"

@@ -10,7 +10,7 @@
 # AUTHORIZATION — only run this against a target you are authorized to test:
 # your own system, a contracted engagement, or written permission.
 #
-#   1. pip install 'hackagent[web]'   # Playwright included, Chromium fetched
+#   1. pip install 'hackagent[browser]'   # Playwright; Chromium is fetched
 #   2. ollama pull hf.co/mlabonne/gemma-3-4b-it-abliterated-GGUF:Q4_K_M
 #      (abliterated, so the attacker will not refuse to write red-team prompts)
 #   3. edit `endpoint` and `url` below to the site you are testing

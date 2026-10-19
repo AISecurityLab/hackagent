@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
@@ -142,7 +142,8 @@ def _pick(
 class Settings:
     """Resolved runtime settings. Build one with :meth:`resolve`."""
 
-    api_key: Optional[str]
+    # Kept out of repr: settings end up in logs and tracebacks.
+    api_key: Optional[str] = field(repr=False)
     api_key_source: Source
     base_url: str
     base_url_source: Source

@@ -175,9 +175,10 @@ def recorded() -> dict[str, Any]
 
 The campaign as it is written to disk and stored with the run.
 
-Environment-backed credentials remain references. Sensitive values
-placed in extra HTTP headers are replaced before the document crosses
-the storage boundary; such campaigns must restore those values from a
+Environment-backed credentials remain references. Credentials written
+into the file itself — in headers, `options`, `extra_body` or a
+URL — are replaced before the document crosses the storage boundary;
+such campaigns must restore those values from a
 trusted source before they can be repeated.
 
 #### campaign\_json\_schema

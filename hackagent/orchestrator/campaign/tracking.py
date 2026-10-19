@@ -180,6 +180,14 @@ class RunTracker:
         )
         self.store.flush()
 
+    def cancel(self) -> None:
+        self.store.update_run(
+            self.run_id,
+            status=RunStatus.CANCELLED.value,
+            run_notes="Execution cancelled",
+        )
+        self.store.flush()
+
 
 def _evaluation_status(attempt: Attempt) -> str | None:
     if attempt.error is not None:
