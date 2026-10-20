@@ -38,6 +38,17 @@ def last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]
 
 Return the text of the last user message in `messages`.
 
+#### is\_ollama\_launcher
+
+```python
+def is_ollama_launcher(binary: str) -> bool
+```
+
+Whether `binary` is Ollama, which starts an agent with `ollama launch`.
+
+Only the executable&#x27;s name counts, so an agent installed under a folder
+called `ollama` still runs natively.
+
 ## SubprocessCLIModel Objects
 
 ```python

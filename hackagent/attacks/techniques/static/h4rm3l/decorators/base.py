@@ -9,11 +9,25 @@ import inspect
 from collections.abc import Awaitable
 from typing import TypeAlias
 
-from numpy.random import RandomState
-
 from ...base import Completion
 
 DecorationResult: TypeAlias = str | Awaitable[str]
+
+
+def _random_state(seed: int):
+    """A seeded numpy RandomState, imported when the first decorator is built.
+
+    Not at module level, so the attack's settings can be read without numpy,
+    as the TUI and campaign validation do for every attack.
+    """
+    try:
+        from numpy.random import RandomState
+    except ImportError as exc:
+        raise ImportError(
+            "numpy is required for the h4rm3l attack. "
+            "Install with: pip install 'hackagent[rag]'"
+        ) from exc
+    return RandomState(seed=seed)
 
 
 class PromptDecorator:
@@ -24,7 +38,7 @@ class PromptDecorator:
     """
 
     def __init__(self, seed: int = 42) -> None:
-        self._random_state = RandomState(seed=seed)
+        self._random_state = _random_state(seed)
         self._chain: list[PromptDecorator] = [self]
 
     def decorate(self, prompt: str) -> DecorationResult:

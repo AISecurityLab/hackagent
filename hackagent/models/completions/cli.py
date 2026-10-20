@@ -16,6 +16,7 @@ Subclasses set the class attributes, read their own options in
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 from abc import abstractmethod
 from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence
@@ -60,6 +61,16 @@ def last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]:
                     if isinstance(text, str):
                         return text
     return None
+
+
+def is_ollama_launcher(binary: str) -> bool:
+    """Whether ``binary`` is Ollama, which starts an agent with ``ollama launch``.
+
+    Only the executable's name counts, so an agent installed under a folder
+    called ``ollama`` still runs natively.
+    """
+    name = os.path.basename(binary).lower()
+    return name in ("ollama", "ollama.exe")
 
 
 class SubprocessCLIModel(Model):
@@ -192,5 +203,6 @@ __all__ = [
     "CLIConfigurationError",
     "CLIInteractionError",
     "SubprocessCLIModel",
+    "is_ollama_launcher",
     "last_user_text",
 ]

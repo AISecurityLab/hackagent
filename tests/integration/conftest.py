@@ -286,6 +286,7 @@ ADK_TEST_SERVER_PORT = 8765
 def adk_server_with_ollama(
     ollama_available: bool,
     ollama_model: str,
+    tmp_path_factory: pytest.TempPathFactory,
 ) -> Generator[Optional[str], None, None]:
     """
     Start a Google ADK server in a subprocess that uses Ollama as the LLM backend.
@@ -357,13 +358,24 @@ def adk_server_with_ollama(
     logger.info(f"Starting ADK server with Ollama ({ollama_model}) on port {port}...")
     logger.debug(f"Command: {' '.join(cmd)}")
 
+    # The server's output goes to a file, never to an unread pipe: a failed
+    # tool call logs a full traceback, and once a pipe's buffer (64 KiB on
+    # Linux) is full the server blocks on its next log line and stops
+    # answering, so later tests time out.
+    log_path = tmp_path_factory.mktemp("adk-server") / "server.log"
+    log_file = open(log_path, "w", encoding="utf-8")
+    logger.info(f"ADK server output: {log_path}")
     process = subprocess.Popen(
         cmd,
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
         text=True,
     )
+
+    def output_tail() -> str:
+        log_file.flush()
+        return log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
 
     # Wait for server to start
     server_url = f"http://127.0.0.1:{port}"
@@ -384,17 +396,20 @@ def adk_server_with_ollama(
 
         # Check if process has died
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
-            logger.error(f"ADK server process died. stdout: {stdout}, stderr: {stderr}")
+            logger.error(f"ADK server process died. Output:\n{output_tail()}")
+            log_file.close()
             yield None
             return
 
         time.sleep(0.5)
 
     if not server_ready:
-        logger.error("ADK server failed to start within timeout")
+        logger.error(
+            f"ADK server failed to start within timeout. Output:\n{output_tail()}"
+        )
         process.terminate()
         process.wait(timeout=5)
+        log_file.close()
         yield None
         return
 
@@ -409,6 +424,7 @@ def adk_server_with_ollama(
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+        log_file.close()
         logger.info("ADK server stopped")
 
 

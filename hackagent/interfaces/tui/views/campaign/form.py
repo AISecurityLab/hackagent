@@ -62,6 +62,9 @@ class FieldRow(Horizontal):
         self.draft = draft
         self.box = box
         self.issue: Optional[str] = None
+        # Kept rather than queried: Textual can remove the row's children
+        # before a pending mount refreshes it, as when the app closes at once.
+        self._state = Static("", classes="state")
 
     @property
     def path(self) -> Path:
@@ -70,7 +73,7 @@ class FieldRow(Horizontal):
     def compose(self) -> ComposeResult:
         yield Static(_label_markup(self.field.label_in(self.box)), classes="label")
         yield self._editor()
-        yield Static("", classes="state")
+        yield self._state
 
     def on_mount(self) -> None:
         self.refresh_state()
@@ -159,7 +162,8 @@ class FieldRow(Horizontal):
         elif self.field.kind == "tristate":
             self._commit(event.value == "true")
         else:
-            self._commit(event.value)
+            # The widget holds text; the campaign needs the schema's type.
+            self._commit(self.field.choice_value(str(event.value)))
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         event.stop()
@@ -203,7 +207,7 @@ class FieldRow(Horizontal):
             # No default and not required: leaving it out sends nothing, and
             # whatever is on the other end picks.
             text = "[dim]not sent[/dim]"
-        self.query_one(".state", Static).update(text)
+        self._state.update(text)
 
 
 def _label_markup(label: str) -> str:

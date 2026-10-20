@@ -26,6 +26,7 @@ from hackagent.models.completions.cli import (
     CLIConfigurationError,
     CLIInteractionError,
     SubprocessCLIModel,
+    is_ollama_launcher,
     last_user_text,
 )
 
@@ -194,9 +195,7 @@ def _get_codex_custom_llm_class():
         def _build_argv(self) -> List[str]:
             """Assemble the CLI argv based on whether we use codex natively or via ollama."""
             argv = [self.binary]
-            is_ollama = "ollama" in self.binary.lower()
-
-            if is_ollama:
+            if is_ollama_launcher(self.binary):
                 # ollama arguments
                 argv.extend(["launch", "codex"])
                 if self.model:
@@ -212,6 +211,10 @@ def _get_codex_custom_llm_class():
                 argv.extend(["exec", "--json"])
                 if self.model:
                     argv.extend(["-m", self.model])
+
+            # Attacks run in throwaway folders, and codex exec refuses to start
+            # outside a Git repository without this.
+            argv.append("--skip-git-repo-check")
 
             # Codex does not need an HTTP endpoint here. Prompt text is passed
             # through stdin by _run, matching the Claude Code backend style.

@@ -110,6 +110,44 @@ def test_wait_for_servers_requires_an_endpoint_for_local_models():
         wait_for_servers(values, ServerReadiness())
 
 
+def test_an_ollama_model_without_an_endpoint_is_checked_where_it_will_run(
+    monkeypatch,
+):
+    """The bundled Ollama examples leave the endpoint to OLLAMA_HOST."""
+    # Both take precedence over OLLAMA_HOST.
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_API_BASE", raising=False)
+    monkeypatch.setenv("OLLAMA_HOST", "http://ollama.test:11434")
+    values = _values()
+    for _, model in campaign_models(values):
+        model["connection"] = _conn(None, wire="OLLAMA", provider="ollama")
+    with patch(
+        "hackagent.orchestrator.campaign.overrides.installed_models",
+        return_value={"target", "atk", "shared", "other"},
+    ) as installed:
+        wait_for_servers(values, ServerReadiness())  # no raise
+    [call] = installed.call_args_list
+    assert call.args[0] == "http://ollama.test:11434"
+
+
+@pytest.mark.parametrize("endpoint", [None, "http://ollama.test:11434/api"])
+def test_an_ollama_endpoint_is_checked_without_its_api_suffix(monkeypatch, endpoint):
+    """The model strips ``/api``, so the check must too, or it asks /api/api/tags."""
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_API_BASE", raising=False)
+    monkeypatch.setenv("OLLAMA_HOST", "http://ollama.test:11434/api")
+    values = _values()
+    for _, model in campaign_models(values):
+        model["connection"] = _conn(endpoint, wire="OLLAMA", provider="ollama")
+    with patch(
+        "hackagent.orchestrator.campaign.overrides.installed_models",
+        return_value={"target", "atk", "shared", "other"},
+    ) as installed:
+        wait_for_servers(values, ServerReadiness())
+    [call] = installed.call_args_list
+    assert call.args[0] == "http://ollama.test:11434"
+
+
 def test_wait_for_servers_passes_when_every_model_is_served():
     served = {"target", "atk", "shared", "other"}
     with patch(

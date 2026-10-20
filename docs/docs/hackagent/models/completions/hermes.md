@@ -14,6 +14,10 @@ unique provider name whose `completion` shells out to `hermes` instead of
 making an HTTP call. Requests therefore still flow through
 `litellm.completion` and come back as a :class:`ModelResponse`.
 
+With `binary` set to `ollama` the backend starts Hermes through
+`ollama launch hermes`, which picks the model, and forwards the Hermes
+arguments after the launcher&#x27;s `--`.
+
 Isolation
 ---------
 Unlike Claude Code, Hermes is explicitly *stateful*: it keeps long-term memory
@@ -44,7 +48,8 @@ the configured default for this run only) and used as the LiteLLM
 model string.
 
 Optional config:
-- `binary` (default `hermes`): path to the Hermes executable.
+- `binary` (default `hermes`): path to the Hermes executable, or
+to `ollama` to start Hermes with `ollama launch hermes`.
 - `provider`: per-run backend provider override (`--provider`).
 - `cwd`: working directory Hermes operates in (skills, worktrees,
 file tools).
@@ -53,10 +58,13 @@ default because Hermes can trigger tool and browser use.
 - `ignore_user_config` (default `True`): pass
 `--ignore-user-config` so the target uses defaults + `.env`
 credentials only and never reads `~/.hermes/config.yaml`.
+Defaults to `False` when `binary` is `ollama`: ``ollama
+launch`` writes the model into that file, so Hermes must read it.
 - `safe_mode` (default `False`): pass `--safe-mode` to disable
 all customizations for maximum isolation.
-- `source` (default `hackagent`): pass `--source` so Hermes-side
-logs are attributable to hackagent runs.
+- `source` (default unset): pass `--source <source>` to tag the
+session. Recent Hermes versions accept it only under `chat`, not
+with `-z`, so it is off unless set.
 - `extra_args`: list of additional raw `hermes` flags.
 
 Note: `endpoint` is accepted for interface symmetry but ignored — the

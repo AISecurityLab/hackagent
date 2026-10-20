@@ -52,6 +52,11 @@ class FieldDef()
 
 One editable leaf of a model, addressed relative to its panel.
 
+#### choice\_values
+
+What each choice stands for, in the same order: `2` for the choice
+`"2"` of `Literal[1, 2]`. Empty when the choices are the values.
+
 #### owner
 
 The model this field belongs to. Two models can share a field name, so
@@ -81,6 +86,14 @@ def default_text() -> str
 ```
 
 The default as the form shows it, empty when there is none.
+
+#### choice\_value
+
+```python
+def choice_value(choice: str) -> Any
+```
+
+The value a choice stands for, with the type the schema expects.
 
 #### is\_default
 

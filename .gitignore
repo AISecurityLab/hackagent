@@ -72,6 +72,7 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+coverage.json
 *.cover
 .hypothesis/
 .pytest_cache/
@@ -150,3 +151,7 @@ snapshot_report.html
 # Web UI bundle (built by scripts/build_webui.sh)
 hackagent/interfaces/web/static/*
 !hackagent/interfaces/web/static/.gitignore
+
+# Results exported from the TUI (hackagent/interfaces/tui/views/results/export.py)
+hackagent_results_*.csv
+hackagent_results_*.json

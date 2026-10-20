@@ -251,3 +251,53 @@ def test_h4rm3l_empty_decorator_reply_is_an_error():
 def test_h4rm3l_rejects_unknown_decorators():
     with pytest.raises(ValueError, match="unknown decorator"):
         H4rm3lAttack(H4rm3lParams(program="NoSuchDecorator()"))
+
+
+def test_every_attack_loads_without_the_optional_extras():
+    """Reading an attack's settings must not need its extra; only running it does.
+
+    The TUI and campaign validation read every attack's settings, so an attack
+    whose module needed Pillow or numpy to import crashed the TUI for anyone
+    without that extra. Running one still says which extra to install.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    script = textwrap.dedent(
+        """
+        import sys
+
+        BLOCKED = ("PIL", "numpy", "faiss", "datasets", "playwright")
+
+        class NoExtras:
+            def find_spec(self, name, path=None, target=None):
+                if name.split(".")[0] in BLOCKED:
+                    raise ImportError(f"No module named {name!r}")
+
+        sys.meta_path.insert(0, NoExtras())
+        from hackagent.attacks.techniques.registry import ATTACKS, get_attack_class
+
+        for name in sorted(ATTACKS):
+            get_attack_class(name).params_type
+        print("all attacks loaded")
+
+        from hackagent.attacks.techniques.static.mml.image_encoder import encode_prompt
+        from hackagent.attacks.techniques.static.h4rm3l.decorators.base import (
+            PromptDecorator,
+        )
+
+        for draw in (lambda: encode_prompt("a goal", "mirror"), PromptDecorator):
+            try:
+                draw()
+            except ImportError as exc:
+                print("needs:", exc)
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=60
+    )
+    assert result.returncode == 0, result.stderr
+    assert "all attacks loaded" in result.stdout
+    assert "pip install 'hackagent[vision]'" in result.stdout
+    assert "pip install 'hackagent[rag]'" in result.stdout
