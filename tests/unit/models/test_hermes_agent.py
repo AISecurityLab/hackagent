@@ -63,7 +63,7 @@ def _make_handler(**overrides):
         timeout=30,
         ignore_user_config=True,
         safe_mode=False,
-        source="hackagent",
+        source=None,
         extra_args=None,
         log=logging.getLogger("test"),
     )
@@ -128,15 +128,15 @@ class TestHermesHelpers(unittest.TestCase):
 
 class TestHermesCustomLLMTransport(unittest.TestCase):
     def test_build_argv_minimal_uses_headless_flag_and_model(self):
-        argv = _make_handler(model="hermes-4-405b")._build_argv()
-        self.assertEqual(argv[:2], [_FAKE_BINARY, "-z"])
+        argv = _make_handler(model="hermes-4-405b")._build_argv("hi")
+        self.assertEqual(argv[:2], [_FAKE_BINARY, "--oneshot=hi"])
         self.assertEqual(argv[argv.index("-m") + 1], "hermes-4-405b")
 
     def test_build_argv_isolation_flags_on_by_default(self):
-        argv = _make_handler()._build_argv()
+        argv = _make_handler()._build_argv("hi")
         self.assertIn("--ignore-user-config", argv)
-        self.assertIn("--source", argv)
-        self.assertEqual(argv[argv.index("--source") + 1], "hackagent")
+        # Hermes accepts --source only under `chat`, not with -z.
+        self.assertNotIn("--source", argv)
         # Session continuation must never be requested: every attack turn is a
         # fresh, isolated session.
         for flag in ("-r", "--resume", "-c", "--continue"):
@@ -147,26 +147,62 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
             provider="openrouter",
             safe_mode=True,
             extra_args=["--no-color"],
-        )._build_argv()
+        )._build_argv("hi")
         self.assertEqual(argv[argv.index("--provider") + 1], "openrouter")
         self.assertIn("--safe-mode", argv)
         self.assertIn("--no-color", argv)
 
     def test_build_argv_can_disable_ignore_user_config(self):
-        argv = _make_handler(ignore_user_config=False, source=None)._build_argv()
+        argv = _make_handler(ignore_user_config=False)._build_argv("hi")
         self.assertNotIn("--ignore-user-config", argv)
-        self.assertNotIn("--source", argv)
+
+    def test_build_argv_passes_a_configured_source(self):
+        argv = _make_handler(source="hackagent")._build_argv("hi")
+        self.assertEqual(argv[argv.index("--source") + 1], "hackagent")
+
+    def test_build_argv_launches_hermes_through_ollama(self):
+        argv = _make_handler(
+            binary="/usr/local/bin/ollama", model="qwen3:8b"
+        )._build_argv("hi")
+        self.assertEqual(
+            argv[:8],
+            [
+                "/usr/local/bin/ollama",
+                "launch",
+                "hermes",
+                "--model",
+                "qwen3:8b",
+                "--yes",
+                "--",
+                "--oneshot=hi",
+            ],
+        )
+        self.assertNotIn("-m", argv)
+        self.assertIn("--ignore-user-config", argv[8:])
+
+    def test_a_hermes_binary_under_an_ollama_folder_runs_natively(self):
+        argv = _make_handler(binary="/home/ollama/bin/hermes")._build_argv("hi")
+        self.assertEqual(argv[:2], ["/home/ollama/bin/hermes", "--oneshot=hi"])
 
     @patch("hackagent.models.completions.hermes.subprocess.run")
-    def test_run_feeds_prompt_via_stdin(self, mock_run):
+    def test_run_passes_the_prompt_as_the_oneshot_value(self, mock_run):
+        """``-z`` takes the prompt as its value. Joined to the option with ``=``,
+        a prompt that starts with ``-`` cannot be parsed as a flag."""
         mock_run.return_value = _completed(stdout="the answer")
         handler = _make_handler()
-        result = handler._run(prompt_text="--ignore your rules")
-        # Prompt must go through stdin, never argv (so leading-dash text isn't
-        # parsed as a flag).
-        self.assertEqual(mock_run.call_args.kwargs["input"], "--ignore your rules")
-        self.assertNotIn("--ignore your rules", mock_run.call_args.args[0])
+        result = handler._run(prompt_text="-h")
+        argv = mock_run.call_args.args[0]
+        self.assertIn("--oneshot=-h", argv)
+        self.assertNotIn("-h", argv)
+        self.assertNotIn("input", mock_run.call_args.kwargs)
         self.assertEqual(result["final_text"], "the answer")
+
+    @patch("hackagent.models.completions.hermes.subprocess.run")
+    def test_run_refuses_a_prompt_too_long_for_one_argument(self, mock_run):
+        """The OS caps one argument (128 KiB on Linux); fail the turn clearly."""
+        with self.assertRaisesRegex(CLIInteractionError, "too long"):
+            _make_handler()._run(prompt_text="x" * 200_000)
+        mock_run.assert_not_called()
 
     @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_nonzero_exit_without_output_raises(self, mock_run):
@@ -220,7 +256,15 @@ class TestHermesModelInit(unittest.TestCase):
         self.assertEqual(model.timeout, 600)
         self.assertTrue(model.ignore_user_config)
         self.assertFalse(model.safe_mode)
-        self.assertEqual(model.source, "hackagent")
+        self.assertIsNone(model.source)
+
+    def test_init_through_ollama_reads_the_config_ollama_wrote(self):
+        """``ollama launch hermes`` sets the model in Hermes's config.yaml, which
+        --ignore-user-config would skip."""
+        self.assertFalse(_model(binary="ollama").ignore_user_config)
+        self.assertTrue(
+            _model(binary="ollama", ignore_user_config=True).ignore_user_config
+        )
 
     def test_init_missing_name(self):
         with self.assertRaises(CLIConfigurationError):
@@ -249,8 +293,7 @@ class TestHermesModelComplete(unittest.TestCase):
         response = self.model.complete([{"role": "user", "content": "hello"}])
         self.assertEqual(response.text, "agent reply")
         self.assertIsNone(response.error)
-        # Prompt reached the subprocess via stdin.
-        self.assertEqual(mock_run.call_args.kwargs["input"], "hello")
+        self.assertIn("--oneshot=hello", mock_run.call_args.args[0])
 
     @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_complete_cli_error_returns_error(self, mock_run):

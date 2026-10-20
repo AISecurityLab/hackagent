@@ -232,6 +232,30 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
         self.assertIn("--sandbox", argv)
         self.assertEqual(argv[argv.index("--sandbox") + 1], "workspace-write")
 
+    def test_build_argv_runs_outside_a_git_repository(self):
+        """Attacks run in throwaway folders, which codex refuses without it."""
+        argv = _make_handler()._build_argv()
+
+        self.assertIn("--skip-git-repo-check", argv)
+
+    def test_build_argv_launches_codex_through_ollama(self):
+        argv = _make_handler(
+            binary="/usr/local/bin/ollama", model="gpt-oss:20b"
+        )._build_argv()
+
+        self.assertEqual(
+            argv[:7],
+            ["/usr/local/bin/ollama", "launch", "codex", "--model", "gpt-oss:20b"]
+            + ["--yes", "--"],
+        )
+        # Forwarded to codex, after the launcher's separator.
+        self.assertIn("--skip-git-repo-check", argv[7:])
+
+    def test_a_codex_binary_under_an_ollama_folder_runs_natively(self):
+        argv = _make_handler(binary="/home/ollama/bin/codex")._build_argv()
+
+        self.assertEqual(argv[:3], ["/home/ollama/bin/codex", "exec", "--json"])
+
     @patch("hackagent.models.completions.codex.subprocess.run")
     def test_run_feeds_prompt_via_stdin(self, mock_run):
         mock_run.return_value = _completed(stdout=_response_json("the answer"))
