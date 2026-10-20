@@ -93,6 +93,7 @@ Wait for every local server and check it serves the models it must.
 
 **Raises**:
 
-- `ValueError` - if a local model has no endpoint.
+- `ValueError` - if a vLLM model has no endpoint. An Ollama model without
+  one is checked at `OLLAMA_HOST`, where it will run.
 - `RuntimeError` - if a server never becomes ready or lacks a model.
 
