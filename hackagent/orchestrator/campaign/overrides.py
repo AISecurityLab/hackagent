@@ -26,6 +26,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from hackagent.core.contracts import AgentType
+from hackagent.core.settings import resolve_ollama_base_url
 
 
 @dataclass(frozen=True)
@@ -173,7 +174,8 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
     """Wait for every local server and check it serves the models it must.
 
     Raises:
-        ValueError: if a local model has no endpoint.
+        ValueError: if a vLLM model has no endpoint. An Ollama model without
+            one is checked at ``OLLAMA_HOST``, where it will run.
         RuntimeError: if a server never becomes ready or lacks a model.
     """
     required: dict[tuple[str, str], set[str]] = {}
@@ -187,6 +189,10 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
         ):
             wire = "ollama" if wire is AgentType.OLLAMA else "openai"
             endpoint = connection["endpoint"]
+            if not endpoint and wire == "ollama":
+                # Where the model will run: an unset Ollama endpoint follows
+                # OLLAMA_HOST, as it does when the model is built.
+                endpoint = resolve_ollama_base_url()
             if not endpoint:
                 raise ValueError("local model servers require an explicit endpoint")
             required.setdefault((wire, endpoint), set()).add(model["name"])
