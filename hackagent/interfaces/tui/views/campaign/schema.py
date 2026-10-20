@@ -80,6 +80,9 @@ class FieldDef:
     default: Any
     description: str
     choices: tuple[str, ...] = ()
+    #: What each choice stands for, in the same order: ``2`` for the choice
+    #: ``"2"`` of ``Literal[1, 2]``. Empty when the choices are the values.
+    choice_values: tuple[Any, ...] = ()
     advanced: bool = False
     #: The model this field belongs to. Two models can share a field name, so
     #: anything keyed on fields must key on this too.
@@ -122,6 +125,13 @@ class FieldDef:
         if isinstance(self.default, (tuple, list)):
             return ", ".join(str(item) for item in self.default)
         return str(self.default)
+
+    def choice_value(self, choice: str) -> Any:
+        """The value a choice stands for, with the type the schema expects."""
+        for text, value in zip(self.choices, self.choice_values):
+            if text == choice:
+                return value
+        return choice
 
     def is_default(self, value: Any) -> bool:
         """Whether ``value`` is what the schema would use anyway."""
@@ -183,6 +193,15 @@ def _kind(annotation: Any) -> tuple[Optional[str], tuple[str, ...]]:
         if "str" in kinds and kinds <= {"str", "list"}:
             return "str", ()
     return None, ()
+
+
+def _choice_values(annotation: Any) -> tuple[Any, ...]:
+    """The values behind a choice field's labels, as :func:`_kind` lists them."""
+    if get_origin(annotation) is Literal:
+        return get_args(annotation)
+    if isinstance(annotation, type) and issubclass(annotation, enum.Enum):
+        return tuple(member.value for member in annotation)
+    return ()
 
 
 def discriminated_variants(
@@ -279,6 +298,7 @@ def model_fields(
                 default=default,
                 description=info.description or "",
                 choices=choices,
+                choice_values=_choice_values(annotation) if kind == "choice" else (),
                 advanced=bool(_advanced_flag(info)),
                 owner=model,
             )

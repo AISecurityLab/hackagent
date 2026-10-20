@@ -149,3 +149,17 @@ def test_plan_counts_inline_goals() -> None:
     plan = draft.plan()
 
     assert (plan.goals, plan.attacks, plan.searches) == (3, 1, 3)
+
+
+def test_a_choice_stands_for_the_value_its_schema_expects() -> None:
+    """The widget shows ``"2"``; ``Literal[1, 2]`` needs the int ``2``."""
+    from hackagent.attacks.techniques.registry import get_attack_class
+
+    [field] = [
+        field
+        for field in model_fields(get_attack_class("h4rm3l").params_type)
+        if field.path == ("syntax_version",)
+    ]
+    assert field.choices == ("1", "2")
+    assert field.choice_value("2") == 2
+    assert field.choice_value("not a choice") == "not a choice"

@@ -421,6 +421,34 @@ class TestWelcomeDestinations:
         assert builder._has_comments
 
     @pytest.mark.asyncio
+    async def test_looking_at_an_attack_does_not_change_it(self, cli_config):
+        """h4rm3l's ``syntax_version`` is ``Literal[1, 2]``: an int, not "2".
+
+        Showing the attack's form used to write the choice back as text, so
+        the example stopped validating and could not be run.
+        """
+        from hackagent import examples as examples_catalog
+
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await self._choose(app, pilot, "example")
+            app.screen.dismiss(examples_catalog.campaign_files()["ollama/h4rm3l-demo"])
+            await pilot.pause()
+            builder = app.query_one(CampaignBuilder)
+            for _ in range(15):
+                if builder._node is not None and builder._node.root == ("attacks", 0):
+                    break
+                await pilot.press("down")
+                await pilot.pause()
+            assert builder._node.root == ("attacks", 0)
+            await pilot.pause()
+
+            spec, issues = builder.draft.validate()
+
+        assert issues == ()
+        assert spec is not None and spec.attacks[0].parameters["syntax_version"] == 2
+
+    @pytest.mark.asyncio
     async def test_open_asks_for_a_path_without_offering_to_discard(self, cli_config):
         """Arriving from the welcome there is no draft to lose."""
         app = HackAgentTUI(cli_config)
