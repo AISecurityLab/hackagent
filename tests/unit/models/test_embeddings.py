@@ -285,6 +285,7 @@ def _fetch_remote_model_cost_map(url: str) -> dict:
     still bypasses LITELLM_LOCAL_MODEL_COST_MAP (as an already-started refresh
     would).
     """
+    import inspect
     import random
     import time
 
@@ -293,12 +294,17 @@ def _fetch_remote_model_cost_map(url: str) -> dict:
         _fetch_remote_model_cost_map_with_retry_sync,
     )
 
-    # litellm 1.101 takes max_attempts as an int. range(1, 2) used to be the
-    # attempt iterator and now blows up as `range + int` inside the retry loop.
+    # A private function whose third argument litellm keeps changing: an
+    # ``attempts`` range before 1.101 and again from 1.106, an int
+    # ``max_attempts`` in between. One attempt either way.
+    parameters = inspect.signature(
+        _fetch_remote_model_cost_map_with_retry_sync
+    ).parameters
+    one_attempt = range(1, 2) if "attempts" in parameters else 1
     result = _fetch_remote_model_cost_map_with_retry_sync(
         url,
         5,
-        1,
+        one_attempt,
         time.sleep,
         random.Random(0),
         httpx,
