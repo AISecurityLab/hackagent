@@ -29,6 +29,7 @@ own Hermes state. The backend therefore forces isolation flags by default
 
 from __future__ import annotations
 
+import os
 import subprocess
 from typing import Any, Dict, List, Optional
 
@@ -48,6 +49,10 @@ _DEFAULT_TIMEOUT = 600
 # Exit codes per the Hermes CLI reference: 0 success, 1 delivery/backend
 # failure, 2 usage error.
 _USAGE_ERROR_EXIT_CODE = 2
+# -z takes the prompt as one argument, which the OS caps: 128 KiB for one
+# argument on Linux, 32,767 characters for the whole command line on Windows.
+# Kept a little under, to leave room for the other arguments.
+_MAX_PROMPT_BYTES = 30_000 if os.name == "nt" else 127 * 1024
 
 
 def _extract_result_text(stdout: str) -> Optional[str]:
@@ -142,6 +147,14 @@ def _get_hermes_custom_llm_class():
 
         def _run(self, prompt_text: str) -> Dict[str, Any]:
             """Invoke ``hermes -z`` with the prompt and read stdout."""
+            size = len(prompt_text.encode("utf-8"))
+            if size > _MAX_PROMPT_BYTES:
+                # Checked here: past the limit the OS refuses to start the
+                # process, and Windows reports that as a missing file.
+                raise CLIInteractionError(
+                    f"prompt too long for hermes -z: {size} bytes, and it is "
+                    f"passed as one argument of at most {_MAX_PROMPT_BYTES}"
+                )
             argv = self._build_argv(prompt_text)
             try:
                 proc = subprocess.run(
@@ -265,6 +278,8 @@ class HermesModel(SubprocessCLIModel):
         - ``ignore_user_config`` (default ``True``): pass
           ``--ignore-user-config`` so the target uses defaults + ``.env``
           credentials only and never reads ``~/.hermes/config.yaml``.
+          Defaults to ``False`` when ``binary`` is ``ollama``: ``ollama
+          launch`` writes the model into that file, so Hermes must read it.
         - ``safe_mode`` (default ``False``): pass ``--safe-mode`` to disable
           all customizations for maximum isolation.
         - ``source`` (default unset): pass ``--source <source>`` to tag the
@@ -286,7 +301,10 @@ class HermesModel(SubprocessCLIModel):
         self.provider: Optional[str] = config.get("provider")
         # Isolation defaults: a red-team target must not learn from being
         # probed, nor write into the operator's real Hermes profile.
-        self.ignore_user_config: bool = bool(config.get("ignore_user_config", True))
+        # Except under Ollama, which configures the model in config.yaml.
+        self.ignore_user_config: bool = bool(
+            config.get("ignore_user_config", not is_ollama_launcher(self.binary))
+        )
         self.safe_mode: bool = bool(config.get("safe_mode", False))
         self.source: Optional[str] = config.get("source")
 

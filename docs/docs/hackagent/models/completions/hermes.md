@@ -58,6 +58,8 @@ default because Hermes can trigger tool and browser use.
 - `ignore_user_config` (default `True`): pass
 `--ignore-user-config` so the target uses defaults + `.env`
 credentials only and never reads `~/.hermes/config.yaml`.
+Defaults to `False` when `binary` is `ollama`: ``ollama
+launch`` writes the model into that file, so Hermes must read it.
 - `safe_mode` (default `False`): pass `--safe-mode` to disable
 all customizations for maximum isolation.
 - `source` (default unset): pass `--source <source>` to tag the

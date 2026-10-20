@@ -198,6 +198,13 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         self.assertEqual(result["final_text"], "the answer")
 
     @patch("hackagent.models.completions.hermes.subprocess.run")
+    def test_run_refuses_a_prompt_too_long_for_one_argument(self, mock_run):
+        """The OS caps one argument (128 KiB on Linux); fail the turn clearly."""
+        with self.assertRaisesRegex(CLIInteractionError, "too long"):
+            _make_handler()._run(prompt_text="x" * 200_000)
+        mock_run.assert_not_called()
+
+    @patch("hackagent.models.completions.hermes.subprocess.run")
     def test_run_nonzero_exit_without_output_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=1)
         handler = _make_handler()
@@ -250,6 +257,14 @@ class TestHermesModelInit(unittest.TestCase):
         self.assertTrue(model.ignore_user_config)
         self.assertFalse(model.safe_mode)
         self.assertIsNone(model.source)
+
+    def test_init_through_ollama_reads_the_config_ollama_wrote(self):
+        """``ollama launch hermes`` sets the model in Hermes's config.yaml, which
+        --ignore-user-config would skip."""
+        self.assertFalse(_model(binary="ollama").ignore_user_config)
+        self.assertTrue(
+            _model(binary="ollama", ignore_user_config=True).ignore_user_config
+        )
 
     def test_init_missing_name(self):
         with self.assertRaises(CLIConfigurationError):
