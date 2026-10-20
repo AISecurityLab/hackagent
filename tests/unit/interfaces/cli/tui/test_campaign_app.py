@@ -710,3 +710,23 @@ class TestPanelsAreBoxed:
             assert builder.draft.data["dataset"]["classifier"] == {}
             assert builder._node.root == ("dataset",)  # still the same panel
             assert self._boxes(builder)["Classifier"]
+
+
+@pytest.mark.asyncio
+async def test_a_field_row_being_torn_down_can_still_refresh(cli_config):
+    """A row's pending mount can run after its children are gone.
+
+    When the app closes right after opening the builder, Textual can remove
+    a row's children before the row handles its own mount, which refreshes
+    the state line. Looking that line up then failed with NoMatches.
+    """
+    from hackagent.interfaces.tui.views.campaign.form import FieldRow
+
+    app = HackAgentTUI(cli_config)
+    async with app.run_test(size=WIDE) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        row = app.screen.query(FieldRow).first()
+        await row.remove_children()
+        row.refresh_state()  # no raise
