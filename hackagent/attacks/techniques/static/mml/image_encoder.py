@@ -15,35 +15,52 @@ All images are returned as base64-encoded data URLs suitable for inclusion
 in multimodal LLM API requests.
 """
 
+from __future__ import annotations
+
 import base64
 import io
 import random
 import textwrap
-from typing import Any, Dict, List
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Dict, List
 
-try:
-    from PIL import Image, ImageDraw, ImageFont
-except ImportError:
-    raise ImportError(
-        "Pillow is required for the MML attack. "
-        "Install with: pip install 'hackagent[vision]'"
-    )
+if TYPE_CHECKING:
+    from PIL import Image, ImageFont
+
+
+def _pil() -> ModuleType:
+    """Pillow, imported when the first image is drawn.
+
+    Not at module level, so the attack's settings can be read without the
+    vision extra, as the TUI and campaign validation do for every attack.
+    """
+    try:
+        import PIL.Image
+        import PIL.ImageDraw
+        import PIL.ImageFont
+    except ImportError as exc:
+        raise ImportError(
+            "Pillow is required for the MML attack. "
+            "Install with: pip install 'hackagent[vision]'"
+        ) from exc
+    return PIL
 
 
 def _get_font(font_size: int) -> ImageFont.FreeTypeFont:
     """Load a monospace font, falling back to the default if unavailable."""
+    fonts = _pil().ImageFont
     try:
-        return ImageFont.truetype("DejaVuSansMono.ttf", font_size)
+        return fonts.truetype("DejaVuSansMono.ttf", font_size)
     except (OSError, IOError):
         try:
-            return ImageFont.truetype("DejaVuSans.ttf", font_size)
+            return fonts.truetype("DejaVuSans.ttf", font_size)
         except (OSError, IOError):
             try:
-                return ImageFont.truetype(
+                return fonts.truetype(
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size
                 )
             except (OSError, IOError):
-                return ImageFont.load_default()
+                return fonts.load_default()
 
 
 def _render_text_to_image(
@@ -67,8 +84,9 @@ def _render_text_to_image(
     Returns:
         A PIL Image with the text rendered on it.
     """
-    img = Image.new("RGB", (width, height), color=background_color)
-    draw = ImageDraw.Draw(img)
+    pil = _pil()
+    img = pil.Image.new("RGB", (width, height), color=background_color)
+    draw = pil.ImageDraw.Draw(img)
     font = _get_font(font_size)
 
     # Wrap text to fit within the image width
@@ -255,7 +273,7 @@ def encode_mirror(
         prompt, image_width, image_height, font_size, background_color, text_color
     )
     # Mirror horizontally
-    img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    img = img.transpose(_pil().Image.FLIP_LEFT_RIGHT)
 
     words = prompt.split()
     scrambled_words = words.copy()
@@ -407,7 +425,7 @@ def encode_mixed(
     )
 
     # Apply mirror and rotation
-    img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    img = img.transpose(_pil().Image.FLIP_LEFT_RIGHT)
     img = img.rotate(180)
 
     # Scramble original words
