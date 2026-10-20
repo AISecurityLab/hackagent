@@ -1,163 +1,80 @@
 <div align="center">
-<p align="center">
-  <img src="https://docs.hackagent.dev/img/banner.svg" alt="HackAgent - AI Agent Security Testing Toolkit" width="800">
-</p>
 
-  <strong>AI Security Red-Team Toolkit</strong>
+<img src="https://docs.hackagent.dev/img/banner.svg" alt="HackAgent" width="800">
 
-<br>
+**The open-source red-team toolkit for AI models and agents**
 
-[App](https://app.hackagent.dev/) -- [Docs](https://docs.hackagent.dev/) -- [API](https://api.hackagent.dev/schema/redoc)
+[Docs](https://docs.hackagent.dev/) · [App](https://app.hackagent.dev/) · [API](https://api.hackagent.dev/schema/redoc)
 
-[![Security Policy](https://img.shields.io/badge/security-policy-blue?logo=github)](SECURITY.md)
-
-<br>
-
-<br>
-
-![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
+[![PyPI](https://img.shields.io/pypi/v/hackagent)](https://pypi.org/project/hackagent/)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)
-[![Commitizen](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
-![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)
-![Test Coverage](https://img.shields.io/codecov/c/github/AISecurityLab/hackagent)
-![CI Status](https://img.shields.io/github/actions/workflow/status/AISecurityLab/hackagent/ci.yml)
+![CI](https://img.shields.io/github/actions/workflow/status/AISecurityLab/hackagent/ci.yml)
+![Coverage](https://img.shields.io/codecov/c/github/AISecurityLab/hackagent)
+
 </div>
 
-## What is HackAgent?
+HackAgent attacks your AI model or agent with research-backed techniques —
+jailbreaks, prompt injection, tool misuse — and has judge models score every
+reply. You get a measured success rate per attack, so you can see how exposed a
+target is and whether a fix helped.
 
-HackAgent is a comprehensive Python SDK and CLI designed to help security researchers, developers, and AI safety practitioners evaluate and strengthen the security of AI agents.
+## See it run
 
+**Terminal UI.** Start from an example, change what you need, run it.
 
+<img src="https://raw.githubusercontent.com/AISecurityLab/hackagent/main/docs/static/gifs/hackagent-tui.gif" alt="Building and running a campaign in the HackAgent terminal UI" width="100%">
 
-As AI agents become more powerful and autonomous, they face security challenges that traditional testing tools cannot address:
+**Command line.** The same campaign is one YAML file you can edit, check and run, in a shell or in CI.
 
-| Threat | Description |
-|--------|-------------|
-| **Prompt Injection** | Malicious inputs that hijack agent behavior |
-| **Jailbreaking** | Bypassing safety guardrails and content filters |
-| **Goal Hijacking** | Manipulating agents to pursue unintended objectives |
-| **Tool Misuse** | Exploiting agent capabilities for unauthorized actions |
+<img src="https://raw.githubusercontent.com/AISecurityLab/hackagent/main/docs/static/gifs/hackagent-cli.gif" alt="Copying, editing, validating and running a campaign from the command line" width="100%">
 
-HackAgent automates testing for these vulnerabilities using research-backed attack techniques, helping you identify and fix security issues before they are exploited.
+**Dashboard.** Browse runs, results and traces with `hackagent web`, or on [app.hackagent.dev](https://app.hackagent.dev/).
 
-<div align="center">
-  <img src="docs/static/gifs/terminal.gif" alt="HackAgent CLI Demo" width="100%" />
-  <p><em>Interactive TUI with real-time attack progress and visual reporting.</em></p>
-</div>
+<img src="https://raw.githubusercontent.com/AISecurityLab/hackagent/main/docs/static/gifs/hackagent-dashboard.gif" alt="Browsing campaign results in the HackAgent dashboard" width="100%">
 
-## Get Started Now
-
-### Quick Install
+## Quick start
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install hackagent
+pip install 'hackagent[tui]'
+hackagent                # opens the terminal UI
 ```
 
-No API key required: HackAgent works locally out of the box. The base install
-imports without the interface and technique extras:
+Or run an example end to end, fully local, with [Ollama](https://ollama.com):
 
 ```bash
-pip install 'hackagent[tui]'      # textual
-pip install 'hackagent[web]'      # flask and the dashboard bundle
-pip install 'hackagent[browser]'  # playwright
-pip install 'hackagent[rag]'      # faiss and numpy
-pip install 'hackagent[vision]'   # Pillow
-pip install 'hackagent[hf]'       # HuggingFace datasets
+ollama pull gemma3:4b
+hackagent examples copy h4rm3l-demo
+hackagent campaign run h4rm3l-demo.yaml
 ```
 
-### Standalone binary (no Python required)
+No API key needed: results go to a local database unless a campaign says
+otherwise.
 
-Every [GitHub Release](https://github.com/AISecurityLab/hackagent/releases) ships a
-self-contained archive per platform:
+## Learn more
 
-| Platform | Asset |
-|----------|-------|
-| Linux x86_64 | `hackagent-<version>-linux-x86_64.tar.gz` |
-| macOS arm64 | `hackagent-<version>-macos-arm64.tar.gz` |
-| Windows x86_64 | `hackagent-<version>-windows-x86_64.zip` |
+- [Installation](https://docs.hackagent.dev/getting-started/installation) — extras, and standalone binaries that need no Python
+- [Your first campaign](https://docs.hackagent.dev/getting-started/first-campaign) — write, check and run one
+- [Concepts](https://docs.hackagent.dev/concepts) — attacks, judges and how a run works
+- [Attacks](https://docs.hackagent.dev/reference/attacks) and the [campaign file reference](https://docs.hackagent.dev/reference/campaign)
+- [Dashboard](https://docs.hackagent.dev/getting-started/dashboard) — `hackagent web`, locally or against your account
 
-Extract the archive and run the `hackagent` launcher inside it — no Python, `pip`
-or `uv` install needed. Keep the extracted folder intact; the launcher loads the
-libraries next to it.
+Questions? Join the [discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.
 
-> **Note:** the `WEB` provider drives a real browser through Playwright
-> (`pip install 'hackagent[browser]'`). The browser binaries cannot be embedded
-> in the archive (or in the PyPI package). Before using `hackagent web`-based
-> targets, install them once with `playwright install`.
+## Responsible use
 
-
-Questions? Join [community discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.
-
-## Architecture
-
-HackAgent uses a modular pipeline to test agent robustness end-to-end.
-
-| Component | Description |
-|-----------|-------------|
-| **Attack Engine** | Orchestrates attacks using AdvPrefix, AutoDAN-Turbo, PAIR, TAP, FlipAttack, BoN, h4rm3l, CipherChat, PAP, and Static Template |
-| **Generator** | LLM role that creates adversarial prompts to test the target agent |
-| **Judge** | LLM role that evaluates whether attacks bypass safety measures |
-| **Target Agent** | Your AI agent under test across supported frameworks |
-| **Datasets** | Pre-built benchmark presets plus custom HuggingFace/file/URL JSON datasets |
-
-## Supported Frameworks
-
-[![Google ADK](https://img.shields.io/badge/Google-ADK-green?style=for-the-badge&logo=google)](https://google.github.io/adk-docs/)
-[![OpenAI SDK](https://img.shields.io/badge/OpenAI-SDK-412991?style=for-the-badge&logo=openai)](https://platform.openai.com/docs)
-[![LiteLLM](https://img.shields.io/badge/LiteLLM-blue?style=for-the-badge&logo=github)](https://github.com/BerriAI/litellm)
-[![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge)](https://python.langchain.com)
-
-## Reporting
-
-HackAgent supports both local and remote reporting.
-
-- A campaign records its results in local SQLite, readable offline.
-- Set `execution.storage.backend: remote` (with `base_url` and `api_key_env`) to
-  send a run to a HackAgent server instead.
-
-`hackagent web` serves the HackAgent dashboard — the same app as
-[app.hackagent.dev](https://app.hackagent.dev) — from your own machine, against
-your cloud data when an API key is configured and against the local SQLite
-database (read-only) when it is not. Your API key stays in the CLI process and
-is never exposed to the browser.
-
-```bash
-hackagent web
-```
-
-Install it with `pip install 'hackagent[web]'`; see the [web command docs](docs/docs/getting-started/dashboard.mdx) for modes and options.
-
-## Responsible Use
-
-HackAgent is designed for authorized security testing only. Always obtain explicit permission before testing any AI system.
-
-### Do
-
-- Test your own agents
-- Conduct authorized pentesting
-- Follow coordinated disclosure
-- Share security knowledge responsibly
-
-### Don't
-
-- Test systems without permission
-- Exploit vulnerabilities maliciously
-- Violate terms of service
-- Share harmful exploit instructions irresponsibly
-
-Read the full guidelines: [Responsible Disclosure](docs/docs/security/responsible-disclosure.md)
+HackAgent is for authorized security testing only. Test systems you own or
+have written permission to test, and report what you find through coordinated
+disclosure. Read the [responsible disclosure guidelines](https://docs.hackagent.dev/security/responsible-disclosure)
+and our [security policy](SECURITY.md).
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
 
-Licensed under Apache-2.0. See [LICENSE](LICENSE).
-
-## Disclaimer
-
-HackAgent is intended for security research and AI safety improvement. The authors are not responsible for misuse.
+Licensed under Apache-2.0. See [LICENSE](LICENSE). HackAgent is intended for
+security research and AI safety improvement; the authors are not responsible
+for misuse.
