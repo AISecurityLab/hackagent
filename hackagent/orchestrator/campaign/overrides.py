@@ -26,7 +26,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from hackagent.core.contracts import AgentType
-from hackagent.core.settings import resolve_ollama_base_url
+from hackagent.models.completions.litellm import normalise_ollama_endpoint
 
 
 @dataclass(frozen=True)
@@ -189,10 +189,10 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
         ):
             wire = "ollama" if wire is AgentType.OLLAMA else "openai"
             endpoint = connection["endpoint"]
-            if not endpoint and wire == "ollama":
-                # Where the model will run: an unset Ollama endpoint follows
-                # OLLAMA_HOST, as it does when the model is built.
-                endpoint = resolve_ollama_base_url()
+            if wire == "ollama":
+                # Where the model will run: as when the model is built, an
+                # unset endpoint follows OLLAMA_HOST and an /api suffix goes.
+                endpoint = normalise_ollama_endpoint(endpoint)
             if not endpoint:
                 raise ValueError("local model servers require an explicit endpoint")
             required.setdefault((wire, endpoint), set()).add(model["name"])
