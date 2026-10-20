@@ -1,3 +1,21 @@
+## v0.16.0 (2026-10-20)
+
+### Feat
+
+- **cli**: copy an example campaign to edit as your own
+
+### Fix
+
+- **models**: keep Ollama's Hermes config, and refuse an oversized prompt
+- **models**: launch Hermes and Codex the way their CLIs now expect
+- **tui**: let a field row refresh while the app tears it down
+- **tui**: run campaigns whose goals come from a Hugging Face dataset
+- **campaign**: check an Ollama server where its model will reach it
+- **attacks**: load MML and h4rm3l without their optional extras
+- **tui**: keep a choice's type when the form shows it
+- **cli**: let campaign run check Ollama where the model will run
+- **deps**: keep the hf extra's datasets floor at 2.14
+
 ## v0.15.0 (2026-10-19)
 
 ### BREAKING CHANGE
