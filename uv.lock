@@ -2474,7 +2474,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1.0" },
-    { name = "datasets", marker = "extra == 'hf'", specifier = ">=5.0" },
+    { name = "datasets", marker = "extra == 'hf'", specifier = ">=2.14.0" },
     { name = "faiss-cpu", marker = "extra == 'rag'", specifier = ">=1.13.2" },
     { name = "flask", marker = "extra == 'web'", specifier = ">=3.1.3" },
     { name = "hackagent-webui", marker = "extra == 'web'", specifier = ">=0.2,<1.0" },

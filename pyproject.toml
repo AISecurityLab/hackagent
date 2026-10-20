@@ -108,7 +108,7 @@ rag = [
     "numpy>=1.26",
 ]
 vision = ["Pillow>=10.0.0"]
-hf = ["datasets>=5.0"]
+hf = ["datasets>=2.14.0"]
 
 [project.scripts]
 hackagent = "hackagent.interfaces.cli.main:main"
