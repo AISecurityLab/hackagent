@@ -8,6 +8,7 @@ Launch ready-to-run example scenarios from the CLI.
 """
 
 import importlib
+import re
 import os
 import socket
 import shutil
@@ -17,6 +18,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
+from typing import Optional
 from urllib.error import URLError
 from urllib.parse import urljoin
 from urllib.request import urlopen
@@ -513,7 +515,53 @@ def list_examples():
             console.print(f"  [dim]{line}[/dim]")
     console.print(
         "\n[dim]Run one with:[/dim] hackagent examples run <name>\n"
+        "[dim]Or copy it here to edit:[/dim] hackagent examples copy <name>\n"
         "[dim]A name's last part is enough when it is unique.[/dim]"
+    )
+
+
+#: Where the docs site serves the campaign JSON Schema.
+CAMPAIGN_SCHEMA_URL = "https://docs.hackagent.dev/schema/campaign.schema.json"
+
+#: An editor schema hint pointing at a relative path, as the examples have.
+_SCHEMA_HINT = re.compile(r"^(# yaml-language-server: \$schema=)(?!https?://)\S+", re.M)
+
+
+@examples.command(name="copy")
+@click.argument("name")
+@click.argument("destination", required=False, type=click.Path(path_type=Path))
+@click.option("--force", is_flag=True, help="Overwrite a file that is already there.")
+@handle_errors
+def copy_example(name: str, destination: Optional[Path], force: bool):
+    """📄 Copy an example campaign here, to edit and run as your own.
+
+    DESTINATION is a file or a folder, the current folder by default.
+    """
+    key, source = _resolve_example_name(name)
+    target = destination or Path(".")
+    if target.is_dir():
+        target = target / source.name
+    if target.exists() and not force:
+        raise click.ClickException(
+            f"{target} already exists; use --force to replace it."
+        )
+    # Copied as it is, comments included: they explain the example. Only the
+    # editor's schema hint changes, from a path inside this repository to the
+    # schema the docs site publishes.
+    text = source.read_text(encoding="utf-8")
+    text = _SCHEMA_HINT.sub(rf"\g<1>{CAMPAIGN_SCHEMA_URL}", text, count=1)
+    target.write_text(text, encoding="utf-8")
+
+    console.print(f"[green]Copied[/green] {key} → {target}")
+    folder = key.rsplit("/", 1)[0] if "/" in key else ""
+    if folder in _TARGETS or folder in _MANUAL_TARGETS:
+        console.print(
+            "[yellow]Its agent is not copied: start it the way "
+            f"`hackagent examples run {key}` does, or point the target elsewhere.[/yellow]"
+        )
+    console.print(
+        f"[dim]Edit it, then run it with:[/dim] hackagent campaign run {target}",
+        soft_wrap=True,
     )
 
 

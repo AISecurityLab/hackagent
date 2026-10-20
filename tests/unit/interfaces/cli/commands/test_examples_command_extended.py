@@ -574,3 +574,58 @@ class TestExampleDiscovery(unittest.TestCase):
             self.assertTrue(script.is_file(), f"{folder}: no {target.script}")
         for folder in ex._MANUAL_TARGETS:
             self.assertTrue((examples_catalog.EXAMPLES_DIR / folder).is_dir(), folder)
+
+
+class TestCopyExample:
+    """``examples copy`` puts an example where you can edit and run it."""
+
+    def _copy(self, *args, cwd):
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=cwd):
+            result = runner.invoke(examples, ["copy", *args])
+            written = sorted(p.name for p in Path(".").iterdir())
+            contents = {
+                name: Path(name).read_text(encoding="utf-8") for name in written
+            }
+        return result, contents
+
+    def test_it_copies_the_campaign_file_with_its_comments(self, tmp_path):
+        source = examples_catalog.campaign_files()["ollama/h4rm3l-demo"]
+        result, contents = self._copy("h4rm3l-demo", cwd=tmp_path)
+
+        assert result.exit_code == 0, result.output
+        [copied] = contents.values()
+        original = source.read_text(encoding="utf-8").splitlines()
+        # The editor schema hint points where the copy can still reach it.
+        assert copied.splitlines()[0] == (
+            "# yaml-language-server: $schema=" + ex.CAMPAIGN_SCHEMA_URL
+        )
+        assert copied.splitlines()[1:] == original[1:]
+        assert "hackagent campaign run h4rm3l-demo.yaml" in result.output
+
+    def test_it_copies_to_the_file_you_name(self, tmp_path):
+        result, contents = self._copy("ollama/h4rm3l-demo", "mine.yaml", cwd=tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert list(contents) == ["mine.yaml"]
+
+    def test_it_does_not_overwrite_a_file_unless_told_to(self, tmp_path):
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            Path("h4rm3l-demo.yaml").write_text("mine", encoding="utf-8")
+            refused = runner.invoke(examples, ["copy", "h4rm3l-demo"])
+            kept = Path("h4rm3l-demo.yaml").read_text(encoding="utf-8")
+            forced = runner.invoke(examples, ["copy", "h4rm3l-demo", "--force"])
+            replaced = Path("h4rm3l-demo.yaml").read_text(encoding="utf-8")
+
+        assert refused.exit_code != 0 and "--force" in refused.output
+        assert kept == "mine"
+        assert forced.exit_code == 0, forced.output
+        assert replaced != "mine"
+
+    def test_an_unknown_example_says_how_to_find_one(self, tmp_path):
+        result, contents = self._copy("no-such-example", cwd=tmp_path)
+
+        assert result.exit_code != 0
+        assert "hackagent examples list" in result.output
+        assert contents == {}
