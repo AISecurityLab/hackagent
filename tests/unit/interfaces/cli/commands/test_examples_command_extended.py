@@ -3,6 +3,8 @@
 
 """Unit tests for the `hackagent examples` command helpers and subcommands."""
 
+import os
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -11,6 +13,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import click
+import pytest
 from click.testing import CliRunner
 
 from hackagent import examples as examples_catalog
@@ -608,6 +611,19 @@ class TestCopyExample:
 
         assert result.exit_code == 0, result.output
         assert list(contents) == ["mine.yaml"]
+
+    @pytest.mark.skipif(os.name == "nt", reason="reads the command as a POSIX shell")
+    @pytest.mark.parametrize("name", ["my campaign.yaml", "-mine.yaml"])
+    def test_the_run_command_it_suggests_names_the_copy(self, tmp_path, name):
+        result, contents = self._copy("h4rm3l-demo", "--", name, cwd=tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert list(contents) == [name]
+        [line] = [s for s in result.output.splitlines() if "campaign run" in s]
+        argv = shlex.split(line.split("run it with:", 1)[1])
+        assert argv[:3] == ["hackagent", "campaign", "run"]
+        assert [a for a in argv[3:] if a != "--"] == [name]
+        assert argv[3] == "--" or not argv[3].startswith("-")
 
     def test_it_does_not_overwrite_a_file_unless_told_to(self, tmp_path):
         runner = CliRunner()

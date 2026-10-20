@@ -10,6 +10,7 @@ Launch ready-to-run example scenarios from the CLI.
 import importlib
 import re
 import os
+import shlex
 import socket
 import shutil
 import subprocess
@@ -25,6 +26,7 @@ from urllib.request import urlopen
 
 import click
 from rich.console import Console
+from rich.markup import escape
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.cli.utils import handle_errors
@@ -560,9 +562,18 @@ def copy_example(name: str, destination: Optional[Path], force: bool):
             f"`hackagent examples run {key}` does, or point the target elsewhere.[/yellow]"
         )
     console.print(
-        f"[dim]Edit it, then run it with:[/dim] hackagent campaign run {target}",
+        "[dim]Edit it, then run it with:[/dim] "
+        + escape(f"hackagent campaign run {_shell_path(target)}"),
         soft_wrap=True,
     )
+
+
+def _shell_path(path: Path) -> str:
+    """``path`` as a shell reads it back: quoted if needed, after ``--`` if it
+    starts with ``-`` so it is not taken for an option."""
+    text = str(path)
+    quoted = subprocess.list2cmdline([text]) if os.name == "nt" else shlex.quote(text)
+    return f"-- {quoted}" if text.startswith("-") else quoted
 
 
 @examples.command(name="run")
