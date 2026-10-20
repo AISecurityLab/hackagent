@@ -10,6 +10,11 @@ updates:
     commit-message:
       prefix: "bump"
       include: "scope"
+    ignore:
+      # litellm requires openai<3.0.0, so an openai 3 bump cannot be
+      # installed. Drop this once litellm accepts openai 3.
+      - dependency-name: "openai"
+        update-types: ["version-update:semver-major"]
 
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
