@@ -208,6 +208,20 @@ hackagent doctor [OPTIONS]
 hackagent examples [OPTIONS] COMMAND [ARGS]...
 ```
 
+### `hackagent examples copy`
+
+📄 Copy an example campaign here, to edit and run as your own.
+
+```text
+hackagent examples copy [OPTIONS] NAME [DESTINATION]
+```
+
+| Name | Kind | Required | Description |
+|---|---|---|---|
+| `NAME` | argument | yes |  |
+| `DESTINATION` | argument | no |  |
+| `--force` | flag | no | Overwrite a file that is already there. |
+
 ### `hackagent examples db-tool`
 
 Run the DB Tool sandbox example: start agent, then launch attack.
