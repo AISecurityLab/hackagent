@@ -13,6 +13,7 @@ app of its own, opened by starting ``HackAgentTUI`` on it, which is how the
 welcome screen reaches past results.
 """
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,27 @@ from hackagent.interfaces.tui.views.agents import AgentsTab
 from hackagent.interfaces.tui.views.campaign import CampaignBuilder
 from hackagent.interfaces.tui.views.config import ConfigTab
 from hackagent.interfaces.tui.views.results import ResultsTab
+
+
+def _start_multiprocessing_tracker() -> None:
+    """Start multiprocessing's resource tracker while stderr is still a file.
+
+    Textual replaces ``sys.stderr`` with an object that has no file
+    descriptor. The first multiprocessing lock made after that starts the
+    tracker, which hands its child stderr's descriptor and fails with
+    "bad value(s) in fds_to_keep". tqdm makes such a lock whenever
+    ``datasets`` loads a Hugging Face dataset, so a campaign whose goals come
+    from a preset could not run in the TUI. Started here, the tracker is
+    already running when that lock is made.
+    """
+    if os.name != "posix":  # Windows has no resource tracker.
+        return
+    from multiprocessing import resource_tracker
+
+    try:
+        resource_tracker.ensure_running()
+    except Exception:  # noqa: BLE001 - never stop the TUI from opening over it
+        pass
 
 
 class HackAgentTUI(App):
@@ -203,6 +225,10 @@ class HackAgentTUI(App):
     def get_css_variables(self) -> dict[str, str]:
         """Expose the HackAgent brand palette as CSS variables."""
         return {**super().get_css_variables(), **css_variables()}
+
+    def run(self, *args: Any, **kwargs: Any) -> Any:
+        _start_multiprocessing_tracker()
+        return super().run(*args, **kwargs)
 
     def compose(self) -> ComposeResult:
         """One view and a footer.
