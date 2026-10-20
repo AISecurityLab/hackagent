@@ -44,9 +44,12 @@ def test_a_run_can_load_a_hugging_face_dataset_once_the_tui_is_up():
                 return -1
 
         def textual_run(self, *args, **kwargs):
-            # What Textual does to stderr, then what tqdm does mid-run.
+            # What Textual does to stderr, then what tqdm does mid-run. A
+            # lock made under "fork", Linux's default before Python 3.14,
+            # never starts the tracker, so "spawn" keeps the test meaningful
+            # on every platform.
             sys.stderr = NoDescriptor()
-            multiprocessing.RLock()
+            multiprocessing.get_context("spawn").RLock()
             print("lock created")
 
         App.run = textual_run
