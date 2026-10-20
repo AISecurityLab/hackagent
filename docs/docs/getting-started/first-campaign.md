@@ -8,6 +8,14 @@ By the end of this page you will have attacked a model running on your own
 machine and read the verdict. Nothing is sent anywhere: the model, the attack
 and the judge all run locally.
 
+![Copying, editing, validating and running a campaign from the command line](/gifs/hackagent-cli.gif)
+
+:::tip Start from an example instead
+Every bundled example is a campaign file you can copy and edit.
+`hackagent examples list` shows them, and
+`hackagent examples copy h4rm3l-demo` writes one into the current folder.
+:::
+
 ## What you need
 
 - **Python 3.10 or newer**, and HackAgent installed — see [Installation](installation.mdx).

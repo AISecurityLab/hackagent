@@ -46,13 +46,14 @@
   font-size: 1.15rem;
 }
 
-/* Terminal GIF container */
+/* Terminal demo container */
 .terminal-demo {
   text-align: center;
   margin: 2rem 0;
 }
 
-.terminal-demo img {
+.terminal-demo img,
+.terminal-demo video {
   max-width: 100%;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
