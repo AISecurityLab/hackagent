@@ -12,6 +12,10 @@ unique provider name whose ``completion`` shells out to ``hermes`` instead of
 making an HTTP call. Requests therefore still flow through
 ``litellm.completion`` and come back as a :class:`ModelResponse`.
 
+With ``binary`` set to ``ollama`` the backend starts Hermes through
+``ollama launch hermes``, which picks the model, and forwards the Hermes
+arguments after the launcher's ``--``.
+
 Isolation
 ---------
 Unlike Claude Code, Hermes is explicitly *stateful*: it keeps long-term memory
@@ -32,6 +36,7 @@ from hackagent.models.completions.cli import (
     CLIConfigurationError,
     CLIInteractionError,
     SubprocessCLIModel,
+    is_ollama_launcher,
     last_user_text,
 )
 
@@ -103,8 +108,8 @@ def _get_hermes_custom_llm_class():
             self.extra_args = list(extra_args or [])
             self.logger = log
 
-        def _build_argv(self) -> List[str]:
-            """Assemble the one-shot headless ``hermes -z`` argv.
+        def _build_argv(self, prompt_text: str) -> List[str]:
+            """Assemble the one-shot headless ``hermes -z`` argv for a prompt.
 
             ``-z`` prints the final response only (no tool-call transcript or
             decorations), which is what we want for automation. The isolation
@@ -112,9 +117,18 @@ def _get_hermes_custom_llm_class():
             ``--continue`` are deliberately never added, so each attack turn
             runs as a fresh session against untainted agent state.
             """
-            argv = [self.binary, "-z"]
-            if self.model:
-                argv.extend(["-m", self.model])
+            # -z/--oneshot takes the prompt as its value. Joined with "=", a
+            # prompt that starts with "-" cannot be parsed as a flag.
+            oneshot = f"--oneshot={prompt_text}"
+            if is_ollama_launcher(self.binary):
+                argv = [self.binary, "launch", "hermes"]
+                if self.model:
+                    argv.extend(["--model", self.model])
+                argv.extend(["--yes", "--", oneshot])
+            else:
+                argv = [self.binary, oneshot]
+                if self.model:
+                    argv.extend(["-m", self.model])
             if self.provider:
                 argv.extend(["--provider", self.provider])
             if self.ignore_user_config:
@@ -127,15 +141,11 @@ def _get_hermes_custom_llm_class():
             return argv
 
         def _run(self, prompt_text: str) -> Dict[str, Any]:
-            """Invoke ``hermes -z`` with the prompt on stdin and read stdout."""
-            argv = self._build_argv()
-            # Prompt goes via stdin (never argv) so adversarial text that
-            # begins with ``-`` is not mistaken for a CLI flag, and we sidestep
-            # argv length limits on long prompts.
+            """Invoke ``hermes -z`` with the prompt and read stdout."""
+            argv = self._build_argv(prompt_text)
             try:
                 proc = subprocess.run(
                     argv,
-                    input=prompt_text,
                     capture_output=True,
                     text=True,
                     timeout=self.timeout,
@@ -245,7 +255,8 @@ class HermesModel(SubprocessCLIModel):
           model string.
 
     Optional config:
-        - ``binary`` (default ``hermes``): path to the Hermes executable.
+        - ``binary`` (default ``hermes``): path to the Hermes executable, or
+          to ``ollama`` to start Hermes with ``ollama launch hermes``.
         - ``provider``: per-run backend provider override (``--provider``).
         - ``cwd``: working directory Hermes operates in (skills, worktrees,
           file tools).
@@ -256,8 +267,9 @@ class HermesModel(SubprocessCLIModel):
           credentials only and never reads ``~/.hermes/config.yaml``.
         - ``safe_mode`` (default ``False``): pass ``--safe-mode`` to disable
           all customizations for maximum isolation.
-        - ``source`` (default ``hackagent``): pass ``--source`` so Hermes-side
-          logs are attributable to hackagent runs.
+        - ``source`` (default unset): pass ``--source <source>`` to tag the
+          session. Recent Hermes versions accept it only under ``chat``, not
+          with ``-z``, so it is off unless set.
         - ``extra_args``: list of additional raw ``hermes`` flags.
 
     Note: ``endpoint`` is accepted for interface symmetry but ignored — the
@@ -276,7 +288,7 @@ class HermesModel(SubprocessCLIModel):
         # probed, nor write into the operator's real Hermes profile.
         self.ignore_user_config: bool = bool(config.get("ignore_user_config", True))
         self.safe_mode: bool = bool(config.get("safe_mode", False))
-        self.source: Optional[str] = config.get("source", "hackagent")
+        self.source: Optional[str] = config.get("source")
 
     def _build_handler(self) -> Any:
         handler_cls = _get_hermes_custom_llm_class()

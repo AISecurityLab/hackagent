@@ -53,13 +53,13 @@ Then run:
 | Config key | Maps to | Default |
 |---|---|---|
 | `name` (required) | `-m <model>` | — |
-| `binary` | argv[0], checked with `shutil.which` at construction | `hermes` |
+| `binary` | argv[0], checked with `shutil.which` at construction. `ollama` starts Hermes with `ollama launch hermes --model <name>` | `hermes` |
 | `provider` | `--provider <provider>` | unset |
 | `cwd` | working directory Hermes operates in | unset |
 | `timeout` | `subprocess.run(..., timeout=)` seconds | `600` |
 | `ignore_user_config` | `--ignore-user-config` | `True` |
 | `safe_mode` | `--safe-mode` | `False` |
-| `source` | `--source <source>` | `hackagent` |
+| `source` | `--source <source>` | unset |
 | `extra_args` | appended raw flags | `[]` |
 
 ---
@@ -73,7 +73,7 @@ The adapter therefore defaults to isolation:
 - `--ignore-user-config` is always passed unless you explicitly set `"ignore_user_config": False`, so the target uses defaults plus `.env` credentials only and never reads `~/.hermes/config.yaml`.
 - `-r`/`--resume` and `-c`/`--continue` are never passed, so every attack turn is a fresh session.
 - `"safe_mode": True` opts into `--safe-mode` for maximum isolation (all customizations disabled).
-- `--source hackagent` is passed so Hermes-side logs are attributable to HackAgent runs.
+- `--source` is not passed by default: recent Hermes versions accept it only under `hermes chat`, not with `-z`. Set `source` if your version takes it.
 
 For stronger separation still, point `cwd` at a scratch directory and/or run the target under a dedicated `hermes profile` so the operator's real profile, memory and skills are never touched.
 
@@ -82,7 +82,7 @@ For stronger separation still, point `cwd` at a scratch directory and/or run the
 ### Notes
 
 - `hermes -z` returns bare text with no structured metadata (no session id, cost or exit reason), so the adapter relies on exit codes: `0` success, `1` delivery/backend failure, `2` usage error. A non-zero exit with usable stdout is captured as the target's response (a refusal is a legitimate response to judge); exit `2` always fails loudly.
-- The prompt is fed via **stdin**, never argv, so adversarial payloads starting with `-` are not parsed as CLI flags.
+- The prompt is passed as `--oneshot=<prompt>`, the value of `-z`. Joined to the option with `=`, an adversarial payload starting with `-` is not parsed as a CLI flag.
 - The `endpoint` field is present for HackAgent compatibility but is ignored for this local setup.
 - If the configured binary is not on `PATH`, the setup fails before the attack runs.
 - `hermes serve` (a headless backend over JSON-RPC/WebSocket) is out of scope here; this example covers the local CLI-driven path only.
