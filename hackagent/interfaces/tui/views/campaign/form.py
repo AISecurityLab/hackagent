@@ -159,7 +159,8 @@ class FieldRow(Horizontal):
         elif self.field.kind == "tristate":
             self._commit(event.value == "true")
         else:
-            self._commit(event.value)
+            # The widget holds text; the campaign needs the schema's type.
+            self._commit(self.field.choice_value(str(event.value)))
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         event.stop()
