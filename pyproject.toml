@@ -49,7 +49,7 @@ dev = [
     "pytest-asyncio>=0.23.7,<1.5.0",
     "mcp>=1.21.2",
     "vllm>=0.11.0; sys_platform != 'win32'",
-    "fastapi[standard]>=0.136.3,<0.137; sys_platform != 'win32'",
+    "fastapi[standard]>=0.136.3,<0.147; sys_platform != 'win32'",
     "transformers>=4.55.2,<5.0; sys_platform != 'win32'",
     "pytest-textual-snapshot>=1.1.0",
     "import-linter>=2.3",
