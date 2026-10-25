@@ -42,10 +42,11 @@ _ADAPTIVE = (
     "advprefix",
     "autodan_turbo",
     "tool_output_ipi",
+    "toolhijacker",
 )
 _MULTI_TURN = ("crescendo",)
 _MULTIMODAL = ("mml", "fc")
-_INDIRECT = ("rag", "tool_output_ipi")
+_INDIRECT = ("rag", "tool_output_ipi", "toolhijacker")
 _RAG = ("rag",)
 
 
