@@ -121,7 +121,7 @@ hackagent config reset [OPTIONS]
 
 ### `hackagent config set`
 
-Set configuration values
+Set configuration values (API keys are never saved: use env variables)
 
 ```text
 hackagent config set [OPTIONS]
@@ -129,7 +129,7 @@ hackagent config set [OPTIONS]
 
 | Name | Kind | Required | Description |
 |---|---|---|---|
-| `--api-key` | option | no | HackAgent API key |
+| `--backend` | option | no | Default storage backend (remote reads the key from HACKAGENT_API_KEY) |
 | `--base-url` | option | no | HackAgent API base URL |
 | `--verbose` | option | no | Default verbosity level: 0/error, 1/warning, 2/info, 3/debug |
 
@@ -370,5 +370,5 @@ hackagent web [OPTIONS]
 | `--host` | option | no | Host to bind the dashboard server. Defaults to `127.0.0.1`. |
 | `--port` | option | no | Port to run the dashboard server on. Defaults to `7860`. |
 | `--db-path` | option | no | SQLite database path (default: ~/.local/share/hackagent/hackagent.db). |
-| `--local` | flag | no | Read from the local database even when an API key is configured. |
+| `--local` | flag | no | Read from the local database even when the remote backend is configured. |
 | `--no-browser` | flag | no | Do not auto-open a browser tab on start. |

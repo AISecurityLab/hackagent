@@ -118,9 +118,7 @@ def test_a_key_saved_in_the_config_file_is_never_used(tmp_path):
     assert settings.api_key is None
     assert settings.mode is Mode.LOCAL
     with pytest.raises(CredentialError, match="HACKAGENT_API_KEY"):
-        _resolve(
-            tmp_path, file_values={"api_key": "stale-file-key"}, backend="remote"
-        )
+        _resolve(tmp_path, file_values={"api_key": "stale-file-key"}, backend="remote")
 
 
 def test_the_api_key_never_appears_when_settings_are_printed(tmp_path):

@@ -9,12 +9,20 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
+from hackagent.core.settings import Settings
 from hackagent.interfaces.cli.commands.web import (
     _free_port,
     _is_hackagent_process,
     _listener_pids,
     web,
 )
+
+
+def _settings(**kwargs):
+    kwargs.setdefault("backend", "remote" if kwargs.get("api_key") else "local")
+    return Settings.resolve(
+        env={}, config_path="/nonexistent-hackagent-web-config", **kwargs
+    )
 
 
 class _Closer:
@@ -51,6 +59,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
+        config.settings = _settings(api_key="test-key")
         app = MagicMock()
         store = _Closer()
         seen, opener = _open_with(store)
@@ -77,6 +86,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
+        config.settings = _settings()
 
         store = _Closer()
         seen, opener = _open_with(store)
@@ -101,15 +111,16 @@ class TestWebCommand(unittest.TestCase):
         mock_create.assert_called_once()
         session = mock_create.call_args.args[0]
         self.assertIs(session.backend, store)
-        self.assertFalse(session.settings.api_key)
+        self.assertEqual(session.settings.backend.value, "local")
         app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
         self.assertTrue(store.closed)
 
-    def test_web_local_flag_overrides_configured_api_key(self):
+    def test_web_local_flag_overrides_configured_remote_backend(self):
         runner = CliRunner()
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
+        config.settings = _settings(api_key="test-key")
 
         store = _Closer()
         seen, opener = _open_with(store)
@@ -128,14 +139,15 @@ class TestWebCommand(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
         session = mock_create.call_args.args[0]
-        self.assertFalse(seen["settings"].api_key)
-        self.assertFalse(session.settings.api_key)
+        self.assertEqual(seen["settings"].backend.value, "local")
+        self.assertEqual(session.settings.backend.value, "local")
 
     def test_web_without_bundle_exits_with_guidance(self):
         runner = CliRunner()
         config = MagicMock()
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
+        config.settings = _settings(db_path=":memory:")
 
         from hackagent.interfaces.web import MissingBundleError
 
@@ -157,6 +169,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
+        config.settings = _settings(api_key="test-key")
 
         with (
             patch("hackagent.interfaces.web.create_app", return_value=MagicMock()),
@@ -251,6 +264,7 @@ class TestFreePort(unittest.TestCase):
         config = MagicMock()
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
+        config.settings = _settings(db_path=":memory:")
 
         app = MagicMock()
         _seen, opener = _open_with(_Closer())

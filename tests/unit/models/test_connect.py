@@ -74,6 +74,39 @@ class TestConnectProvider(unittest.TestCase):
         self.assertIsInstance(model, LiteLLMModel)
 
 
+class TestConnectCredentials(unittest.TestCase):
+    def test_a_literal_key_reaches_the_client(self):
+        model = connect(
+            ModelSpec(
+                identifier="gpt-4",
+                agent_type=AgentType.OPENAI,
+                endpoint="http://localhost:8000/v1",
+                api_key="sk-runtime",
+            )
+        )
+        self.assertEqual(model.connection.to_litellm()["api_key"], "sk-runtime")
+        self.assertNotIn("sk-runtime", repr(model.connection))
+
+    def test_a_reference_reads_only_its_own_variable(self):
+        with patch.dict(
+            "os.environ",
+            {"PROVIDER_KEY": "provider", "HACKAGENT_API_KEY": "platform"},
+        ):
+            model = connect(
+                ModelSpec(
+                    identifier="gpt-4",
+                    agent_type=AgentType.OPENAI,
+                    api_key_env="PROVIDER_KEY",
+                )
+            )
+            self.assertEqual(model.connection.to_litellm()["api_key"], "provider")
+
+    def test_the_platform_key_is_never_a_provider_fallback(self):
+        model = connect(ModelSpec(identifier="gpt-4", agent_type=AgentType.OPENAI))
+        with patch.dict("os.environ", {"HACKAGENT_API_KEY": "platform"}, clear=True):
+            self.assertNotIn("api_key", model.connection.to_litellm())
+
+
 class TestConnectNative(unittest.TestCase):
     def test_native_types_are_built_directly_from_the_spec(self):
         with patch(

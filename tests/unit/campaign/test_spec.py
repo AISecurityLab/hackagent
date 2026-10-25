@@ -196,8 +196,8 @@ def test_missing_file_is_reported(tmp_path):
         ),
         (campaign(evaluation={"aggregation": "median"}), "aggregation"),
         (
-            campaign(execution={"storage": {"backend": "remote"}}),
-            "Remote storage requires",
+            campaign(execution={"storage": {"backend": "remote", "api_key_env": " "}}),
+            "'api_key_env' cannot be empty",
         ),
         (
             campaign(execution={"concurrency": {"target": 0}}),

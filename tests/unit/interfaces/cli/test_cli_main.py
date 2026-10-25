@@ -86,16 +86,28 @@ class TestCLIConfigContext(unittest.TestCase):
 
     @patch("hackagent.interfaces.cli.main.CLIConfig")
     @patch("hackagent.interfaces.cli.main._launch_tui_default")
-    def test_api_key_passed_to_config(self, mock_tui, mock_config_class):
-        """Test that --api-key option is passed to CLIConfig."""
+    def test_api_key_env_and_backend_passed_to_config(
+        self, mock_tui, mock_config_class
+    ):
+        """--api-key-env names a variable; --backend selects storage."""
         mock_config = MagicMock()
         mock_config_class.return_value = mock_config
 
         runner = CliRunner()
-        runner.invoke(cli, ["--api-key", "my-test-key"])
+        runner.invoke(cli, ["--api-key-env", "MY_KEY", "--backend", "remote"])
 
         call_kwargs = mock_config_class.call_args.kwargs
-        self.assertEqual(call_kwargs["api_key"], "my-test-key")
+        self.assertEqual(call_kwargs["api_key_env"], "MY_KEY")
+        self.assertEqual(call_kwargs["backend"], "remote")
+        self.assertNotIn("api_key", call_kwargs)
+
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
+    def test_raw_api_key_flag_is_rejected(self, mock_config_class):
+        """Secrets are never accepted on the command line."""
+        result = CliRunner().invoke(cli, ["--api-key", "my-test-key", "doctor"])
+
+        self.assertNotEqual(result.exit_code, 0)
+        mock_config_class.assert_not_called()
 
     @patch("hackagent.interfaces.cli.main.CLIConfig")
     @patch("hackagent.interfaces.cli.main._launch_tui_default")
@@ -143,7 +155,6 @@ class TestCLIDoctor(unittest.TestCase):
         mock_config = MagicMock()
         mock_config.api_key = None
         mock_config.settings = Settings.resolve(
-            api_key="",
             env={},
             config_path="/nonexistent-hackagent-doctor-config",
         )
@@ -164,6 +175,7 @@ class TestCLIDoctor(unittest.TestCase):
         mock_config.base_url = "https://api.hackagent.dev"
         mock_config.settings = Settings.resolve(
             api_key="a-very-long-api-key-that-is-valid",
+            backend="remote",
             base_url="https://api.hackagent.dev",
             env={},
             config_path="/nonexistent-hackagent-doctor-config",
@@ -208,7 +220,7 @@ class TestCLIInit(unittest.TestCase):
         mock_prompt,
         mock_splash,
     ):
-        """Test init captures API key when remote mode is enabled."""
+        """Init selects the remote backend but never asks for the key."""
         mock_config = MagicMock()
         mock_config.api_key = None
         mock_config.base_url = "https://api.hackagent.dev"
@@ -221,13 +233,15 @@ class TestCLIInit(unittest.TestCase):
         # Prompt order in init:
         # 1) API key, 2) verbosity level
         mock_confirm.return_value = True
-        mock_prompt.side_effect = ["test-api-key", 2]
+        mock_prompt.side_effect = [2]
 
         runner = CliRunner()
         result = runner.invoke(cli, ["init"])
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(mock_config.api_key, "test-api-key")
+        mock_config.set_user_override.assert_any_call("backend", "remote")
+        self.assertIsNone(mock_config.api_key)
+        self.assertIn("HACKAGENT_API_KEY is not set", result.output)
         self.assertEqual(mock_config.base_url, "https://api.hackagent.dev")
         self.assertEqual(mock_config.verbose, 2)
         mock_config.save.assert_called_once()
@@ -237,14 +251,14 @@ class TestCLIInit(unittest.TestCase):
     @patch("hackagent.interfaces.cli.main.click.prompt")
     @patch("hackagent.interfaces.cli.main.click.confirm")
     @patch("hackagent.interfaces.cli.main.CLIConfig")
-    def test_init_local_mode_clears_api_key(
+    def test_init_local_mode_selects_local_backend(
         self,
         mock_config_class,
         mock_confirm,
         mock_prompt,
         mock_splash,
     ):
-        """Test init local mode clears any existing API key from config."""
+        """A key in the environment does not stop init choosing local."""
         mock_config = MagicMock()
         mock_config.api_key = "existing-key"
         mock_config.base_url = "https://api.hackagent.dev"
@@ -262,7 +276,7 @@ class TestCLIInit(unittest.TestCase):
         result = runner.invoke(cli, ["init"])
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIsNone(mock_config.api_key)
+        mock_config.set_user_override.assert_any_call("backend", "local")
         self.assertEqual(mock_config.verbose, 1)
         mock_config.save.assert_called_once()
         mock_splash.assert_called_once()

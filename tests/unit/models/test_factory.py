@@ -27,7 +27,7 @@ def basic_config():
 
 def _settings(api_key=None, base_url="https://api.hackagent.dev"):
     return Settings.resolve(
-        api_key=api_key or "",
+        api_key=api_key,
         base_url=base_url,
         env={},
         config_path="/nonexistent/hackagent/config.json",
@@ -62,11 +62,26 @@ class TestSpecFromConfig:
         assert spec.api_key == "sk-literal"
         assert spec.api_key_env is None
 
-    def test_api_key_naming_a_set_env_var(self, basic_config):
+    def test_api_key_naming_a_set_env_var_is_still_a_value(self, basic_config):
         basic_config["api_key"] = "MY_API_KEY_VAR"
         with patch.dict("os.environ", {"MY_API_KEY_VAR": "env-value-123"}):
             spec = spec_from_config(basic_config)
-            assert spec.api_key_env == "MY_API_KEY_VAR"
+            assert spec.api_key == "MY_API_KEY_VAR"
+            assert spec.api_key_env is None
+
+    def test_api_key_env_is_a_reference(self, basic_config):
+        basic_config["api_key_env"] = "MY_API_KEY_VAR"
+        spec = spec_from_config(basic_config)
+        assert spec.api_key_env == "MY_API_KEY_VAR"
+        assert spec.api_key is None
+
+    def test_api_key_and_api_key_env_conflict(self, basic_config):
+        from hackagent.core.credentials import CredentialError
+
+        basic_config["api_key"] = "k"
+        basic_config["api_key_env"] = "K"
+        with pytest.raises(CredentialError, match="not both"):
+            spec_from_config(basic_config)
 
     def test_api_key_from_agent_metadata(self, basic_config):
         basic_config["agent_metadata"] = {"api_key": "override-key"}
@@ -172,7 +187,7 @@ class TestModelFactoryCredentials:
         )
         assert factory.with_credentials(spec) is spec
 
-    def test_local_mode_adds_nothing(self):
+    def test_no_platform_key_adds_nothing(self):
         factory = ModelFactory(_settings())
         spec = ModelSpec(identifier="judge", endpoint="https://api.hackagent.dev/v1")
         assert not factory.is_gateway(spec.endpoint)

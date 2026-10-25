@@ -12,6 +12,8 @@ import httpx
 import numpy as np
 import pytest
 
+from hackagent.core.credentials import CredentialError
+
 try:  # openai >= 3 ships its own httpx fork and no longer uses httpx directly.
     import httpx2
 except ImportError:  # pragma: no cover - depends on the installed openai major
@@ -92,15 +94,17 @@ def test_every_openai_spelling_selects_the_openai_transport(agent_type):
 
 
 @pytest.mark.parametrize(
-    ("configured", "expected"),
+    ("credentials", "expected"),
     [
-        ("explicit-key", "explicit-key"),
-        ("EMBEDDING_KEY", "environment-key"),
-        ("${EMBEDDING_KEY}", "environment-key"),
-        (None, "openai-key"),
+        ({"api_key": "explicit-key"}, "explicit-key"),
+        # A value is never guessed to be a variable name.
+        ({"api_key": "EMBEDDING_KEY"}, "EMBEDDING_KEY"),
+        ({"api_key": "${EMBEDDING_KEY}"}, "${EMBEDDING_KEY}"),
+        ({"api_key_env": "EMBEDDING_KEY"}, "environment-key"),
+        ({}, "openai-key"),
     ],
 )
-def test_openai_keys(configured, expected):
+def test_openai_keys(credentials, expected):
     with patch.dict(
         "os.environ",
         {"EMBEDDING_KEY": "environment-key", "OPENAI_API_KEY": "openai-key"},
@@ -110,7 +114,7 @@ def test_openai_keys(configured, expected):
             {
                 "identifier": "openai/text-embedding-3-small",
                 "agent_type": "OPENAI_SDK",
-                "api_key": configured,
+                **credentials,
             }
         )
     assert kwargs["api_key"] == expected
@@ -122,9 +126,13 @@ def test_no_storage_key_fallback_and_unset_env_reference():
     with patch.dict("os.environ", {"HACKAGENT_API_KEY": "storage-token"}, clear=True):
         kwargs = embedding_request_kwargs({"identifier": "text-embedding-3-small"})
         assert "api_key" not in kwargs
-        with pytest.raises(ValueError, match="is unset"):
+        with pytest.raises(CredentialError, match="MISSING_KEY"):
             embedding_request_kwargs(
-                {"identifier": "model", "api_key": "${MISSING_KEY}"}
+                {"identifier": "model", "api_key_env": "MISSING_KEY"}
+            )
+        with pytest.raises(CredentialError, match="not both"):
+            embedding_request_kwargs(
+                {"identifier": "model", "api_key": "k", "api_key_env": "K"}
             )
 
 

@@ -8,6 +8,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+from hackagent.core.credentials import CredentialError
+
 from hackagent.core.settings import Settings, Source
 from hackagent.orchestrator.campaign.spec import StorageSpec
 from hackagent.orchestrator.campaign.tracking import open_store
@@ -73,6 +77,41 @@ def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch)
         open_store(storage)
 
     connect.assert_called_once_with("https://other.example.test", "other-secret")
+
+
+def test_remote_storage_without_a_key_fails_instead_of_recording_locally(
+    monkeypatch,
+):
+    monkeypatch.delenv("HACKAGENT_API_KEY", raising=False)
+    with (
+        patch("hackagent.storage.local.LocalBackend") as local,
+        pytest.raises(CredentialError, match="HACKAGENT_API_KEY"),
+    ):
+        open_store(StorageSpec(backend="remote"), settings=_settings())
+
+    local.assert_not_called()
+
+
+def test_an_unset_storage_reference_never_falls_back_to_the_platform_key(
+    monkeypatch,
+):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "platform-secret")
+    monkeypatch.delenv("MISSING_STORAGE_KEY", raising=False)
+    storage = StorageSpec(backend="remote", api_key_env="MISSING_STORAGE_KEY")
+    with (
+        patch("hackagent.storage.remote.RemoteBackend.connect") as connect,
+        pytest.raises(CredentialError, match="MISSING_STORAGE_KEY"),
+    ):
+        open_store(storage, settings=_settings(api_key="platform-secret"))
+
+    connect.assert_not_called()
+
+
+def test_remote_storage_uses_the_platform_key_in_hand():
+    with patch("hackagent.storage.remote.RemoteBackend.connect") as connect:
+        open_store(StorageSpec(backend="remote"), settings=_settings(api_key="k"))
+
+    connect.assert_called_once_with("https://api.example.test", "k")
 
 
 def test_each_result_carries_what_the_dashboard_reads():

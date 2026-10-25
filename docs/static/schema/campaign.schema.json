@@ -1124,7 +1124,7 @@
       "properties": {
         "backend": {
           "default": "local",
-          "description": "``local`` writes to a SQLite file on this machine; ``remote`` sends results to the HackAgent server named below, authenticated with the key in the environment variable that ``api_key_env`` names.",
+          "description": "``local`` writes to a SQLite file on this machine; ``remote`` sends results to the HackAgent server. The backend is always chosen here, never inferred from which API keys happen to be set, and ``remote`` fails before the run starts if its key is missing.",
           "enum": [
             "local",
             "remote"
@@ -1142,7 +1142,7 @@
             }
           ],
           "default": null,
-          "description": "Address of the remote server. Required when ``backend`` is ``remote``.",
+          "description": "Address of the remote server. Defaults to ``HACKAGENT_BASE_URL`` or the hosted service.",
           "title": "Base Url"
         },
         "api_key_env": {
@@ -1155,7 +1155,7 @@
             }
           ],
           "default": null,
-          "description": "Name of the environment variable holding the remote server's API key. Required when ``backend`` is ``remote``.",
+          "description": "Name of the environment variable holding the remote server's API key. Defaults to ``HACKAGENT_API_KEY``. The key itself never goes in the campaign file.",
           "title": "Api Key Env"
         }
       },

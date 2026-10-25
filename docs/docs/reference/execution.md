@@ -65,9 +65,9 @@ Where results are recorded so they can be browsed later.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `backend` | one of `local`, `remote` | `local` | `local` writes to a SQLite file on this machine; `remote` sends results to the HackAgent server named below, authenticated with the key in the environment variable that `api_key_env` names. |
-| `base_url` | string | unset | Address of the remote server. Required when `backend` is `remote`. |
-| `api_key_env` | string | unset | Name of the environment variable holding the remote server's API key. Required when `backend` is `remote`. |
+| `backend` | one of `local`, `remote` | `local` | `local` writes to a SQLite file on this machine; `remote` sends results to the HackAgent server. The backend is always chosen here, never inferred from which API keys happen to be set, and `remote` fails before the run starts if its key is missing. |
+| `base_url` | string | unset | Address of the remote server. Defaults to `HACKAGENT_BASE_URL` or the hosted service. |
+| `api_key_env` | string | unset | Name of the environment variable holding the remote server's API key. Defaults to `HACKAGENT_API_KEY`. The key itself never goes in the campaign file. |
 
 ## Examples
 

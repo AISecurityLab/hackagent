@@ -137,12 +137,15 @@ def test_main_cli_passes_its_remote_settings_to_the_campaign_runner():
     with (
         patch("hackagent.orchestrator.campaign.load_campaign", return_value=_spec()),
         patch("hackagent.orchestrator.campaign.run_campaign", side_effect=fake_run),
+        patch.dict("os.environ", {"DASHBOARD_KEY": "dashboard-key"}),
     ):
         result = runner.invoke(
             cli,
             [
-                "--api-key",
-                "dashboard-key",
+                "--api-key-env",
+                "DASHBOARD_KEY",
+                "--backend",
+                "remote",
                 "--base-url",
                 "https://api.example.test",
                 "campaign",
@@ -155,6 +158,7 @@ def test_main_cli_passes_its_remote_settings_to_the_campaign_runner():
 
     assert result.exit_code == 0, result.output
     assert captured["settings"].api_key == "dashboard-key"
+    assert captured["settings"].backend.value == "remote"
     assert captured["settings"].base_url == "https://api.example.test"
 
 
