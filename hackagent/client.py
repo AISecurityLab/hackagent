@@ -13,6 +13,7 @@ types re-exported from :mod:`hackagent`.
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 from dataclasses import dataclass
 from functools import lru_cache
@@ -268,6 +269,35 @@ def catalog_entries() -> List[Dict[str, Any]]:
             }
         )
     return entries
+
+
+@lru_cache(maxsize=1)
+def _technique_catalog() -> List[Dict[str, Any]]:
+    from hackagent.attacks.techniques.registry import get_attack_class, params_schema
+
+    entries: List[Dict[str, Any]] = []
+    for entry in catalog_entries():
+        attack_id = entry["attack_type"]
+        params_type = get_attack_class(attack_id).params_type
+        required = frozenset(params_type.REQUIRED_ROLES)
+        entries.append(
+            {
+                **copy.deepcopy(entry),
+                "params_schema": params_schema(attack_id),
+                "required_roles": sorted(required),
+                "optional_roles": sorted(params_type.role_names() - required),
+            }
+        )
+    return entries
+
+
+def technique_catalog() -> List[Dict[str, Any]]:
+    """Every technique with its parameter schema and auxiliary-model roles.
+
+    Consumers build attack forms from this instead of hardcoding them. The
+    result is a fresh copy, so callers may mutate it freely.
+    """
+    return copy.deepcopy(_technique_catalog())
 
 
 def catalog_by_id() -> Dict[str, Dict[str, Any]]:
