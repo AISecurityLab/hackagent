@@ -68,7 +68,31 @@ def _format_trace_block(
     step_name = content.get("step_name", "")
     has_goal = "goal" in content and "attack_type" in content
 
-    if has_goal and not step_name:
+    data = content.get("data") or {}
+    if content.get("node") == "call" and data.get("role") == "tool":
+        request = data.get("request") or {}
+        response = data.get("response") or {}
+        header = f"  [bold cyan]{_step_num_circle(step_num)} 🔗 TOOL CHAIN[/bold cyan]{ts_str}"
+        body = f"  [dim]│[/dim]  [bold]{_escape(request.get('name', 'tool'))}[/bold]\n"
+        for label, value in (
+            ("Arguments", request.get("arguments", "<not retained>")),
+            ("Result", response.get("result", "<not retained>")),
+            ("State before", response.get("state_before", "<not retained>")),
+            ("State after", response.get("state_after", "<not retained>")),
+        ):
+            body += f"  [dim]│[/dim]  {label}: {_escape(str(value))}\n"
+        if content.get("error"):
+            body += f"  [dim]│[/dim]  [red]{_escape(str(content['error']))}[/red]\n"
+    elif (
+        content.get("node") == "artifact"
+        and content.get("label") == "chain-verification"
+    ):
+        header = f"  [bold cyan]{_step_num_circle(step_num)} 🔗 CHAIN VERIFICATION[/bold cyan]{ts_str}"
+        status = "verified" if data.get("success") else "not verified"
+        body = f"  [dim]│[/dim]  {_escape(str(data.get('chain', '')))}: {status}\n"
+        body += f"  [dim]│[/dim]  Executed: {_escape(' → '.join(data.get('executed_tools', [])))}\n"
+        body += f"  [dim]│[/dim]  Completed: {data.get('completed_steps', 0)}/{data.get('total_steps', 0)}\n"
+    elif has_goal and not step_name:
         # ── Attack initialisation ──────────────────────────────────────────
         goal = content.get("goal", "")
         goal_index = content.get("goal_index", "?")

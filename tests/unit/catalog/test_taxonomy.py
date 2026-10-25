@@ -43,9 +43,9 @@ _ADAPTIVE = (
     "autodan_turbo",
     "tool_output_ipi",
 )
-_MULTI_TURN = ("crescendo",)
+_MULTI_TURN = ("crescendo", "stac")
 _MULTIMODAL = ("mml", "fc")
-_INDIRECT = ("rag", "tool_output_ipi")
+_INDIRECT = ("rag", "tool_output_ipi", "stac")
 _RAG = ("rag",)
 
 
