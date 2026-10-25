@@ -44,9 +44,9 @@ _ADAPTIVE = (
     "tool_output_ipi",
     "toolhijacker",
 )
-_MULTI_TURN = ("crescendo",)
+_MULTI_TURN = ("crescendo", "stac")
 _MULTIMODAL = ("mml", "fc")
-_INDIRECT = ("rag", "tool_output_ipi", "toolhijacker")
+_INDIRECT = ("rag", "tool_output_ipi", "toolhijacker", "stac")
 _RAG = ("rag",)
 
 

@@ -122,6 +122,7 @@ ATTACK_TAXONOMY: Mapping[str, AttackTaxonomy] = {
     "toolhijacker": _entry(AttackCategory.ADAPTIVE, AttackTag.INDIRECT),
     # Multi-turn — one growing conversation with the target.
     "crescendo": _entry(AttackCategory.MULTI_TURN),
+    "stac": _entry(AttackCategory.MULTI_TURN, AttackTag.INDIRECT),
 }
 
 
@@ -146,6 +147,7 @@ AttackId = Literal[
     "tool_output_ipi",
     "toolhijacker",
     "crescendo",
+    "stac",
 ]
 
 ATTACK_IDS: Tuple[str, ...] = get_args(AttackId)
