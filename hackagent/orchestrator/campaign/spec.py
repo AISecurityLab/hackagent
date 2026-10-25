@@ -481,6 +481,12 @@ def _is_credential_name(name: str) -> bool:
     return not normalized.endswith("_env") and bool(_CREDENTIAL_NAME.search(normalized))
 
 
+def recorded_model(model: ModelConfig) -> dict[str, Any]:
+    """One model's config as it is stored, credentials redacted as
+    :meth:`CampaignSpec.recorded` redacts them."""
+    return _redacted(model.model_dump(mode="json", exclude_none=True))
+
+
 def _redacted(value: Any) -> Any:
     """A dumped campaign with every credential it spells out replaced.
 
@@ -549,4 +555,5 @@ __all__ = [
     "ScoringSpec",
     "StorageSpec",
     "campaign_json_schema",
+    "recorded_model",
 ]

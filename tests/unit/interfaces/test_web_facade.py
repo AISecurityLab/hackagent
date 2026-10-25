@@ -32,7 +32,14 @@ class TestWebReadsThroughFacade(unittest.TestCase):
 
         self.store = RecordingStore()
         self.agent = self.store.create_or_update_agent(
-            "demo-agent", "OPENAI_SDK", "http://localhost:1234", {"description": "d"}
+            "demo-agent",
+            {
+                "connection": {
+                    "type": "OPENAI_SDK",
+                    "endpoint": "http://localhost:1234",
+                },
+                "generation": {"description": "d"},
+            },
         )
         attack = self.store.create_attack(
             "pair", self.agent.id, self.store.context.org_id, {"goals": ["g"]}

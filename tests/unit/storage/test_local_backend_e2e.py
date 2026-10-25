@@ -51,10 +51,14 @@ class TestLocalBackendFullWorkflow(unittest.TestCase):
 
         # 2. Agent
         agent = self.backend.create_or_update_agent(
-            name="target-llm",
-            agent_type="LITELLM",
-            endpoint="http://localhost:11434/v1",
-            metadata={"model": "tinyllama", "temperature": 0.8},
+            "target-llm",
+            {
+                "connection": {
+                    "type": "LITELLM",
+                    "endpoint": "http://localhost:11434/v1",
+                },
+                "generation": {"model": "tinyllama", "temperature": 0.8},
+            },
         )
         self.assertIsInstance(agent, AgentRecord)
         self.assertEqual(agent.name, "target-llm")
@@ -183,7 +187,7 @@ class TestLocalBackendMultipleAttacks(unittest.TestCase):
     def test_runs_isolated_per_attack(self):
         ctx = self.backend.get_context()
         agent = self.backend.create_or_update_agent(
-            "agent", "LITELLM", "http://localhost", {}
+            "agent", {"connection": {"type": "LITELLM", "endpoint": "http://localhost"}}
         )
 
         atk_a = self.backend.create_attack("flipattack", agent.id, ctx.org_id, {})
@@ -212,7 +216,8 @@ class TestLocalBackendConcurrentWorkflow(unittest.TestCase):
     def test_parallel_result_evaluation(self):
         ctx = self.backend.get_context()
         agent = self.backend.create_or_update_agent(
-            "worker-agent", "LITELLM", "http://localhost", {}
+            "worker-agent",
+            {"connection": {"type": "LITELLM", "endpoint": "http://localhost"}},
         )
         attack = self.backend.create_attack("tap", agent.id, ctx.org_id, {})
         run = self.backend.create_run(attack.id, agent.id, {})
@@ -277,10 +282,11 @@ class TestLocalBackendAgentIdempotency(unittest.TestCase):
         ids = set()
         for _ in range(5):
             rec = self.backend.create_or_update_agent(
-                name="stable-agent",
-                agent_type="LITELLM",
-                endpoint="http://localhost",
-                metadata={"pass": _},
+                "stable-agent",
+                {
+                    "connection": {"type": "LITELLM", "endpoint": "http://localhost"},
+                    "generation": {"pass": _},
+                },
             )
             ids.add(rec.id)
 
@@ -290,15 +296,16 @@ class TestLocalBackendAgentIdempotency(unittest.TestCase):
         agents = self.backend.list_agents()
         self.assertEqual(agents.total, 1)
 
-    def test_metadata_accumulates(self):
+    def test_config_is_replaced(self):
         self.backend.create_or_update_agent(
-            "meta-agent", "LITELLM", "http://localhost", {"k1": "v1"}
+            "meta-agent",
+            {"connection": {"type": "LITELLM"}, "generation": {"k1": "v1"}},
         )
         rec = self.backend.create_or_update_agent(
-            "meta-agent", "LITELLM", "http://localhost", {"k2": "v2"}
+            "meta-agent",
+            {"connection": {"type": "LITELLM"}, "generation": {"k2": "v2"}},
         )
-        self.assertEqual(rec.metadata.get("k1"), "v1")
-        self.assertEqual(rec.metadata.get("k2"), "v2")
+        self.assertEqual(rec.metadata["generation"], {"k2": "v2"})
 
 
 class TestLocalBackendPersistence(unittest.TestCase):
@@ -313,7 +320,11 @@ class TestLocalBackendPersistence(unittest.TestCase):
         b1 = LocalBackend(db_path=self.db_path)
         ctx = b1.get_context()
         agent = b1.create_or_update_agent(
-            "persistent-agent", "OPENAI_SDK", "http://localhost", {"key": "val"}
+            "persistent-agent",
+            {
+                "connection": {"type": "OPENAI_SDK", "endpoint": "http://localhost"},
+                "generation": {"key": "val"},
+            },
         )
         attack = b1.create_attack("bon", agent.id, ctx.org_id, {"n": 10})
         run = b1.create_run(attack.id, agent.id, {"cfg": True})

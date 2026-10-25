@@ -199,11 +199,7 @@ async def arun_campaign(
     campaign_record = None
     try:
         agent_id = register_target(store, resolved.spec.target)
-        campaign_record = store.create_campaign_run(
-            agent_id,
-            spec.campaign.name,
-            recorded_spec,
-        )
+        campaign_record = store.start_campaign(agent_id, recorded_spec)
         store.update_campaign_run(campaign_record.id, status=RunStatus.RUNNING.value)
 
         if spec.execution.preflight:

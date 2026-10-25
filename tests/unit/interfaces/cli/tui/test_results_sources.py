@@ -30,10 +30,8 @@ def _session(db_path: str, *, campaign: str = "") -> HackAgent:
     store = LocalBackend(db_path=db_path)
     if campaign:
         agent = store.create_or_update_agent(
-            name="target",
-            agent_type="OPENAI_SDK",
-            endpoint="http://host/v1",
-            metadata={},
+            "target",
+            {"connection": {"type": "OPENAI_SDK", "endpoint": "http://host/v1"}},
         )
         attack = store.create_attack(
             attack_type="baseline",
@@ -41,7 +39,9 @@ def _session(db_path: str, *, campaign: str = "") -> HackAgent:
             organization=store.get_context().org_id,
             configuration={},
         )
-        run_of_campaign = store.create_campaign_run(agent.id, campaign, {})
+        run_of_campaign = store.start_campaign(
+            agent.id, {"campaign": {"name": campaign}}
+        )
         run = store.create_run(
             attack.id, agent.id, {"expected_total_goals": 1}, run_of_campaign.id
         )

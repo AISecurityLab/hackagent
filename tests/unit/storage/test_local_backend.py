@@ -129,10 +129,11 @@ class TestLocalBackendAgent(unittest.TestCase):
 
     def _create_agent(self, name="my-agent") -> AgentRecord:
         return self.backend.create_or_update_agent(
-            name=name,
-            agent_type="LITELLM",
-            endpoint="http://localhost:8000",
-            metadata={"model": "gpt-4o-mini"},
+            name,
+            {
+                "connection": {"type": "LITELLM", "endpoint": "http://localhost:8000"},
+                "generation": {"model": "gpt-4o-mini"},
+            },
         )
 
     def test_create_agent_returns_record(self):
@@ -141,7 +142,7 @@ class TestLocalBackendAgent(unittest.TestCase):
         self.assertEqual(rec.name, "my-agent")
         self.assertEqual(rec.agent_type, "LITELLM")
         self.assertEqual(rec.endpoint, "http://localhost:8000")
-        self.assertEqual(rec.metadata["model"], "gpt-4o-mini")
+        self.assertEqual(rec.metadata["generation"], {"model": "gpt-4o-mini"})
         self.assertEqual(rec.owner, "local")
         self.assertIsInstance(rec.id, UUID)
         self.assertIsInstance(rec.created_at, datetime)
@@ -156,28 +157,25 @@ class TestLocalBackendAgent(unittest.TestCase):
         rec2 = self._create_agent("duplicate")
         self.assertEqual(rec1.id, rec2.id)
 
-    def test_update_agent_merges_metadata(self):
+    def test_update_agent_replaces_the_config(self):
         self._create_agent()
         rec2 = self.backend.create_or_update_agent(
-            name="my-agent",
-            agent_type="LITELLM",
-            endpoint="http://localhost:8000",
-            metadata={"temperature": 0.5},
+            "my-agent",
+            {
+                "connection": {"type": "OLLAMA", "endpoint": "http://localhost:11434"},
+                "generation": {"temperature": 0.5},
+            },
         )
-        # merged: original model + new temperature
-        self.assertIn("model", rec2.metadata)
-        self.assertIn("temperature", rec2.metadata)
+        self.assertEqual(rec2.agent_type, "OLLAMA")
+        self.assertEqual(rec2.endpoint, "http://localhost:11434")
+        self.assertEqual(rec2.metadata["generation"], {"temperature": 0.5})
+        self.assertEqual(self.backend.get_agent(rec2.id), rec2)
 
-    def test_update_agent_no_overwrite(self):
-        self._create_agent()
-        rec2 = self.backend.create_or_update_agent(
-            name="my-agent",
-            agent_type="LITELLM",
-            endpoint="http://localhost:8000",
-            metadata={"new_key": "new_val"},
-            overwrite_metadata=False,
+    def test_agent_without_endpoint(self):
+        rec = self.backend.create_or_update_agent(
+            "hosted", {"connection": {"type": "OPENAI"}}
         )
-        self.assertNotIn("new_key", rec2.metadata)
+        self.assertEqual(rec.endpoint, "")
 
     def test_list_agents_empty(self):
         result = self.backend.list_agents()
@@ -231,10 +229,8 @@ class TestLocalBackendAttack(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.backend = _make_backend(self.tmp)
         self.agent = self.backend.create_or_update_agent(
-            name="test-agent",
-            agent_type="LITELLM",
-            endpoint="http://localhost:8000",
-            metadata={},
+            "test-agent",
+            {"connection": {"type": "LITELLM", "endpoint": "http://localhost:8000"}},
         )
 
     def test_create_attack(self):
@@ -271,16 +267,23 @@ class TestLocalBackendCampaignRun(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.backend = _make_backend(self.tmp)
         self.agent = self.backend.create_or_update_agent(
-            "campaign-target", "OPENAI_SDK", "http://localhost:8000/v1", {}
+            "campaign-target",
+            {
+                "connection": {
+                    "type": "OPENAI_SDK",
+                    "endpoint": "http://localhost:8000/v1",
+                }
+            },
         )
 
     def test_campaign_run_round_trip(self):
-        record = self.backend.create_campaign_run(
+        record = self.backend.start_campaign(
             self.agent.id,
-            "safety campaign",
             {"version": 1, "campaign": {"name": "safety campaign"}},
         )
         self.assertIsInstance(record, CampaignRunRecord)
+        self.assertEqual(record.name, "safety campaign")
+        self.assertEqual(record.status, "RUNNING")
 
         audit = {"samples": 2, "passed": True, "judges": []}
         updated = self.backend.update_campaign_run(
@@ -293,8 +296,8 @@ class TestLocalBackendCampaignRun(unittest.TestCase):
         self.assertEqual(self.backend.list_campaign_runs().items, [updated])
 
     def test_attack_run_has_a_real_campaign_foreign_key(self):
-        campaign_run = self.backend.create_campaign_run(
-            self.agent.id, "campaign", {"version": 1}
+        campaign_run = self.backend.start_campaign(
+            self.agent.id, {"version": 1, "campaign": {"name": "campaign"}}
         )
         attack = self.backend.create_attack(
             "baseline", self.agent.id, self.backend.get_context().org_id, {}
@@ -319,10 +322,8 @@ class TestLocalBackendRun(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.backend = _make_backend(self.tmp)
         self.agent = self.backend.create_or_update_agent(
-            name="test-agent",
-            agent_type="LITELLM",
-            endpoint="http://localhost:8000",
-            metadata={},
+            "test-agent",
+            {"connection": {"type": "LITELLM", "endpoint": "http://localhost:8000"}},
         )
         org = self.backend.get_context().org_id
         self.attack = self.backend.create_attack("flipattack", self.agent.id, org, {})
@@ -403,7 +404,7 @@ class TestLocalBackendResult(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.backend = _make_backend(self.tmp)
         agent = self.backend.create_or_update_agent(
-            "agent", "LITELLM", "http://localhost", {}
+            "agent", {"connection": {"type": "LITELLM", "endpoint": "http://localhost"}}
         )
         org = self.backend.get_context().org_id
         attack = self.backend.create_attack("tap", agent.id, org, {})
@@ -501,7 +502,7 @@ class TestLocalBackendTrace(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.backend = _make_backend(self.tmp)
         agent = self.backend.create_or_update_agent(
-            "agent", "LITELLM", "http://localhost", {}
+            "agent", {"connection": {"type": "LITELLM", "endpoint": "http://localhost"}}
         )
         org = self.backend.get_context().org_id
         attack = self.backend.create_attack("bon", agent.id, org, {})
@@ -540,7 +541,8 @@ class TestLocalBackendTrace(unittest.TestCase):
         """Traces from different results don't bleed into each other."""
         # Create a second result
         agent = self.backend.create_or_update_agent(
-            "agent2", "LITELLM", "http://localhost", {}
+            "agent2",
+            {"connection": {"type": "LITELLM", "endpoint": "http://localhost"}},
         )
         org = self.backend.get_context().org_id
         atk = self.backend.create_attack("x", agent.id, org, {})
@@ -565,7 +567,7 @@ class TestLocalBackendDeleteAndBuckets(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.backend = _make_backend(self.tmp)
         self.agent = self.backend.create_or_update_agent(
-            "agent", "LITELLM", "http://localhost", {}
+            "agent", {"connection": {"type": "LITELLM", "endpoint": "http://localhost"}}
         )
         org = self.backend.get_context().org_id
         self.attack = self.backend.create_attack("pair", self.agent.id, org, {})
@@ -693,10 +695,13 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
                 def create(i):
                     try:
                         backend.create_or_update_agent(
-                            name=f"agent-{i}",
-                            agent_type="LITELLM",
-                            endpoint="http://localhost",
-                            metadata={},
+                            f"agent-{i}",
+                            {
+                                "connection": {
+                                    "type": "LITELLM",
+                                    "endpoint": "http://localhost",
+                                }
+                            },
                         )
                     except Exception as e:
                         errors.append(e)
@@ -720,7 +725,8 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
             backend = _make_backend(tmp)
             try:
                 agent = backend.create_or_update_agent(
-                    "agent", "LITELLM", "http://localhost", {}
+                    "agent",
+                    {"connection": {"type": "LITELLM", "endpoint": "http://localhost"}},
                 )
                 org = backend.get_context().org_id
                 attack = backend.create_attack("x", agent.id, org, {})

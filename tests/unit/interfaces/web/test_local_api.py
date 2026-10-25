@@ -37,7 +37,14 @@ class _WebUITestCase(unittest.TestCase):
         self.backend = LocalBackend(str(root / "hackagent.db"))
         self.org_id = self.backend.get_context().org_id
         self.agent = self.backend.create_or_update_agent(
-            "demo-agent", "OPENAI_SDK", "http://localhost:1234", {"description": "d"}
+            "demo-agent",
+            {
+                "connection": {
+                    "type": "OPENAI_SDK",
+                    "endpoint": "http://localhost:1234",
+                },
+                "generation": {"description": "d"},
+            },
         )
         self.attack = self.backend.create_attack(
             "tap", self.agent.id, self.org_id, {"goals": ["g"]}
