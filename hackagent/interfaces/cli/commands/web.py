@@ -5,9 +5,9 @@
 ``hackagent web`` — serve the HackAgent dashboard locally.
 
 Serves the bundled single-page app (the same one hosted at app.hackagent.dev)
-from this process. With an API key configured its API calls are proxied to the
-hosted API, with the key attached server-side; without one they are answered
-read-only from the local SQLite store.
+from this process. With the ``remote`` storage backend its API calls are proxied
+to the hosted API, with the key attached server-side; with ``local`` (the
+default) they are answered read-only from the local SQLite store.
 """
 
 import os
@@ -130,7 +130,7 @@ def _open_browser_when_up(url: str, host: str, port: int, timeout: float = 15.0)
     "force_local",
     is_flag=True,
     default=False,
-    help="Read from the local database even when an API key is configured.",
+    help="Read from the local database even when the remote backend is configured.",
 )
 @click.option(
     "--no-browser",
@@ -142,18 +142,22 @@ def _open_browser_when_up(url: str, host: str, port: int, timeout: float = 15.0)
 def web(ctx, host, port, db_path, force_local, no_browser):
     """🌐 Launch the web dashboard.
 
-    With an API key configured, the dashboard shows your hosted HackAgent data;
-    the key stays in this process and is never exposed to the browser. Without
-    one, it shows the runs recorded in your local database (read-only).
+    With ``--backend remote``, the dashboard shows your hosted HackAgent data;
+    the key stays in this process and is never exposed to the browser. With
+    the default local backend, it shows the runs recorded in your local
+    database (read-only).
 
     \b
     Examples:
       hackagent web                    # http://127.0.0.1:7860 (default)
       hackagent web --port 8080        # custom port
-      hackagent web --local            # ignore the API key, read local runs
+      hackagent web --local            # force the local backend
       hackagent web --no-browser       # skip opening a browser tab
     """
-    from hackagent import HackAgent, Settings
+    from dataclasses import replace
+
+    from hackagent import HackAgent
+    from hackagent.core.settings import Mode
     from hackagent.interfaces.cli.config import CLIConfig
 
     try:
@@ -167,11 +171,12 @@ def web(ctx, host, port, db_path, force_local, no_browser):
         return
 
     cli_config: CLIConfig = ctx.obj["config"]
-    api_key = "" if force_local or not cli_config.api_key else cli_config.api_key
-    resolve_kwargs = {"api_key": api_key, "base_url": cli_config.base_url}
+    settings = cli_config.settings
+    if force_local:
+        settings = replace(settings, backend=Mode.LOCAL)
     if db_path:
-        resolve_kwargs["db_path"] = db_path
-    session = HackAgent(Settings.resolve(**resolve_kwargs))
+        settings = replace(settings, db_path=db_path)
+    session = HackAgent(settings)
 
     try:
         app = create_app(session)
@@ -186,7 +191,7 @@ def web(ctx, host, port, db_path, force_local, no_browser):
     console.print()
     console.print("[bold]🌐  HackAgent Dashboard[/bold]")
     console.print(f"    [cyan]→  {url}[/cyan]")
-    if session.settings.api_key:
+    if session.settings.mode is Mode.REMOTE:
         console.print("    Mode : [cyan]remote[/cyan]")
         console.print(f"    API  : [dim]{app.config['HACKAGENT_TARGET']}[/dim]")
     else:

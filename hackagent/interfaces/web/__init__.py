@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional
 
 from flask import Flask, Response, jsonify, send_from_directory
 
+from hackagent.core.settings import Mode
 from hackagent.interfaces.web._static import (
     bundle_source,
     bundle_version,
@@ -105,7 +106,8 @@ def create_app(client) -> Flask:
 
     Args:
         client: a :class:`hackagent.client.HackAgent` session. A configured
-            API key selects remote proxy mode. Otherwise calls are answered
+            ``remote`` storage backend selects remote proxy mode (its
+            settings carry the validated API key). Otherwise calls are answered
             from the session's local store. ``delete_run`` is the one local
             write; other writes stay unavailable.
 
@@ -122,7 +124,7 @@ def create_app(client) -> Flask:
 
     app = Flask(__name__, static_folder=None)
 
-    if client.settings.api_key:
+    if client.settings.mode is Mode.REMOTE:
         from hackagent.interfaces.web._proxy import create_proxy
 
         target = client.settings.base_url

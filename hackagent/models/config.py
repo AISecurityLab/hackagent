@@ -11,7 +11,6 @@ attack roles, and the judges. :class:`ModelConnection` and
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, Mapping, Optional
 
 from pydantic import (
@@ -24,6 +23,7 @@ from pydantic import (
 )
 
 from hackagent.core.contracts import AgentType
+from hackagent.core.credentials import resolve_api_key
 
 __all__ = [
     "ConnectionSpec",
@@ -247,17 +247,12 @@ class ModelConnection(BaseModel):
             exclude={"api_key", "api_key_env", "extra_headers"},
             exclude_none=True,
         )
-        if self.api_key is not None:
-            kwargs["api_key"] = self.api_key.get_secret_value()
-        elif self.api_key_env:
-            try:
-                api_key = os.environ[self.api_key_env]
-            except KeyError as exc:
-                raise ValueError(
-                    f"Environment variable '{self.api_key_env}' is not set."
-                ) from exc
-            if not api_key.strip():
-                raise ValueError(f"Environment variable '{self.api_key_env}' is empty.")
+        api_key = resolve_api_key(
+            None if self.api_key is None else self.api_key.get_secret_value(),
+            self.api_key_env,
+            purpose="Model API key",
+        )
+        if api_key is not None:
             kwargs["api_key"] = api_key
         if self.extra_headers:
             kwargs["extra_headers"] = dict(self.extra_headers)

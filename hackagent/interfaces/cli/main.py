@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.traceback import install
 
 from hackagent._version import get_version
+from hackagent.core.credentials import CredentialError
 from hackagent.interfaces.cli.commands import (
     campaign as campaign_cmd,
     datasets as datasets_cmd,
@@ -55,9 +56,17 @@ console = Console()
     "--config-file", type=click.Path(), help="Configuration file path (JSON/YAML)"
 )
 @click.option(
-    "--api-key",
+    "--api-key-env",
     default=None,
-    help="HackAgent API key (or set HACKAGENT_API_KEY env var)",
+    metavar="VARIABLE",
+    help="Name of the environment variable holding the HackAgent API key "
+    "(default: HACKAGENT_API_KEY)",
+)
+@click.option(
+    "--backend",
+    type=click.Choice(["local", "remote"]),
+    default=None,
+    help="Storage backend (default: local, or HACKAGENT_BACKEND)",
 )
 @click.option(
     "--base-url",
@@ -67,7 +76,7 @@ console = Console()
 @click.option("--verbose", "-v", count=True, help="Increase verbosity (-v, -vv, -vvv)")
 @click.version_option(version=get_version(), prog_name="hackagent")
 @click.pass_context
-def cli(ctx, config_file, api_key, base_url, verbose):
+def cli(ctx, config_file, api_key_env, backend, base_url, verbose):
     ctx.ensure_object(dict)
 
     # Set debug mode based on environment variable
@@ -82,12 +91,18 @@ def cli(ctx, config_file, api_key, base_url, verbose):
     try:
         ctx.obj["config"] = CLIConfig(
             config_file=config_file,
-            api_key=api_key,
+            api_key_env=api_key_env,
+            backend=backend,
             base_url=base_url,
             verbose=verbose,
         )
     except Exception as e:
         console.print(f"[bold red]❌ Configuration Error: {e}")
+        if isinstance(e, CredentialError):
+            console.print(
+                "[dim]Export the API key variable, name another one with "
+                "--api-key-env, or use --backend local.[/dim]"
+            )
         ctx.exit(1)
 
     # Launch TUI by default if no subcommand is provided
@@ -125,40 +140,24 @@ def init(ctx):
         # Reload config from file to get the latest saved values
         cli_config.reload()
 
-    # Mode and API key setup
-    console.print("\n[cyan]☁️ Mode Configuration[/cyan]")
-    console.print("[green]Local mode (default):[/green] no API key required")
+    # Storage backend setup. API keys are never saved to the config file.
+    console.print("\n[cyan]☁️ Storage Backend[/cyan]")
+    console.print("[green]Local (default):[/green] results stay on this machine")
     console.print(
-        "[green]Remote mode:[/green] requires HackAgent API key for cloud sync"
+        "[green]Remote:[/green] results sync to the HackAgent platform; the API "
+        "key is read from the HACKAGENT_API_KEY environment variable"
     )
 
     use_remote = click.confirm(
-        "Enable remote mode (cloud sync)?",
-        default=False,
+        "Use remote storage (cloud sync)?",
+        default=cli_config.backend == "remote",
     )
-
-    if use_remote:
-        if cli_config.api_key:
-            console.print(
-                "[dim]Press Enter to keep your current API key from config/environment.[/dim]"
-            )
-
-        api_key_input = click.prompt(
-            "HackAgent API key",
-            default=cli_config.api_key or "",
-            hide_input=True,
-            show_default=False,
-        ).strip()
-
-        if api_key_input:
-            cli_config.api_key = api_key_input
-        else:
-            console.print(
-                "[yellow]⚠️ No API key provided. Falling back to local mode.[/yellow]"
-            )
-            cli_config.api_key = None
-    else:
-        cli_config.api_key = None
+    cli_config.set_user_override("backend", "remote" if use_remote else "local")
+    if use_remote and not cli_config.api_key:
+        console.print(
+            "[yellow]⚠️ HACKAGENT_API_KEY is not set. Export it before running: "
+            "remote storage fails without it.[/yellow]"
+        )
 
     # Verbosity level setup
     console.print("\n[cyan]🔊 Verbosity Level Configuration[/cyan]")
@@ -191,7 +190,7 @@ def init(ctx):
         try:
             from hackagent import HackAgent
 
-            session = HackAgent(cli_config.settings)
+            session = HackAgent(cli_config.settings, backend=object())
             existing_dot = session.ensure_graphviz(allow_download=False)
             if existing_dot:
                 console.print(
@@ -227,7 +226,7 @@ def init(ctx):
                 f"[dim]{graphviz_exc}[/dim]"
             )
 
-        if cli_config.api_key:
+        if cli_config.backend == "remote":
             console.print(
                 "[bold green]✅ Setup complete![/bold green] "
                 "[dim](Remote mode enabled: runs can sync to the HackAgent platform)[/dim]"
@@ -350,11 +349,14 @@ def doctor(ctx):
     else:
         console.print("[yellow]⚠️ No local database yet (will be created on first run)")
 
+    console.print("\n[cyan]🗄️ Storage Backend")
+    console.print(f"[green]{cli_config.backend}")
+
     console.print("\n[cyan]🔐 API Key")
     if report.api_key_set:
         console.print("[green]✅ API key is set")
     else:
-        console.print("[yellow]⚠️ API key not set")
+        console.print("[yellow]⚠️ API key not set (export HACKAGENT_API_KEY)")
 
     console.print("\n[cyan]📦 Dependencies")
     if report.pandas_available:

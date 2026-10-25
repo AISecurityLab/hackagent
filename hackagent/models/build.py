@@ -8,9 +8,10 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from hackagent.core.contracts import AgentType, ModelSpec
+from hackagent.core.credentials import CredentialError
 from hackagent.models.completions import LiteLLMModel
 from hackagent.models.config import ModelConfig, ModelConnection, ModelGeneration
 from hackagent.models.completions.litellm import (
@@ -26,16 +27,29 @@ class ModelCallError(RuntimeError):
     """A model gave no usable reply."""
 
 
-def build_model(config: ModelConfig, *, retries: int = 0) -> Model:
+def build_model(
+    config: ModelConfig, *, retries: int = 0, api_key: Optional[str] = None
+) -> Model:
     """Create the model client described by ``config``.
+
+    ``api_key`` is a secret value injected at runtime; it is held in memory
+    only and cannot be combined with ``config.connection.api_key_env``.
 
     No request is sent. An ``api_key_env`` that is not set fails here, so
     configuration errors surface before a run starts.
     """
     if retries < 0:
         raise ValueError("retries cannot be negative")
+    if api_key is not None and config.connection.api_key_env is not None:
+        raise CredentialError(
+            f"Model {config.name!r}: set either api_key or api_key_env, not both."
+        )
     provider = get_provider_config(config.connection.type)
-    model = _adapter_model(config) if provider is None else _litellm_model(config)
+    model = (
+        _adapter_model(config, api_key)
+        if provider is None
+        else _litellm_model(config, api_key)
+    )
     return RetryingModel(model, retries) if retries else model
 
 
@@ -113,17 +127,21 @@ async def embedder_is_reachable(
     return Reachability(True, latency_s=latency)
 
 
-def _litellm_model(config: ModelConfig) -> LiteLLMModel:
+def _litellm_model(config: ModelConfig, api_key: Optional[str] = None) -> LiteLLMModel:
     connection = config.connection
     provider = get_provider_config(connection.type)
     assert provider is not None
     endpoint = connection.endpoint
-    api_key = None
     api_key_env = connection.api_key_env
     if connection.type == AgentType.OLLAMA:
         endpoint = normalise_ollama_endpoint(endpoint)
-        api_key_env = None
-    elif connection.type == AgentType.OPENAI and endpoint and not api_key_env:
+        api_key = api_key_env = None
+    elif (
+        connection.type == AgentType.OPENAI
+        and endpoint
+        and not api_key_env
+        and api_key is None
+    ):
         # Self-hosted OpenAI-compatible servers accept any key, but the
         # client refuses to send a request without one.
         api_key = "not-needed"
@@ -166,7 +184,7 @@ def _native_model_classes() -> dict:
     }
 
 
-def _adapter_model(config: ModelConfig) -> Model:
+def _adapter_model(config: ModelConfig, api_key: Optional[str] = None) -> Model:
     """Agent types LiteLLM cannot speak (CLI agents, ADK, web…), each with a
     native :class:`Model` backend of its own."""
     native_models = _native_model_classes()
@@ -177,10 +195,10 @@ def _adapter_model(config: ModelConfig) -> Model:
             f"Unsupported agent type: {agent_type}. "
             f"Native backends: {supported}, plus the LiteLLM chat providers."
         )
-    return native_models[agent_type](_adapter_spec(config))
+    return native_models[agent_type](_adapter_spec(config, api_key))
 
 
-def _adapter_spec(config: ModelConfig) -> ModelSpec:
+def _adapter_spec(config: ModelConfig, api_key: Optional[str] = None) -> ModelSpec:
     """The :class:`ModelSpec` a non-LiteLLM backend is built from."""
     generation = config.generation.model_dump(exclude_none=True, exclude_defaults=True)
     fields = {
@@ -197,6 +215,7 @@ def _adapter_spec(config: ModelConfig) -> ModelSpec:
         identifier=config.name,
         endpoint=config.connection.endpoint,
         agent_type=config.connection.type,
+        api_key=api_key,
         api_key_env=config.connection.api_key_env,
         timeout=config.connection.timeout,
         extra=extra,

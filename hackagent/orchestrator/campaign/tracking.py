@@ -11,13 +11,13 @@ exchange), and the final run status.
 
 from __future__ import annotations
 
-import os
 from dataclasses import asdict
 from typing import Any, Mapping, Optional
 from uuid import UUID
 
 from hackagent.core.contracts import EvalStatus, RunStatus
-from hackagent.core.settings import Settings
+from hackagent.core.credentials import resolve_api_key
+from hackagent.core.settings import API_KEY_ENV, Settings, resolve_remote_base_url
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.results import (
     Attempt,
@@ -34,21 +34,32 @@ def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Sto
     """Open the store the campaign names.
 
     A campaign says where its results go, and nothing else decides it: the
-    default is this machine's SQLite, and ``remote`` names its own server
-    and the environment variable holding that server's key. ``settings``
-    supplies the database path the CLI or TUI resolved, so a run follows
-    the configuration they were started with.
+    default is this machine's SQLite whatever keys are set. ``remote`` uses
+    the shared credential rules: the variable ``api_key_env`` names, else the
+    platform key ``settings`` resolved (e.g. from ``--api-key-env``), else
+    ``HACKAGENT_API_KEY``. A missing or empty key is an error, never a switch
+    to local storage. ``settings`` also supplies the database path and base
+    URL the CLI or TUI resolved, so a run follows the configuration they
+    were started with.
     """
     if storage.backend == "remote":
         from hackagent.storage.remote import RemoteBackend
 
-        assert storage.base_url and storage.api_key_env  # enforced by StorageSpec
-        api_key = os.environ.get(storage.api_key_env, "").strip()
-        if not api_key:
-            raise ValueError(
-                f"Environment variable {storage.api_key_env!r} required for remote storage is not set."
+        purpose = "Remote campaign storage API key"
+        if storage.api_key_env is None and settings is not None and settings.api_key:
+            api_key = resolve_api_key(settings.api_key, purpose=purpose)
+        else:
+            api_key = resolve_api_key(
+                None,
+                storage.api_key_env,
+                default_env=API_KEY_ENV,
+                required=True,
+                purpose=purpose,
             )
-        return RemoteBackend.connect(storage.base_url, api_key)
+        base_url = storage.base_url or (
+            settings.base_url if settings is not None else resolve_remote_base_url()
+        )
+        return RemoteBackend.connect(base_url, api_key)
 
     from hackagent.storage.local import LocalBackend
 

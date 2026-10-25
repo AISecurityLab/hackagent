@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hackagent.core.contracts.enums import AgentType
 
@@ -20,7 +20,9 @@ class ModelSpec(BaseModel):
     identifier: str
     endpoint: Optional[str] = None
     agent_type: AgentType = AgentType.OPENAI
-    api_key: Optional[str] = None
+    #: Secret value injected at runtime. Excluded from dumps and repr.
+    api_key: Optional[str] = Field(default=None, exclude=True, repr=False)
+    #: Name of the environment variable holding the secret.
     api_key_env: Optional[str] = None
     max_tokens: Optional[int] = Field(default=None, ge=1)
     temperature: Optional[float] = Field(default=None, ge=0.0)
@@ -39,6 +41,12 @@ class ModelSpec(BaseModel):
         return frozenset(
             str(item).strip().lower() for item in values if str(item).strip()
         )
+
+    @model_validator(mode="after")
+    def check_credential_source(self) -> "ModelSpec":
+        if self.api_key is not None and self.api_key_env is not None:
+            raise ValueError("Set either api_key or api_key_env, not both.")
+        return self
 
 
 class JudgeSpec(ModelSpec):

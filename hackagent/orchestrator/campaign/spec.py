@@ -339,26 +339,31 @@ class StorageSpec(_Spec):
         default="local",
         description=(
             "``local`` writes to a SQLite file on this machine; ``remote`` sends "
-            "results to the HackAgent server named below, authenticated with the "
-            "key in the environment variable that ``api_key_env`` names."
+            "results to the HackAgent server. The backend is always chosen "
+            "here, never inferred from which API keys happen to be set, and "
+            "``remote`` fails before the run starts if its key is missing."
         ),
     )
     base_url: Optional[str] = Field(
         default=None,
-        description="Address of the remote server. Required when ``backend`` is ``remote``.",
+        description=(
+            "Address of the remote server. Defaults to ``HACKAGENT_BASE_URL`` "
+            "or the hosted service."
+        ),
     )
     api_key_env: Optional[str] = Field(
         default=None,
         description=(
             "Name of the environment variable holding the remote server's API key. "
-            "Required when ``backend`` is ``remote``."
+            "Defaults to ``HACKAGENT_API_KEY``. The key itself never goes in "
+            "the campaign file."
         ),
     )
 
     @model_validator(mode="after")
-    def validate_remote(self) -> "StorageSpec":
-        if self.backend == "remote" and not (self.base_url and self.api_key_env):
-            raise ValueError("Remote storage requires 'base_url' and 'api_key_env'.")
+    def validate_api_key_env(self) -> "StorageSpec":
+        if self.api_key_env is not None and not self.api_key_env.strip():
+            raise ValueError("'api_key_env' cannot be empty.")
         return self
 
 

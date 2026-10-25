@@ -3,23 +3,32 @@
 
 """Runtime settings: the single place that resolves credentials and locations.
 
-Every value is resolved with the same priority order::
+Non-secret values are resolved with the same priority order::
 
     explicit argument  >  environment variable  >  config file  >  default
 
-An empty environment variable counts as unset. Nothing is resolved at import
-time; call :meth:`Settings.resolve` when the values are needed.
+An empty environment variable counts as unset. API keys are never read from or
+written to config files: the platform key is resolved by
+:func:`hackagent.core.credentials.resolve_api_key` from an explicit runtime
+``api_key``, an explicit ``api_key_env`` reference, or ``HACKAGENT_API_KEY``.
+
+The storage backend is chosen explicitly (``local`` by default) and never
+inferred from the presence of a key. Nothing is resolved at import time; call
+:meth:`Settings.resolve` when the values are needed.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 from urllib.parse import urlparse
+
+from hackagent.core.credentials import resolve_api_key
 
 DEFAULT_CONFIG_PATH = Path("~/.config/hackagent/config.json")
 DEFAULT_DB_PATH = Path("~/.local/share/hackagent/hackagent.db")
@@ -29,6 +38,7 @@ IN_MEMORY_DB = ":memory:"
 API_KEY_ENV = "HACKAGENT_API_KEY"
 BASE_URL_ENV = "HACKAGENT_BASE_URL"
 DB_PATH_ENV = "HACKAGENT_DB_PATH"
+BACKEND_ENV = "HACKAGENT_BACKEND"
 
 OLLAMA_BASE_URL_ENV_VARS = ("OLLAMA_BASE_URL", "OLLAMA_API_BASE", "OLLAMA_HOST")
 DEFAULT_OLLAMA_HOST = "localhost"
@@ -52,6 +62,16 @@ class Mode(str, Enum):
 
     LOCAL = "local"
     REMOTE = "remote"
+
+
+def _backend(value: Any, origin: str) -> Mode:
+    try:
+        return Mode(str(value).strip().lower())
+    except ValueError:
+        raise ValueError(
+            f"Invalid storage backend {value!r} from {origin}: "
+            "expected 'local' or 'remote'"
+        ) from None
 
 
 def _normalize_ollama_base_url(raw: str) -> str:
@@ -151,12 +171,19 @@ class Settings:
     db_path_source: Source
     config_path: Path
     ollama_base_url: str
+    backend: Mode = Mode.LOCAL
+    backend_source: Source = Source.DEFAULT
+    #: Name of the variable the platform key is read from, when it came from
+    #: the environment. A reference, never the secret, so it may be shown.
+    api_key_env: Optional[str] = None
 
     @classmethod
     def resolve(
         cls,
         *,
         api_key: Optional[str] = None,
+        api_key_env: Optional[str] = None,
+        backend: Optional[str | Mode] = None,
         base_url: Optional[str] = None,
         db_path: Optional[str] = None,
         config_path: Optional[Path | str] = None,
@@ -165,26 +192,64 @@ class Settings:
         """Resolve every setting once, from arguments, environment and file.
 
         Args:
-            api_key: Explicit API key. ``None`` means "not given"; an empty
-                string explicitly selects local mode.
+            api_key: Platform API key value injected at runtime.
+            api_key_env: Name of the environment variable holding the
+                platform API key. Defaults to ``HACKAGENT_API_KEY``.
+            backend: ``"local"`` (default) or ``"remote"`` storage. Falls
+                back to ``HACKAGENT_BACKEND``, then ``backend`` in the config
+                file. Remote storage requires a platform API key.
             base_url: Explicit remote API base URL.
             db_path: Explicit local database path, or ``":memory:"``.
             config_path: Config file to read instead of the default one.
             env: Environment mapping (defaults to ``os.environ``).
 
         Raises:
-            ValueError: If ``base_url`` is given but empty, or the config file
-                cannot be parsed.
+            CredentialError: If ``api_key`` and ``api_key_env`` are both
+                given, an explicitly selected key is empty or unset, or the
+                remote backend has no key.
+            ValueError: If ``base_url`` is given but empty, the backend is
+                invalid, or the config file cannot be parsed.
         """
         if base_url is not None and not base_url.strip():
             raise ValueError("Base URL is required: an explicit base_url is empty")
         env = os.environ if env is None else env
         path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
         file_values = read_config_file(path)
+        if file_values.get("api_key"):
+            logging.getLogger(__name__).warning(
+                "Ignoring 'api_key' in %s: API keys are never read from config "
+                "files. Set %s (or pass api_key_env / --api-key-env) instead.",
+                path,
+                API_KEY_ENV,
+            )
 
-        key, key_source = _pick(
-            api_key, env.get(API_KEY_ENV), file_values.get("api_key"), None
+        if backend is not None:
+            mode, mode_source = _backend(backend, "argument"), Source.EXPLICIT
+        elif (env.get(BACKEND_ENV) or "").strip():
+            mode, mode_source = _backend(env[BACKEND_ENV], BACKEND_ENV), Source.ENV
+        elif file_values.get("backend"):
+            mode = _backend(file_values["backend"], str(path))
+            mode_source = Source.FILE
+        else:
+            mode, mode_source = Mode.LOCAL, Source.DEFAULT
+
+        key = resolve_api_key(
+            api_key,
+            api_key_env,
+            default_env=API_KEY_ENV,
+            required=mode is Mode.REMOTE,
+            purpose="HackAgent platform API key",
+            env=env,
         )
+        if api_key is not None:
+            key_source, key_env = Source.EXPLICIT, None
+        elif api_key_env is not None:
+            key_source, key_env = Source.EXPLICIT, api_key_env.strip()
+        elif key:
+            key_source, key_env = Source.ENV, API_KEY_ENV
+        else:
+            key_source, key_env = Source.DEFAULT, None
+
         url, url_source = _pick(
             base_url,
             env.get(BASE_URL_ENV),
@@ -201,7 +266,7 @@ class Settings:
             db = str(Path(db).expanduser())
 
         return cls(
-            api_key=key or None,
+            api_key=key,
             api_key_source=key_source,
             base_url=(url or DEFAULT_REMOTE_BASE_URL).strip().rstrip("/"),
             base_url_source=url_source,
@@ -209,6 +274,9 @@ class Settings:
             db_path_source=db_source,
             config_path=path.expanduser(),
             ollama_base_url=resolve_ollama_base_url(env),
+            backend=mode,
+            backend_source=mode_source,
+            api_key_env=key_env,
         )
 
     @property
@@ -219,17 +287,18 @@ class Settings:
 
     @property
     def mode(self) -> Mode:
-        """Remote when an API key is set, local otherwise."""
-        return Mode.REMOTE if self.api_key else Mode.LOCAL
+        """The selected storage backend (never inferred from the API key)."""
+        return self.backend
 
     @property
     def uses_hosted_gateway(self) -> bool:
         """Whether role models should default to the hosted LLM gateway.
 
-        Requires an API key and a base URL that is not this machine, so a
-        local deployment keeps its attacker and judge local.
+        Requires a platform API key and a base URL that is not this machine,
+        so a local deployment keeps its attacker and judge local. Independent
+        of the storage backend.
         """
-        return self.mode is Mode.REMOTE and not self.is_local_host
+        return bool(self.api_key) and not self.is_local_host
 
     @property
     def gateway_endpoint(self) -> str:

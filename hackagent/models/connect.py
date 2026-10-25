@@ -49,7 +49,7 @@ def connect(spec: ModelSpec, *, instance_id: Optional[str] = None) -> Model:
     native = _native_model_classes()
     if spec.agent_type in native:
         return native[spec.agent_type](spec)
-    return build_model(_config_from_spec(spec))
+    return build_model(_config_from_spec(spec), api_key=spec.api_key)
 
 
 def _config_from_spec(spec: ModelSpec) -> ModelConfig:

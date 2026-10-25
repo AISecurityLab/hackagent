@@ -26,6 +26,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from hackagent.core.contracts import AgentType
+from hackagent.core.credentials import resolve_api_key
 from hackagent.models.completions.litellm import normalise_ollama_endpoint
 
 
@@ -197,7 +198,15 @@ def wait_for_servers(values: dict[str, Any], readiness: ServerReadiness) -> None
                 raise ValueError("local model servers require an explicit endpoint")
             required.setdefault((wire, endpoint), set()).add(model["name"])
             kinds.setdefault(endpoint, kind)
-            key = os.environ.get(connection.get("api_key_env") or "", "").strip()
+            key = (
+                resolve_api_key(
+                    None,
+                    connection.get("api_key_env"),
+                    purpose=f"API key for {model['name']!r}",
+                )
+                if wire == "openai"
+                else None
+            )
             if key:
                 keys.setdefault(endpoint, key)
     pids = {

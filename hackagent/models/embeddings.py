@@ -8,6 +8,7 @@ import os
 from typing import TYPE_CHECKING, Any, Dict, Optional
 from urllib.parse import urlsplit
 
+from hackagent.core.credentials import resolve_api_key
 from hackagent.core.contracts import AgentType
 from hackagent.core.settings import resolve_ollama_base_url
 
@@ -93,18 +94,12 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
     else:
         raise ValueError(f"Unsupported embedding agent_type: {agent_type}")
 
-    raw_key = config.get("api_key")
-    if raw_key:
-        key = str(raw_key)
-        if key.startswith("${") and key.endswith("}"):
-            env_name = key[2:-1]
-            key = os.environ.get(env_name, "")
-            if not key:
-                raise ValueError(
-                    f"Embedding API key environment variable {env_name} is unset"
-                )
-        else:
-            key = os.environ.get(key) or key
+    key = resolve_api_key(
+        config.get("api_key"),
+        config.get("api_key_env"),
+        purpose="Embedding API key",
+    )
+    if key is not None:
         kwargs["api_key"] = key
     elif ollama:
         # Ollama's compatible API needs a client key, but has no default auth.

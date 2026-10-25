@@ -25,7 +25,11 @@ def config():
 
 
 @config.command()
-@click.option("--api-key", help="HackAgent API key")
+@click.option(
+    "--backend",
+    type=click.Choice(["local", "remote"]),
+    help="Default storage backend (remote reads the key from HACKAGENT_API_KEY)",
+)
 @click.option("--base-url", help="HackAgent API base URL")
 @click.option(
     "--verbose",
@@ -34,18 +38,18 @@ def config():
 )
 @click.pass_context
 @handle_errors
-def set(ctx, api_key, base_url, verbose):
-    """Set configuration values"""
+def set(ctx, backend, base_url, verbose):
+    """Set configuration values (API keys are never saved: use env variables)"""
 
     cli_config: CLIConfig = ctx.obj["config"]
 
     updated = False
 
-    if api_key:
-        cli_config.set_user_override("api_key", api_key)
+    if backend:
+        cli_config.set_user_override("backend", backend)
         updated = True
         if cli_config.should_show_info():
-            display_success("API key updated")
+            display_success(f"Storage backend updated to: {backend}")
 
     if base_url:
         cli_config.set_user_override("base_url", base_url)
@@ -104,20 +108,23 @@ def show(ctx):
     table.add_column("Value", style="green")
     table.add_column("Source", style="dim")
 
-    # ctx.params holds only this subcommand's options; --api-key/--base-url are
-    # group-level, so ask the config itself where each value came from.
-    api_key_source = (
-        cli_config.source_of("api_key") if cli_config.api_key else "Not set"
-    )
-    base_url_source = cli_config.source_of("base_url")
-
-    api_key_display = (
-        cli_config.api_key[:8] + "..." if cli_config.api_key else "Not set"
-    )
+    # ctx.params holds only this subcommand's options; --api-key-env/--base-url
+    # are group-level, so ask the config itself where each value came from.
+    # Only the variable name is shown, never the key.
+    key_env = cli_config.settings.api_key_env
+    if cli_config.api_key and key_env:
+        api_key_display, api_key_source = f"${key_env} (set)", "Environment"
+    elif cli_config.api_key:
+        api_key_display, api_key_source = "Set", "Runtime"
+    else:
+        api_key_display, api_key_source = "Not set", "HACKAGENT_API_KEY"
     from hackagent.interfaces.cli.config import VERBOSITY_NAMES
 
+    table.add_row(
+        "Storage Backend", cli_config.backend, cli_config.source_of("backend")
+    )
     table.add_row("API Key", api_key_display, api_key_source)
-    table.add_row("Base URL", cli_config.base_url, base_url_source)
+    table.add_row("Base URL", cli_config.base_url, cli_config.source_of("base_url"))
     verbosity_display = (
         f"{cli_config.verbose} ({VERBOSITY_NAMES.get(cli_config.verbose, 'UNKNOWN')})"
     )
@@ -158,7 +165,7 @@ def reset(ctx, confirm):
         display_success("✅ Configuration reset to defaults")
         if cli_config.should_show_info():
             display_info(
-                "API key will need to be set again using environment variable or 'hackagent config set --api-key'"
+                "API keys are read from environment variables (HACKAGENT_API_KEY by default)"
             )
     else:
         display_info("No configuration file to reset")
@@ -177,14 +184,9 @@ def validate(ctx):
 
         from contextlib import nullcontext
 
-        from hackagent import HackAgent, Settings
+        from hackagent import HackAgent
 
-        session = HackAgent(
-            Settings.resolve(
-                api_key=cli_config.api_key or "",
-                base_url=cli_config.base_url,
-            )
-        )
+        session = HackAgent(cli_config.settings)
         spinner = (
             console.status("[bold green]Testing API connection...")
             if cli_config.should_show_info()
@@ -203,7 +205,7 @@ def validate(ctx):
     except ValueError as e:
         console.print(f"[red]❌ Configuration validation failed: {e}")
         console.print("\n[cyan]💡 Quick fixes:")
-        console.print("  • Set API key: hackagent config set --api-key YOUR_KEY")
+        console.print("  • Set API key: export HACKAGENT_API_KEY=...")
         console.print(
             f"  • Set base URL: hackagent config set --base-url {resolve_remote_base_url()}"
         )
@@ -231,8 +233,14 @@ def import_config(ctx, config_file):
 
         updated_fields = []
         if "api_key" in config_data:
-            cli_config.api_key = config_data["api_key"]
-            updated_fields.append("API key")
+            display_info(
+                "Ignoring 'api_key': API keys are never stored in configuration "
+                "files. Set HACKAGENT_API_KEY instead."
+            )
+
+        if config_data.get("backend") in ("local", "remote"):
+            cli_config.set_user_override("backend", config_data["backend"])
+            updated_fields.append("Storage backend")
 
         if "base_url" in config_data:
             cli_config.base_url = config_data["base_url"]

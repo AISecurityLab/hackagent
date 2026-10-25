@@ -5,8 +5,14 @@
 CLI Configuration Management
 
 Adds CLI flags and verbosity on top of :class:`hackagent.core.settings.Settings`,
-so the CLI resolves credentials exactly like the SDK:
+so the CLI resolves settings exactly like the SDK:
 CLI args > Environment > Config file > Default.
+
+API keys are never read from or written to the config file. The platform key
+comes from the variable named by ``--api-key-env`` (default
+``HACKAGENT_API_KEY``); the storage backend comes from ``--backend``,
+``HACKAGENT_BACKEND`` or ``backend`` in the config file, and is ``local``
+by default.
 """
 
 import json
@@ -49,13 +55,15 @@ class CLIConfig:
 
     def __init__(
         self,
-        api_key=_UNSET,
+        api_key_env=_UNSET,
+        backend=_UNSET,
         base_url=_UNSET,
         config_file=_UNSET,
         verbose=_UNSET,
     ):
         # click passes None for unset options, so None means "not provided".
-        self._explicit_api_key = None if api_key is _UNSET else api_key
+        self._explicit_api_key_env = None if api_key_env is _UNSET else api_key_env
+        self._explicit_backend = None if backend is _UNSET else backend
         self._explicit_base_url = None if base_url is _UNSET else base_url
         self._explicit_verbose = None if verbose is _UNSET else verbose
         self.config_file = None if config_file is _UNSET else config_file
@@ -65,14 +73,17 @@ class CLIConfig:
     def reload(self) -> None:
         """Re-resolve every value from CLI flags, environment and config file."""
         self.settings = Settings.resolve(
-            api_key=self._explicit_api_key,
+            api_key_env=self._explicit_api_key_env,
+            backend=self._explicit_backend,
             base_url=self._explicit_base_url,
             config_path=self.config_file,
         )
         self.api_key = self.settings.api_key
+        self.backend = self.settings.backend.value
         self.base_url = self.settings.base_url
         self._sources = {
             "api_key": self.settings.api_key_source,
+            "backend": self.settings.backend_source,
             "base_url": self.settings.base_url_source,
         }
 
@@ -88,21 +99,21 @@ class CLIConfig:
             self._sources["verbose"] = Source.DEFAULT
 
     def save(self, path: Optional[str] = None):
-        """Save configuration to file."""
+        """Save the non-secret configuration to file. API keys are never saved."""
         path = Path(path) if path else self.default_config_path
         path.parent.mkdir(parents=True, exist_ok=True)
         config_dict = {}
-        for attr in ["api_key", "base_url", "verbose"]:
+        for attr in ["backend", "base_url", "verbose"]:
             value = getattr(self, attr, None)
             if value is None:
-                continue
-            if attr == "api_key" and isinstance(value, str) and not value.strip():
                 continue
             kept = (
                 attr in self._explicit_user_overrides
                 or self._sources.get(attr) is Source.FILE
             )
             if attr == "base_url" and value == DEFAULT_REMOTE_BASE_URL and not kept:
+                continue
+            if attr == "backend" and value == "local" and not kept:
                 continue
             config_dict[attr] = value
         with open(path, "w") as f:
@@ -117,9 +128,8 @@ class CLIConfig:
         """Raise an error if no api_key is set (for commands that need cloud access)."""
         if not self.api_key:
             raise ValueError(
-                "API key is required for this command. Set HACKAGENT_API_KEY "
-                "environment variable, use --api-key flag, or run "
-                "'hackagent config set --api-key YOUR_KEY'"
+                "API key is required for this command. Set the HACKAGENT_API_KEY "
+                "environment variable, or name another one with --api-key-env."
             )
 
     def source_of(self, key: str) -> str:

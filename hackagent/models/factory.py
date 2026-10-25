@@ -9,18 +9,18 @@ HackAgent API key, and only for a spec whose endpoint is the hosted LLM
 gateway; it is never sent to any other provider.
 
 :func:`spec_from_config` reads the role-model dicts attack configs still
-use (``identifier``, ``endpoint``, ``agent_type``, ``api_key`` given as a
-literal or an environment variable name, ...).
+use (``identifier``, ``endpoint``, ``agent_type``, ``api_key`` as a secret
+value or ``api_key_env`` as the name of an environment variable, ...).
 """
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, Mapping, Optional, Type, TypeVar
 
 from hackagent.core.contracts import AgentType, ModelSpec
 from hackagent.core.logging import get_logger
-from hackagent.core.settings import Mode, Settings
+from hackagent.core.credentials import CredentialError
+from hackagent.core.settings import Settings
 from hackagent.models.connect import connect
 from hackagent.models.model import Model
 
@@ -55,7 +55,7 @@ _SPEC_FIELD_KEYS = (
 
 #: ``agent_metadata`` keys that never override the model's identity.
 _IDENTITY_KEYS = frozenset(
-    {"api_key", "name", "identifier", "model", "endpoint", "agent_type"}
+    {"api_key", "api_key_env", "name", "identifier", "model", "endpoint", "agent_type"}
 )
 
 
@@ -85,14 +85,22 @@ def _agent_type(raw: Any, identifier: str, default: AgentType) -> AgentType:
         return default
 
 
-def _split_api_key(value: Any) -> Dict[str, str]:
-    """Map a legacy ``api_key`` (literal or env var name) onto spec fields."""
-    if not value:
-        return {}
-    value = str(value)
-    if os.environ.get(value):
-        return {"api_key_env": value}
-    return {"api_key": value}
+def _credential_fields(
+    config: Mapping[str, Any], metadata: Mapping[str, Any]
+) -> Dict[str, str]:
+    """Copy ``api_key`` (a secret value) and ``api_key_env`` (a variable name).
+
+    The two are never guessed from each other; giving both is an error.
+    """
+    names = ("api_key", "api_key_env")
+    source = config if any(config.get(n) is not None for n in names) else metadata
+    fields = {name: str(source[name]) for name in names if source.get(name) is not None}
+    if len(fields) == 2:
+        raise CredentialError(
+            f"Model {config.get('identifier')!r}: set either api_key or "
+            "api_key_env, not both."
+        )
+    return fields
 
 
 def spec_from_config(
@@ -143,7 +151,7 @@ def spec_from_config(
         "identifier": str(config.get("model") or identifier),
         "endpoint": config.get("endpoint") or None,
         "agent_type": agent_type,
-        **_split_api_key(config.get("api_key") or metadata.get("api_key")),
+        **_credential_fields(config, metadata),
     }
     for key in ("timeout", *_SPEC_FIELD_KEYS):
         if key in values:
@@ -162,8 +170,8 @@ class ModelFactory:
         self.settings = settings
 
     def is_gateway(self, endpoint: Optional[str]) -> bool:
-        """Whether ``endpoint`` is the hosted LLM gateway of a remote run."""
-        if self.settings.mode is not Mode.REMOTE or not endpoint:
+        """Whether ``endpoint`` is the hosted LLM gateway and a platform key is set."""
+        if not self.settings.api_key or not endpoint:
             return False
         return endpoint.strip().rstrip("/").startswith(self.settings.base_url)
 
