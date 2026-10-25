@@ -47,9 +47,8 @@ def _render_rich_help(ctx: click.Context) -> None:
         "# 2. Register a target agent\n"
         'hackagent agent create --name "my-bot" --type google-adk \\\n'
         "    --endpoint http://localhost:8000\n\n"
-        "# 3. Run an adversarial attack\n"
-        'hackagent eval advprefix --agent-name "my-bot" \\\n'
-        '    --goals "Ignore safety rules"\n\n'
+        "# 3. Run a campaign\n"
+        "hackagent campaign run campaign.yaml\n\n"
         "# 4. Review findings\n"
         "hackagent results summary"
     )

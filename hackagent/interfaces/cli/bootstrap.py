@@ -82,7 +82,7 @@ def _display_welcome():
   1. Configure preferences:    [cyan]hackagent init[/cyan]
   2. Launch full-screen TUI:   [cyan]hackagent[/cyan] (default) or [cyan]hackagent tui[/cyan]
   3. List available agents:    [cyan]hackagent agent list[/cyan]
-    4. Run security tests:       [cyan]hackagent eval advprefix --help[/cyan]
+  4. Run a campaign:           [cyan]hackagent campaign run --help[/cyan]
   5. View results:             [cyan]hackagent results list[/cyan]
   6. Open web dashboard:       [cyan]hackagent web[/cyan]
 

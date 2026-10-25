@@ -229,6 +229,6 @@ def sample_cmd(
         console.print(f"[cyan]{index}.[/cyan] {goal}")
 
     console.print(
-        f"\n[dim]Use in evals:[/dim] "
-        f"[cyan]hackagent eval advprefix --dataset {preset} --limit {limit} ...[/cyan]"
+        f"\n[dim]Use in campaigns:[/dim] "
+        f"[cyan]hackagent campaign run <file>[/cyan] with dataset preset {preset}"
     )
