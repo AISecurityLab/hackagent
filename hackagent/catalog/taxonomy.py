@@ -119,6 +119,7 @@ ATTACK_TAXONOMY: Mapping[str, AttackTaxonomy] = {
     "advprefix": _entry(AttackCategory.ADAPTIVE),
     "autodan_turbo": _entry(AttackCategory.ADAPTIVE),
     "tool_output_ipi": _entry(AttackCategory.ADAPTIVE, AttackTag.INDIRECT),
+    "toolhijacker": _entry(AttackCategory.ADAPTIVE, AttackTag.INDIRECT),
     # Multi-turn — one growing conversation with the target.
     "crescendo": _entry(AttackCategory.MULTI_TURN),
     "stac": _entry(AttackCategory.MULTI_TURN, AttackTag.INDIRECT),
@@ -144,6 +145,7 @@ AttackId = Literal[
     "advprefix",
     "autodan_turbo",
     "tool_output_ipi",
+    "toolhijacker",
     "crescendo",
     "stac",
 ]

@@ -110,6 +110,8 @@ class RunTracker:
         identity = {
             "attack_type": self.attack_name,
             "request_index": attempt.request_index,
+            "goal": attempt.goal,
+            "goal_index": attempt.goal_index,
             **attempt.labels,
         }
         record = self.store.create_result(
@@ -149,7 +151,17 @@ class RunTracker:
         if self.output.save_responses and attempt.response is not None:
             details["response"] = attempt.response.text
             details["decoded_response"] = attempt.decoded
+            details["response_body"] = attempt.response.text
         response = attempt.response
+        latency_ms = response.latency_ms if response else None
+        status_code = (
+            response.error.status_code if response and response.error else None
+        )
+        # Older servers and the local dashboard read these from the metadata.
+        if latency_ms is not None:
+            details["latency_ms"] = latency_ms
+        if status_code is not None:
+            details["response_status_code"] = status_code
         self.store.update_result(
             record.id,
             evaluation_status=_evaluation_status(attempt),
@@ -162,10 +174,8 @@ class RunTracker:
                 if key.startswith(("eval_", "explanation_"))
             },
             agent_specific_data=sanitize_for_json(details),
-            latency_ms=response.latency_ms if response else None,
-            response_status_code=response.error.status_code
-            if response and response.error
-            else None,
+            latency_ms=latency_ms,
+            response_status_code=status_code,
         )
 
     def complete(self) -> None:

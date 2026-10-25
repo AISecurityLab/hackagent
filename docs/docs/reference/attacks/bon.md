@@ -8,7 +8,7 @@ sidebar_position: 4
 
 Best-of-N augmentation search with inline judge evaluation.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 A stochastic search over augmentations of the goal.
 

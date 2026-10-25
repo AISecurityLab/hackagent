@@ -8,7 +8,7 @@ sidebar_position: 18
 
 Indirect prompt injection via poisoned tool observations (InjecAgent / OPI).
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 Hand the agent a poisoned tool result and see what it does with it.
 

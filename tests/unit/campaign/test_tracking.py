@@ -73,3 +73,43 @@ def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch)
         open_store(storage)
 
     connect.assert_called_once_with("https://other.example.test", "other-secret")
+
+
+def test_each_result_carries_what_the_dashboard_reads():
+    """Goal, reply, latency and status land in the metadata both stores keep."""
+    from unittest.mock import MagicMock
+    from uuid import uuid4
+
+    from hackagent.models.response import ModelResponse
+    from hackagent.orchestrator.campaign.results import Attempt
+    from hackagent.orchestrator.campaign.spec import OutputSpec
+    from hackagent.orchestrator.campaign.tracking import RunTracker
+
+    store = MagicMock()
+    tracker = RunTracker(
+        store,
+        agent_id=uuid4(),
+        attack_name="baseline",
+        configuration={},
+        expected_goals=1,
+        output=OutputSpec(),
+    )
+    response = ModelResponse(text="no", latency_ms=42)
+    tracker.record(
+        Attempt(
+            goal_index=3,
+            request_index=0,
+            goal="do something",
+            messages=({"role": "user", "content": "hi"},),
+            response=response,
+        )
+    )
+
+    created = store.create_result.call_args.args
+    assert created[4]["goal"] == "do something"
+    assert created[4]["goal_index"] == 3
+    data = store.update_result.call_args.kwargs["agent_specific_data"]
+    assert data["goal"] == "do something"
+    assert data["goal_index"] == 3
+    assert data["response_body"] == "no"
+    assert data["latency_ms"] == 42
