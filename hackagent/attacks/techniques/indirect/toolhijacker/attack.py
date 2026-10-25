@@ -252,7 +252,11 @@ class ToolHijackerAttack(IterativeAttack[ToolHijackerParams]):
             (f for f in best_batch if f.verdict.success), best_batch[0]
         )
         rate = best_feedback["selection_success_rate"]
-        errors = [f.verdict.error for f in best_batch if f.verdict.error]
+        errors = [
+            f.verdict.error or "target provider error"
+            for f in best_batch
+            if f.verdict.error is not None
+        ]
         verdict = Verdict(
             success=rate >= params.success_threshold and not errors,
             score=rate * 10,
