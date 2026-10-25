@@ -7,10 +7,12 @@
 (the same single-page app as ``app.hackagent.dev``) and answers its API calls
 under ``/api/proxy``:
 
-* **remote mode** — an API key is configured, so calls are forwarded to
-  ``api.hackagent.dev`` with the key attached server-side (``_proxy``);
-* **offline mode** — no API key, so calls are answered from the local SQLite
-  store the SDK writes runs into (``_local_api``), read-only.
+* **remote mode** — the ``remote`` storage backend is selected, so calls are
+  forwarded to ``api.hackagent.dev`` with the key attached server-side
+  (``_proxy``);
+* **offline mode** — the ``local`` backend (the default), so calls are
+  answered from the local SQLite store the SDK writes runs into
+  (``_local_api``), read-only.
 
 Either way the browser only ever talks to ``127.0.0.1``, and the SPA itself is
 identical to the hosted one — there is no second dashboard to keep in sync.

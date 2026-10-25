@@ -14,8 +14,8 @@ with no Node runtime, Docker or database server involved.
 
 The recording shows the runs of the [example run](./example-run.mdx) against a small support bot.
 
-- **Local mode** (no API key): reads the runs recorded in your SQLite database. Read-only, apart from deleting a run.
-- **Remote mode** (API key configured): shows your hosted HackAgent data.
+- **Local mode** (the default `local` backend): reads the runs recorded in your SQLite database. Read-only, apart from deleting a run.
+- **Remote mode** (`--backend remote`, `HACKAGENT_BACKEND=remote` or `backend: remote` in the config file, with `HACKAGENT_API_KEY` set): shows your hosted HackAgent data. Having a key set does not select remote mode by itself.
 
 Your API key never reaches the browser. It stays in the CLI process, which
 attaches it to each request it proxies; the page itself runs with authentication
@@ -108,7 +108,7 @@ which dashboard bundle is in use — the first things to include in a bug report
 | "Port 7860 is already in use by another process" | An unrelated process holds the port — a previous HackAgent dashboard is reclaimed automatically, anything else never is. Use `--port` |
 | Every panel is empty (local mode) | No runs recorded in that database yet, or they went to another one. Check `hackagent results list` |
 | Creating or launching returns "read-only" | Expected in local mode — see above |
-| 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `hackagent config show` |
+| 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `hackagent config show` and `HACKAGENT_API_KEY` |
 
 ## See also
 
