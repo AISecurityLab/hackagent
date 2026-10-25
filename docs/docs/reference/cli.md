@@ -29,6 +29,14 @@ Every command the `hackagent` executable offers. Run any of them with `--help` t
 hackagent campaign [OPTIONS] COMMAND [ARGS]...
 ```
 
+### `hackagent campaign list`
+
+List available attack techniques, their category and tags.
+
+```text
+hackagent campaign list [OPTIONS]
+```
+
 ### `hackagent campaign run`
 
 Run a campaign file against its (or overridden) model servers.

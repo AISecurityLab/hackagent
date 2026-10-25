@@ -32,8 +32,8 @@ KINDS = {
     ),
     "adaptive": (
         "Adaptive",
-        "Searches: it reads the target's replies and refines its prompts, which "
-        "is why it needs an attacker model.",
+        "Searches across independent attempts, optionally using helper models "
+        "to refine candidates.",
     ),
     "multi_turn": (
         "Multi-turn",

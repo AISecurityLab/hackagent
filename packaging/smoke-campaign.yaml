@@ -43,6 +43,7 @@ attacks:
   - name: advprefix
     roles: {attacker: *role}
   - name: tool_output_ipi
+  - name: toolhijacker
   - name: rag
     parameters:
       documents: [A document.]

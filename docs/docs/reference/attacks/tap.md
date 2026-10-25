@@ -8,7 +8,7 @@ sidebar_position: 15
 
 Tree of Attacks with Pruning search attack.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 A pruned tree of attacker-refined prompts.
 

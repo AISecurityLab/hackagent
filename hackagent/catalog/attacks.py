@@ -82,4 +82,8 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "Tool-output IPI",
         "description": "Indirect prompt injection via poisoned tool observations (InjecAgent / OPI).",
     },
+    "toolhijacker": {
+        "label": "ToolHijacker",
+        "description": "Poison a tool registry description to steer retrieval and tool selection across task paraphrases.",
+    },
 }

@@ -33,6 +33,7 @@ _ATTACKS: dict[str, str] = {
     "crescendo": "multi_turn.crescendo:CrescendoAttack",
     "advprefix": "adaptive.advprefix:AdvPrefixAttack",
     "tool_output_ipi": "indirect.tool_output_ipi:ToolOutputIPIAttack",
+    "toolhijacker": "indirect.toolhijacker:ToolHijackerAttack",
     "rag": "indirect.rag:RagAttack",
     "autodan_turbo": "adaptive.autodan_turbo:AutoDANTurboAttack",
 }
