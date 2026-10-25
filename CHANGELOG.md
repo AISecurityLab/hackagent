@@ -1,3 +1,10 @@
+## v0.13.0a1 (2026-10-25)
+
+### Feat
+
+- **campaign**: portable HackAgent gateway marker for role and judge models
+- **client**: technique catalogue with parameter schemas and roles
+
 ## v0.12.0 (2026-07-27)
 
 ### Fix

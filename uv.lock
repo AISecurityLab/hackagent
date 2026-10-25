@@ -2386,7 +2386,7 @@ wheels = [
 
 [[package]]
 name = "hackagent"
-version = "0.12.0"
+version = "0.13.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -3162,7 +3162,7 @@ name = "macholib"
 version = "1.16.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "altgraph" },
+    { name = "altgraph", marker = "(python_full_version < '3.15' and sys_platform != 'emscripten') or (python_full_version < '3.14' and sys_platform == 'emscripten') or (platform_machine != 's390x' and sys_platform != 'emscripten') or sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/10/2f/97589876ea967487978071c9042518d28b958d87b17dceb7cdc1d881f963/macholib-1.16.4.tar.gz", hash = "sha256:f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362", size = 59427, upload-time = "2025-11-22T08:28:38.373Z" }
 wheels = [
