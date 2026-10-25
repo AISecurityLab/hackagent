@@ -14,6 +14,7 @@ from rich.table import Table
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.cli.utils import display_info, display_success, handle_errors
 from hackagent import resolve_remote_base_url
+from hackagent.core.settings import tls_error_hint
 
 console = Console()
 
@@ -28,13 +29,18 @@ def config():
 @click.option("--api-key", help="HackAgent API key")
 @click.option("--base-url", help="HackAgent API base URL")
 @click.option(
+    "--ca-bundle",
+    type=click.Path(exists=True, dir_okay=True),
+    help="CA bundle (PEM) trusted for the HackAgent API",
+)
+@click.option(
     "--verbose",
     type=str,
     help="Default verbosity level: 0/error, 1/warning, 2/info, 3/debug",
 )
 @click.pass_context
 @handle_errors
-def set(ctx, api_key, base_url, verbose):
+def set(ctx, api_key, base_url, ca_bundle, verbose):
     """Set configuration values"""
 
     cli_config: CLIConfig = ctx.obj["config"]
@@ -52,6 +58,14 @@ def set(ctx, api_key, base_url, verbose):
         updated = True
         if cli_config.should_show_info():
             display_success(f"Base URL updated to: {base_url}")
+
+    if ca_bundle:
+        from pathlib import Path
+
+        cli_config.set_user_override("ca_bundle", str(Path(ca_bundle).resolve()))
+        updated = True
+        if cli_config.should_show_info():
+            display_success(f"CA bundle updated to: {cli_config.ca_bundle}")
 
     if verbose is not None:
         from hackagent.interfaces.cli.config import VERBOSITY_LEVELS, VERBOSITY_NAMES
@@ -118,6 +132,10 @@ def show(ctx):
 
     table.add_row("API Key", api_key_display, api_key_source)
     table.add_row("Base URL", cli_config.base_url, base_url_source)
+    if cli_config.ca_bundle:
+        table.add_row(
+            "CA Bundle", cli_config.ca_bundle, cli_config.source_of("ca_bundle")
+        )
     verbosity_display = (
         f"{cli_config.verbose} ({VERBOSITY_NAMES.get(cli_config.verbose, 'UNKNOWN')})"
     )
@@ -183,6 +201,7 @@ def validate(ctx):
             Settings.resolve(
                 api_key=cli_config.api_key or "",
                 base_url=cli_config.base_url,
+                ca_bundle=cli_config.ca_bundle,
             )
         )
         spinner = (
@@ -210,6 +229,9 @@ def validate(ctx):
         raise click.ClickException("Configuration validation failed")
     except Exception as e:
         console.print(f"[yellow]⚠️ Could not test API connection: {e}")
+        hint = tls_error_hint(e)
+        if hint:
+            console.print(f"[yellow]{hint}")
         display_info(
             "Configuration appears valid, but API connection could not be tested"
         )
@@ -237,6 +259,10 @@ def import_config(ctx, config_file):
         if "base_url" in config_data:
             cli_config.base_url = config_data["base_url"]
             updated_fields.append("Base URL")
+
+        if "ca_bundle" in config_data:
+            cli_config.set_user_override("ca_bundle", config_data["ca_bundle"])
+            updated_fields.append("CA bundle")
 
         if "verbose" in config_data:
             cli_config.verbose = config_data["verbose"]

@@ -53,11 +53,13 @@ class CLIConfig:
         base_url=_UNSET,
         config_file=_UNSET,
         verbose=_UNSET,
+        ca_bundle=_UNSET,
     ):
         # click passes None for unset options, so None means "not provided".
         self._explicit_api_key = None if api_key is _UNSET else api_key
         self._explicit_base_url = None if base_url is _UNSET else base_url
         self._explicit_verbose = None if verbose is _UNSET else verbose
+        self._explicit_ca_bundle = None if ca_bundle is _UNSET else ca_bundle
         self.config_file = None if config_file is _UNSET else config_file
         self._explicit_user_overrides = set()
         self.reload()
@@ -68,12 +70,15 @@ class CLIConfig:
             api_key=self._explicit_api_key,
             base_url=self._explicit_base_url,
             config_path=self.config_file,
+            ca_bundle=self._explicit_ca_bundle,
         )
         self.api_key = self.settings.api_key
         self.base_url = self.settings.base_url
+        self.ca_bundle = self.settings.ca_bundle
         self._sources = {
             "api_key": self.settings.api_key_source,
             "base_url": self.settings.base_url_source,
+            "ca_bundle": self.settings.ca_bundle_source,
         }
 
         file_verbose = read_config_file(self.settings.config_path).get("verbose")
@@ -92,9 +97,16 @@ class CLIConfig:
         path = Path(path) if path else self.default_config_path
         path.parent.mkdir(parents=True, exist_ok=True)
         config_dict = {}
-        for attr in ["api_key", "base_url", "verbose"]:
+        for attr in ["api_key", "base_url", "ca_bundle", "verbose"]:
             value = getattr(self, attr, None)
             if value is None:
+                continue
+            # A bundle taken from REQUESTS_CA_BUNDLE/SSL_CERT_FILE stays there.
+            if (
+                attr == "ca_bundle"
+                and attr not in self._explicit_user_overrides
+                and self._sources.get(attr) is not Source.FILE
+            ):
                 continue
             if attr == "api_key" and isinstance(value, str) and not value.strip():
                 continue

@@ -17,7 +17,7 @@ from typing import Any, Mapping, Optional
 from uuid import UUID
 
 from hackagent.core.contracts import EvalStatus, RunStatus
-from hackagent.core.settings import Settings
+from hackagent.core.settings import Settings, env_ca_bundle, ssl_verify
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.results import (
     Attempt,
@@ -48,7 +48,10 @@ def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Sto
             raise ValueError(
                 f"Environment variable {storage.api_key_env!r} required for remote storage is not set."
             )
-        return RemoteBackend.connect(storage.base_url, api_key)
+        # The campaign names its own server, so only the CA bundle carries
+        # over: from the caller's settings, else the standard variables.
+        verify = settings.verify if settings else ssl_verify(env_ca_bundle())
+        return RemoteBackend.connect(storage.base_url, api_key, verify=verify)
 
     from hackagent.storage.local import LocalBackend
 

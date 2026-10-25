@@ -77,6 +77,7 @@ class BaseTab(Container):
             Settings.resolve(
                 api_key=self.cli_config.api_key or "",
                 base_url=self.cli_config.base_url,
+                ca_bundle=self.cli_config.ca_bundle,
             )
         )
 

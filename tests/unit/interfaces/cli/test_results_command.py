@@ -24,6 +24,7 @@ def _config():
     cfg.validate.return_value = None
     cfg.api_key = None
     cfg.base_url = None
+    cfg.ca_bundle = None
     return cfg
 
 

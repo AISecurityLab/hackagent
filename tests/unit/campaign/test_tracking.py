@@ -58,6 +58,8 @@ def test_the_database_path_comes_from_the_settings_in_hand():
 
 def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch):
     monkeypatch.setenv("OTHER_HACKAGENT_KEY", "other-secret")
+    monkeypatch.delenv("REQUESTS_CA_BUNDLE", raising=False)
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     storage = StorageSpec(
         backend="remote",
         base_url="https://other.example.test",
@@ -72,7 +74,9 @@ def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch)
     ):
         open_store(storage)
 
-    connect.assert_called_once_with("https://other.example.test", "other-secret")
+    connect.assert_called_once_with(
+        "https://other.example.test", "other-secret", verify=True
+    )
 
 
 def test_each_result_carries_what_the_dashboard_reads():

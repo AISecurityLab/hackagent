@@ -53,6 +53,7 @@ def show(ctx, result_id):
             Settings.resolve(
                 api_key=cli_config.api_key or "",
                 base_url=cli_config.base_url,
+                ca_bundle=cli_config.ca_bundle,
             )
         )
         with console.status(f"[bold green]Fetching result {result_id}..."):
@@ -140,6 +141,7 @@ def summary(ctx, status, agent, attack_type, days):
             Settings.resolve(
                 api_key=cli_config.api_key or "",
                 base_url=cli_config.base_url,
+                ca_bundle=cli_config.ca_bundle,
             )
         )
         result_items = []

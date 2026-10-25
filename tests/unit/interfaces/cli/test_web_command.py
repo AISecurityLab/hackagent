@@ -51,6 +51,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
+        config.ca_bundle = None
         app = MagicMock()
         store = _Closer()
         seen, opener = _open_with(store)
@@ -77,6 +78,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
+        config.ca_bundle = None
 
         store = _Closer()
         seen, opener = _open_with(store)
@@ -110,6 +112,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
+        config.ca_bundle = None
 
         store = _Closer()
         seen, opener = _open_with(store)
@@ -136,6 +139,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
+        config.ca_bundle = None
 
         from hackagent.interfaces.web import MissingBundleError
 
@@ -157,6 +161,7 @@ class TestWebCommand(unittest.TestCase):
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
+        config.ca_bundle = None
 
         with (
             patch("hackagent.interfaces.web.create_app", return_value=MagicMock()),
@@ -251,6 +256,7 @@ class TestFreePort(unittest.TestCase):
         config = MagicMock()
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
+        config.ca_bundle = None
 
         app = MagicMock()
         _seen, opener = _open_with(_Closer())

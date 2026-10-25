@@ -26,6 +26,7 @@ def _cli_config(**overrides):
     cfg = MagicMock()
     cfg.api_key = overrides.get("api_key", "hk_abcdefghijklmnop")
     cfg.base_url = overrides.get("base_url", "https://api.hackagent.dev")
+    cfg.ca_bundle = overrides.get("ca_bundle")
     cfg.verbose = overrides.get("verbose", 1)
     cfg.should_show_info.return_value = overrides.get("show_info", True)
     cfg.source_of.return_value = overrides.get("source", "Environment variable")

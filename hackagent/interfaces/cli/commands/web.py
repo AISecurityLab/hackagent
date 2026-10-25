@@ -168,7 +168,11 @@ def web(ctx, host, port, db_path, force_local, no_browser):
 
     cli_config: CLIConfig = ctx.obj["config"]
     api_key = "" if force_local or not cli_config.api_key else cli_config.api_key
-    resolve_kwargs = {"api_key": api_key, "base_url": cli_config.base_url}
+    resolve_kwargs = {
+        "api_key": api_key,
+        "base_url": cli_config.base_url,
+        "ca_bundle": cli_config.ca_bundle,
+    }
     if db_path:
         resolve_kwargs["db_path"] = db_path
     session = HackAgent(Settings.resolve(**resolve_kwargs))

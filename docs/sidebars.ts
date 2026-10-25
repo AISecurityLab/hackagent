@@ -22,6 +22,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/first-campaign',
         'getting-started/example-run',
         'getting-started/dashboard',
+        'getting-started/self-hosted-api',
       ],
     },
     {

@@ -127,7 +127,10 @@ def create_app(client) -> Flask:
 
         target = client.settings.base_url
         app.register_blueprint(
-            create_proxy(target, client.settings.api_key), url_prefix=API_PREFIX
+            create_proxy(
+                target, client.settings.api_key, verify=client.settings.verify
+            ),
+            url_prefix=API_PREFIX,
         )
         app.config["HACKAGENT_MODE"] = "remote"
         app.config["HACKAGENT_TARGET"] = target
