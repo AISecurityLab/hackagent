@@ -87,7 +87,7 @@ def _campaign_audit(session, result):
 
 def _display_audit(audit) -> None:
     """Show how the campaign's judge panel scored in its audit."""
-    from hackagent.interfaces.tui.views.audit import audit_markup
+    from hackagent.interfaces.audit import audit_markup
 
     try:
         console.print()

@@ -46,7 +46,7 @@ from textual.widgets.option_list import Option
 from textual.widgets.tree import TreeNode
 
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.tui.views.audit import audit_markup
+from hackagent.interfaces.audit import audit_markup
 from hackagent.orchestrator.campaign import CampaignCancelled, CampaignSpec
 
 from .draft import CampaignDraft, Issue

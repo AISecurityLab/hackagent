@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from hackagent.interfaces.tui.views.audit import audit_markup, audit_summary
+from hackagent.interfaces.audit import audit_markup, audit_summary
 
 
 def test_a_persisted_audit_is_rendered_as_a_terminal_report():

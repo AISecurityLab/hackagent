@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Rich markup for judge audits shown by TUI run and result views."""
+"""Rich markup for judge audits shown by the CLI and TUI run and result views."""
 
 from __future__ import annotations
 

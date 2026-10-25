@@ -29,7 +29,7 @@ from textual.widgets.tree import TreeNode
 
 from hackagent.evaluation.audit import AuditReport
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.tui.views.audit import audit_summary
+from hackagent.interfaces.audit import audit_summary
 from hackagent.orchestrator.campaign.audit import format_report
 from hackagent.interfaces.tui.base import BaseTab
 from hackagent.interfaces.tui.theme import (
