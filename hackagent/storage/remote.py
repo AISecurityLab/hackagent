@@ -12,8 +12,10 @@ when an API key is available and selected automatically by HackAgent.__init__.
 from __future__ import annotations
 
 import atexit
+import getpass
 import logging
 import queue
+import socket
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -67,6 +69,7 @@ from hackagent.storage._http.api.models import (
     PatchedResultRequest,
     PatchedRunUpdateRequest,
     ResultRequest,
+    Run,
     StepTypeEnum,
     TraceRequest,
 )
@@ -133,6 +136,15 @@ def _is_final(status: Optional[str]) -> bool:
     if status in _FINAL_STATUSES:
         return True
     raise ValueError(f"RemoteBackend: an executor cannot set run status {status!r}")
+
+
+def _local_executor() -> str:
+    """How this process describes itself as a run's executor."""
+    try:
+        user = getpass.getuser()
+    except Exception:  # noqa: BLE001 - no login name (e.g. some containers)
+        user = "unknown"
+    return f"local:{socket.gethostname()} ({user})"
 
 
 def _parent_id(run: Any) -> Optional[UUID]:
@@ -571,11 +583,20 @@ class RemoteBackend:
 
     # ── Campaign run ──────────────────────────────────────────────────────────
 
-    def start_campaign(self, agent_id: UUID, spec: Dict[str, Any]) -> CampaignRunRecord:
+    def start_campaign(
+        self,
+        agent_id: UUID,
+        spec: Dict[str, Any],
+        *,
+        claimed_by: Optional[str] = None,
+    ) -> CampaignRunRecord:
         """Save the campaign and create its run, claimed by this caller (the
         ``cli`` executor): it is RUNNING, and heartbeats and finishes like
-        any executor's run. ``spec`` is the recorded campaign."""
-        body = CampaignStartRequest(agent=agent_id, spec=spec)
+        any executor's run. ``spec`` is the recorded campaign; ``claimed_by``
+        describes the executor, ``local:<hostname> (<user>)`` by default."""
+        body = CampaignStartRequest(
+            agent=agent_id, spec=spec, claimed_by=claimed_by or _local_executor()
+        )
         resp = campaign_start_create.sync_detailed(client=self._client, body=body)
         if resp.status_code != 201 or resp.parsed is None:
             raise RuntimeError(
@@ -600,6 +621,7 @@ class RemoteBackend:
             patch["run_config"] = {"evaluation_audit": audit}
         if run_notes is not None and not final:
             patch["run_notes"] = run_notes
+        run = None
         if patch:
             response = run_partial_update.sync_detailed(
                 id=campaign_run_id,
@@ -611,9 +633,14 @@ class RemoteBackend:
                     "RemoteBackend: Failed to update campaign run record "
                     f"(status {response.status_code})"
                 )
+            run = response.parsed
         if final:
-            self.finish_run(campaign_run_id, status, run_notes or "")
-        return self.get_campaign_run(campaign_run_id)
+            # Built from the finish response: finishing a campaign run revokes
+            # its run token, so it may not be read back afterwards.
+            run = self.finish_run(campaign_run_id, status, run_notes or "")
+        if run is None:
+            return self.get_campaign_run(campaign_run_id)
+        return _campaign_record(run)
 
     def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord:
         self.flush()
@@ -694,6 +721,9 @@ class RemoteBackend:
         run_config: Optional[Dict[str, Any]] = None,
     ) -> RunRecord:
         final = _is_final(status)
+        if final:
+            # Lost result writes surface before the run can end as COMPLETED.
+            self.flush()
         patch: Dict[str, Any] = {}
         if run_config is not None:
             patch["run_config"] = run_config
@@ -899,10 +929,11 @@ class RemoteBackend:
             )
         return bool(self._parse_json_response(resp).get("cancel_requested"))
 
-    def finish_run(self, run_id: UUID, status: str, note: str = "") -> None:
+    def finish_run(self, run_id: UUID, status: str, note: str = "") -> Run:
         """End the run as COMPLETED, FAILED or CANCELLED, with ``note`` as its
-        run notes. Queued writes go first: finishing a campaign run revokes
-        its run token. Raises :class:`ExecutorRejected` on 401 or 403."""
+        run notes, and return the finished run. Queued writes go first:
+        finishing a campaign run revokes its run token. Raises
+        :class:`ExecutorRejected` on 401 or 403."""
         if status not in _FINAL_STATUSES:
             raise ValueError(f"RemoteBackend: {status!r} is not a final run status")
         self._drain()
@@ -915,10 +946,11 @@ class RemoteBackend:
                 f"RemoteBackend: the server refused to finish run {run_id} "
                 f"({resp.status_code})"
             )
-        if resp.status_code != 200:
+        if resp.status_code != 200 or resp.parsed is None:
             raise RuntimeError(
                 f"RemoteBackend: finish_run {run_id} returned {resp.status_code}"
             )
+        return resp.parsed
 
     # ── Result ────────────────────────────────────────────────────────────────
 
