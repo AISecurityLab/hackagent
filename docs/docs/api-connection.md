@@ -1,5 +1,6 @@
 ---
 title: "API connection settings"
+slug: "/reference/api-connection"
 description: "Base URLs, CA bundles and proxy settings for API clients."
 ---
 
