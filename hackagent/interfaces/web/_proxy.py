@@ -82,11 +82,11 @@ def create_proxy(
                 content=request.get_data() or None,
             )
         except httpx.HTTPError as exc:
-            detail = f"Proxy error: {exc}"
+            logger.warning("Proxy %s %s failed: %s", request.method, url, exc)
+            detail = "Proxy error: could not reach the HackAgent API."
             hint = tls_error_hint(exc)
             if hint:
-                detail = f"{detail}. {hint}"
-            logger.warning("Proxy %s %s failed: %s", request.method, url, detail)
+                detail = f"{detail} {hint}"
             return Response(
                 json.dumps({"detail": detail}),
                 status=502,
