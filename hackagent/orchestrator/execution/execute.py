@@ -37,6 +37,7 @@ from hackagent.orchestrator.campaign.runner import (
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 from hackagent.orchestrator.campaign.tracking import register_target
 from hackagent.orchestrator.execution.adopted import AdoptedRunStore
+from hackagent.orchestrator.execution.credits import CreditGuard
 from hackagent.orchestrator.execution.heartbeat import RunHeartbeat
 from hackagent.storage.remote import ClaimResult, RemoteBackend
 
@@ -82,14 +83,19 @@ def execute_run(
     claimed.
     """
     claim = claim or store.claim_run(run_id, claimed_by)
-    # Same client, so the adopted store writes with the key that claimed it.
-    adopted = AdoptedRunStore.for_run(store._client, claim.run)
     try:
-        spec = _executable_spec(claim.run["run_config"]["campaign_config"], base_url)
+        # Same client, so the adopted store writes with the key that claimed it.
+        adopted = AdoptedRunStore.for_run(store.client, claim.run)
     except Exception as exc:
         # Claimed but not runnable: end it now rather than leave it to the reaper.
         outcome = ExecutionOutcome("FAILED", failure_note(exc))
-        _finish(adopted, outcome)
+        _finish(store, run_id, outcome)
+        return outcome
+    try:
+        spec = _executable_spec(claim.run["run_config"]["campaign_config"], base_url)
+    except Exception as exc:
+        outcome = ExecutionOutcome("FAILED", failure_note(exc))
+        _finish(adopted, adopted.run_id, outcome)
         adopted.close()
         return outcome
     return _execute(
@@ -125,7 +131,7 @@ def execute_spec(
         record = store.start_campaign(agent_id, spec.recorded())
         context = store.get_context()
         adopted = AdoptedRunStore(
-            store._client,
+            store.client,
             run_id=record.id,
             agent_id=agent_id,
             organization_id=context.org_id,
@@ -175,14 +181,21 @@ def _execute(
 ) -> ExecutionOutcome:
     bound = bind_gateway(spec, base_url)
     heartbeat = RunHeartbeat(adopted, adopted.run_id)
+    credits = CreditGuard(base_url)
     result: Optional[CampaignResult] = None
     error: Optional[BaseException] = None
     try:
         with _environment({**(env or {}), GATEWAY_KEY_ENV: gateway_key}):
             try:
                 result = run_coroutine_blocking(
-                    lambda: _run_with_heartbeat(
-                        adopted, bound, heartbeat, on_event, build, load
+                    lambda: _run_watched(
+                        adopted,
+                        bound,
+                        heartbeat,
+                        credits,
+                        on_event,
+                        credits.wrap(build),
+                        load,
                     )
                 )
             except BaseException as exc:
@@ -193,27 +206,30 @@ def _execute(
             logger.warning(
                 "run %s | the server no longer accepts this executor", adopted.run_id
             )
-            return ExecutionOutcome("FAILED", REJECTED_NOTE)
-        outcome = _outcome(
-            adopted.final_status,
-            result,
-            error,
-            cancel_requested=heartbeat.cancel_requested.is_set(),
-        )
-        _finish(adopted, outcome)
+            outcome = ExecutionOutcome("FAILED", REJECTED_NOTE)
+        else:
+            outcome = _outcome(
+                adopted.final_status,
+                result,
+                error,
+                cancel_requested=heartbeat.cancel_requested.is_set(),
+                out_of_credits=credits.tripped.is_set(),
+            )
+            _finish(adopted, adopted.run_id, outcome)
         if error is not None and not isinstance(
             error, (Exception, asyncio.CancelledError)
         ):
-            raise error  # KeyboardInterrupt, SystemExit: finished, then passed on
+            raise error  # KeyboardInterrupt, SystemExit: recorded, then passed on
         return outcome
     finally:
         adopted.close()
 
 
-async def _run_with_heartbeat(
+async def _run_watched(
     store: AdoptedRunStore,
     spec: CampaignSpec,
     heartbeat: RunHeartbeat,
+    credits: CreditGuard,
     on_event: Optional[EventCallback],
     build: ModelBuilder,
     load: GoalLoader,
@@ -222,9 +238,14 @@ async def _run_with_heartbeat(
     task = loop.create_task(
         arun_campaign(spec, store=store, on_event=on_event, build=build, load=load)
     )
-    # A cancel request or a rejection stops the campaign; the runner records
-    # its runs as cancelled on the way out.
-    heartbeat.on_change = lambda: loop.call_soon_threadsafe(task.cancel)
+
+    def stop() -> None:
+        loop.call_soon_threadsafe(task.cancel)
+
+    # A cancel request, a rejection or spent credits stop the campaign; the
+    # runner records its runs as cancelled on the way out.
+    heartbeat.on_change = stop
+    credits.on_trip = stop
     with heartbeat:
         return await task
 
@@ -235,7 +256,10 @@ def _outcome(
     error: Optional[BaseException],
     *,
     cancel_requested: bool,
+    out_of_credits: bool,
 ) -> ExecutionOutcome:
+    if out_of_credits:
+        return ExecutionOutcome("FAILED", OUT_OF_CREDITS_NOTE, result)
     if error is None:
         status, note = final_status or ("COMPLETED", "")
         return ExecutionOutcome(_status(status), note, result)
@@ -283,19 +307,19 @@ def _is_cancellation(error: BaseException) -> bool:
     )
 
 
-def _finish(store: AdoptedRunStore, outcome: ExecutionOutcome) -> None:
+def _finish(store: RemoteBackend, run_id: UUID, outcome: ExecutionOutcome) -> None:
     """End the run on the server; a run that is already over stays as it is."""
     try:
-        store.finish_run(store.run_id, outcome.status, outcome.note)
+        store.finish_run(run_id, outcome.status, outcome.note)
     except Exception:
         logger.warning(
             "run %s | could not finish it as %s",
-            store.run_id,
+            run_id,
             outcome.status,
             exc_info=True,
         )
     else:
-        logger.info("run %s | finished as %s", store.run_id, outcome.status)
+        logger.info("run %s | finished as %s", run_id, outcome.status)
 
 
 @contextmanager

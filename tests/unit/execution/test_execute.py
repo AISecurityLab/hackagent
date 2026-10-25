@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-from hackagent.models import Reachability
+from hackagent.models import ModelResponse, Reachability
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV
 from hackagent.orchestrator.execution import AdoptedRunStore, execute
 from hackagent.storage import remote
@@ -126,7 +126,7 @@ def models(target="a reply", judge="yes", **others):
 def execute_with(config, *, builder=None, texts=("goal one",), **kwargs):
     run = run_detail(config)
     claim = ClaimResult(run=run, run_token=None, env={})
-    store = SimpleNamespace(_client=MagicMock())
+    store = SimpleNamespace(client=MagicMock())
     outcome = execute.execute_run(
         store,
         run["id"],
@@ -169,7 +169,7 @@ def test_claims_the_run_when_no_claim_is_given(tmp_path):
         claims.append((run_id, claimed_by))
         return ClaimResult(run=run, run_token=None, env={})
 
-    store = SimpleNamespace(_client=MagicMock(), claim_run=claim_run)
+    store = SimpleNamespace(client=MagicMock(), claim_run=claim_run)
     outcome = execute.execute_run(
         store,
         run["id"],
@@ -200,7 +200,67 @@ def test_cancel_request_finishes_cancelled(tmp_path, fake_heartbeat):
     assert store.finished == [(store.run_id, "CANCELLED", "Campaign cancelled")]
 
 
-def test_402_maps_to_out_of_credits(tmp_path):
+def out_of_credits(_messages):
+    return ModelResponse.failed(ProviderError(402))
+
+
+PAP = {
+    "name": "pap",
+    "parameters": {"techniques": ["Logical Appeal", "Expert Endorsement"]},
+}
+
+
+def test_402_from_a_gateway_role_stops_the_run(tmp_path):
+    attacker = ScriptedModel(out_of_credits)
+    builder = FakeBuilder(models(gateway=attacker))
+
+    outcome, store, _ = execute_with(
+        stored_campaign(tmp_path, attacks=[{**PAP, "roles": {"attacker": GW}}]),
+        builder=builder,
+        texts=("one", "two", "three", "four"),
+    )
+
+    assert (outcome.status, outcome.note) == ("FAILED", "Out of credits")
+    assert store.finished == [(store.run_id, "FAILED", "Out of credits")]
+    # The first 402 trips the guard; nothing reaches the gateway after it.
+    assert len(attacker.requests) == 1
+
+
+def test_402_from_the_target_stays_an_attempt_error(tmp_path):
+    target = ScriptedModel(out_of_credits)
+
+    outcome, store, _ = execute_with(
+        stored_campaign(tmp_path),
+        builder=FakeBuilder(models(target=target)),
+        texts=("one", "two"),
+    )
+
+    assert outcome.status == "COMPLETED"
+    assert len(target.requests) == 2
+    attempts = [a for attack in outcome.result.attacks for a in attack.attempts]
+    assert attempts and all(a.error for a in attempts)
+    assert store.finished == [(store.run_id, "COMPLETED", "")]
+
+
+def test_402_at_preflight_on_a_gateway_judge(tmp_path):
+    judge = ScriptedModel(out_of_credits)
+
+    outcome, store, _ = execute_with(
+        stored_campaign(
+            tmp_path,
+            evaluation={"judges": [{**GW, "scoring": {"type": "harmbench"}}]},
+            execution={"preflight": True},
+        ),
+        builder=FakeBuilder(models(gateway=judge)),
+    )
+
+    assert (outcome.status, outcome.note) == ("FAILED", "Out of credits")
+    assert store.finished == [(store.run_id, "FAILED", "Out of credits")]
+    assert len(judge.requests) == 1
+    assert store.memory.call_names().count("create_attack") == 0
+
+
+def test_402_in_an_escaping_error_maps_to_out_of_credits(tmp_path):
     class OutOfCreditsModel(ScriptedModel):
         async def is_reachable(self) -> Reachability:
             try:
@@ -256,6 +316,30 @@ def test_an_unreadable_campaign_is_finished_failed(tmp_path):
     assert store.finished == [(store.run_id, "FAILED", outcome.note)]
 
 
+def test_a_run_without_its_agent_is_finished_on_the_claiming_store(tmp_path):
+    run = run_detail(stored_campaign(tmp_path))
+    del run["agent"]
+    finished = []
+    store = SimpleNamespace(
+        client=MagicMock(),
+        finish_run=lambda run_id, status, note="": finished.append(
+            (run_id, status, note)
+        ),
+    )
+
+    outcome = execute.execute_run(
+        store,
+        run["id"],
+        base_url=BASE_URL,
+        gateway_key=GATEWAY_KEY,
+        claimed_by="local:test",
+        claim=ClaimResult(run=run, run_token=None, env={}),
+    )
+
+    assert (outcome.status, outcome.note) == ("FAILED", "KeyError: 'agent'")
+    assert finished == [(run["id"], "FAILED", "KeyError: 'agent'")]
+
+
 def test_a_refused_finish_does_not_escape(tmp_path, monkeypatch):
     original = RecordingAdoptedStore.__init__
 
@@ -285,6 +369,30 @@ def test_rejected_heartbeat_returns_failed_without_finish(tmp_path, fake_heartbe
     assert outcome.note == "Your API key is no longer valid for this run"
     assert outcome.result is None
     assert store.finished == []
+
+
+def test_interrupt_finishes_cancelled_then_passes_on(tmp_path):
+    def on_event(event, **payload):
+        if event == "goal_finished":
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        execute_with(stored_campaign(tmp_path), on_event=on_event)
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert store.finished == [(store.run_id, "CANCELLED", "Campaign cancelled")]
+
+
+def test_interrupt_after_a_rejection_passes_on_without_finish(tmp_path, fake_heartbeat):
+    def on_event(event, **payload):
+        if event == "goal_finished":
+            fake_heartbeat[-1].trip(fake_heartbeat[-1].rejected)
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        execute_with(stored_campaign(tmp_path), on_event=on_event)
+
+    assert RecordingAdoptedStore.instances[-1].finished == []
 
 
 # --- environment, agent, gateway ---------------------------------------------
@@ -385,7 +493,7 @@ def test_execute_spec_starts_the_run_then_executes_it(tmp_path, monkeypatch):
     closed = []
 
     class StartingStore:
-        _client = MagicMock()
+        client = MagicMock()
 
         def create_or_update_agent(self, name, config):
             return SimpleNamespace(id=agent_id)

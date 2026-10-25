@@ -396,6 +396,11 @@ class RemoteBackend:
     def get_api_key(self) -> Optional[str]:
         return self._client.token
 
+    @property
+    def client(self) -> AuthenticatedClient:
+        """The HTTP client, for another store that writes with the same key."""
+        return self._client
+
     def get_context(self) -> OrganizationContext:
         """Fetch org_id and user_id from the first agent (cached after first call)."""
         if self._context is not None:

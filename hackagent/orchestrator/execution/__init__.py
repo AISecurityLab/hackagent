@@ -6,6 +6,7 @@
 - :mod:`.execute`: :func:`execute_run` and :func:`execute_spec`, shared by
   ``hackagent run``, ``hackagent campaign run`` and the cloud worker
 - :mod:`.adopted`: the store that runs a campaign inside an existing run
+- :mod:`.credits`: stop a run on the gateway's first "out of credits" answer
 - :mod:`.heartbeat`: the background heartbeat with cancel and rejection signals
 """
 
