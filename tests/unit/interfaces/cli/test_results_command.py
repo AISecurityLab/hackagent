@@ -40,6 +40,28 @@ def _result(**overrides):
     return SimpleNamespace(**data)
 
 
+_AUDIT = {
+    "samples": 2,
+    "contextual_samples": 0,
+    "judges": [
+        {
+            "judge": "harmbench",
+            "metrics": {
+                "samples": 2,
+                "tp": 1,
+                "fp": 0,
+                "tn": 1,
+                "fn": 0,
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1": 1.0,
+                "accuracy": 1.0,
+            },
+        }
+    ],
+}
+
+
 class TestGenerateResultStatistics(unittest.TestCase):
     def test_empty_results(self):
         stats = _generate_result_statistics([], days=7)
@@ -116,6 +138,26 @@ class TestResultsCommands(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         backend.get_result.assert_called_once()
         self.assertIn("weather-bot", result.output)
+
+    def test_show_renders_the_campaign_judge_audit(self):
+        runner = CliRunner()
+        campaign_id = uuid4()
+        record = _result(run_id=uuid4())
+        backend = MagicMock()
+        backend.get_result.return_value = record
+        backend.get_run.return_value = SimpleNamespace(campaign_run_id=campaign_id)
+        backend.get_campaign_run.return_value = SimpleNamespace(audit=_AUDIT)
+        with (
+            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
+            patch("hackagent.client._open_store", return_value=backend),
+        ):
+            result = runner.invoke(
+                results, ["show", str(uuid4())], obj={"config": _config()}
+            )
+        self.assertEqual(result.exit_code, 0, result.output)
+        backend.get_campaign_run.assert_called_once_with(campaign_id)
+        self.assertIn("Judge audit", result.output)
+        self.assertIn("harmbench", result.output)
 
     def test_show_wraps_backend_errors(self):
         runner = CliRunner()
