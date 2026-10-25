@@ -57,13 +57,43 @@ def show(ctx, result_id):
         )
         with console.status(f"[bold green]Fetching result {result_id}..."):
             result = session.result(result_id)
+            audit = _campaign_audit(session, result)
 
         _display_result_details(result)
+        if audit:
+            _display_audit(audit)
 
     except click.ClickException:
         raise
     except Exception as e:
         raise click.ClickException(f"Failed to fetch result: {e}")
+
+
+def _campaign_audit(session, result):
+    """The judge audit of the campaign this result's run belongs to, if any."""
+    run_id = getattr(result, "run_id", None)
+    if not run_id:
+        return None
+    try:
+        run = session.run(run_id)
+        campaign_run_id = getattr(run, "campaign_run_id", None)
+        if not campaign_run_id:
+            return None
+        return getattr(session.campaign_run(campaign_run_id), "audit", None)
+    except Exception:
+        # The audit is context for the result, not a reason to fail showing it.
+        return None
+
+
+def _display_audit(audit) -> None:
+    """Show how the campaign's judge panel scored in its audit."""
+    from hackagent.interfaces.tui.views.audit import audit_markup
+
+    try:
+        console.print()
+        console.print(audit_markup(audit))
+    except (TypeError, ValueError):
+        console.print("[yellow]Judge audit recorded but could not be read.")
 
 
 def _display_result_details(result) -> None:
