@@ -1,3 +1,19 @@
+## v0.13.0a2 (2026-10-25)
+
+### Feat
+
+- **worker**: cloud worker that claims and executes queued runs
+- **cli**: `hackagent run` executes a campaign queued from the dashboard
+- **execution**: execute a queued run with the same code locally and in the cloud (`execute_run`, `execute_spec`)
+- **execution**: background heartbeat with cancel and rejection signals
+- **storage**: remote backend uses the campaign start and executor endpoints
+
+### Fix
+
+- **execution**: end a run as "Out of credits" on the gateway's first 402
+- **storage**: finish runs only after their writes land, without reading back
+- **core**: keep the handled error on exceptions from `run_coroutine_blocking`
+
 ## v0.13.0a1 (2026-10-25)
 
 ### Feat
