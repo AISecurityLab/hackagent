@@ -217,10 +217,9 @@ class Settings:
         file_values = read_config_file(path)
         if file_values.get("api_key"):
             logging.getLogger(__name__).warning(
-                "Ignoring 'api_key' in %s: API keys are never read from config "
-                "files. Set %s (or pass api_key_env / --api-key-env) instead.",
-                path,
-                API_KEY_ENV,
+                "Ignoring 'api_key' in the config file: API keys are never read "
+                "from config files. Set HACKAGENT_API_KEY (or pass api_key_env "
+                "/ --api-key-env) instead."
             )
 
         if backend is not None:
