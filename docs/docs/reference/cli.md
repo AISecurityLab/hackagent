@@ -131,6 +131,7 @@ hackagent config set [OPTIONS]
 |---|---|---|---|
 | `--api-key` | option | no | HackAgent API key |
 | `--base-url` | option | no | HackAgent API base URL |
+| `--ca-bundle` | option | no | CA bundle (PEM) trusted for the HackAgent API |
 | `--verbose` | option | no | Default verbosity level: 0/error, 1/warning, 2/info, 3/debug |
 
 ### `hackagent config show`

@@ -64,10 +64,19 @@ console = Console()
     default=None,
     help="HackAgent API base URL (or set HACKAGENT_BASE_URL env var)",
 )
+@click.option(
+    "--ca-bundle",
+    default=None,
+    type=click.Path(exists=True),
+    help=(
+        "CA bundle (PEM) trusted for the HackAgent API, e.g. a private CA "
+        "(or set REQUESTS_CA_BUNDLE / SSL_CERT_FILE)"
+    ),
+)
 @click.option("--verbose", "-v", count=True, help="Increase verbosity (-v, -vv, -vvv)")
 @click.version_option(version=get_version(), prog_name="hackagent")
 @click.pass_context
-def cli(ctx, config_file, api_key, base_url, verbose):
+def cli(ctx, config_file, api_key, base_url, ca_bundle, verbose):
     ctx.ensure_object(dict)
 
     # Set debug mode based on environment variable
@@ -85,6 +94,7 @@ def cli(ctx, config_file, api_key, base_url, verbose):
             api_key=api_key,
             base_url=base_url,
             verbose=verbose,
+            ca_bundle=ca_bundle,
         )
     except Exception as e:
         console.print(f"[bold red]❌ Configuration Error: {e}")

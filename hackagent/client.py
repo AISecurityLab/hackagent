@@ -53,6 +53,7 @@ def _open_store(
             settings.api_key,
             timeout=timeout,
             raise_on_unexpected_status=raise_on_unexpected_status,
+            verify=settings.verify,
         )
     from hackagent.storage.local import LocalBackend
 

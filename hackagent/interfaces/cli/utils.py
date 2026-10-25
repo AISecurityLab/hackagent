@@ -21,6 +21,7 @@ from rich.text import Text
 from rich.traceback import Traceback
 
 from hackagent import ApiError, HackAgentError
+from hackagent.core.settings import tls_error_hint
 
 console = Console()
 
@@ -55,6 +56,11 @@ def handle_errors(func):
             console.print(f"[bold red]❌ File Not Found: {str(e)}")
             raise click.ClickException(str(e))
         except Exception as e:
+            hint = tls_error_hint(e)
+            if hint:
+                console.print(f"[bold red]❌ TLS certificate error: {str(e)}")
+                console.print(f"[yellow]{hint}")
+                raise click.ClickException(f"{e}. {hint}")
             console.print(f"[bold red]❌ Unexpected error: {str(e)}")
             if console._environ.get("HACKAGENT_DEBUG"):
                 console.print(Traceback())

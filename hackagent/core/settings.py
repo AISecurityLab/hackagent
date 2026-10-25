@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import ssl
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -29,6 +30,9 @@ IN_MEMORY_DB = ":memory:"
 API_KEY_ENV = "HACKAGENT_API_KEY"
 BASE_URL_ENV = "HACKAGENT_BASE_URL"
 DB_PATH_ENV = "HACKAGENT_DB_PATH"
+
+#: Standard variables naming a CA bundle to trust, checked in this order.
+CA_BUNDLE_ENV_VARS = ("REQUESTS_CA_BUNDLE", "SSL_CERT_FILE")
 
 OLLAMA_BASE_URL_ENV_VARS = ("OLLAMA_BASE_URL", "OLLAMA_API_BASE", "OLLAMA_HOST")
 DEFAULT_OLLAMA_HOST = "localhost"
@@ -97,6 +101,52 @@ def resolve_remote_role_endpoint(env: Optional[Mapping[str, str]] = None) -> str
     return f"{resolve_remote_base_url(env)}/v1"
 
 
+def env_ca_bundle(env: Optional[Mapping[str, str]] = None) -> Optional[str]:
+    """Return the CA bundle named by ``REQUESTS_CA_BUNDLE`` / ``SSL_CERT_FILE``."""
+    env = os.environ if env is None else env
+    for name in CA_BUNDLE_ENV_VARS:
+        value = (env.get(name) or "").strip()
+        if value:
+            return str(Path(value).expanduser())
+    return None
+
+
+def ssl_verify(ca_bundle: Optional[str]) -> ssl.SSLContext | bool:
+    """Return an httpx ``verify`` value trusting ``ca_bundle`` (or defaults)."""
+    if not ca_bundle:
+        return True
+    if not Path(ca_bundle).exists():
+        raise ValueError(
+            f"CA bundle not found: {ca_bundle}. Point --ca-bundle, the ca_bundle "
+            "config option, REQUESTS_CA_BUNDLE or SSL_CERT_FILE at the PEM file "
+            "of the CA that signed the API's certificate."
+        )
+    if Path(ca_bundle).is_dir():
+        return ssl.create_default_context(capath=ca_bundle)
+    return ssl.create_default_context(cafile=ca_bundle)
+
+
+TLS_VERIFY_HINT = (
+    "The server's TLS certificate is not trusted. If the API uses a private "
+    "CA, point --ca-bundle, the ca_bundle config option, REQUESTS_CA_BUNDLE or "
+    "SSL_CERT_FILE at that CA's PEM bundle."
+)
+
+
+def tls_error_hint(error: BaseException) -> Optional[str]:
+    """Return :data:`TLS_VERIFY_HINT` if ``error`` is a certificate failure."""
+    seen = set()
+    current: Optional[BaseException] = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ssl.SSLCertVerificationError) or (
+            "CERTIFICATE_VERIFY_FAILED" in str(current)
+        ):
+            return TLS_VERIFY_HINT
+        current = current.__cause__ or current.__context__
+    return None
+
+
 def read_config_file(path: Path) -> Dict[str, Any]:
     """Read a JSON or YAML config file; a missing file is an empty config.
 
@@ -151,6 +201,10 @@ class Settings:
     db_path_source: Source
     config_path: Path
     ollama_base_url: str
+    #: CA bundle (file or directory) trusted for the remote API, or ``None``
+    #: for the default trust store. Verification is never disabled.
+    ca_bundle: Optional[str] = None
+    ca_bundle_source: Source = Source.DEFAULT
 
     @classmethod
     def resolve(
@@ -161,6 +215,7 @@ class Settings:
         db_path: Optional[str] = None,
         config_path: Optional[Path | str] = None,
         env: Optional[Mapping[str, str]] = None,
+        ca_bundle: Optional[str] = None,
     ) -> "Settings":
         """Resolve every setting once, from arguments, environment and file.
 
@@ -171,6 +226,11 @@ class Settings:
             db_path: Explicit local database path, or ``":memory:"``.
             config_path: Config file to read instead of the default one.
             env: Environment mapping (defaults to ``os.environ``).
+            ca_bundle: CA bundle file (or directory) used to verify the remote
+                API's TLS certificate, e.g. for a server signed by a private
+                CA. Falls back to ``REQUESTS_CA_BUNDLE`` / ``SSL_CERT_FILE``,
+                then to ``ca_bundle`` in the config file. Checked when a
+                remote client is built (:attr:`verify`).
 
         Raises:
             ValueError: If ``base_url`` is given but empty, or the config file
@@ -197,6 +257,12 @@ class Settings:
             file_values.get("db_path"),
             str(DEFAULT_DB_PATH),
         )
+        ca, ca_source = _pick(
+            ca_bundle or None, env_ca_bundle(env), file_values.get("ca_bundle"), None
+        )
+        if ca:
+            ca = str(Path(ca.strip()).expanduser())
+
         if db != IN_MEMORY_DB:
             db = str(Path(db).expanduser())
 
@@ -209,7 +275,18 @@ class Settings:
             db_path_source=db_source,
             config_path=path.expanduser(),
             ollama_base_url=resolve_ollama_base_url(env),
+            ca_bundle=ca,
+            ca_bundle_source=ca_source,
         )
+
+    @property
+    def verify(self) -> ssl.SSLContext | bool:
+        """TLS verification for HTTP clients talking to ``base_url``.
+
+        ``True`` (default trust store) unless a CA bundle is configured, in
+        which case an SSL context trusting that bundle. Never ``False``.
+        """
+        return ssl_verify(self.ca_bundle)
 
     @property
     def is_local_host(self) -> bool:

@@ -66,6 +66,7 @@ class TestResultsShow(unittest.TestCase):
         self.config = MagicMock()
         self.config.api_key = None
         self.config.base_url = None
+        self.config.ca_bundle = None
 
     def test_fetches_the_result_by_uuid_and_renders_details(self):
         result_id = uuid4()
@@ -312,6 +313,7 @@ class TestResultsSummaryCommand(unittest.TestCase):
         self.config = MagicMock()
         self.config.api_key = None
         self.config.base_url = None
+        self.config.ca_bundle = None
 
     def _invoke(self, pages, args=()):
         backend = MagicMock()
