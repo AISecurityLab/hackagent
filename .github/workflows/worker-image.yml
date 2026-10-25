@@ -1,0 +1,52 @@
+name: Publish worker image
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Called by release.yml once it has tagged a merge to main; a tag pushed with
+  # GITHUB_TOKEN never triggers the push trigger above.
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to build and publish.
+        required: true
+        type: string
+
+env:
+  IMAGE: ghcr.io/aisecuritylab/hackagent-worker
+
+jobs:
+  image:
+    name: Build and push worker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Compute image version
+        id: version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE }}:latest

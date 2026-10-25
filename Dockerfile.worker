@@ -1,0 +1,17 @@
+# Cloud worker image: claims queued cloud runs and executes them.
+# Configure with HACKAGENT_BASE_URL and HACKAGENT_WORKER_TOKEN.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /src
+COPY . .
+RUN pip install . && rm -rf /src
+
+RUN useradd --create-home --uid 10001 worker
+USER worker
+WORKDIR /home/worker
+
+ENTRYPOINT ["hackagent-worker"]

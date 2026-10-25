@@ -112,6 +112,7 @@ hf = ["datasets>=2.14.0"]
 
 [project.scripts]
 hackagent = "hackagent.interfaces.cli.main:main"
+hackagent-worker = "hackagent.interfaces.worker:main"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
