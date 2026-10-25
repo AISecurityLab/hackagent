@@ -14,6 +14,7 @@ before a run starts; ``schema`` prints the campaign format as JSON Schema. Both 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -153,13 +154,17 @@ def run(
         setup_package_logging,
         suppress_noisy_libraries,
     )
+    from hackagent.core.settings import Settings
     from hackagent.orchestrator.campaign import (
+        GATEWAY_KEY_ENV,
         EndpointOverrides,
         ServerReadiness,
+        bind_gateway,
         run_campaign,
         summary,
         wait_for_servers,
     )
+    from hackagent.orchestrator.campaign.gateway import uses_gateway
 
     overrides = EndpointOverrides(
         ollama=ollama_endpoint,
@@ -174,6 +179,16 @@ def run(
         concurrency=concurrency,
         output_directory=output_directory,
     )
+
+    settings = _runtime_settings() or Settings.resolve()
+    spec = bind_gateway(spec, settings.base_url)
+    if uses_gateway(spec) and not settings.api_key:
+        raise click.ClickException(
+            "This campaign uses the HackAgent gateway; set an API key with: "
+            "hackagent config set --api-key"
+        )
+    if settings.api_key:
+        os.environ.setdefault(GATEWAY_KEY_ENV, settings.api_key)
 
     setup_package_logging(default_level_str="INFO")
     suppress_noisy_libraries("httpx", "httpcore", "LiteLLM")
@@ -207,7 +222,7 @@ def run(
     result = run_campaign(
         spec,
         on_event=on_event,
-        settings=_runtime_settings(),
+        settings=settings,
     )
     report = summary(result)
     report["output_directory"] = spec.execution.output.directory
