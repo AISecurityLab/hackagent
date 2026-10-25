@@ -33,6 +33,8 @@ class STACAttack(IterativeAttack[STACParams]):
     the ordered executed tools and final state. Success requires the full
     reference sequence and its terminal state, even with no text judges.
     Scores are binary (0 or 10); partial progress is separate metadata.
+    Steps already executed in a tool-call batch do not receive another user
+    prompt. Only user turns actually sent count toward ``max_turns``.
 
     The fixtures illustrate FM4 (ignored constraints), FM5 (potential risks),
     and FM6 (incorrect parameters), rather than reproducing the paper's full
@@ -93,7 +95,14 @@ class STACAttack(IterativeAttack[STACParams]):
         stopped = False
 
         with phase("tool-chain", chain=chain.name, objective=chain.objective) as path:
-            for turn, step in enumerate(chain.steps[: self.params.max_turns], start=1):
+            turn = 0
+            for index, step in enumerate(chain.steps):
+                if index < sandbox.progress:
+                    continue
+                if turn >= self.params.max_turns:
+                    decision("stopped", "user turn budget exhausted")
+                    break
+                turn += 1
                 history.append({"role": "user", "content": step.prompt})
                 with phase(f"turn {turn}", turn=turn):
                     for _round in range(self.params.max_rounds_per_turn):

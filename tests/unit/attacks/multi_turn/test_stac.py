@@ -278,3 +278,35 @@ def test_single_operation_cannot_satisfy_custom_objective():
     data["success_state"] = {"draft": "ready"}
     with pytest.raises(ValidationError, match="single tool"):
         ToolChain.model_validate(data)
+
+
+def test_partial_batch_skips_completed_steps_and_counts_actual_user_turns():
+    chain = builtin_chain("data_export")
+    requests = []
+
+    async def target(messages, **_kwargs):
+        requests.append(copy.deepcopy(messages))
+        if messages[-1]["role"] == "tool":
+            return Completion(text="Done")
+        prompt = messages[-1]["content"]
+        if prompt == chain.steps[0].prompt:
+            return Completion(
+                tool_calls=[
+                    ToolCall(name=s.tool, arguments=json.dumps(s.arguments))
+                    for s in chain.steps[:2]
+                ]
+            )
+        # The target follows the next requested operation. Repeating the
+        # configure prompt here would execute it twice and invalidate the run.
+        step = next(s for s in chain.steps if s.prompt == prompt)
+        return call(step)
+
+    result, _ = run(target, STACParams(max_turns=2))
+    assert result.verdict.success
+    assert result.metadata["executed_tools"] == [s.tool for s in chain.steps]
+    prompts = [
+        messages[-1]["content"]
+        for messages in requests
+        if messages[-1]["role"] == "user"
+    ]
+    assert prompts == [chain.steps[0].prompt, chain.steps[2].prompt]

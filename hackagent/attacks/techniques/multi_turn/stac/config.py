@@ -24,7 +24,7 @@ class STACParams(AttackParams):
         default=8,
         ge=1,
         le=64,
-        description="Maximum user turns; each step supplies one turn, bounded by this limit.",
+        description="Maximum user turns sent. Steps already executed in a batch are skipped.",
     )
     max_rounds_per_turn: int = Field(
         default=4,
