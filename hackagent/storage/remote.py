@@ -31,6 +31,7 @@ from hackagent.storage._http.api.agent import (
     agent_list,
     agent_partial_update,
 )
+from hackagent.storage._http.api.key import key_context_retrieve
 from hackagent.storage._http.api.organization import organization_me_retrieve
 from hackagent.storage._http.api.attack import (
     attack_create,
@@ -68,6 +69,8 @@ from hackagent.storage._http.api.models import (
     PatchedAgentRequest,
     PatchedResultRequest,
     PatchedRunUpdateRequest,
+    RunListExecutor,
+    RunListStatus,
     ResultRequest,
     Run,
     StepTypeEnum,
@@ -107,6 +110,10 @@ class RunNotClaimable(RuntimeError):
         self.claimed_by = claimed_by
         self.status = status
         self.note = note
+
+
+class InvalidApiKey(RuntimeError):
+    """The server does not accept the API key (401)."""
 
 
 class ExecutorRejected(RuntimeError):
@@ -290,6 +297,49 @@ class RemoteBackend:
         ``/organization/me`` are Auth0-only on the deployed API).
         """
         return agent_list.sync_detailed(client=self._client).status_code
+
+    def check_key(self) -> None:
+        """Raise :class:`InvalidApiKey` when the server refuses this key."""
+        resp = key_context_retrieve.sync_detailed(client=self._client)
+        if resp.status_code == 401:
+            raise InvalidApiKey("The server does not accept this API key.")
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"RemoteBackend: key check returned {resp.status_code} "
+                f"(body={resp.content!r})"
+            )
+
+    def list_queued_local_runs(self) -> List[Dict[str, Any]]:
+        """Campaign runs queued for a local machine, newest first, as
+        ``{id, agent_name, campaign, timestamp}`` (``timestamp`` is ISO 8601)."""
+        found: List[Any] = []
+        page = 1
+        while True:
+            resp = run_list.sync_detailed(
+                client=self._client,
+                executor=RunListExecutor.LOCAL,
+                status=RunListStatus.PENDING,
+                parent_isnull=True,
+                page=page,
+            )
+            if resp.status_code != 200 or not resp.parsed:
+                raise RuntimeError(
+                    f"RemoteBackend: run list returned {resp.status_code}"
+                )
+            found.extend(resp.parsed.results or [])
+            if not resp.parsed.next:
+                break
+            page += 1
+        found.sort(key=lambda run: run.timestamp, reverse=True)
+        return [
+            {
+                "id": str(run.id),
+                "agent_name": run.agent_name,
+                "campaign": str(run.campaign) if run.campaign else None,
+                "timestamp": run.timestamp.isoformat(),
+            }
+            for run in found
+        ]
 
     def __init__(self, client: AuthenticatedClient) -> None:
         self._client = client

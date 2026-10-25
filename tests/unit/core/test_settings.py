@@ -209,3 +209,19 @@ def test_hosted_gateway_needs_key_and_remote_host(tmp_path, base_url, hosted):
     assert remote.uses_hosted_gateway is hosted
     assert local.uses_hosted_gateway is False
     assert remote.gateway_endpoint == f"{base_url.rstrip('/')}/v1"
+
+
+def test_dashboard_url_defaults_only_for_the_hosted_api():
+    from hackagent.core.settings import Settings
+
+    hosted = Settings.resolve(config_path="/nonexistent.json", env={})
+    assert hosted.dashboard_url == "https://app.hackagent.dev"
+    own = Settings.resolve(
+        base_url="https://api.example.test", config_path="/nonexistent.json", env={}
+    )
+    assert own.dashboard_url is None
+    env = {"HACKAGENT_DASHBOARD_URL": "https://dash.test/"}
+    assert (
+        Settings.resolve(config_path="/nonexistent.json", env=env).dashboard_url
+        == "https://dash.test"
+    )

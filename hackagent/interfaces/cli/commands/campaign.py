@@ -46,6 +46,22 @@ def _runtime_settings():
     return getattr(config, "settings", None)
 
 
+def event_printer(as_json: bool):
+    """The run-progress callback shared by ``campaign run`` and ``run``."""
+
+    def on_event(event: str, **payload: Any) -> None:
+        if as_json:
+            click.echo(json.dumps({"event": event, **payload}))
+        elif event == "attack_started":
+            console.print(f"[cyan]▶ {payload.get('attack')}[/cyan] started")
+        elif event == "attack_finished":
+            error = payload.get("error")
+            mark = "[red]✗[/red]" if error else "[green]✓[/green]"
+            console.print(f"{mark} {payload.get('attack')} finished")
+
+    return on_event
+
+
 def _endpoint_options(func):
     """Attach the run-time endpoint/server options shared by ``run``."""
     options = [
@@ -165,6 +181,7 @@ def run(
         wait_for_servers,
     )
     from hackagent.orchestrator.campaign.gateway import uses_gateway
+    from hackagent.orchestrator.execution import execute_spec
 
     overrides = EndpointOverrides(
         ollama=ollama_endpoint,
@@ -209,28 +226,25 @@ def run(
         except (ValueError, RuntimeError) as exc:
             raise click.ClickException(str(exc)) from exc
 
-    def on_event(event: str, **payload: Any) -> None:
-        if as_json:
-            click.echo(json.dumps({"event": event, **payload}))
-        elif event == "attack_started":
-            console.print(f"[cyan]▶ {payload.get('attack')}[/cyan] started")
-        elif event == "attack_finished":
-            error = payload.get("error")
-            mark = "[red]✗[/red]" if error else "[green]✓[/green]"
-            console.print(f"{mark} {payload.get('attack')} finished")
+    on_event = event_printer(as_json)
 
-    result = run_campaign(
-        spec,
-        on_event=on_event,
-        settings=settings,
-    )
+    if spec.execution.storage.backend == "remote":
+        outcome = execute_spec(spec, settings=settings, on_event=on_event)
+        if outcome.result is None:
+            display_error(outcome.note or f"Campaign {outcome.status.lower()}.")
+            raise SystemExit(1)
+        result = outcome.result
+        completed = outcome.status == "COMPLETED"
+    else:
+        result = run_campaign(spec, on_event=on_event, settings=settings)
+        completed = True
     report = summary(result)
     report["output_directory"] = spec.execution.output.directory
     if as_json:
         click.echo(json.dumps(report))
     else:
         _render_summary(report)
-    raise SystemExit(0 if report["succeeded"] else 1)
+    raise SystemExit(0 if report["succeeded"] and completed else 1)
 
 
 @campaign.command()

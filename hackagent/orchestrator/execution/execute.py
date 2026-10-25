@@ -92,7 +92,7 @@ def execute_run(
         _finish(store, run_id, outcome)
         return outcome
     try:
-        spec = _executable_spec(claim.run["run_config"]["campaign_config"], base_url)
+        spec = executable_spec(claim.run["run_config"]["campaign_config"], base_url)
     except Exception as exc:
         outcome = ExecutionOutcome("FAILED", failure_note(exc))
         _finish(adopted, adopted.run_id, outcome)
@@ -151,7 +151,7 @@ def execute_spec(
         store.close()
 
 
-def _executable_spec(campaign_config: Mapping[str, Any], base_url: str) -> CampaignSpec:
+def executable_spec(campaign_config: Mapping[str, Any], base_url: str) -> CampaignSpec:
     """The stored campaign, with the remote storage this executor writes to.
 
     The server leaves the storage address and key variable for the executor
@@ -344,5 +344,6 @@ __all__ = [
     "ExecutionOutcome",
     "execute_run",
     "execute_spec",
+    "executable_spec",
     "failure_note",
 ]

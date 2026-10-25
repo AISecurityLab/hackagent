@@ -29,6 +29,8 @@ IN_MEMORY_DB = ":memory:"
 API_KEY_ENV = "HACKAGENT_API_KEY"
 BASE_URL_ENV = "HACKAGENT_BASE_URL"
 DB_PATH_ENV = "HACKAGENT_DB_PATH"
+DASHBOARD_URL_ENV = "HACKAGENT_DASHBOARD_URL"
+DEFAULT_DASHBOARD_URL = "https://app.hackagent.dev"
 
 OLLAMA_BASE_URL_ENV_VARS = ("OLLAMA_BASE_URL", "OLLAMA_API_BASE", "OLLAMA_HOST")
 DEFAULT_OLLAMA_HOST = "localhost"
@@ -151,6 +153,8 @@ class Settings:
     db_path_source: Source
     config_path: Path
     ollama_base_url: str
+    #: Where the dashboard lives; None when it cannot be told from the settings.
+    dashboard_url: Optional[str] = None
 
     @classmethod
     def resolve(
@@ -200,15 +204,21 @@ class Settings:
         if db != IN_MEMORY_DB:
             db = str(Path(db).expanduser())
 
+        base = (url or DEFAULT_REMOTE_BASE_URL).strip().rstrip("/")
+        dashboard = (env.get(DASHBOARD_URL_ENV) or "").strip().rstrip("/") or (
+            DEFAULT_DASHBOARD_URL if base == DEFAULT_REMOTE_BASE_URL else None
+        )
+
         return cls(
             api_key=key or None,
             api_key_source=key_source,
-            base_url=(url or DEFAULT_REMOTE_BASE_URL).strip().rstrip("/"),
+            base_url=base,
             base_url_source=url_source,
             db_path=db,
             db_path_source=db_source,
             config_path=path.expanduser(),
             ollama_base_url=resolve_ollama_base_url(env),
+            dashboard_url=dashboard,
         )
 
     @property

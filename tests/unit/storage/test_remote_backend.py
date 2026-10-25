@@ -1689,3 +1689,41 @@ class TestRemoteBackendExecutorProtocol(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_check_key_raises_invalid_api_key_on_401():
+    from hackagent.storage import InvalidApiKey
+    from hackagent.storage._http.api.key import key_context_retrieve
+
+    backend = RemoteBackend(MagicMock())
+    with patch.object(
+        key_context_retrieve, "sync_detailed", return_value=MagicMock(status_code=401)
+    ):
+        with unittest.TestCase().assertRaises(InvalidApiKey):
+            backend.check_key()
+    with patch.object(
+        key_context_retrieve, "sync_detailed", return_value=MagicMock(status_code=200)
+    ):
+        backend.check_key()
+
+
+def test_list_queued_local_runs_filters_and_orders_newest_first():
+    from hackagent.storage._http.api.run import run_list
+
+    def run(day):
+        return MagicMock(
+            id=_uid(),
+            agent_name="a",
+            campaign=None,
+            timestamp=datetime(2026, 1, day, tzinfo=timezone.utc),
+        )
+
+    old, new = run(1), run(2)
+    page = MagicMock(status_code=200, parsed=MagicMock(results=[old, new], next=None))
+    with patch.object(run_list, "sync_detailed", return_value=page) as listing:
+        runs = RemoteBackend(MagicMock()).list_queued_local_runs()
+    assert [r["id"] for r in runs] == [str(new.id), str(old.id)]
+    kwargs = listing.call_args.kwargs
+    assert kwargs["executor"].value == "local"
+    assert kwargs["status"].value == "PENDING"
+    assert kwargs["parent_isnull"] is True
