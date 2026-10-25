@@ -75,6 +75,7 @@ def sync_detailed(
     body: UserProfileRequest | UserProfileRequest | UserProfileRequest | Unset = UNSET,
 ) -> Response[UserProfile]:
     """Update the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         body (UserProfileRequest | Unset):
@@ -106,6 +107,7 @@ def sync(
     body: UserProfileRequest | UserProfileRequest | UserProfileRequest | Unset = UNSET,
 ) -> UserProfile | None:
     """Update the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         body (UserProfileRequest | Unset):
@@ -132,6 +134,7 @@ async def asyncio_detailed(
     body: UserProfileRequest | UserProfileRequest | UserProfileRequest | Unset = UNSET,
 ) -> Response[UserProfile]:
     """Update the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         body (UserProfileRequest | Unset):
@@ -161,6 +164,7 @@ async def asyncio(
     body: UserProfileRequest | UserProfileRequest | UserProfileRequest | Unset = UNSET,
 ) -> UserProfile | None:
     """Update the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         body (UserProfileRequest | Unset):

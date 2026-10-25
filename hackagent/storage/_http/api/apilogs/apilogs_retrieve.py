@@ -13,6 +13,7 @@ from ..models import APITokenLog
 def _get_kwargs(
     id: int,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/apilogs/{id}".format(
@@ -55,8 +56,9 @@ def sync_detailed(
 ) -> Response[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         id (int):
@@ -87,8 +89,9 @@ def sync(
 ) -> APITokenLog | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         id (int):
@@ -114,8 +117,9 @@ async def asyncio_detailed(
 ) -> Response[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         id (int):
@@ -144,8 +148,9 @@ async def asyncio(
 ) -> APITokenLog | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         id (int):

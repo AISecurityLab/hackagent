@@ -13,6 +13,7 @@ def _get_kwargs(
     *,
     page: int | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["page"] = page
@@ -60,8 +61,8 @@ def sync_detailed(
 ) -> Response[PaginatedUserAPIKeyList]:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         page (int | Unset):
@@ -92,8 +93,8 @@ def sync(
 ) -> PaginatedUserAPIKeyList | None:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         page (int | Unset):
@@ -119,8 +120,8 @@ async def asyncio_detailed(
 ) -> Response[PaginatedUserAPIKeyList]:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         page (int | Unset):
@@ -149,8 +150,8 @@ async def asyncio(
 ) -> PaginatedUserAPIKeyList | None:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         page (int | Unset):
