@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
 from hackagent.storage import remote
+from hackagent.storage._http.api.models import PaginatedAgentList
 from hackagent.storage._http.api.agent import agent_create, agent_partial_update
 from hackagent.storage._http.api.campaign import campaign_start_create
 from hackagent.storage._http.api.result import result_create, result_partial_update
@@ -204,6 +205,33 @@ class TestRemoteBackendListAgents(unittest.TestCase):
         self.assertEqual(result.total, 1)
         self.assertEqual(len(result.items), 1)
         self.assertEqual(result.items[0].name, "alpha")
+
+    def test_list_agents_parses_an_agent_without_an_endpoint(self):
+        backend = self._setup_backend_with_context()
+        org = str(_uid())
+        agent = {
+            "id": str(_uid()),
+            "name": "no-endpoint",
+            "endpoint": "",
+            "agent_type": "LITELLM",
+            "config": {},
+            "organization": org,
+            "organization_detail": {"id": org, "name": "org"},
+            "owner": None,
+            "owner_detail": None,
+            "created_at": "2026-10-25T10:00:00Z",
+            "updated_at": "2026-10-25T10:00:00Z",
+        }
+        parsed = PaginatedAgentList.model_validate(
+            {"count": 1, "next": None, "previous": None, "results": [agent]}
+        )
+        resp = _mock_response(200, parsed=parsed)
+
+        with patch("hackagent.storage.remote.agent_list") as mock_list:
+            mock_list.sync_detailed.return_value = resp
+            result = backend.list_agents()
+
+        self.assertEqual(result.items[0].name, "no-endpoint")
 
     def test_list_agents_empty_on_http_error(self):
         backend = self._setup_backend_with_context()
