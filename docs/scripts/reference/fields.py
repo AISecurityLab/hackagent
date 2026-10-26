@@ -14,7 +14,7 @@ from __future__ import annotations
 import collections.abc
 import enum
 import types
-from typing import Any, Literal, Mapping, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Mapping, Union, get_args, get_origin
 
 import annotated_types
 from pydantic import BaseModel
@@ -65,6 +65,8 @@ def nested_model(annotation: Any) -> type[BaseModel] | None:
 def type_name(annotation: Any, links: Links, page: str) -> str:
     """How to describe an annotation to someone writing a campaign file."""
     origin, args = get_origin(annotation), get_args(annotation)
+    if origin is Annotated:
+        return type_name(args[0], links, page)
     if annotation is Any:
         return "any"
     if annotation is type(None):

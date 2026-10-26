@@ -20,8 +20,18 @@ def config()
 
 ```python
 @config.command()
-@click.option("--api-key", help="HackAgent API key")
+@click.option(
+    "--backend",
+    type=click.Choice(["local", "remote"]),
+    help=
+    "Default storage backend (remote reads the key from HACKAGENT_API_KEY)",
+)
 @click.option("--base-url", help="HackAgent API base URL")
+@click.option(
+    "--ca-bundle",
+    type=click.Path(exists=True, dir_okay=True),
+    help="CA bundle (PEM) trusted for the HackAgent API",
+)
 @click.option(
     "--verbose",
     type=str,
@@ -29,10 +39,10 @@ def config()
 )
 @click.pass_context
 @handle_errors
-def set(ctx, api_key, base_url, verbose)
+def set(ctx, backend, base_url, ca_bundle, verbose)
 ```
 
-Set configuration values
+Set configuration values (API keys are never saved: use env variables)
 
 #### show
 

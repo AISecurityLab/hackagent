@@ -213,7 +213,7 @@ EXAMPLES: dict[str, list[tuple[str, Any]]] = {
                         "provider": "openai",
                         "type": "OPENAI",
                         "endpoint": "https://api.openai.com/v1",
-                        "api_key_env": "OPENAI_API_KEY",
+                        "api_key": "${OPENAI_API_KEY}",
                     },
                     "generation": {"temperature": 0.0, "max_tokens": 512},
                 }
@@ -354,7 +354,7 @@ def _agent_types() -> str:
         "field that matters; `provider` is only a label.",
         "",
         "**Chat APIs**, reached over HTTP and driven through LiteLLM: "
-        f"{chat_names}. These need an `endpoint`, and an `api_key_env` when the "
+        f"{chat_names}. These need an `endpoint`, and an `api_key` when the "
         "provider requires a key. `OLLAMA` is the exception: leave its "
         "`endpoint` unset and HackAgent reads `OLLAMA_HOST`, so the campaign "
         "follows whichever Ollama the machine runs.",

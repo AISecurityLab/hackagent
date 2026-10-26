@@ -19,6 +19,35 @@ export HACKAGENT_BASE_URL=https://api.example.com/prefix
 API requests preserve the prefix: an endpoint such as `/agent/` is
 requested at `https://api.example.com/prefix/agent/`.
 
+## API key
+
+The default platform credential variable is `HACKAGENT_API_KEY`.
+Credentials do not select storage: choose `backend: remote` explicitly when
+results should be stored remotely.
+
+Python callers can supply a runtime value:
+
+```python
+import os
+from hackagent import Settings
+
+settings = Settings.resolve(
+    api_key=os.environ["HACKAGENT_API_KEY"], backend="remote"
+)
+```
+
+Configuration files use the same `api_key` field with an explicit reference:
+
+```yaml
+api_key: "${HACKAGENT_API_KEY}"
+```
+
+Other variables may be selected explicitly with `${VARIABLE}`. Missing or
+empty selected variables fail before execution. Literal keys are rejected
+in configuration files; resolved values are never written back to them.
+Model connections select their own credential explicitly. A platform key
+is only supplied automatically to the configured HackAgent gateway.
+
 ## CA bundle
 
 TLS certificates are verified. To trust a private certificate authority,

@@ -79,7 +79,7 @@ const { results } = await response.json();
 
 ## Authentication
 
-Send the API key as a bearer token on every request: `Authorization: Bearer <api-key>`. The dashboard shows a new key once, when you create it; store it like a password. The SDK and CLI read it from `HACKAGENT_API_KEY` or from `hackagent config set --api-key`.
+Send the API key as a bearer token on every request: `Authorization: Bearer <api-key>`. The dashboard shows a new key once, when you create it; store it like a password. The SDK and CLI read it from `HACKAGENT_API_KEY`.
 
 A missing, malformed or revoked key gets `401` with `WWW-Authenticate: Bearer`. A few account endpoints only work from a signed-in dashboard session; they answer an API key with `401` and `"API key authentication not allowed on this endpoint"`. The resource sections below mark them **dashboard only**.
 

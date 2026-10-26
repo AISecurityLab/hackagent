@@ -11,6 +11,8 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Mapping
 
 from hackagent.core.contracts import AgentType, ModelSpec
+from hackagent.core.credentials import resolve_api_key, is_gateway_endpoint
+from hackagent.core.settings import resolve_remote_base_url
 from hackagent.models.completions import LiteLLMModel
 from hackagent.models.config import ModelConfig, ModelConnection, ModelGeneration
 from hackagent.models.completions.litellm import (
@@ -27,11 +29,7 @@ class ModelCallError(RuntimeError):
 
 
 def build_model(config: ModelConfig, *, retries: int = 0) -> Model:
-    """Create the model client described by ``config``.
-
-    No request is sent. An ``api_key_env`` that is not set fails here, so
-    configuration errors surface before a run starts.
-    """
+    """Build a client from one connection configuration, without network I/O."""
     if retries < 0:
         raise ValueError("retries cannot be negative")
     provider = get_provider_config(config.connection.type)
@@ -73,7 +71,7 @@ def build_embedder(
         "identifier": config.name,
         "endpoint": config.connection.endpoint,
         "agent_type": config.connection.type.value,
-        "api_key_env": config.connection.api_key_env,
+        "api_key": config.connection.api_key,
         "timeout": config.connection.timeout,
     }
     kwargs = embedding_request_kwargs(spec)
@@ -118,15 +116,20 @@ def _litellm_model(config: ModelConfig) -> LiteLLMModel:
     provider = get_provider_config(connection.type)
     assert provider is not None
     endpoint = connection.endpoint
-    api_key = None
-    api_key_env = connection.api_key_env
+    api_key = resolve_api_key(
+        connection.api_key,
+        use_default=is_gateway_endpoint(endpoint, resolve_remote_base_url()),
+        required=is_gateway_endpoint(endpoint, resolve_remote_base_url()),
+        purpose=f"Model {config.name!r} API key",
+    )
     if connection.type == AgentType.OLLAMA:
         endpoint = normalise_ollama_endpoint(endpoint)
-        api_key_env = None
-    elif connection.type == AgentType.OPENAI and endpoint and not api_key_env:
-        # Self-hosted OpenAI-compatible servers accept any key, but the
-        # client refuses to send a request without one.
+        api_key = api_key or "not-needed"
+    elif connection.type == AgentType.OPENAI and endpoint and api_key is None:
         api_key = "not-needed"
+    elif api_key is None:
+        # Do not let the underlying provider select an ambient provider key.
+        resolve_api_key(required=True, purpose=f"Model {config.name!r} API key")
 
     generation = config.generation
     return LiteLLMModel(
@@ -134,7 +137,6 @@ def _litellm_model(config: ModelConfig) -> LiteLLMModel:
         connection=ModelConnection(
             api_base=endpoint,
             api_key=api_key,
-            api_key_env=api_key_env,
             timeout=connection.timeout,
             extra_headers=dict(connection.headers),
         ),
@@ -197,7 +199,7 @@ def _adapter_spec(config: ModelConfig) -> ModelSpec:
         identifier=config.name,
         endpoint=config.connection.endpoint,
         agent_type=config.connection.type,
-        api_key_env=config.connection.api_key_env,
+        api_key=config.connection.api_key,
         timeout=config.connection.timeout,
         extra=extra,
         **fields,

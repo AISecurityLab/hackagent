@@ -105,21 +105,22 @@ def test_recorded_campaign_redacts_credentials_wherever_they_are_written():
     }
 
 
-def test_recorded_campaign_keeps_references_to_credentials():
+def test_recorded_campaign_keeps_references_to_credentials(monkeypatch):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "runtime-secret")
     """An environment variable's name is how a repeated run finds the key."""
     values = campaign(
         execution={
             "storage": {
                 "backend": "remote",
                 "base_url": "https://api.example",
-                "api_key_env": "HACKAGENT_API_KEY",
+                "api_key": "${HACKAGENT_API_KEY}",
             }
         }
     )
 
     recorded = load_campaign(values).recorded()
 
-    assert recorded["execution"]["storage"]["api_key_env"] == "HACKAGENT_API_KEY"
+    assert recorded["execution"]["storage"]["api_key"] == "${HACKAGENT_API_KEY}"
 
 
 def test_no_campaign_setting_is_mistaken_for_a_credential():
@@ -138,7 +139,7 @@ def test_no_campaign_setting_is_mistaken_for_a_credential():
             return
         seen.add(model)
         for name, field in model.model_fields.items():
-            if _is_credential_name(name):
+            if name != "api_key" and _is_credential_name(name):
                 mistaken.append(f"{model.__name__}.{name}")
             for outer in (field.annotation, *typing.get_args(field.annotation)):
                 for inner in (outer, *typing.get_args(outer)):
@@ -151,7 +152,8 @@ def test_no_campaign_setting_is_mistaken_for_a_credential():
     assert mistaken == []
 
 
-def test_repository_campaign_loads():
+def test_repository_campaign_loads(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-provider-key")
     """The campaign in the repository stays loadable, whatever it enables."""
     spec = load_campaign(REPO_CAMPAIGN)
     assert spec.target.connection.type is AgentType.OPENAI
@@ -195,10 +197,6 @@ def test_missing_file_is_reported(tmp_path):
             "Unknown judge type",
         ),
         (campaign(evaluation={"aggregation": "median"}), "aggregation"),
-        (
-            campaign(execution={"storage": {"backend": "remote"}}),
-            "Remote storage requires",
-        ),
         (
             campaign(execution={"concurrency": {"target": 0}}),
             "greater than or equal to 1",

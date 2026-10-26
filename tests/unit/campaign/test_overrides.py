@@ -170,7 +170,7 @@ def test_wait_for_servers_sends_the_connection_key(monkeypatch):
     monkeypatch.setenv("SERVER_KEY", "secret")
     values = _values()
     for judge in values["evaluation"]["judges"]:
-        judge["connection"]["api_key_env"] = "SERVER_KEY"
+        judge["connection"]["api_key"] = "${SERVER_KEY}"
     with patch(
         "hackagent.orchestrator.campaign.overrides.installed_models",
         return_value={"target", "atk", "shared", "other"},

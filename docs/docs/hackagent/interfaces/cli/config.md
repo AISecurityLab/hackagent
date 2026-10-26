@@ -6,8 +6,11 @@ title: hackagent.interfaces.cli.config
 CLI Configuration Management
 
 Adds CLI flags and verbosity on top of :class:`hackagent.core.settings.Settings`,
-so the CLI resolves credentials exactly like the SDK:
+so the CLI resolves settings exactly like the SDK:
 CLI args &gt; Environment &gt; Config file &gt; Default.
+
+API keys come from HACKAGENT_API_KEY or an explicit $\{VARIABLE\} file reference.
+The local storage default is independent of credentials.
 
 #### VERBOSITY\_ERROR
 
@@ -47,7 +50,7 @@ Re-resolve every value from CLI flags, environment and config file.
 def save(path: Optional[str] = None)
 ```
 
-Save configuration to file.
+Save the non-secret configuration to file. API keys are never saved.
 
 #### validate
 

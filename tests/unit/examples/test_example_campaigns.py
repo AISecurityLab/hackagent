@@ -39,6 +39,18 @@ class _Fake(Model):
         return ModelResponse(text="ok")
 
 
+@pytest.fixture(autouse=True)
+def example_credentials(monkeypatch):
+    """Load-only example checks use dummy credentials, never real providers."""
+    for name in (
+        "HACKAGENT_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "ANTHROPIC_API_KEY",
+    ):
+        monkeypatch.setenv(name, "example-test-key")
+
+
 def test_there_are_example_campaigns():
     """A glob that matches nothing would make every test below vacuous."""
     assert CAMPAIGNS

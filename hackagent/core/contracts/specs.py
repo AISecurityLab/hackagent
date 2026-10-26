@@ -10,6 +10,7 @@ from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from hackagent.core.contracts.enums import AgentType
+from hackagent.core.credentials import ApiKey
 
 
 class ModelSpec(BaseModel):
@@ -20,8 +21,8 @@ class ModelSpec(BaseModel):
     identifier: str
     endpoint: Optional[str] = None
     agent_type: AgentType = AgentType.OPENAI
-    api_key: Optional[str] = None
-    api_key_env: Optional[str] = None
+    #: Secret value injected at runtime. Excluded from dumps and repr.
+    api_key: Optional[ApiKey] = Field(default=None, repr=False)
     max_tokens: Optional[int] = Field(default=None, ge=1)
     temperature: Optional[float] = Field(default=None, ge=0.0)
     top_p: Optional[float] = None

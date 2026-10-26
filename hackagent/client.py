@@ -22,7 +22,8 @@ from uuid import UUID
 
 from hackagent.core.contracts import AgentType
 from hackagent.core.logging import get_logger
-from hackagent.core.settings import Settings
+from hackagent.core.credentials import CredentialError
+from hackagent.core.settings import Mode, Settings
 
 logger = get_logger(__name__)
 
@@ -44,8 +45,13 @@ def _open_store(
             "HackAgent using caller-provided backend %s", type(backend).__name__
         )
         return backend
-    if settings.api_key:
+    if settings.mode is Mode.REMOTE:
         from hackagent.storage.remote import RemoteBackend
+
+        if not settings.api_key:
+            raise CredentialError(
+                "Remote storage requires a HackAgent platform API key."
+            )
 
         logger.info("HackAgent using remote backend → %s", settings.base_url)
         return RemoteBackend.connect(
@@ -58,8 +64,8 @@ def _open_store(
     from hackagent.storage.local import LocalBackend
 
     logger.info(
-        "HackAgent using local backend → %s. Set HACKAGENT_API_KEY or "
-        "pass api_key= to enable remote tracking.",
+        "HackAgent using local backend → %s. Pass backend='remote' "
+        "(or set HACKAGENT_BACKEND=remote) to enable remote tracking.",
         settings.db_path,
     )
     return LocalBackend(db_path=settings.db_path)
@@ -398,7 +404,7 @@ def _target_spec(
         identifier=str(model_name),
         endpoint=flat.pop("endpoint", None) or endpoint or None,
         agent_type=agent_type,
-        api_key=flat.pop("api_key", None) or None,
+        api_key=flat.pop("api_key", None),
         extra=flat,
         **fields,
     )

@@ -126,7 +126,8 @@ def test_run_applies_an_endpoint_override_and_reports_the_summary():
     assert report["succeeded"] is True
 
 
-def test_main_cli_passes_its_remote_settings_to_the_campaign_runner():
+def test_main_cli_passes_its_remote_settings_to_the_campaign_runner(monkeypatch):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "dashboard-key")
     runner = CliRunner()
     captured = {}
 
@@ -141,8 +142,10 @@ def test_main_cli_passes_its_remote_settings_to_the_campaign_runner():
         result = runner.invoke(
             cli,
             [
-                "--api-key",
-                "dashboard-key",
+                "--config-file",
+                "/nonexistent-hackagent-test-config",
+                "--backend",
+                "remote",
                 "--base-url",
                 "https://api.example.test",
                 "campaign",

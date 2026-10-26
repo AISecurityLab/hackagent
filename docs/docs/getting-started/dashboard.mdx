@@ -14,8 +14,8 @@ with no Node runtime, Docker or database server involved.
 
 The recording shows the runs of the [example run](./example-run.mdx) against a small support bot.
 
-- **Local mode** (no API key): reads the runs recorded in your SQLite database. Read-only, apart from deleting a run.
-- **Remote mode** (API key configured): shows your hosted HackAgent data.
+- **Local mode** (the default local backend): reads the runs recorded in your SQLite database. Read-only, apart from deleting a run.
+- **Remote mode** (`--backend remote`, with `HACKAGENT_API_KEY` set): shows your hosted HackAgent data.
 
 Your API key never reaches the browser. It stays in the CLI process, which
 attaches it to each request it proxies; the page itself runs with authentication

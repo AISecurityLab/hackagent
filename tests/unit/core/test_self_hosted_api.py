@@ -118,14 +118,14 @@ def test_cli_keeps_the_path_prefix(recorded, base_url, tmp_path):
     from hackagent.interfaces.cli.main import cli
 
     requests, _ = recorded
-    with patch.dict("os.environ", _NO_CA_ENV):
+    with patch.dict("os.environ", {**_NO_CA_ENV, "HACKAGENT_API_KEY": "secret"}):
         result = CliRunner().invoke(
             cli,
             [
                 "--config-file",
                 str(tmp_path / "missing.json"),
-                "--api-key",
-                "secret",
+                "--backend",
+                "remote",
                 "--base-url",
                 base_url,
                 "config",

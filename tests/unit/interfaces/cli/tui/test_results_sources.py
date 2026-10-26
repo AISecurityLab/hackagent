@@ -51,7 +51,7 @@ def _session(db_path: str, *, campaign: str = "") -> HackAgent:
         )
     return HackAgent(
         Settings.resolve(
-            api_key="", db_path=db_path, env={}, config_path="/nonexistent"
+            backend="local", db_path=db_path, env={}, config_path="/nonexistent"
         ),
         backend=store,
     )
