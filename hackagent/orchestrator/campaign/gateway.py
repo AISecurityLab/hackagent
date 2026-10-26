@@ -4,8 +4,9 @@
 """The HackAgent LLM gateway as a symbolic model connection.
 
 A stored campaign refers to the gateway as ``connection: {provider: hackagent,
-type: OPENAI}`` with no endpoint and no key variable. Whoever executes the run
-binds it to its own base URL and key with :func:`bind_gateway`.
+type: OPENAI}`` with no endpoint and no key. Whoever executes the run binds it
+to its own base URL and to the key in ``HACKAGENT_GATEWAY_KEY`` with
+:func:`bind_gateway`.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 from typing import Optional, TypeVar
 
 from hackagent.core.contracts import AgentType
+from hackagent.core.credentials import env_reference, reference_name
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
@@ -36,7 +38,7 @@ def _bind(config: M, endpoint: str) -> M:
             f"got type {config.connection.type.value}."
         )
     connection = config.connection.model_copy(
-        update={"endpoint": endpoint, "api_key_env": GATEWAY_KEY_ENV}
+        update={"endpoint": endpoint, "api_key": env_reference(GATEWAY_KEY_ENV)}
     )
     return config.model_copy(update={"connection": connection})
 
@@ -70,6 +72,8 @@ def spec_models(spec: CampaignSpec) -> list[tuple[str, ModelConfig]]:
 
 def bind_gateway(spec: CampaignSpec, base_url: str) -> CampaignSpec:
     """Point every gateway model of ``spec`` at ``base_url`` and its key variable.
+
+    The key is read from ``HACKAGENT_GATEWAY_KEY`` when each model is built.
 
     Raises ``ValueError`` for a gateway model whose type is not ``OPENAI``.
     """
@@ -110,11 +114,12 @@ def bind_gateway(spec: CampaignSpec, base_url: str) -> CampaignSpec:
 
 def key_envs(spec: CampaignSpec) -> set[str]:
     """Every non-gateway API-key variable the spec reads."""
-    return {
-        m.connection.api_key_env
+    names = (
+        reference_name(m.connection.api_key)
         for _, m in spec_models(spec)
-        if not is_gateway(m) and m.connection.api_key_env
-    }
+        if not is_gateway(m)
+    )
+    return {name for name in names if name}
 
 
 def uses_gateway(spec: CampaignSpec) -> bool:

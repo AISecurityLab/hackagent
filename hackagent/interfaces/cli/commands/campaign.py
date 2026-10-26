@@ -228,7 +228,7 @@ def run(
         if storage.backend == "remote":
             gateway_url = storage.base_url or settings.base_url
             # Nothing is sent in a dry run; any key lets the models build.
-            gateway_key = os.environ.get(storage.api_key_env or "") or settings.api_key
+            gateway_key = storage.api_key or settings.api_key
         else:
             gateway_url, gateway_key = settings.base_url, settings.api_key
         spec = bind_gateway(spec, gateway_url)
@@ -262,7 +262,7 @@ def run(
     on_event = event_printer(as_json)
 
     if tracked:
-        outcome = execute_spec(spec, on_event=on_event)
+        outcome = execute_spec(spec, on_event=on_event, settings=settings)
         if outcome.result is None:
             display_error(outcome.note or f"Campaign {outcome.status.lower()}.")
             raise SystemExit(1)

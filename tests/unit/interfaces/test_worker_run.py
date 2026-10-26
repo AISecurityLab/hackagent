@@ -177,6 +177,7 @@ def test_a_redirecting_endpoint_is_a_model_error(name, model_type, path):
                         "provider": "p",
                         "type": model_type,
                         "endpoint": f"http://127.0.0.1:{endpoint.server_port}{path}",
+                        "api_key": "test-key",
                     },
                 }
             )

@@ -75,7 +75,7 @@ def _agent_config(name="test-agent") -> dict:
         "connection": {
             "type": "LITELLM",
             "endpoint": "http://localhost:8000",
-            "api_key_env": "TARGET_KEY",
+            "api_key": "${TARGET_KEY}",
         },
         "generation": {"temperature": 0.2},
     }

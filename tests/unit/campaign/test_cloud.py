@@ -16,6 +16,8 @@ from hackagent.orchestrator.campaign.cloud import (
     secret_name_reason,
 )
 
+from hackagent.orchestrator.campaign.loader import load_stored_campaign
+
 from .fakes import campaign, model
 
 GW = {"name": "gateway", "connection": {"provider": "hackagent", "type": "OPENAI"}}
@@ -29,7 +31,7 @@ def m(name, type_, endpoint=None, **extra):
 
 
 def issues_for(target) -> list[CloudIssue]:
-    return cloud_issues(CampaignSpec.model_validate(campaign(target=target)))
+    return cloud_issues(load_stored_campaign(campaign(target=target)))
 
 
 def paths(issues) -> list[str]:
@@ -87,9 +89,11 @@ def test_a_gateway_marker_with_options_is_refused():
     ]
 
 
-@pytest.mark.parametrize("key", ["endpoint", "api_key_env"])
-def test_a_gateway_marker_with_an_endpoint_or_key_is_refused(key):
-    gateway = {"name": "g", "connection": {**GW["connection"], key: "X"}}
+@pytest.mark.parametrize(
+    ("key", "value"), [("endpoint", "https://x.example"), ("api_key", "${X_KEY}")]
+)
+def test_a_gateway_marker_with_an_endpoint_or_key_is_refused(key, value):
+    gateway = {"name": "g", "connection": {**GW["connection"], key: value}}
     assert paths(issues_for(gateway)) == ["target"]
 
 
@@ -301,7 +305,7 @@ def test_in_process_vllm_is_refused(endpoint):
 
 def keyed(name):
     target = m("gpt-4o", "OPENAI", ENDPOINT)
-    target["connection"]["api_key_env"] = name
+    target["connection"]["api_key"] = "${" + name + "}"
     return target
 
 
@@ -324,13 +328,12 @@ def test_a_secret_variable_named_as_a_key_is_allowed(name):
         "HOME",
         "LD_PRELOAD",
         "openai_api_key",
-        "1_API_KEY",
         "OPENAI_SECRET",
     ],
 )
 def test_a_variable_that_is_not_a_key_is_refused(name):
     assert secret_name_reason(name) is not None
-    assert paths(issues_for(keyed(name))) == ["target.connection.api_key_env"]
+    assert paths(issues_for(keyed(name))) == ["target.connection.api_key"]
 
 
 @pytest.mark.parametrize(
@@ -355,7 +358,18 @@ def test_a_key_named_variable_a_library_reads_settings_from_is_refused(name):
     assert secret_name_reason(name) == f"{name} can't hold a secret in the cloud"
     assert issues_for(keyed(name)) == [
         CloudIssue(
-            "target.connection.api_key_env", f"{name} can't hold a secret in the cloud"
+            "target.connection.api_key", f"{name} can't hold a secret in the cloud"
+        )
+    ]
+
+
+def test_a_key_given_as_a_value_is_refused():
+    target = m("gpt-4o", "OPENAI", ENDPOINT)
+    target["connection"]["api_key"] = "sk-literal"
+    spec = CampaignSpec.model_validate(campaign(target=target))
+    assert cloud_issues(spec) == [
+        CloudIssue(
+            "target.connection.api_key", "the API key must be a ${VARIABLE} reference"
         )
     ]
 

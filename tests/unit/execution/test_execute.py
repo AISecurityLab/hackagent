@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import pytest
 
+from hackagent.core.credentials import reference_name
 from hackagent.models import ModelResponse, Reachability
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV
 from hackagent.orchestrator.execution import AdoptedRunStore, execute
@@ -153,8 +154,8 @@ class ProviderError(Exception):
 def test_completed_run_finishes_completed(tmp_path):
     outcome, store, run = execute_with(stored_campaign(tmp_path))
 
-    assert outcome.status == "COMPLETED"
     assert outcome.note == ""
+    assert outcome.status == "COMPLETED"
     assert outcome.result is not None
     assert outcome.result.campaign_run_id == run["id"]
     assert store.finished == [(store.run_id, "COMPLETED", "")]
@@ -409,7 +410,7 @@ def test_env_injected_and_restored(tmp_path, monkeypatch):
         return "a reply"
 
     target = model("target")
-    target["connection"]["api_key_env"] = "OPENAI_KEY"
+    target["connection"]["api_key"] = "${OPENAI_KEY}"
     outcome, _, _ = execute_with(
         stored_campaign(tmp_path, target=target),
         builder=FakeBuilder(models(target=ScriptedModel(target_reply))),
@@ -478,7 +479,7 @@ def test_gateway_bound_with_executor_base_url(tmp_path):
     assert outcome.status == "COMPLETED"
     gateway = next(c for c in built if c.name == "gateway")
     assert gateway.connection.endpoint == "https://exec.example/api/v1"
-    assert gateway.connection.api_key_env == GATEWAY_KEY_ENV
+    assert reference_name(gateway.connection.api_key) == GATEWAY_KEY_ENV
 
 
 # --- execute_spec and remote campaigns --------------------------------------
@@ -492,10 +493,10 @@ class StartingStore:
 
     instances: list["StartingStore"] = []
 
-    def __init__(self, base_url, api_key):
+    def __init__(self, base_url, api_key, *, verify=True):
         from uuid import uuid4
 
-        self.base_url, self.api_key = base_url, api_key
+        self.base_url, self.api_key, self.verify = base_url, api_key, verify
         self.client = MagicMock()
         self.run_id, self.agent_id, self.org_id = uuid4(), uuid4(), uuid4()
         self.started: list[tuple] = []
@@ -556,7 +557,7 @@ def remote_spec(tmp_path, **sections):
         "storage": {
             "backend": "remote",
             "base_url": STORAGE_URL,
-            "api_key_env": STORAGE_KEY_ENV,
+            "api_key": "${" + STORAGE_KEY_ENV + "}",
         },
         **sections.pop("execution", {}),
     }
@@ -601,15 +602,26 @@ def test_execute_spec_starts_the_run_on_the_storage_server(
     # The stored campaign keeps the gateway marker, not this executor's address.
     stored_judge = remote_store.started[0][1]["evaluation"]["judges"][0]["connection"]
     assert stored_judge["provider"] == "hackagent"
-    assert "endpoint" not in stored_judge and "api_key_env" not in stored_judge
+    assert "endpoint" not in stored_judge and "api_key" not in stored_judge
     assert remote_store.closed == [{"close_client": True}]
 
 
 def test_execute_spec_needs_the_storage_key(tmp_path, starting_store, monkeypatch):
-    monkeypatch.delenv(STORAGE_KEY_ENV)
+    from hackagent.core.credentials import CredentialError
+    from hackagent.orchestrator.campaign import load_campaign
 
-    with pytest.raises(ValueError, match=STORAGE_KEY_ENV):
-        execute.execute_spec(remote_spec(tmp_path))
+    monkeypatch.delenv("HACKAGENT_API_KEY", raising=False)
+    spec = load_campaign(
+        campaign(
+            execution={
+                "output": {"directory": str(tmp_path)},
+                "storage": {"backend": "remote", "base_url": STORAGE_URL},
+            }
+        )
+    )
+
+    with pytest.raises(CredentialError, match="HACKAGENT_API_KEY"):
+        execute.execute_spec(spec)
     assert starting_store == []
 
 
@@ -618,8 +630,8 @@ def test_a_started_run_whose_setup_fails_is_finished_failed(
 ):
     original = StartingStore.__init__
 
-    def broken_context(self, *args):
-        original(self, *args)
+    def broken_context(self, *args, **kwargs):
+        original(self, *args, **kwargs)
         self.context_error = RuntimeError("context unavailable")
 
     monkeypatch.setattr(StartingStore, "__init__", broken_context)
@@ -667,7 +679,7 @@ def test_run_campaign_with_remote_storage_is_a_tracked_run(
     assert store.finished == [(remote_store.run_id, "COMPLETED", "")]
     gateway = next(c for c in built if c.name == "gateway")
     assert gateway.connection.endpoint == f"{STORAGE_URL}/v1"
-    assert gateway.connection.api_key_env == GATEWAY_KEY_ENV
+    assert reference_name(gateway.connection.api_key) == GATEWAY_KEY_ENV
 
 
 def test_run_campaign_with_remote_storage_raises_when_cancelled(
@@ -941,11 +953,11 @@ def test_a_cloud_run_refuses_a_program_that_runs_code(tmp_path):
 )
 def test_a_cloud_run_refuses_a_key_variable_that_is_not_a_key(tmp_path, name):
     target = model("target")
-    target["connection"]["api_key_env"] = name
+    target["connection"]["api_key"] = "${" + name + "}"
 
     outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
 
-    _refused(outcome, "target.connection.api_key_env")
+    _refused(outcome, "target.connection.api_key")
 
 
 def test_a_cloud_run_refuses_goals_from_a_file(tmp_path):

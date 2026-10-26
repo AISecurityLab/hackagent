@@ -11,8 +11,8 @@ a campaign it runs is either the HackAgent gateway marker, exactly as
 type. Each model's LiteLLM provider, as LiteLLM itself infers it from the
 model string the model is built with, must be one of
 :data:`HOSTED_PROVIDERS` without an endpoint, or of
-:data:`ENDPOINT_PROVIDERS` with one, and the variable its key is read from
-must pass :func:`secret_name_reason`. Goals come from a preset or the
+:data:`ENDPOINT_PROVIDERS` with one, and its key must be a ``${VARIABLE}``
+reference whose variable passes :func:`secret_name_reason`. Goals come from a preset or the
 campaign itself; no technique parameter may carry code (see
 :meth:`~hackagent.attacks.techniques.contract.AttackParams.cloud_parameter_issues`),
 no setting may name a path, and ``trust_remote_code`` is never set.
@@ -31,6 +31,7 @@ from typing import Any, Iterator, Mapping, Optional
 
 from hackagent.attacks.techniques.registry import get_attack_class
 from hackagent.core.contracts import AgentType
+from hackagent.core.credentials import reference_name
 from hackagent.datasets.calibration import CalibrationSpec
 from hackagent.models.completions.litellm import resolve_litellm_model
 from hackagent.models.config import ModelConfig
@@ -167,10 +168,15 @@ def model_cloud_issues(config: ModelConfig, path: str) -> list[CloudIssue]:
         for key in config.options
         if key not in allowed
     ]
-    if connection.api_key_env is not None:
-        reason = secret_name_reason(connection.api_key_env)
+    if connection.api_key is not None:
+        name = reference_name(connection.api_key)
+        reason = (
+            secret_name_reason(name)
+            if name
+            else "the API key must be a ${VARIABLE} reference"
+        )
         if reason:
-            issues.append(CloudIssue(f"{path}.connection.api_key_env", reason))
+            issues.append(CloudIssue(f"{path}.connection.api_key", reason))
     reason = _provider_reason(
         connection.type,
         config.name,
@@ -187,8 +193,8 @@ def _gateway_issues(config: ModelConfig, path: str) -> list[CloudIssue]:
     reasons = []
     if connection.type != AgentType.OPENAI:
         reasons.append("the HackAgent gateway must have type OPENAI")
-    if connection.endpoint is not None or connection.api_key_env is not None:
-        reasons.append("the HackAgent gateway must not set endpoint or api_key_env")
+    if connection.endpoint is not None or connection.api_key is not None:
+        reasons.append("the HackAgent gateway must not set endpoint or api_key")
     if config.options:
         reasons.append("the HackAgent gateway takes no options")
     if connection.type == AgentType.OPENAI:

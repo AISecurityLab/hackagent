@@ -163,7 +163,9 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
     config.require_remote()
     settings = config.settings
 
-    store = RemoteBackend.connect(settings.base_url, settings.api_key)
+    store = RemoteBackend.connect(
+        settings.base_url, settings.api_key, verify=settings.verify
+    )
     try:
         _check_key(store)
         if run_id is None:
@@ -198,6 +200,7 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
                     gateway_key=settings.api_key,
                     claimed_by=_local_executor(),
                     on_event=event_printer(as_json),
+                    settings=settings,
                 )
         except RunNotClaimable as exc:
             _fail(exc.note)

@@ -24,8 +24,8 @@ from tests.unit.interfaces.cli.test_campaign_command import MIN
 
 RUN_ID = str(uuid4())
 CAMPAIGN = copy.deepcopy(MIN)
-CAMPAIGN["target"]["connection"]["api_key_env"] = "OPENAI_KEY"
-ARGS = ["--api-key", "k", "--base-url", "https://api.example.test"]
+CAMPAIGN["target"]["connection"]["api_key"] = "${OPENAI_KEY}"
+ARGS = ["--base-url", "https://api.example.test"]
 
 
 def _detail(**over):
@@ -42,6 +42,7 @@ def _detail(**over):
 @pytest.fixture
 def store(monkeypatch):
     monkeypatch.delenv("OPENAI_KEY", raising=False)
+    monkeypatch.setenv("HACKAGENT_API_KEY", "k")
     backend = MagicMock()
     backend.get_run_detail.return_value = _detail()
     backend.list_queued_local_runs.return_value = []
@@ -198,7 +199,7 @@ def _remote_values():
     values["execution"]["storage"] = {
         "backend": "remote",
         "base_url": "https://api.example.test",
-        "api_key_env": "HACKAGENT_API_KEY",
+        "api_key": "${HACKAGENT_API_KEY}",
     }
     gateway = {"name": "gw", "connection": {"provider": "hackagent", "type": "OPENAI"}}
     values["attacks"] = [{"name": "pair", "roles": {"attacker": gateway}}]
@@ -230,7 +231,7 @@ def test_campaign_run_remote_records_the_campaign_as_written(monkeypatch):
     sent = execute.call_args.args[0]
     connection = sent.attacks[0].roles["attacker"].connection
     assert connection.provider == "hackagent"
-    assert connection.endpoint is None and connection.api_key_env is None
+    assert connection.endpoint is None and connection.api_key is None
 
 
 def test_campaign_dry_run_with_remote_storage_stays_local(monkeypatch):

@@ -68,8 +68,8 @@ def register_target(store: Store, target: ModelConfig) -> UUID:
     """Create or update the agent record that runs are attached to.
 
     The agent stores the target's whole model config, with any credential
-    written into the campaign file redacted: keys stay in the environment
-    variable ``api_key_env`` names.
+    written into the campaign file redacted: an API key is stored only as
+    its ``${VARIABLE}`` reference.
     """
     agent = store.create_or_update_agent(target.name, recorded_model(target))
     return agent.id

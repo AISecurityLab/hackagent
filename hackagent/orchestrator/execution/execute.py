@@ -29,12 +29,20 @@ from typing import Any, Literal, Optional
 from uuid import UUID
 
 from hackagent.core.async_utils import run_coroutine_blocking
+from hackagent.core.credentials import env_reference, resolve_api_key
 from hackagent.core.logging import get_logger
+from hackagent.core.settings import (
+    Settings,
+    env_ca_bundle,
+    resolve_remote_base_url,
+    ssl_verify,
+)
 from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals
 from hackagent.models import build_embedder, build_model
 from hackagent.orchestrator.campaign.audit import CalibrationLoader
 from hackagent.orchestrator.campaign.cloud import CloudIssue, cloud_issues
+from hackagent.orchestrator.campaign.loader import load_stored_campaign
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV, bind_gateway
 from hackagent.orchestrator.campaign.resolve import (
     EmbedderBuilder,
@@ -101,6 +109,7 @@ def execute_run(
     interrupted_as: tuple[Status, str] = CANCELLED_ON_INTERRUPT,
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
+    settings: Optional[Settings] = None,
 ) -> ExecutionOutcome:
     """Claim ``run_id`` (unless ``claim`` is given), execute it and finish it.
 
@@ -113,7 +122,8 @@ def execute_run(
     output files to a temporary folder, removed afterwards: its results are
     on the server, and it runs only a campaign the cloud may run (see
     :func:`~hackagent.orchestrator.campaign.cloud.cloud_issues`); any other
-    ends FAILED before a model is built. Raises
+    ends FAILED before a model is built. ``settings`` are the ones the
+    campaign is resolved with (resolved when omitted). Raises
     :class:`~hackagent.storage.RunNotClaimable` when the run cannot be
     claimed.
     """
@@ -160,6 +170,7 @@ def execute_run(
                 build=build,
                 load=load,
                 interrupted_as=interrupted_as,
+                settings=settings,
             )
         )
     finally:
@@ -173,18 +184,29 @@ def execute_spec(
     on_event: Optional[EventCallback] = None,
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
+    settings: Optional[Settings] = None,
 ) -> ExecutionOutcome:
     """Run a campaign whose results go to the server its storage names.
 
-    The server and its key are the ones ``execution.storage`` names. The run
+    The server and its key are the ones ``execution.storage`` names, or else
+    those of ``settings`` (resolved when omitted), as for any remote store. The run
     is started there already claimed by this machine (the ``cli`` executor),
     recorded with the campaign as written, then executed with its gateway
     models bound to that server and finished like :func:`execute_run`.
     """
-    store, api_key = _connect(spec.execution.storage)
+    store, base_url, api_key = _connect(spec.execution.storage, settings)
     try:
         return _execute(
-            _start(store, spec, api_key, on_event=on_event, build=build, load=load)
+            _start(
+                store,
+                spec,
+                base_url,
+                api_key,
+                settings,
+                on_event=on_event,
+                build=build,
+                load=load,
+            )
         )
     finally:
         store.close(close_client=True)
@@ -199,6 +221,7 @@ async def arun_remote_campaign(
     calibration: CalibrationLoader = load_calibration,
     build_embed: EmbedderBuilder = build_embedder,
     resolved: Optional[ResolvedCampaign] = None,
+    settings: Optional[Settings] = None,
 ) -> CampaignResult:
     """:func:`execute_spec` for an async caller, returning the result.
 
@@ -206,12 +229,14 @@ async def arun_remote_campaign(
     ended early (cancel requested, out of credits, no longer accepted)
     raises :class:`RunEnded`.
     """
-    store, api_key = _connect(spec.execution.storage)
+    store, base_url, api_key = _connect(spec.execution.storage, settings)
     try:
         execution = _start(
             store,
             spec,
+            base_url,
             api_key,
+            settings,
             on_event=on_event,
             build=build,
             load=load,
@@ -249,16 +274,17 @@ def executable_spec(
 ) -> CampaignSpec:
     """The stored campaign, with the remote storage this executor writes to.
 
-    The server leaves the storage address and key variable for the executor
-    to supply; the key is the one this executor runs with. A given
-    ``output_directory`` replaces where the run's files are written.
+    The server leaves the storage address and key for the executor to
+    supply; the key is the one this executor runs with. A given
+    ``output_directory`` replaces where the run's files are written. API keys
+    stay ``${VARIABLE}`` references, read when each model is built.
     """
     values = dict(campaign_config)
     execution = dict(values.get("execution") or {})
     execution["storage"] = {
         "backend": "remote",
         "base_url": base_url,
-        "api_key_env": GATEWAY_KEY_ENV,
+        "api_key": env_reference(GATEWAY_KEY_ENV),
     }
     if output_directory is not None:
         execution["output"] = {
@@ -266,27 +292,43 @@ def executable_spec(
             "directory": output_directory,
         }
     values["execution"] = execution
-    return CampaignSpec.model_validate(values)
+    return load_stored_campaign(values)
 
 
-def _connect(storage: StorageSpec) -> tuple[RemoteBackend, str]:
-    """The store for the server ``storage`` names, and the key it uses."""
-    assert storage.base_url and storage.api_key_env  # enforced by StorageSpec
-    api_key = os.environ.get(storage.api_key_env, "").strip()
-    if not api_key:
-        raise ValueError(
-            f"Environment variable {storage.api_key_env!r} required for remote "
-            "storage is not set."
-        )
-    return RemoteBackend.connect(storage.base_url, api_key), api_key
+def _connect(
+    storage: StorageSpec, settings: Optional[Settings]
+) -> tuple[RemoteBackend, str, str]:
+    """The store for the server ``storage`` names, its address and its key.
+
+    Resolved as :func:`~hackagent.orchestrator.campaign.tracking.open_store`
+    resolves a remote store.
+    """
+    api_key = resolve_api_key(
+        storage.api_key
+        if storage.api_key is not None
+        else (settings.api_key if settings else None),
+        use_default=True,
+        required=True,
+        purpose="Remote campaign storage API key",
+    )
+    assert api_key is not None  # required
+    base_url = (
+        storage.base_url
+        or (settings.base_url if settings is not None else resolve_remote_base_url())
+    ).rstrip("/")
+    verify = settings.verify if settings else ssl_verify(env_ca_bundle())
+    return RemoteBackend.connect(base_url, api_key, verify=verify), base_url, api_key
 
 
 def _start(
-    store: RemoteBackend, spec: CampaignSpec, api_key: str, **options: Any
+    store: RemoteBackend,
+    spec: CampaignSpec,
+    base_url: str,
+    api_key: str,
+    settings: Optional[Settings] = None,
+    **options: Any,
 ) -> _Execution:
     """Start the campaign's run on the server, claimed by this machine."""
-    base_url = spec.execution.storage.base_url
-    assert base_url  # enforced by StorageSpec
     agent_id = register_target(store, bind_gateway(spec, base_url).target)
     with _HeldSignals() as held:
         # Recorded as written: gateway models stay markers, not this address.
@@ -305,7 +347,13 @@ def _start(
             _finish(store, record.id, _ended_by(exc, CANCELLED_ON_INTERRUPT))
             raise
     return _Execution(
-        adopted, spec, base_url=base_url, gateway_key=api_key, env=None, **options
+        adopted,
+        spec,
+        base_url=base_url,
+        gateway_key=api_key,
+        env=None,
+        settings=settings,
+        **options,
     )
 
 
@@ -327,8 +375,10 @@ class _Execution:
         build_embed: EmbedderBuilder = build_embedder,
         resolved: Optional[ResolvedCampaign] = None,
         interrupted_as: tuple[Status, str] = CANCELLED_ON_INTERRUPT,
+        settings: Optional[Settings] = None,
     ) -> None:
         self.adopted = adopted
+        self.settings = settings
         self.spec = bind_gateway(spec, base_url)
         self.environment = {**(env or {}), GATEWAY_KEY_ENV: gateway_key}
         self.heartbeat = RunHeartbeat(adopted, adopted.run_id)
@@ -366,6 +416,7 @@ class _Execution:
                 calibration=self.calibration,
                 build_embed=self.build_embed,
                 resolved=self.resolved,
+                settings=self.settings,
             )
         )
 

@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import pytest
 
+from hackagent.core.credentials import reference_name
 from hackagent.models import ModelConfig
 from hackagent.orchestrator.campaign import CampaignSpec
+from hackagent.orchestrator.campaign.loader import load_stored_campaign
 from hackagent.orchestrator.campaign.gateway import (
     GATEWAY_KEY_ENV,
     bind_gateway,
@@ -23,15 +25,21 @@ JUDGE_GW = {**GW, "scoring": {"type": "harmbench"}}
 
 
 def _spec(**sections) -> CampaignSpec:
-    return CampaignSpec.model_validate(campaign(**sections))
+    return load_stored_campaign(campaign(**sections))
 
 
-def test_bind_gateway_sets_endpoint_and_key_env():
+def test_bind_gateway_sets_endpoint_and_key_reference():
     spec = _spec(attacks=[{"name": "pair", "roles": {"attacker": GW}}])
     bound = bind_gateway(spec, "https://api.x.it/")
     c = bound.attacks[0].roles["attacker"].connection
     assert c.endpoint == "https://api.x.it/v1"
-    assert c.api_key_env == GATEWAY_KEY_ENV == "HACKAGENT_GATEWAY_KEY"
+    assert reference_name(c.api_key) == GATEWAY_KEY_ENV == "HACKAGENT_GATEWAY_KEY"
+    assert (
+        bound.model_dump(mode="json")["attacks"][0]["roles"]["attacker"]["connection"][
+            "api_key"
+        ]
+        == "${HACKAGENT_GATEWAY_KEY}"
+    )
     assert c.provider == "hackagent"
 
 
@@ -50,7 +58,7 @@ def test_bind_gateway_rewrites_a_gateway_target():
 
 def test_non_gateway_models_untouched():
     target = model("target", "http://t/v1")
-    target["connection"]["api_key_env"] = "OPENAI_KEY"
+    target["connection"]["api_key"] = "${OPENAI_KEY}"
     spec = _spec(target=target, attacks=[{"name": "pair", "roles": {"attacker": GW}}])
     bound = bind_gateway(spec, "https://h")
     assert bound.target == spec.target
@@ -77,7 +85,7 @@ def test_is_gateway():
 
 def test_key_envs_excludes_gateway():
     target = model("target")
-    target["connection"]["api_key_env"] = "OPENAI_KEY"
+    target["connection"]["api_key"] = "${OPENAI_KEY}"
     bound = bind_gateway(
         _spec(
             target=target,

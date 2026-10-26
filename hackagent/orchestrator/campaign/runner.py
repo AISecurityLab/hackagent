@@ -198,6 +198,7 @@ async def arun_campaign(
             calibration=calibration,
             build_embed=build_embed,
             resolved=resolved,
+            settings=settings,
         )
     resolved = resolved or resolve_campaign(
         spec, build=build, load=load, build_embed=build_embed, settings=settings

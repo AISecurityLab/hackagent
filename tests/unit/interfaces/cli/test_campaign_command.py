@@ -177,6 +177,7 @@ def test_run_rejects_an_incompatible_override():
 
 def test_campaign_run_binds_gateway(monkeypatch):
     monkeypatch.delenv("HACKAGENT_GATEWAY_KEY", raising=False)
+    monkeypatch.setenv("HACKAGENT_API_KEY", "dashboard-key")
     gateway = {"name": "gw", "connection": {"provider": "hackagent", "type": "OPENAI"}}
     spec = CampaignSpec.model_validate(
         MIN | {"attacks": [{"name": "pair", "roles": {"attacker": gateway}}]}
@@ -195,8 +196,8 @@ def test_campaign_run_binds_gateway(monkeypatch):
         result = CliRunner().invoke(
             cli,
             [
-                "--api-key",
-                "dashboard-key",
+                "--config-file",
+                "/nonexistent-hackagent-test-config",
                 "--base-url",
                 "https://api.example.test",
                 "campaign",
@@ -210,7 +211,7 @@ def test_campaign_run_binds_gateway(monkeypatch):
     assert result.exit_code == 0, result.output
     connection = captured["spec"].attacks[0].roles["attacker"].connection
     assert connection.endpoint == "https://api.example.test/v1"
-    assert connection.api_key_env == "HACKAGENT_GATEWAY_KEY"
+    assert connection.api_key == "${HACKAGENT_GATEWAY_KEY}"
     assert captured["key"] == "dashboard-key"
     os.environ.pop("HACKAGENT_GATEWAY_KEY", None)
 

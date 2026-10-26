@@ -17,6 +17,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Callable, Mapping, Optional, Sequence
 
+from hackagent.core.credentials import reference_name
 from hackagent.models import Model, ModelConfig, ModelResponse, Reachability
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV
 from hackagent.orchestrator.campaign.resolve import ModelBuilder
@@ -46,7 +47,7 @@ class CreditGuard:
         connection = config.connection
         return (
             connection.endpoint == self.endpoint
-            and connection.api_key_env == GATEWAY_KEY_ENV
+            and reference_name(connection.api_key) == GATEWAY_KEY_ENV
         )
 
     def wrap(self, build: ModelBuilder) -> ModelBuilder:
