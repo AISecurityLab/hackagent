@@ -81,16 +81,17 @@ def test_non_secret_settings_follow_argument_environment_file_order(
     tmp_path, monkeypatch
 ):
     path = tmp_path / "config.json"
+    ca_bundle = str(tmp_path / "ca.pem")
     path.write_text(
         json.dumps(
-            {"base_url": "https://file.test", "verbose": 2, "ca_bundle": "/file/ca.pem"}
+            {"base_url": "https://file.test", "verbose": 2, "ca_bundle": ca_bundle}
         )
     )
     monkeypatch.setenv("HACKAGENT_BASE_URL", "https://env.test")
     config = CLIConfig(config_file=path, base_url="https://arg.test", verbose=3)
     assert config.base_url == "https://arg.test"
     assert config.verbose == 3
-    assert config.ca_bundle == "/file/ca.pem"
+    assert config.ca_bundle == ca_bundle
     assert CLIConfig(config_file=path).base_url == "https://env.test"
     monkeypatch.delenv("HACKAGENT_BASE_URL")
     assert CLIConfig(config_file=path).base_url == "https://file.test"

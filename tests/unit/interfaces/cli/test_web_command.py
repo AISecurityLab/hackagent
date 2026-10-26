@@ -367,3 +367,31 @@ def test_root_cli_applies_web_local_before_requiring_remote_credentials(
         assert result.exit_code == 0, result.output
         assert create.call_args.args[0].settings.mode is Mode.LOCAL
         app.run.assert_called_once()
+
+
+def test_web_db_path_override_expands_home_and_preserves_in_memory():
+    from types import SimpleNamespace
+
+    config = SimpleNamespace(
+        settings=Settings.resolve(
+            backend="local", db_path=":memory:", env={}, config_path="/nonexistent"
+        )
+    )
+    for db_path, expected in (
+        ("~/test-dashboard.db", str(Path("~/test-dashboard.db").expanduser())),
+        (":memory:", ":memory:"),
+    ):
+        app = MagicMock()
+        seen, opener = _open_with(_Closer())
+        with (
+            opener,
+            patch("hackagent.interfaces.web.create_app", return_value=app),
+            patch(
+                "hackagent.interfaces.cli.commands.web._free_port", return_value=True
+            ),
+        ):
+            result = CliRunner().invoke(
+                web, ["--db-path", db_path, "--no-browser"], obj={"config": config}
+            )
+        assert result.exit_code == 0, result.output
+        assert seen["settings"].db_path == expected
