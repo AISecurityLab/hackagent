@@ -34,7 +34,11 @@ from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals
 from hackagent.models import build_embedder, build_model
 from hackagent.orchestrator.campaign.audit import CalibrationLoader
-from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV, bind_gateway
+from hackagent.orchestrator.campaign.gateway import (
+    GATEWAY_KEY_ENV,
+    bind_gateway,
+    cloud_runnable,
+)
 from hackagent.orchestrator.campaign.resolve import (
     EmbedderBuilder,
     GoalLoader,
@@ -59,6 +63,7 @@ logger = get_logger(__name__)
 OUT_OF_CREDITS_NOTE = "Out of credits"
 REJECTED_NOTE = "Your API key is no longer valid for this run"
 CANCELLED_NOTE = "Campaign cancelled"
+NOT_CLOUD_RUNNABLE_NOTE = "This campaign uses a model type that can't run in the cloud"
 _NOTE_LIMIT = 500
 
 Status = Literal["COMPLETED", "FAILED", "CANCELLED"]
@@ -109,8 +114,11 @@ def execute_run(
     ``KeyboardInterrupt`` finishes the run with ``interrupted_as`` and is
     then passed on. A run claimed with a run token (in the cloud) writes its
     output files to a temporary folder, removed afterwards: its results are
-    on the server. Raises :class:`~hackagent.storage.RunNotClaimable` when
-    the run cannot be claimed.
+    on the server, and runs only models the cloud can reach (see
+    :func:`~hackagent.orchestrator.campaign.gateway.cloud_runnable`); any
+    other ends it FAILED before a model is built. Raises
+    :class:`~hackagent.storage.RunNotClaimable` when the run cannot be
+    claimed.
     """
     with _HeldSignals() as held:
         claim = claim or store.claim_run(run_id, claimed_by)
@@ -134,6 +142,8 @@ def execute_run(
                 base_url,
                 output_directory=scratch,
             )
+            if claim.run_token and not cloud_runnable(spec):
+                raise _NotCloudRunnable()
         except BaseException as exc:
             outcome = _ended_by(exc, interrupted_as)
             _finish(adopted, adopted.run_id, outcome)
@@ -436,10 +446,16 @@ def _outcome(
     return ExecutionOutcome("FAILED", failure_note(error))
 
 
+class _NotCloudRunnable(Exception):
+    """A cloud run whose campaign uses a model the cloud cannot run."""
+
+
 def _ended_by(
     error: BaseException, interrupted_as: tuple[Status, str]
 ) -> ExecutionOutcome:
     """How a run ends when ``error`` stops it before its campaign starts."""
+    if isinstance(error, _NotCloudRunnable):
+        return ExecutionOutcome("FAILED", NOT_CLOUD_RUNNABLE_NOTE)
     if isinstance(error, KeyboardInterrupt):
         return ExecutionOutcome(*interrupted_as)
     if isinstance(error, Exception):
@@ -572,6 +588,7 @@ def _environment(values: Mapping[str, str]) -> Iterator[None]:
 __all__ = [
     "CANCELLED_NOTE",
     "CANCELLED_ON_INTERRUPT",
+    "NOT_CLOUD_RUNNABLE_NOTE",
     "OUT_OF_CREDITS_NOTE",
     "REJECTED_NOTE",
     "ExecutionOutcome",

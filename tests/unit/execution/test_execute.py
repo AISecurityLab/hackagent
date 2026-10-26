@@ -816,3 +816,73 @@ def test_a_local_run_keeps_its_files(tmp_path):
 
     assert outcome.result.outputs
     assert all(path.exists() for path in outcome.result.outputs)
+
+
+# --- cloud model types ---------------------------------------------------------
+
+CLAUDE_CODE_JUDGE = {
+    "name": "judge",
+    "connection": {"provider": "local", "type": "CLAUDE_CODE"},
+    "scoring": {"type": "harmbench"},
+}
+
+
+def never_build(config, *, retries=0):
+    raise AssertionError(f"built {config.name} for a run that must not start")
+
+
+def cloud_execute(config, build):
+    run = run_detail(config)
+    return execute.execute_run(
+        SimpleNamespace(client=MagicMock()),
+        run["id"],
+        base_url=BASE_URL,
+        gateway_key=GATEWAY_KEY,
+        claimed_by="cloud-worker:test",
+        claim=ClaimResult(run=run, run_token="run-token-for-test", env={}),
+        build=build,
+        load=goals("goal one"),
+    )
+
+
+def test_a_cloud_run_refuses_a_local_agent_type_before_building(tmp_path):
+    config = stored_campaign(tmp_path, evaluation={"judges": [CLAUDE_CODE_JUDGE]})
+
+    outcome = cloud_execute(config, never_build)
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert (outcome.status, outcome.note) == ("FAILED", execute.NOT_CLOUD_RUNNABLE_NOTE)
+    assert store.finished == [
+        (
+            store.run_id,
+            "FAILED",
+            "This campaign uses a model type that can't run in the cloud",
+        )
+    ]
+
+
+def test_a_cloud_run_refuses_a_model_that_names_a_program(tmp_path):
+    target = {**model("target"), "options": {"binary": "/usr/bin/agent"}}
+
+    outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
+
+    assert (outcome.status, outcome.note) == ("FAILED", execute.NOT_CLOUD_RUNNABLE_NOTE)
+
+
+def test_a_cloud_run_allows_api_models_and_the_gateway(tmp_path):
+    config = stored_campaign(
+        tmp_path,
+        evaluation={"judges": [{**GW, "scoring": {"type": "harmbench"}}]},
+    )
+
+    outcome = cloud_execute(config, FakeBuilder(models(gateway=ScriptedModel("yes"))))
+
+    assert outcome.status == "COMPLETED"
+
+
+def test_a_local_run_allows_every_model_type(tmp_path):
+    config = stored_campaign(tmp_path, evaluation={"judges": [CLAUDE_CODE_JUDGE]})
+
+    outcome, _, _ = execute_with(config)
+
+    assert outcome.status == "COMPLETED"

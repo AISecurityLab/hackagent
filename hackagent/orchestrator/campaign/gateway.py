@@ -12,11 +12,14 @@ from __future__ import annotations
 
 from typing import Optional, TypeVar
 
+from hackagent.core.contracts import AgentType
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 GATEWAY_PROVIDER = "hackagent"
 GATEWAY_KEY_ENV = "HACKAGENT_GATEWAY_KEY"
+#: Model types the cloud worker runs: chat APIs it calls over HTTP.
+CLOUD_MODEL_TYPES = frozenset({AgentType.OPENAI, AgentType.LITELLM, AgentType.OLLAMA})
 
 M = TypeVar("M", bound=ModelConfig)
 
@@ -101,3 +104,14 @@ def key_envs(spec: CampaignSpec) -> set[str]:
 def uses_gateway(spec: CampaignSpec) -> bool:
     """Whether any model of ``spec`` is the gateway."""
     return any(is_gateway(m) for m in _models(spec))
+
+
+def cloud_runnable(spec: CampaignSpec) -> bool:
+    """Whether the cloud worker can run every model of ``spec``: each one is
+    the gateway, or an API of a :data:`CLOUD_MODEL_TYPES` type that names no
+    local program (``options.binary``)."""
+    return all(
+        is_gateway(m)
+        or (m.connection.type in CLOUD_MODEL_TYPES and "binary" not in m.options)
+        for m in _models(spec)
+    )
