@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.core.settings import Source
 from hackagent.interfaces.cli.utils import display_info, display_success, handle_errors
 from hackagent import resolve_remote_base_url
 from hackagent.core.settings import tls_error_hint
@@ -26,7 +27,11 @@ def config():
 
 
 @config.command()
-@click.option("--api-key", help="HackAgent API key")
+@click.option(
+    "--backend",
+    type=click.Choice(["local", "remote"]),
+    help="Default storage backend (remote reads the key from HACKAGENT_API_KEY)",
+)
 @click.option("--base-url", help="HackAgent API base URL")
 @click.option(
     "--ca-bundle",
@@ -40,18 +45,18 @@ def config():
 )
 @click.pass_context
 @handle_errors
-def set(ctx, api_key, base_url, ca_bundle, verbose):
-    """Set configuration values"""
+def set(ctx, backend, base_url, ca_bundle, verbose):
+    """Set storage, API location, CA bundle and verbosity defaults"""
 
     cli_config: CLIConfig = ctx.obj["config"]
 
     updated = False
 
-    if api_key:
-        cli_config.set_user_override("api_key", api_key)
+    if backend:
+        cli_config.set_user_override("backend", backend)
         updated = True
         if cli_config.should_show_info():
-            display_success("API key updated")
+            display_success(f"Storage backend updated to: {backend}")
 
     if base_url:
         cli_config.set_user_override("base_url", base_url)
@@ -118,24 +123,15 @@ def show(ctx):
     table.add_column("Value", style="green")
     table.add_column("Source", style="dim")
 
-    # ctx.params holds only this subcommand's options; --api-key/--base-url are
-    # group-level, so ask the config itself where each value came from.
-    api_key_source = (
-        cli_config.source_of("api_key") if cli_config.api_key else "Not set"
-    )
-    base_url_source = cli_config.source_of("base_url")
-
-    api_key_display = (
-        cli_config.api_key[:8] + "..." if cli_config.api_key else "Not set"
-    )
+    api_key_display = "Set" if cli_config.api_key else "Not set"
+    api_key_source = cli_config.source_of("api_key")
     from hackagent.interfaces.cli.config import VERBOSITY_NAMES
 
+    table.add_row(
+        "Storage Backend", cli_config.backend, cli_config.source_of("backend")
+    )
     table.add_row("API Key", api_key_display, api_key_source)
-    table.add_row("Base URL", cli_config.base_url, base_url_source)
-    if cli_config.ca_bundle:
-        table.add_row(
-            "CA Bundle", cli_config.ca_bundle, cli_config.source_of("ca_bundle")
-        )
+    table.add_row("Base URL", cli_config.base_url, cli_config.source_of("base_url"))
     verbosity_display = (
         f"{cli_config.verbose} ({VERBOSITY_NAMES.get(cli_config.verbose, 'UNKNOWN')})"
     )
@@ -176,7 +172,7 @@ def reset(ctx, confirm):
         display_success("✅ Configuration reset to defaults")
         if cli_config.should_show_info():
             display_info(
-                "API key will need to be set again using environment variable or 'hackagent config set --api-key'"
+                "API keys are read from environment variables (HACKAGENT_API_KEY by default)"
             )
     else:
         display_info("No configuration file to reset")
@@ -195,15 +191,9 @@ def validate(ctx):
 
         from contextlib import nullcontext
 
-        from hackagent import HackAgent, Settings
+        from hackagent import HackAgent
 
-        session = HackAgent(
-            Settings.resolve(
-                api_key=cli_config.api_key or "",
-                base_url=cli_config.base_url,
-                ca_bundle=cli_config.ca_bundle,
-            )
-        )
+        session = HackAgent(cli_config.settings)
         spinner = (
             console.status("[bold green]Testing API connection...")
             if cli_config.should_show_info()
@@ -222,7 +212,7 @@ def validate(ctx):
     except ValueError as e:
         console.print(f"[red]❌ Configuration validation failed: {e}")
         console.print("\n[cyan]💡 Quick fixes:")
-        console.print("  • Set API key: hackagent config set --api-key YOUR_KEY")
+        console.print("  • Set API key: export HACKAGENT_API_KEY=...")
         console.print(
             f"  • Set base URL: hackagent config set --base-url {resolve_remote_base_url()}"
         )
@@ -252,9 +242,17 @@ def import_config(ctx, config_file):
         cli_config: CLIConfig = ctx.obj["config"]
 
         updated_fields = []
+        from hackagent.core.credentials import prepare_credentials
+
+        config_data = prepare_credentials(config_data, from_file=True)
         if "api_key" in config_data:
-            cli_config.api_key = config_data["api_key"]
-            updated_fields.append("API key")
+            cli_config.set_user_override("api_key", config_data["api_key"])
+            cli_config._sources["api_key"] = Source.FILE
+            updated_fields.append("API key reference")
+
+        if config_data.get("backend") in ("local", "remote"):
+            cli_config.set_user_override("backend", config_data["backend"])
+            updated_fields.append("Storage backend")
 
         if "base_url" in config_data:
             cli_config.base_url = config_data["base_url"]

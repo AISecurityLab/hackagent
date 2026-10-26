@@ -7,10 +7,10 @@
 (the same single-page app as ``app.hackagent.dev``) and answers its API calls
 under ``/api/proxy``:
 
-* **remote mode** — an API key is configured, so calls are forwarded to
-  ``api.hackagent.dev`` with the key attached server-side (``_proxy``);
-* **offline mode** — no API key, so calls are answered from the local SQLite
-  store the SDK writes runs into (``_local_api``), read-only.
+* **remote mode** — the remote storage backend is selected, so calls are
+  forwarded to the configured API with the key attached server-side (``_proxy``);
+* **offline mode** — the local backend is selected (the default), so calls
+  are answered from the local SQLite store (``_local_api``), read-only.
 
 Either way the browser only ever talks to ``127.0.0.1``, and the SPA itself is
 identical to the hosted one — there is no second dashboard to keep in sync.
@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional
 
 from flask import Flask, Response, jsonify, send_from_directory
 
+from hackagent.core.settings import Mode
 from hackagent.interfaces.web._static import (
     bundle_source,
     bundle_version,
@@ -105,7 +106,8 @@ def create_app(client) -> Flask:
 
     Args:
         client: a :class:`hackagent.client.HackAgent` session. A configured
-            API key selects remote proxy mode. Otherwise calls are answered
+            ``remote`` storage backend selects remote proxy mode (its
+            settings carry the validated API key). Otherwise calls are answered
             from the session's local store. ``delete_run`` is the one local
             write; other writes stay unavailable.
 
@@ -122,7 +124,7 @@ def create_app(client) -> Flask:
 
     app = Flask(__name__, static_folder=None)
 
-    if client.settings.api_key:
+    if client.settings.mode is Mode.REMOTE:
         from hackagent.interfaces.web._proxy import create_proxy
 
         target = client.settings.base_url

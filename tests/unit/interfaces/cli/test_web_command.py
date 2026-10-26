@@ -3,6 +3,7 @@
 
 """Unit tests for the `hackagent web` CLI command."""
 
+from hackagent.core.settings import Settings
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -52,6 +53,14 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
         config.ca_bundle = None
+        config.settings = Settings.resolve(
+            api_key=config.api_key,
+            backend="remote" if config.api_key else "local",
+            base_url=config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
         app = MagicMock()
         store = _Closer()
         seen, opener = _open_with(store)
@@ -79,6 +88,14 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
         config.ca_bundle = None
+        config.settings = Settings.resolve(
+            api_key=config.api_key,
+            backend="remote" if config.api_key else "local",
+            base_url=config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
 
         store = _Closer()
         seen, opener = _open_with(store)
@@ -103,7 +120,7 @@ class TestWebCommand(unittest.TestCase):
         mock_create.assert_called_once()
         session = mock_create.call_args.args[0]
         self.assertIs(session.backend, store)
-        self.assertFalse(session.settings.api_key)
+        self.assertEqual(session.settings.mode.value, "local")
         app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
         self.assertTrue(store.closed)
 
@@ -113,6 +130,14 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
         config.ca_bundle = None
+        config.settings = Settings.resolve(
+            api_key=config.api_key,
+            backend="remote" if config.api_key else "local",
+            base_url=config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
 
         store = _Closer()
         seen, opener = _open_with(store)
@@ -131,8 +156,8 @@ class TestWebCommand(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
         session = mock_create.call_args.args[0]
-        self.assertFalse(seen["settings"].api_key)
-        self.assertFalse(session.settings.api_key)
+        self.assertEqual(seen["settings"].mode.value, "local")
+        self.assertEqual(session.settings.mode.value, "local")
 
     def test_web_without_bundle_exits_with_guidance(self):
         runner = CliRunner()
@@ -140,6 +165,14 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
         config.ca_bundle = None
+        config.settings = Settings.resolve(
+            api_key=config.api_key,
+            backend="remote" if config.api_key else "local",
+            base_url=config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
 
         from hackagent.interfaces.web import MissingBundleError
 
@@ -162,6 +195,14 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
         config.ca_bundle = None
+        config.settings = Settings.resolve(
+            api_key=config.api_key,
+            backend="remote" if config.api_key else "local",
+            base_url=config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
 
         with (
             patch("hackagent.interfaces.web.create_app", return_value=MagicMock()),
@@ -257,6 +298,14 @@ class TestFreePort(unittest.TestCase):
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
         config.ca_bundle = None
+        config.settings = Settings.resolve(
+            api_key=config.api_key,
+            backend="remote" if config.api_key else "local",
+            base_url=config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
 
         app = MagicMock()
         _seen, opener = _open_with(_Closer())
@@ -276,3 +325,45 @@ class TestFreePort(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_root_cli_applies_web_local_before_requiring_remote_credentials(
+    tmp_path, monkeypatch
+):
+    from hackagent.core.settings import Mode
+    from hackagent.interfaces.cli.main import cli
+
+    monkeypatch.delenv("HACKAGENT_API_KEY", raising=False)
+    config_path = tmp_path / "config.json"
+    config_path.write_text('{"backend":"remote"}')
+    for remote_source in ("file", "environment", "argument"):
+        monkeypatch.setenv(
+            "HACKAGENT_BACKEND", "remote" if remote_source == "environment" else ""
+        )
+        config_path.write_text(
+            '{"backend":"remote"}' if remote_source == "file" else "{}"
+        )
+        args = ["--config-file", str(config_path)]
+        if remote_source == "argument":
+            args += ["--backend", "remote"]
+        app = MagicMock()
+        with (
+            patch("hackagent.interfaces.web.create_app", return_value=app) as create,
+            patch(
+                "hackagent.interfaces.cli.commands.web._free_port", return_value=True
+            ),
+        ):
+            result = CliRunner().invoke(
+                cli,
+                [
+                    *args,
+                    "web",
+                    "--local",
+                    "--no-browser",
+                    "--db-path",
+                    str(tmp_path / "local.db"),
+                ],
+            )
+        assert result.exit_code == 0, result.output
+        assert create.call_args.args[0].settings.mode is Mode.LOCAL
+        app.run.assert_called_once()

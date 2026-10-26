@@ -11,7 +11,7 @@ from tests.fakes import in_memory_store
 
 
 def _settings(**kwargs):
-    kwargs.setdefault("api_key", "")
+    kwargs.setdefault("backend", "remote" if kwargs.get("api_key") else "local")
     kwargs.setdefault("db_path", ":memory:")
     kwargs.setdefault("env", {})
     kwargs.setdefault("config_path", "/nonexistent/hackagent/config.json")

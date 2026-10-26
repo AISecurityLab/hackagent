@@ -11,13 +11,18 @@ exchange), and the final run status.
 
 from __future__ import annotations
 
-import os
 from dataclasses import asdict
 from typing import Any, Mapping, Optional
 from uuid import UUID
 
 from hackagent.core.contracts import EvalStatus, RunStatus
-from hackagent.core.settings import Settings, env_ca_bundle, ssl_verify
+from hackagent.core.credentials import resolve_api_key
+from hackagent.core.settings import (
+    Settings,
+    resolve_remote_base_url,
+    env_ca_bundle,
+    ssl_verify,
+)
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.results import (
     Attempt,
@@ -31,27 +36,23 @@ from hackagent.tracking.serialize import sanitize_for_json
 
 
 def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Store:
-    """Open the store the campaign names.
-
-    A campaign says where its results go, and nothing else decides it: the
-    default is this machine's SQLite, and ``remote`` names its own server
-    and the environment variable holding that server's key. ``settings``
-    supplies the database path the CLI or TUI resolved, so a run follows
-    the configuration they were started with.
-    """
+    """Open the explicitly selected backend, independently of credentials."""
     if storage.backend == "remote":
         from hackagent.storage.remote import RemoteBackend
 
-        assert storage.base_url and storage.api_key_env  # enforced by StorageSpec
-        api_key = os.environ.get(storage.api_key_env, "").strip()
-        if not api_key:
-            raise ValueError(
-                f"Environment variable {storage.api_key_env!r} required for remote storage is not set."
-            )
-        # The campaign names its own server, so only the CA bundle carries
-        # over: from the caller's settings, else the standard variables.
+        api_key = resolve_api_key(
+            storage.api_key
+            if storage.api_key is not None
+            else (settings.api_key if settings else None),
+            use_default=True,
+            required=True,
+            purpose="Remote campaign storage API key",
+        )
+        base_url = storage.base_url or (
+            settings.base_url if settings is not None else resolve_remote_base_url()
+        )
         verify = settings.verify if settings else ssl_verify(env_ca_bundle())
-        return RemoteBackend.connect(storage.base_url, api_key, verify=verify)
+        return RemoteBackend.connect(base_url, api_key, verify=verify)
 
     from hackagent.storage.local import LocalBackend
 

@@ -177,7 +177,7 @@ async def arun_campaign(
     if resolved is not None and resolved.spec != spec:
         raise ValueError("The resolved campaign was built from a different campaign.")
     resolved = resolved or resolve_campaign(
-        spec, build=build, load=load, build_embed=build_embed
+        spec, build=build, load=load, build_embed=build_embed, settings=settings
     )
     logger.info(
         "campaign %s | resolved %d goals, %d attacks, %d judges",

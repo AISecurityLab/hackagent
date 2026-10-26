@@ -45,6 +45,7 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 from textual.widgets.tree import TreeNode
 
+from hackagent.core.credentials import CredentialError
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.audit import audit_markup
 from hackagent.orchestrator.campaign import CampaignCancelled, CampaignSpec
@@ -611,7 +612,10 @@ class CampaignBuilder(Container):
         )
 
     def _is_dirty(self) -> bool:
-        return self.draft.to_yaml() != self._saved
+        try:
+            return self.draft.to_yaml() != self._saved
+        except CredentialError:
+            return True
 
     # -- events from the form -----------------------------------------------
 
@@ -781,11 +785,11 @@ class CampaignBuilder(Container):
                 lambda: self._write(path, confirmed=True),
             )
             return
-        text = self.draft.to_yaml()
         try:
+            text = self.draft.to_yaml()
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
-        except OSError as exc:
+        except (OSError, CredentialError) as exc:
             self.notify(str(exc), title="Save failed", severity="error")
             return
         self._path, self._saved, self._has_comments = path, text, False
@@ -831,6 +835,11 @@ class CampaignBuilder(Container):
 
     def action_edit_yaml(self) -> None:
         """Edit the whole campaign in ``$EDITOR``; the form reloads from it."""
+        try:
+            draft_text = self.draft.to_yaml()
+        except CredentialError as exc:
+            self.notify(str(exc), title="Editor failed", severity="error")
+            return
         editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
         # An unmodified file is edited in place, so its comments survive.
         in_place = self._path is not None and not self._is_dirty()
@@ -841,7 +850,7 @@ class CampaignBuilder(Container):
                 "w", suffix=".yaml", delete=False, encoding="utf-8"
             )
             with handle:
-                handle.write(self.draft.to_yaml())
+                handle.write(draft_text)
             target = FilePath(handle.name)
         try:
             with self.app.suspend():
@@ -922,7 +931,7 @@ class CampaignBuilder(Container):
         # run then uses, so the report describes the run that follows.
         self.app.call_from_thread(self._log, "[dim]Checking the campaign…[/dim]")
         try:
-            resolved = resolve_campaign(spec)
+            resolved = resolve_campaign(spec, settings=self.cli_config.settings)
         except Exception as exc:
             self.app.call_from_thread(
                 self._finish, "[red]Campaign rejected[/]", str(exc), None

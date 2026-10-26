@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from hackagent.attacks.techniques.registry import ATTACKS
+from hackagent.core.settings import Settings
 from hackagent.orchestrator.campaign import load_campaign, resolve_campaign
 
 PACKAGING = Path(__file__).resolve().parents[3] / "packaging"
@@ -25,7 +26,10 @@ def test_the_smoke_campaign_names_every_registered_attack():
 
 
 def test_the_smoke_campaign_resolves_without_a_model_server():
-    resolved = resolve_campaign(load_campaign(SMOKE_CAMPAIGN))
+    resolved = resolve_campaign(
+        load_campaign(SMOKE_CAMPAIGN),
+        settings=Settings.resolve(env={}, config_path="/nonexistent"),
+    )
     assert len(resolved.attacks) == len(ATTACKS)
 
 

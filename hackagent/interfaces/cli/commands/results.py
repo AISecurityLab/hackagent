@@ -47,15 +47,9 @@ def show(ctx, result_id):
     cli_config.validate()
 
     try:
-        from hackagent import HackAgent, Settings
+        from hackagent import HackAgent
 
-        session = HackAgent(
-            Settings.resolve(
-                api_key=cli_config.api_key or "",
-                base_url=cli_config.base_url,
-                ca_bundle=cli_config.ca_bundle,
-            )
-        )
+        session = HackAgent(cli_config.settings)
         with console.status(f"[bold green]Fetching result {result_id}..."):
             result = session.result(result_id)
             audit = _campaign_audit(session, result)
@@ -165,15 +159,9 @@ def summary(ctx, status, agent, attack_type, days):
     cli_config.validate()
 
     try:
-        from hackagent import HackAgent, Settings
+        from hackagent import HackAgent
 
-        session = HackAgent(
-            Settings.resolve(
-                api_key=cli_config.api_key or "",
-                base_url=cli_config.base_url,
-                ca_bundle=cli_config.ca_bundle,
-            )
-        )
+        session = HackAgent(cli_config.settings)
         result_items = []
         page = 1
         with console.status("[bold green]Analyzing results..."):

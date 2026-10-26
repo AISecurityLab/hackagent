@@ -3,6 +3,7 @@
 
 """Unit tests for results CLI helpers and commands."""
 
+from hackagent.core.settings import Settings
 import unittest
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -25,6 +26,14 @@ def _config():
     cfg.api_key = None
     cfg.base_url = None
     cfg.ca_bundle = None
+    cfg.settings = Settings.resolve(
+        api_key=cfg.api_key,
+        backend="remote" if cfg.api_key else "local",
+        base_url=cfg.base_url,
+        db_path=":memory:",
+        config_path="/nonexistent",
+        env={},
+    )
     return cfg
 
 

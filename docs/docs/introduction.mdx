@@ -133,7 +133,7 @@ Next: [HTTP API](./api/index.mdx).
 
 **Locally, by default.** Every attempt goes to a SQLite database on your machine and to a JSON file under `./logs/runs/`. `hackagent results list`, the terminal UI and `hackagent web` all read the database.
 
-**On a HackAgent server.** A campaign records there when `execution.storage.backend` is `remote`. The SDK does so whenever `HACKAGENT_API_KEY` is set, and `hackagent web` then opens [app.hackagent.dev](https://app.hackagent.dev).
+**On a HackAgent server.** A campaign records there when `execution.storage.backend` is `remote`. SDK sessions select it with `Settings.resolve(backend="remote")`; CLI sessions use `--backend remote`. The platform key comes from `HACKAGENT_API_KEY`. `hackagent web` serves the dashboard locally and proxies requests to the selected API.
 
 The attacks, judges and models run in the same place either way; only where results are stored changes.
 

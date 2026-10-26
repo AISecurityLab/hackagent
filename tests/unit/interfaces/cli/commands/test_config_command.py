@@ -3,6 +3,7 @@
 
 """Unit tests for the `hackagent config` command group."""
 
+from hackagent.core.settings import Settings
 import json
 import tempfile
 import unittest
@@ -24,9 +25,20 @@ from hackagent.interfaces.cli.commands.config import (
 def _cli_config(**overrides):
     """A CLIConfig stand-in with realistic attribute values."""
     cfg = MagicMock()
+    cfg._sources = {}
+    cfg.set_user_override.side_effect = lambda key, value: setattr(cfg, key, value)
+    cfg.backend = "local"
     cfg.api_key = overrides.get("api_key", "hk_abcdefghijklmnop")
     cfg.base_url = overrides.get("base_url", "https://api.hackagent.dev")
     cfg.ca_bundle = overrides.get("ca_bundle")
+    cfg.settings = Settings.resolve(
+        api_key=cfg.api_key,
+        backend="remote" if cfg.api_key else "local",
+        base_url=cfg.base_url,
+        db_path=":memory:",
+        config_path="/nonexistent",
+        env={},
+    )
     cfg.verbose = overrides.get("verbose", 1)
     cfg.should_show_info.return_value = overrides.get("show_info", True)
     cfg.source_of.return_value = overrides.get("source", "Environment variable")
@@ -53,11 +65,11 @@ class TestConfigSet(unittest.TestCase):
         cfg.save.assert_not_called()
         self.assertIn("No configuration changes made", result.output)
 
-    def test_api_key_is_stored_as_user_override_and_saved(self):
-        result, cfg = self._invoke(["--api-key", "hk_new_key"])
+    def test_backend_is_stored_as_user_override_and_saved(self):
+        result, cfg = self._invoke(["--backend", "remote"])
 
         self.assertEqual(result.exit_code, 0)
-        cfg.set_user_override.assert_any_call("api_key", "hk_new_key")
+        cfg.set_user_override.assert_any_call("backend", "remote")
         cfg.save.assert_called_once()
         self.assertIn("Configuration saved", result.output)
 
@@ -102,7 +114,7 @@ class TestConfigSet(unittest.TestCase):
 
     def test_quiet_config_suppresses_success_messages(self):
         cfg = _cli_config(show_info=False, verbose=0)
-        result, _ = self._invoke(["--api-key", "k", "--verbose", "0"], cfg=cfg)
+        result, _ = self._invoke(["--backend", "remote", "--verbose", "0"], cfg=cfg)
 
         self.assertNotIn("API key updated", result.output)
         # The final save confirmation is unconditional.
@@ -110,7 +122,7 @@ class TestConfigSet(unittest.TestCase):
 
     def test_all_options_together_save_once(self):
         result, cfg = self._invoke(
-            ["--api-key", "k", "--base-url", "https://x", "--verbose", "2"]
+            ["--backend", "remote", "--base-url", "https://x", "--verbose", "2"]
         )
 
         self.assertEqual(cfg.set_user_override.call_count, 3)
@@ -127,7 +139,8 @@ class TestConfigShow(unittest.TestCase):
         result = self.runner.invoke(show, [], obj={"config": cfg})
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("hk_secre", result.output)
+        self.assertIn("Set", result.output)
+        self.assertNotIn("hk_secre", result.output)
         self.assertNotIn("secret_value", result.output)
         self.assertIn("WARNING", result.output)
 
@@ -137,10 +150,6 @@ class TestConfigShow(unittest.TestCase):
         result = self.runner.invoke(show, [], obj={"config": cfg})
 
         self.assertIn("Not set", result.output)
-        # source_of must not be consulted for a missing key.
-        self.assertNotIn(
-            "api_key", [call.args[0] for call in cfg.source_of.call_args_list]
-        )
 
     def test_missing_config_file_hints_at_config_set(self):
         path = MagicMock(spec=Path)
@@ -249,7 +258,7 @@ class TestConfigValidate(unittest.TestCase):
         session_cls.assert_not_called()
         session.check_connection.assert_not_called()
         self.assertIn("API key is required", result.output)
-        self.assertIn("hackagent config set --api-key", result.output)
+        self.assertIn("HACKAGENT_API_KEY", result.output)
 
     def test_connection_failure_is_a_warning_not_an_error(self):
         cfg = _cli_config()
@@ -275,9 +284,14 @@ class TestConfigImport(unittest.TestCase):
     def _import(self, payload):
         return self._import_text(json.dumps(payload))
 
+    @patch.dict("os.environ", {"HACKAGENT_API_KEY": "hk_imported"})
     def test_imports_every_known_field(self):
         result, cfg = self._import(
-            {"api_key": "hk_imported", "base_url": "https://imported", "verbose": 3}
+            {
+                "api_key": "${HACKAGENT_API_KEY}",
+                "base_url": "https://imported",
+                "verbose": 3,
+            }
         )
 
         self.assertEqual(result.exit_code, 0)
@@ -302,8 +316,11 @@ class TestConfigImport(unittest.TestCase):
         cfg.save.assert_not_called()
         self.assertIn("No valid configuration found", result.output)
 
+    @patch.dict("os.environ", {"HACKAGENT_API_KEY": "hk_from_yaml"})
     def test_yaml_file_is_supported(self):
-        result, cfg = self._import_text("api_key: hk_from_yaml\n", suffix=".yaml")
+        result, cfg = self._import_text(
+            "api_key: '${HACKAGENT_API_KEY}'\n", suffix=".yaml"
+        )
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(cfg.api_key, "hk_from_yaml")

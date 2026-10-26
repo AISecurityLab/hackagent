@@ -63,7 +63,7 @@ def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch)
     storage = StorageSpec(
         backend="remote",
         base_url="https://other.example.test",
-        api_key_env="OTHER_HACKAGENT_KEY",
+        api_key="${OTHER_HACKAGENT_KEY}",
     )
     with (
         patch("hackagent.storage.remote.RemoteBackend.connect") as connect,
