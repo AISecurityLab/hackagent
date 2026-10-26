@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import signal
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -168,16 +169,23 @@ def test_ctrl_c_no_continues_and_yes_cancels():
     assert signal.getsignal(signal.SIGINT) is previous
 
 
-def test_campaign_run_remote_uses_execute_spec(monkeypatch):
-    from hackagent.interfaces.cli.commands.campaign import campaign
-
+def _remote_values():
     values = copy.deepcopy(MIN)
     values["execution"]["storage"] = {
         "backend": "remote",
         "base_url": "https://api.example.test",
         "api_key_env": "HACKAGENT_API_KEY",
     }
-    spec = CampaignSpec.model_validate(values)
+    gateway = {"name": "gw", "connection": {"provider": "hackagent", "type": "OPENAI"}}
+    values["attacks"] = [{"name": "pair", "roles": {"attacker": gateway}}]
+    return values
+
+
+def test_campaign_run_remote_records_the_campaign_as_written(monkeypatch):
+    from hackagent.interfaces.cli.commands.campaign import campaign
+
+    monkeypatch.setenv("HACKAGENT_API_KEY", "storage-key")
+    spec = CampaignSpec.model_validate(_remote_values())
     outcome = ExecutionOutcome(
         "COMPLETED", "", CampaignResult(campaign_name="demo", run_id="r1", dry_run=True)
     )
@@ -187,10 +195,41 @@ def test_campaign_run_remote_uses_execute_spec(monkeypatch):
             "hackagent.orchestrator.execution.execute_spec", return_value=outcome
         ) as execute,
         patch("hackagent.orchestrator.campaign.run_campaign") as local,
+        patch("hackagent.orchestrator.campaign.wait_for_servers"),
+    ):
+        result = CliRunner().invoke(campaign, ["run", "campaign.yaml", "--json"])
+    assert result.exit_code == 0, result.output
+    execute.assert_called_once()
+    local.assert_not_called()
+    # Unbound: execute_spec binds the gateway for execution only, so the run
+    # is started with the marker rather than this machine's gateway address.
+    sent = execute.call_args.args[0]
+    connection = sent.attacks[0].roles["attacker"].connection
+    assert connection.provider == "hackagent"
+    assert connection.endpoint is None and connection.api_key_env is None
+
+
+def test_campaign_dry_run_with_remote_storage_stays_local(monkeypatch):
+    from hackagent.interfaces.cli.commands.campaign import campaign
+
+    monkeypatch.setenv("HACKAGENT_API_KEY", "storage-key")
+    monkeypatch.delenv("HACKAGENT_GATEWAY_KEY", raising=False)
+    spec = CampaignSpec.model_validate(_remote_values())
+    with (
+        patch("hackagent.orchestrator.campaign.load_campaign", return_value=spec),
+        patch("hackagent.orchestrator.execution.execute_spec") as execute,
+        patch(
+            "hackagent.orchestrator.campaign.run_campaign",
+            return_value=CampaignResult(
+                campaign_name="demo", run_id="r1", dry_run=True
+            ),
+        ) as local,
     ):
         result = CliRunner().invoke(
             campaign, ["run", "campaign.yaml", "--dry-run", "--json"]
         )
+    os.environ.pop("HACKAGENT_GATEWAY_KEY", None)
     assert result.exit_code == 0, result.output
-    execute.assert_called_once()
-    local.assert_not_called()
+    execute.assert_not_called()
+    local.assert_called_once()
+    assert local.call_args.args[0].execution.dry_run

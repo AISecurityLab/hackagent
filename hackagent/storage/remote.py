@@ -427,19 +427,26 @@ class RemoteBackend:
             failures, self._writer_failures = self._writer_failures, 0
         return failures
 
-    def close(self) -> None:
-        """Drain the queue, stop the worker, and report any write failures."""
-        if self._closed:
-            return
-        self._closed = True
-        self._write_queue.put(_STOP)
-        self._writer.join()
-        failures = self._take_failures()
-        if failures:
-            logger.warning(
-                "RemoteBackend: %d background write(s) failed and were never flushed",
-                failures,
-            )
+    def close(self, *, close_client: bool = False) -> None:
+        """Drain the queue, stop the worker, and report any write failures.
+
+        ``close_client`` then also closes the HTTP client; leave it open
+        while another store shares it (see :attr:`client`).
+        """
+        if not self._closed:
+            self._closed = True
+            atexit.unregister(self.close)
+            self._write_queue.put(_STOP)
+            self._writer.join()
+            failures = self._take_failures()
+            if failures:
+                logger.warning(
+                    "RemoteBackend: %d background write(s) failed and were never "
+                    "flushed",
+                    failures,
+                )
+        if close_client:
+            self._client.get_httpx_client().close()
 
     # ── Context ──────────────────────────────────────────────────────────────
 

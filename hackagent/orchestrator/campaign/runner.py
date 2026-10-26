@@ -171,11 +171,34 @@ async def arun_campaign(
     will do before starting it — passes it as ``resolved``, and the goals
     and models it checked are the ones the run uses. It has to come from
     the same campaign, or the report would describe a different run.
+
+    Without a ``store``, a campaign whose ``execution.storage`` is remote
+    runs as a run the server tracks, as ``hackagent campaign run`` runs it:
+    started there claimed by this machine, heartbeating, its gateway models
+    bound to that server, and finished once (see
+    :func:`~hackagent.orchestrator.execution.execute.arun_remote_campaign`).
     """
     spec = source if isinstance(source, CampaignSpec) else load_campaign(source)
     run_id = spec.execution.output.run_id or str(uuid4())
     if resolved is not None and resolved.spec != spec:
         raise ValueError("The resolved campaign was built from a different campaign.")
+    if (
+        store is None
+        and spec.execution.storage.backend == "remote"
+        and not spec.execution.dry_run
+    ):
+        # Imported here: the execution package builds on this module.
+        from hackagent.orchestrator.execution.execute import arun_remote_campaign
+
+        return await arun_remote_campaign(
+            spec,
+            on_event=on_event,
+            build=build,
+            load=load,
+            calibration=calibration,
+            build_embed=build_embed,
+            resolved=resolved,
+        )
     resolved = resolved or resolve_campaign(
         spec, build=build, load=load, build_embed=build_embed
     )

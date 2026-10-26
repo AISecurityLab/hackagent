@@ -481,85 +481,338 @@ def test_gateway_bound_with_executor_base_url(tmp_path):
     assert gateway.connection.api_key_env == GATEWAY_KEY_ENV
 
 
-# --- execute_spec -----------------------------------------------------------
+# --- execute_spec and remote campaigns --------------------------------------
+
+STORAGE_URL = "https://storage.example/api"
+STORAGE_KEY_ENV = "CAMPAIGN_STORAGE_KEY"
 
 
-def test_execute_spec_starts_the_run_then_executes_it(tmp_path, monkeypatch):
-    from hackagent.orchestrator.campaign import load_campaign
-    from hackagent.storage.records import CampaignRunRecord, OrganizationContext
+class StartingStore:
+    """The remote store a campaign with remote storage connects to."""
 
-    run_id, agent_id, org_id = uuid4(), uuid4(), uuid4()
-    started = []
-    closed = []
+    instances: list["StartingStore"] = []
 
-    class StartingStore:
-        client = MagicMock()
+    def __init__(self, base_url, api_key):
+        from uuid import uuid4
 
-        def create_or_update_agent(self, name, config):
-            return SimpleNamespace(id=agent_id)
+        self.base_url, self.api_key = base_url, api_key
+        self.client = MagicMock()
+        self.run_id, self.agent_id, self.org_id = uuid4(), uuid4(), uuid4()
+        self.started: list[tuple] = []
+        self.finished: list[tuple] = []
+        self.closed: list[dict] = []
+        self.context_error: Exception | None = None
+        StartingStore.instances.append(self)
 
-        def start_campaign(self, agent, spec, *, claimed_by=None):
-            started.append((agent, spec))
-            from datetime import datetime, timezone
+    def create_or_update_agent(self, name, config):
+        return SimpleNamespace(id=self.agent_id)
 
-            now = datetime.now(timezone.utc)
-            return CampaignRunRecord(
-                id=run_id,
-                agent_id=agent,
-                name="test-campaign",
-                campaign_config=spec,
-                audit=None,
-                status="RUNNING",
-                run_notes=None,
-                created_at=now,
-                updated_at=now,
-            )
+    def start_campaign(self, agent, spec, *, claimed_by=None):
+        from datetime import datetime, timezone
 
-        def get_context(self):
-            return OrganizationContext(org_id=org_id, user_id="7")
+        from hackagent.storage.records import CampaignRunRecord
 
-        def close(self):
-            closed.append(True)
-
-    connected = []
-
-    def connect(base_url, api_key):
-        connected.append((base_url, api_key))
-        return StartingStore()
-
-    monkeypatch.setattr(execute.RemoteBackend, "connect", staticmethod(connect))
-    judge = {**GW, "scoring": {"type": "harmbench"}}
-    spec = load_campaign(
-        campaign(
-            evaluation={"judges": [judge]},
-            execution={"output": {"directory": str(tmp_path)}},
+        self.started.append((agent, spec))
+        now = datetime.now(timezone.utc)
+        return CampaignRunRecord(
+            id=self.run_id,
+            agent_id=agent,
+            name="test-campaign",
+            campaign_config=spec,
+            audit=None,
+            status="RUNNING",
+            run_notes=None,
+            created_at=now,
+            updated_at=now,
         )
-    )
-    settings = SimpleNamespace(base_url=BASE_URL, api_key="user-key")
 
+    def get_context(self):
+        from hackagent.storage.records import OrganizationContext
+
+        if self.context_error is not None:
+            raise self.context_error
+        return OrganizationContext(org_id=self.org_id, user_id="7")
+
+    def finish_run(self, run_id, status, note=""):
+        self.finished.append((run_id, status, note))
+
+    def close(self, **kwargs):
+        self.closed.append(kwargs)
+
+
+@pytest.fixture
+def starting_store(monkeypatch):
+    StartingStore.instances = []
+    monkeypatch.setenv(STORAGE_KEY_ENV, "storage-key")
+    monkeypatch.setattr(execute.RemoteBackend, "connect", StartingStore)
+    return StartingStore.instances
+
+
+def remote_spec(tmp_path, **sections):
+    from hackagent.orchestrator.campaign import load_campaign
+
+    execution = {
+        "output": {"directory": str(tmp_path)},
+        "storage": {
+            "backend": "remote",
+            "base_url": STORAGE_URL,
+            "api_key_env": STORAGE_KEY_ENV,
+        },
+        **sections.pop("execution", {}),
+    }
+    return load_campaign(campaign(execution=execution, **sections))
+
+
+def test_execute_spec_starts_the_run_on_the_storage_server(
+    tmp_path, starting_store, monkeypatch
+):
+    monkeypatch.delenv(GATEWAY_KEY_ENV, raising=False)
+    built, seen = [], {}
+    fakes = FakeBuilder(models(gateway=ScriptedModel("yes")))
+
+    def build(config, *, retries=0):
+        built.append(config)
+        seen["key"] = os.environ.get(GATEWAY_KEY_ENV)
+        return fakes(config, retries=retries)
+
+    judge = {**GW, "scoring": {"type": "harmbench"}}
     outcome = execute.execute_spec(
-        spec,
-        settings=settings,
-        build=FakeBuilder(models(gateway=ScriptedModel("yes"))),
+        remote_spec(tmp_path, evaluation={"judges": [judge]}),
+        build=build,
         load=goals("goal one"),
     )
 
+    remote_store = starting_store[-1]
     store = RecordingAdoptedStore.instances[-1]
-    assert connected == [(BASE_URL, "user-key")]
+    # The server and key are the campaign's own, not the CLI settings.
+    assert (remote_store.base_url, remote_store.api_key) == (
+        STORAGE_URL,
+        "storage-key",
+    )
     assert outcome.status == "COMPLETED"
-    assert (store.run_id, store.agent_id) == (run_id, agent_id)
-    assert store.finished == [(run_id, "COMPLETED", "")]
+    assert (store.run_id, store.agent_id) == (
+        remote_store.run_id,
+        remote_store.agent_id,
+    )
+    assert store.finished == [(remote_store.run_id, "COMPLETED", "")]
+    gateway = next(c for c in built if c.name == "gateway")
+    assert gateway.connection.endpoint == f"{STORAGE_URL}/v1"
+    assert seen["key"] == "storage-key"
     # The stored campaign keeps the gateway marker, not this executor's address.
-    stored_judge = started[0][1]["evaluation"]["judges"][0]["connection"]
-    assert "endpoint" not in stored_judge
-    assert closed == [True]
+    stored_judge = remote_store.started[0][1]["evaluation"]["judges"][0]["connection"]
+    assert stored_judge["provider"] == "hackagent"
+    assert "endpoint" not in stored_judge and "api_key_env" not in stored_judge
+    assert remote_store.closed == [{"close_client": True}]
 
 
-def test_execute_spec_needs_an_api_key():
-    from hackagent.orchestrator.campaign import load_campaign
+def test_execute_spec_needs_the_storage_key(tmp_path, starting_store, monkeypatch):
+    monkeypatch.delenv(STORAGE_KEY_ENV)
 
-    with pytest.raises(ValueError, match="API key"):
-        execute.execute_spec(
-            load_campaign(campaign()),
-            settings=SimpleNamespace(base_url=BASE_URL, api_key=None),
+    with pytest.raises(ValueError, match=STORAGE_KEY_ENV):
+        execute.execute_spec(remote_spec(tmp_path))
+    assert starting_store == []
+
+
+def test_a_started_run_whose_setup_fails_is_finished_failed(
+    tmp_path, starting_store, monkeypatch
+):
+    original = StartingStore.__init__
+
+    def broken_context(self, *args):
+        original(self, *args)
+        self.context_error = RuntimeError("context unavailable")
+
+    monkeypatch.setattr(StartingStore, "__init__", broken_context)
+
+    with pytest.raises(RuntimeError, match="context unavailable"):
+        execute.execute_spec(remote_spec(tmp_path), load=goals("goal one"))
+
+    remote_store = starting_store[-1]
+    assert remote_store.finished == [
+        (remote_store.run_id, "FAILED", "RuntimeError: context unavailable")
+    ]
+
+
+class EnteredHeartbeat(FakeHeartbeat):
+    def __enter__(self):
+        self.entered = True
+        return self
+
+
+def test_run_campaign_with_remote_storage_is_a_tracked_run(
+    tmp_path, starting_store, monkeypatch
+):
+    from hackagent.orchestrator.campaign import run_campaign
+
+    FakeHeartbeat.instances = []
+    monkeypatch.setattr(execute, "RunHeartbeat", EnteredHeartbeat)
+    built = []
+    fakes = FakeBuilder(models(gateway=ScriptedModel("yes")))
+
+    def build(config, *, retries=0):
+        built.append(config)
+        return fakes(config, retries=retries)
+
+    result = run_campaign(
+        remote_spec(tmp_path, attacks=[{**PAP, "roles": {"attacker": GW}}]),
+        build=build,
+        load=goals("goal one"),
+    )
+
+    remote_store = starting_store[-1]
+    store = RecordingAdoptedStore.instances[-1]
+    assert result.campaign_run_id == str(remote_store.run_id)
+    assert len(remote_store.started) == 1
+    assert FakeHeartbeat.instances[-1].entered
+    assert store.finished == [(remote_store.run_id, "COMPLETED", "")]
+    gateway = next(c for c in built if c.name == "gateway")
+    assert gateway.connection.endpoint == f"{STORAGE_URL}/v1"
+    assert gateway.connection.api_key_env == GATEWAY_KEY_ENV
+
+
+def test_run_campaign_with_remote_storage_raises_when_cancelled(
+    tmp_path, starting_store, fake_heartbeat
+):
+    from hackagent.orchestrator.campaign import run_campaign
+
+    def on_event(event, **payload):
+        if event == "goal_finished":
+            fake_heartbeat[-1].trip(fake_heartbeat[-1].cancel_requested)
+
+    with pytest.raises(execute.RunEnded) as ended:
+        run_campaign(
+            remote_spec(tmp_path),
+            on_event=on_event,
+            build=FakeBuilder(models()),
+            load=goals("one", "two", "three", "four"),
         )
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert ended.value.outcome.status == "CANCELLED"
+    assert store.finished == [(store.run_id, "CANCELLED", "Campaign cancelled")]
+
+
+def test_run_campaign_passes_the_campaign_error_on_after_finishing(
+    tmp_path, starting_store
+):
+    from hackagent.orchestrator.campaign import run_campaign
+
+    def build(config, *, retries=0):
+        raise LookupError("no such model")
+
+    with pytest.raises(LookupError, match="no such model"):
+        run_campaign(remote_spec(tmp_path), build=build, load=goals("one"))
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert store.finished == [(store.run_id, "FAILED", "LookupError: no such model")]
+
+
+def test_a_dry_run_never_touches_remote_storage(tmp_path, starting_store):
+    from hackagent.orchestrator.campaign import run_campaign
+
+    result = run_campaign(
+        remote_spec(tmp_path, execution={"dry_run": True}),
+        build=FakeBuilder(models()),
+        load=goals("one"),
+    )
+
+    assert result.dry_run
+    assert starting_store == []
+
+
+# --- signals, cloud runs ------------------------------------------------------
+
+
+def test_interrupt_during_the_claim_still_finishes_the_run(tmp_path):
+    import signal
+
+    run = run_detail(stored_campaign(tmp_path))
+    finished = []
+
+    def claim_run(run_id, claimed_by):
+        signal.raise_signal(signal.SIGINT)  # held until the claim is ours
+        return ClaimResult(run=run, run_token=None, env={})
+
+    store = SimpleNamespace(
+        client=MagicMock(),
+        claim_run=claim_run,
+        finish_run=lambda run_id, status, note="": finished.append(
+            (run_id, status, note)
+        ),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        execute.execute_run(
+            store,
+            run["id"],
+            base_url=BASE_URL,
+            gateway_key=GATEWAY_KEY,
+            claimed_by="local:test",
+            build=FakeBuilder(models()),
+            load=goals("goal one"),
+        )
+
+    assert finished == [(run["id"], "CANCELLED", "Campaign cancelled")]
+
+
+def test_interrupt_during_the_finish_lets_the_finish_land(tmp_path, monkeypatch):
+    import signal
+
+    original = RecordingAdoptedStore.finish_run
+
+    def interrupted_finish(self, run_id, status, note=""):
+        signal.raise_signal(signal.SIGINT)
+        return original(self, run_id, status, note)
+
+    monkeypatch.setattr(RecordingAdoptedStore, "finish_run", interrupted_finish)
+
+    with pytest.raises(KeyboardInterrupt):
+        execute_with(stored_campaign(tmp_path))
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert store.finished == [(store.run_id, "COMPLETED", "")]
+
+
+def test_interrupt_ends_the_run_as_the_executor_says(tmp_path):
+    def on_event(event, **payload):
+        if event == "goal_finished":
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        execute_with(
+            stored_campaign(tmp_path),
+            on_event=on_event,
+            interrupted_as=("FAILED", "The executor stopped"),
+        )
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert store.finished == [(store.run_id, "FAILED", "The executor stopped")]
+
+
+def test_a_cloud_run_writes_its_files_to_a_removed_scratch_folder(tmp_path):
+    output = tmp_path / "out"
+    config = stored_campaign(tmp_path, execution={"output": {"directory": str(output)}})
+    run = run_detail(config)
+
+    outcome = execute.execute_run(
+        SimpleNamespace(client=MagicMock()),
+        run["id"],
+        base_url=BASE_URL,
+        gateway_key=GATEWAY_KEY,
+        claimed_by="cloud-worker:test",
+        claim=ClaimResult(run=run, run_token="run-token-for-test", env={}),
+        build=FakeBuilder(models()),
+        load=goals("goal one"),
+    )
+
+    assert outcome.status == "COMPLETED"
+    assert outcome.result.outputs
+    assert not output.exists()
+    assert not any(path.exists() for path in outcome.result.outputs)
+
+
+def test_a_local_run_keeps_its_files(tmp_path):
+    outcome, _, _ = execute_with(stored_campaign(tmp_path))
+
+    assert outcome.result.outputs
+    assert all(path.exists() for path in outcome.result.outputs)

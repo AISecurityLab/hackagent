@@ -198,14 +198,27 @@ def run(
     )
 
     settings = _runtime_settings() or Settings.resolve()
-    spec = bind_gateway(spec, settings.base_url)
-    if uses_gateway(spec) and not settings.api_key:
-        raise click.ClickException(
-            "This campaign uses the HackAgent gateway; set an API key with: "
-            "hackagent config set --api-key"
-        )
-    if settings.api_key:
-        os.environ.setdefault(GATEWAY_KEY_ENV, settings.api_key)
+    storage = spec.execution.storage
+    # Remote storage names its server and key: the run is tracked there, and
+    # execute_spec binds the gateway to it for execution only, so the
+    # campaign is recorded with its gateway markers. A dry run never
+    # touches remote storage.
+    tracked = storage.backend == "remote" and not spec.execution.dry_run
+    if not tracked:
+        if storage.backend == "remote":
+            gateway_url = storage.base_url or settings.base_url
+            # Nothing is sent in a dry run; any key lets the models build.
+            gateway_key = os.environ.get(storage.api_key_env or "") or settings.api_key
+        else:
+            gateway_url, gateway_key = settings.base_url, settings.api_key
+        spec = bind_gateway(spec, gateway_url)
+        if uses_gateway(spec) and not gateway_key:
+            raise click.ClickException(
+                "This campaign uses the HackAgent gateway; set an API key with: "
+                "hackagent config set --api-key"
+            )
+        if gateway_key:
+            os.environ.setdefault(GATEWAY_KEY_ENV, gateway_key)
 
     setup_package_logging(default_level_str="INFO")
     suppress_noisy_libraries("httpx", "httpcore", "LiteLLM")
@@ -228,8 +241,8 @@ def run(
 
     on_event = event_printer(as_json)
 
-    if spec.execution.storage.backend == "remote":
-        outcome = execute_spec(spec, settings=settings, on_event=on_event)
+    if tracked:
+        outcome = execute_spec(spec, on_event=on_event)
         if outcome.result is None:
             display_error(outcome.note or f"Campaign {outcome.status.lower()}.")
             raise SystemExit(1)
