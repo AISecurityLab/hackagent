@@ -6,12 +6,10 @@
 The cloud worker calls chat APIs over HTTP and nothing else. Every model of
 a campaign it runs is either the HackAgent gateway marker, exactly as
 :mod:`.gateway` describes it, or a model of a :data:`CLOUD_MODEL_TYPES` type
-with only the :data:`CLOUD_OPTIONS` of its type. A model without an endpoint
-must name a hosted API: an ``OPENAI`` model a bare OpenAI model name, a
-``LITELLM`` model one with a :data:`HOSTED_LITELLM_PREFIXES` prefix. A model
-with an endpoint may name no other LiteLLM provider than those of
-:data:`ENDPOINT_LITELLM_PREFIXES`, whose clients call that endpoint with the
-key the campaign names. Anything not listed here is refused.
+with only the :data:`CLOUD_OPTIONS` of its type. Each model's LiteLLM
+provider, as LiteLLM itself infers it from the model string the model is
+built with, must be one of :data:`HOSTED_PROVIDERS` without an endpoint, or
+of :data:`ENDPOINT_PROVIDERS` with one. Anything not listed here is refused.
 
 Whether an endpoint's address is reachable from the cloud is up to whoever
 queues the run: :func:`cloud_issues` resolves no host names.
@@ -21,11 +19,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping
+from typing import Mapping, Optional
 
 from hackagent.core.contracts import AgentType
-from hackagent.models.completions.litellm import KNOWN_LITELLM_PROVIDER_PREFIXES
+from hackagent.models.completions.litellm import resolve_litellm_model
 from hackagent.models.config import ModelConfig
+from hackagent.models.provider_config import get_provider_config
 from hackagent.orchestrator.campaign.gateway import is_gateway, spec_models
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
@@ -41,33 +40,36 @@ CLOUD_OPTIONS: Mapping[AgentType, frozenset[str]] = MappingProxyType(
     }
 )
 
-#: LiteLLM model prefixes of hosted APIs, which a ``LITELLM`` model without
-#: an endpoint must start with.
-HOSTED_LITELLM_PREFIXES = (
-    "openai/",
-    "anthropic/",
-    "openrouter/",
-    "gemini/",
-    "mistral/",
-    "groq/",
-    "together_ai/",
-    "deepseek/",
-    "cohere/",
-    "fireworks_ai/",
-    "perplexity/",
-    "xai/",
+#: LiteLLM providers of hosted APIs: all a model without an endpoint may use.
+HOSTED_PROVIDERS = frozenset(
+    {
+        "openai",
+        "anthropic",
+        "openrouter",
+        "gemini",
+        "mistral",
+        "groq",
+        "together_ai",
+        "deepseek",
+        "cohere",
+        "fireworks_ai",
+        "perplexity",
+        "xai",
+    }
 )
 
-#: LiteLLM model prefixes a model with an endpoint may start with.
-ENDPOINT_LITELLM_PREFIXES = (
-    *HOSTED_LITELLM_PREFIXES,
-    "hosted_vllm/",
-    "vllm/",
-    "ollama/",
-    "ollama_chat/",
-    "lm_studio/",
-    "llamafile/",
-)
+#: LiteLLM providers a model with an endpoint may use: they call that
+#: endpoint with the key the campaign names.
+ENDPOINT_PROVIDERS = HOSTED_PROVIDERS | {
+    "hosted_vllm",
+    "vllm",
+    "ollama",
+    "ollama_chat",
+    "lm_studio",
+    "llamafile",
+}
+
+UNKNOWN_PROVIDER_REASON = "can't tell which provider this model uses"
 
 
 @dataclass(frozen=True)
@@ -107,10 +109,12 @@ def model_cloud_issues(config: ModelConfig, path: str) -> list[CloudIssue]:
         for key in config.options
         if key not in allowed
     ]
-    if connection.endpoint:
-        reason = _provider_reason(connection.type, config.name)
-    else:
-        reason = _endpointless_reason(connection.type, config.name)
+    reason = _provider_reason(
+        connection.type,
+        config.name,
+        api_base=connection.endpoint or None,
+        at_endpoint=bool(connection.endpoint),
+    )
     if reason:
         issues.append(CloudIssue(path, reason))
     return issues
@@ -125,59 +129,65 @@ def _gateway_reasons(config: ModelConfig) -> list[str]:
         reasons.append("the HackAgent gateway must not set endpoint or api_key_env")
     if config.options:
         reasons.append("the HackAgent gateway takes no options")
-    # Bound, the gateway is an OPENAI model with an endpoint.
-    provider = _provider_reason(AgentType.OPENAI, config.name)
-    if provider:
-        reasons.append(provider)
+    if connection.type == AgentType.OPENAI:
+        # Bound, the gateway is an OPENAI model at an endpoint (its own).
+        provider = _provider_reason(
+            AgentType.OPENAI, config.name, api_base=None, at_endpoint=True
+        )
+        if provider:
+            reasons.append(provider)
     return reasons
 
 
-def _provider_reason(model_type: AgentType, name: str) -> str | None:
-    """Why a model of ``model_type`` named ``name`` cannot run in the cloud
-    at an endpoint, or None when its LiteLLM provider calls that endpoint.
-
-    ``OPENAI`` and ``OLLAMA`` models get their own provider prefix unless the
-    name already starts with a known LiteLLM one (see
-    :func:`~hackagent.models.completions.litellm.resolve_litellm_model`); a
-    ``LITELLM`` model's prefix is its provider.
-    """
-    if "/" not in name:
+def _provider_reason(
+    model_type: AgentType, name: str, *, api_base: Optional[str], at_endpoint: bool
+) -> Optional[str]:
+    """Why the cloud may not call the LiteLLM provider a ``model_type``
+    model named ``name`` resolves to, or None when it may."""
+    provider = _inferred_provider(model_type, name, api_base)
+    if provider is None:
+        return UNKNOWN_PROVIDER_REASON
+    if at_endpoint:
+        return None if provider in ENDPOINT_PROVIDERS else _refused(provider)
+    if provider in HOSTED_PROVIDERS:
         return None
-    prefix = name.split("/", 1)[0] + "/"
-    if prefix in ENDPOINT_LITELLM_PREFIXES:
-        return None
-    if model_type == AgentType.LITELLM or prefix in KNOWN_LITELLM_PROVIDER_PREFIXES:
-        return f"{prefix} models can't run in the cloud"
-    return None
+    if provider in ENDPOINT_PROVIDERS:
+        return _without_endpoint(provider)
+    return _refused(provider)
 
 
-def _endpointless_reason(model_type: AgentType, name: str) -> str | None:
-    """Why a model of ``model_type`` named ``name`` cannot run in the cloud
-    without an endpoint, or None when it calls a hosted API."""
-    if model_type == AgentType.OLLAMA:
-        return "set an endpoint; Ollama models can't run in the cloud without one"
-    if "/" not in name:
-        if model_type == AgentType.OPENAI:
-            return None
-        return (
-            "set an endpoint, or start the model name with a provider "
-            f"({', '.join(HOSTED_LITELLM_PREFIXES)})"
-        )
-    if model_type == AgentType.LITELLM and name.startswith(HOSTED_LITELLM_PREFIXES):
+def _refused(provider: str) -> str:
+    return f"{provider} models can't run in the cloud"
+
+
+def _without_endpoint(provider: str) -> str:
+    return f"set an endpoint; {provider} models can't run in the cloud without one"
+
+
+def _inferred_provider(
+    model_type: AgentType, name: str, api_base: Optional[str]
+) -> Optional[str]:
+    """The provider LiteLLM routes the model to, from the model string
+    :func:`~hackagent.models.build.build_model` passes it; None when LiteLLM
+    cannot tell."""
+    import litellm
+
+    provider_config = get_provider_config(model_type)
+    assert provider_config is not None  # every CLOUD_MODEL_TYPES type has one
+    model = resolve_litellm_model(name, provider_prefix=provider_config.provider_prefix)
+    try:
+        _, provider, _, _ = litellm.get_llm_provider(model=model, api_base=api_base)
+    except Exception:
         return None
-    # A provider an endpoint does not help.
-    provider = _provider_reason(model_type, name)
-    if provider:
-        return provider
-    prefix = name.split("/", 1)[0] + "/"
-    return f"set an endpoint; {prefix} models can't run in the cloud without one"
+    return provider or None
 
 
 __all__ = [
     "CLOUD_MODEL_TYPES",
     "CLOUD_OPTIONS",
-    "ENDPOINT_LITELLM_PREFIXES",
-    "HOSTED_LITELLM_PREFIXES",
+    "ENDPOINT_PROVIDERS",
+    "HOSTED_PROVIDERS",
+    "UNKNOWN_PROVIDER_REASON",
     "CloudIssue",
     "cloud_issues",
     "model_cloud_issues",
