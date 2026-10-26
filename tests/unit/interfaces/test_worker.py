@@ -1,27 +1,40 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""The cloud worker: claims queued runs and executes them with their token."""
+"""The cloud worker: claims queued runs and executes each in its own process."""
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 import signal
+import sys
+import textwrap
 import threading
+import time
+from pathlib import Path
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from click.testing import CliRunner
 
 from hackagent.interfaces import worker
 from hackagent.interfaces.cli.main import cli
-from hackagent.orchestrator.execution.execute import ExecutionOutcome
+from hackagent.interfaces.worker_run import EXIT_COMPLETED, EXIT_ENDED, STOPPED_NOTE
 from hackagent.storage.remote import ClaimFailed, ClaimResult
 
 RUN_ID = str(uuid4())
+CLAIM_ENV = {
+    "OPENAI_API_KEY": "sk-allowed",
+    "OPENAI_BASE_URL": "http://injected.example",
+    "HTTPS_PROXY": "http://proxy.example",
+    "HF_ENDPOINT": "http://hf.example",
+    "HACKAGENT_GRAPHVIZ_DOT": "/tmp/dot",
+    "PATH": "/tmp/evil",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -30,6 +43,7 @@ def _env(monkeypatch):
     monkeypatch.setattr(os, "environ", dict(os.environ))
     monkeypatch.setenv("HACKAGENT_BASE_URL", "https://api.example")
     monkeypatch.setenv("HACKAGENT_WORKER_TOKEN", "hworker_secret")
+    monkeypatch.setenv("PARENT_ONLY_SETTING", "parent-value")
     monkeypatch.delenv("HACKAGENT_WORKER_POLL_S", raising=False)
     monkeypatch.setattr(worker, "setup_package_logging", lambda **_: None)
 
@@ -46,8 +60,10 @@ def worker_log(caplog):
         package.removeHandler(caplog.handler)
 
 
-def _claim():
-    return ClaimResult(run={"id": RUN_ID}, run_token="hart_x", env={"OPENAI_KEY": "sk"})
+def _claim(env=None):
+    return ClaimResult(
+        run={"id": RUN_ID}, run_token="hart_x", env=dict(env or {"OPENAI_KEY": "sk"})
+    )
 
 
 def _backends(claims):
@@ -63,6 +79,32 @@ def _backends(claims):
     return connect, worker_store, run_store
 
 
+def _child(monkeypatch, tmp_path: Path, body: str) -> None:
+    """Run ``body`` as the run's process instead of the real one."""
+    script = tmp_path / "child.py"
+    script.write_text(textwrap.dedent(body))
+    monkeypatch.setattr(worker, "CHILD_COMMAND", (sys.executable, "-I", str(script)))
+
+
+def _recording_child(monkeypatch, tmp_path: Path, exit_code: int) -> Path:
+    """A run's process that records what it was given, then exits."""
+    record = tmp_path / "record.json"
+    _child(
+        monkeypatch,
+        tmp_path,
+        f"""
+        import json, os, sys
+        claim = json.loads(sys.stdin.read())
+        with open({str(record)!r}, "w") as f:
+            json.dump(
+                {{"env": dict(os.environ), "claim": claim, "cwd": os.getcwd()}}, f
+            )
+        sys.exit({exit_code})
+        """,
+    )
+    return record
+
+
 def test_once_without_work_exits_0():
     connect, store, _ = _backends([None])
     with patch.object(worker.RemoteBackend, "connect", connect):
@@ -70,49 +112,173 @@ def test_once_without_work_exits_0():
     store.close.assert_called_once()
 
 
-def test_claimed_run_executed_with_run_token():
-    connect, store, run_store = _backends([_claim()])
-    ex = MagicMock(return_value=ExecutionOutcome("COMPLETED", "ok"))
-    with (
-        patch.object(worker.RemoteBackend, "connect", connect),
-        patch.object(worker, "execute_run", ex),
-    ):
+def test_a_claimed_run_executes_in_its_own_process(monkeypatch, tmp_path):
+    record = _recording_child(monkeypatch, tmp_path, EXIT_COMPLETED)
+    connect, _, run_store = _backends([_claim(CLAIM_ENV)])
+    with patch.object(worker.RemoteBackend, "connect", connect):
         assert worker.main(["--once"]) == 0
+
+    seen = json.loads(record.read_text())
+    assert seen["claim"]["run"] == {"id": RUN_ID}
+    assert seen["claim"]["run_token"] == "hart_x"
+    assert seen["claim"]["claimed_by"].startswith("cloud-worker:")
+    env = seen["env"]
+    # Built from scratch: nothing of the worker's own environment.
+    assert "HACKAGENT_WORKER_TOKEN" not in env
+    assert "hworker_secret" not in json.dumps(seen)
+    assert "PARENT_ONLY_SETTING" not in env
+    assert env["PATH"] == worker.CHILD_PATH
+    assert env["LANG"] == worker.CHILD_LANG
+    assert env["HACKAGENT_BASE_URL"] == "https://api.example"
+    assert env["HACKAGENT_CLOUD_RUN"] == "1"
+    assert os.path.realpath(env["HOME"]) == os.path.realpath(seen["cwd"])
+    # Only the secrets a cloud run may read are passed on.
+    assert env["OPENAI_API_KEY"] == "sk-allowed"
+    for name in ("OPENAI_BASE_URL", "HTTPS_PROXY", "HF_ENDPOINT"):
+        assert name not in env
+    assert "HACKAGENT_GRAPHVIZ_DOT" not in env
+    # The per-run home goes with the run; the run finished itself.
+    assert not os.path.exists(env["HOME"])
+    run_store.finish_run.assert_not_called()
+
+
+def test_a_run_that_ended_failed_exits_1(monkeypatch, tmp_path):
+    _recording_child(monkeypatch, tmp_path, EXIT_ENDED)
+    connect, _, run_store = _backends([_claim()])
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 1
+    run_store.finish_run.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "crash",
+    ["os._exit(1)", "os.kill(os.getpid(), signal.SIGKILL)", "raise RuntimeError"],
+)
+def test_the_worker_finishes_a_run_whose_process_died(monkeypatch, tmp_path, crash):
+    _child(
+        monkeypatch, tmp_path, f"import os, signal, sys\nsys.stdin.read()\n{crash}\n"
+    )
+    connect, _, run_store = _backends([_claim()])
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 1
     connect.assert_any_call("https://api.example", "hart_x")
-    args, kwargs = ex.call_args
-    assert args[0] is run_store
-    assert kwargs["gateway_key"] == "hart_x"
-    assert kwargs["env"] == {"OPENAI_KEY": "sk"}
-    assert kwargs["claim"].run_token == "hart_x"
-    assert kwargs["claimed_by"].startswith("cloud-worker:")
-    # Stopping the worker mid-run fails the run rather than cancelling it.
-    assert kwargs["interrupted_as"] == ("FAILED", worker.STOPPED_NOTE)
-    # The per-run client is closed with its run, not left to the process exit.
+    run_store.finish_run.assert_called_once_with(
+        UUID(RUN_ID), "FAILED", worker.UNEXPECTED_NOTE
+    )
     run_store.close.assert_called_once_with(close_client=True)
 
 
-def test_failed_run_exits_1():
-    connect, _, _ = _backends([_claim()])
-    ex = MagicMock(return_value=ExecutionOutcome("FAILED", "boom"))
-    with (
-        patch.object(worker.RemoteBackend, "connect", connect),
-        patch.object(worker, "execute_run", ex),
-    ):
-        assert worker.main(["--once"]) == 1
-
-
-def test_env_values_not_logged(worker_log):
-    connect, _, _ = _backends([_claim()])
-    ex = MagicMock(side_effect=RuntimeError("leaked sk hart_x hworker_secret"))
-    with (
-        patch.object(worker.RemoteBackend, "connect", connect),
-        patch.object(worker, "execute_run", ex),
-    ):
+def test_a_finish_the_server_refuses_is_logged_without_secrets(
+    monkeypatch, tmp_path, worker_log
+):
+    _child(monkeypatch, tmp_path, "import os\nos._exit(1)\n")
+    connect, _, run_store = _backends([_claim()])
+    run_store.finish_run.side_effect = RuntimeError("hart_x sk hworker_secret")
+    with patch.object(worker.RemoteBackend, "connect", connect):
         assert worker.main(["--once"]) == 1
     text = worker_log.text
     assert RUN_ID in text
     for secret in ("sk", "hart_x", "hworker_secret", "OPENAI_KEY"):
         assert not re.search(rf"\b{secret}\b", text)
+
+
+def _send_sigterm_when(ready: Path) -> threading.Thread:
+    def send() -> None:
+        deadline = time.monotonic() + 20
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    thread = threading.Thread(target=send, daemon=True)
+    thread.start()
+    return thread
+
+
+def test_sigterm_is_passed_on_to_the_run_process(monkeypatch, tmp_path):
+    ready, stopped = tmp_path / "ready", tmp_path / "stopped"
+    _child(
+        monkeypatch,
+        tmp_path,
+        f"""
+        import pathlib, signal, sys, time
+        sys.stdin.read()
+        def stop(signum, frame):
+            pathlib.Path({str(stopped)!r}).touch()
+            sys.exit({EXIT_ENDED})
+        signal.signal(signal.SIGTERM, stop)
+        pathlib.Path({str(ready)!r}).touch()
+        time.sleep(30)
+        """,
+    )
+    connect, store, run_store = _backends([_claim()])
+    before = signal.getsignal(signal.SIGTERM)
+    thread = _send_sigterm_when(ready)
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main([]) == 0
+    thread.join()
+    assert stopped.exists()
+    # The run's process finished the run; the worker stops polling.
+    run_store.finish_run.assert_not_called()
+    assert store.claim_next_run.call_count == 1
+    assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_a_process_killed_by_the_stop_is_finished_as_stopped(monkeypatch, tmp_path):
+    ready = tmp_path / "ready"
+    _child(
+        monkeypatch,
+        tmp_path,
+        f"""
+        import pathlib, sys, time
+        sys.stdin.read()
+        pathlib.Path({str(ready)!r}).touch()
+        time.sleep(30)
+        """,
+    )
+    connect, _, run_store = _backends([_claim()])
+    thread = _send_sigterm_when(ready)
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 1
+    thread.join()
+    run_store.finish_run.assert_called_once_with(UUID(RUN_ID), "FAILED", STOPPED_NOTE)
+
+
+def test_the_real_run_process_starts_in_its_scrubbed_environment(monkeypatch):
+    # Nothing listens there: the run cannot even be finished, and the run's
+    # process says so by its exit status.
+    monkeypatch.setenv("HACKAGENT_BASE_URL", "http://127.0.0.1:9")
+    claim = ClaimResult(
+        run={"id": RUN_ID, "organization": str(uuid4()), "agent": str(uuid4())},
+        run_token="hart_x",
+        env={},
+    )
+    connect, _, run_store = _backends([claim])
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 1
+    run_store.finish_run.assert_not_called()
+
+
+def test_child_environment_passes_on_only_cloud_secret_names():
+    env = worker.child_environment("https://api.example", CLAIM_ENV, "/tmp/home")
+    assert env == {
+        "OPENAI_API_KEY": "sk-allowed",
+        "PATH": worker.CHILD_PATH,
+        "HOME": "/tmp/home",
+        "LANG": worker.CHILD_LANG,
+        "HACKAGENT_BASE_URL": "https://api.example",
+        "HACKAGENT_CLOUD_RUN": "1",
+    }
+
+
+def test_dropped_secrets_are_counted_not_named(monkeypatch, tmp_path, worker_log):
+    _recording_child(monkeypatch, tmp_path, EXIT_COMPLETED)
+    connect, _, _ = _backends([_claim(CLAIM_ENV)])
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 0
+    assert "5 secrets not passed on" in worker_log.text
+    for name, value in CLAIM_ENV.items():
+        assert name not in worker_log.text
+        assert value not in worker_log.text
 
 
 def test_a_refused_claim_logs_its_status_and_no_secret(worker_log):
@@ -154,12 +320,14 @@ PROVIDER_CREDENTIALS = {
     "VERTEXAI_PROJECT": "project",
     "OPENAI_API_KEY": "sk-ambient",
     "HF_API_TOKEN": "hf-ambient",
+    "HF_TOKEN": "hf-token-ambient",
+    "GITHUB_TOKEN": "gh-ambient",
     "WEBHOOK_SECRET": "whsec-ambient",
     "SERVICE_ACCESS_KEY": "ak-ambient",
 }
 
 
-def test_provider_credentials_kept_out_of_runs(monkeypatch, worker_log):
+def test_provider_credentials_removed_from_the_worker(monkeypatch, worker_log):
     monkeypatch.setattr(
         os,
         "environ",
@@ -171,24 +339,14 @@ def test_provider_credentials_kept_out_of_runs(monkeypatch, worker_log):
             **PROVIDER_CREDENTIALS,
         },
     )
-    seen = {}
-
-    def execute(*args, **kwargs):
-        seen.update(os.environ)
-        return ExecutionOutcome("COMPLETED", "")
-
-    connect, _, _ = _backends([_claim()])
-    with (
-        patch.object(worker.RemoteBackend, "connect", connect),
-        patch.object(worker, "execute_run", execute),
-    ):
+    connect, _, _ = _backends([None])
+    with patch.object(worker.RemoteBackend, "connect", connect):
         assert worker.main(["--once"]) == 0
 
-    assert not set(PROVIDER_CREDENTIALS) & set(seen)
     assert not set(PROVIDER_CREDENTIALS) & set(os.environ)
-    assert seen["HACKAGENT_BASE_URL"] == "https://api.example"
-    assert seen["HACKAGENT_WORKER_POLL_S"] == "1"
-    assert seen["PATH_FOR_TEST"] == "/usr/bin"
+    assert os.environ["HACKAGENT_BASE_URL"] == "https://api.example"
+    assert os.environ["HACKAGENT_WORKER_POLL_S"] == "1"
+    assert os.environ["PATH_FOR_TEST"] == "/usr/bin"
     assert f"Removed {len(PROVIDER_CREDENTIALS)} provider credential variables" in (
         worker_log.text
     )
@@ -207,13 +365,8 @@ def test_missing_base_url_exits_2(monkeypatch):
     assert worker.main(["--once"]) == 2
 
 
-def _stop_loop():
-    """A claim that finds no work and asks the worker to stop (SIGTERM)."""
-    os.kill(os.getpid(), signal.SIGTERM)  # idle: only sets the stop flag
-    return None
-
-
-def test_loop_survives_a_failed_claim_and_keeps_polling():
+def test_loop_survives_a_failed_claim_and_keeps_polling(monkeypatch, tmp_path):
+    _recording_child(monkeypatch, tmp_path, EXIT_COMPLETED)
     connect, store, _ = _backends([])
     outcomes = iter([ConnectionError("down"), _claim(), None])
 
@@ -222,35 +375,18 @@ def test_loop_survives_a_failed_claim_and_keeps_polling():
         if isinstance(item, Exception):
             raise item
         if item is None:
-            return _stop_loop()
+            # Idle: SIGTERM only sets the stop flag.
+            os.kill(os.getpid(), signal.SIGTERM)
         return item
 
     store.claim_next_run.side_effect = claim_next
-    ex = MagicMock(return_value=ExecutionOutcome("COMPLETED", "ok"))
     with (
         patch.object(worker.RemoteBackend, "connect", connect),
-        patch.object(worker, "execute_run", ex),
         patch.object(threading.Event, "wait", lambda self, timeout=None: False),
     ):
         assert worker.main(["--interval", "0"]) == 0
-    assert ex.call_count == 1
+    assert (tmp_path / "record.json").exists()
     assert store.claim_next_run.call_count == 3
-
-
-def test_sigterm_during_run_stops_it_and_exits():
-    connect, _, _ = _backends([_claim()])
-
-    def during_run(*a, **k):
-        os.kill(os.getpid(), signal.SIGTERM)
-        raise AssertionError("handler should have interrupted the run")
-
-    before = signal.getsignal(signal.SIGTERM)
-    with (
-        patch.object(worker.RemoteBackend, "connect", connect),
-        patch.object(worker, "execute_run", side_effect=during_run),
-    ):
-        assert worker.main([]) == 0
-    assert signal.getsignal(signal.SIGTERM) == before
 
 
 def test_worker_not_listed_in_cli_help():
