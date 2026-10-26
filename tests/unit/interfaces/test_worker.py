@@ -26,6 +26,8 @@ RUN_ID = str(uuid4())
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
+    # The worker removes variables from the environment: give it a copy.
+    monkeypatch.setattr(os, "environ", dict(os.environ))
     monkeypatch.setenv("HACKAGENT_BASE_URL", "https://api.example")
     monkeypatch.setenv("HACKAGENT_WORKER_TOKEN", "hworker_secret")
     monkeypatch.delenv("HACKAGENT_WORKER_POLL_S", raising=False)
@@ -140,6 +142,59 @@ def test_worker_token_kept_out_of_the_environment():
         assert worker.main(["--once"]) == 0
     connect.assert_any_call("https://api.example", "hworker_secret")
     assert "HACKAGENT_WORKER_TOKEN" not in os.environ
+
+
+PROVIDER_CREDENTIALS = {
+    "AWS_ACCESS_KEY_ID": "AKIAEXAMPLE",
+    "AWS_SECRET_ACCESS_KEY": "aws-secret-value",
+    "AWS_SESSION_TOKEN": "aws-session-value",
+    "AZURE_CLIENT_SECRET": "azure-secret-value",
+    "GOOGLE_APPLICATION_CREDENTIALS": "/var/run/gcp.json",
+    "GCP_PROJECT": "project",
+    "VERTEXAI_PROJECT": "project",
+    "OPENAI_API_KEY": "sk-ambient",
+    "HF_API_TOKEN": "hf-ambient",
+    "WEBHOOK_SECRET": "whsec-ambient",
+    "SERVICE_ACCESS_KEY": "ak-ambient",
+}
+
+
+def test_provider_credentials_kept_out_of_runs(monkeypatch, worker_log):
+    monkeypatch.setattr(
+        os,
+        "environ",
+        {
+            "HACKAGENT_BASE_URL": "https://api.example",
+            "HACKAGENT_WORKER_TOKEN": "hworker_secret",
+            "HACKAGENT_WORKER_POLL_S": "1",
+            "PATH_FOR_TEST": "/usr/bin",
+            **PROVIDER_CREDENTIALS,
+        },
+    )
+    seen = {}
+
+    def execute(*args, **kwargs):
+        seen.update(os.environ)
+        return ExecutionOutcome("COMPLETED", "")
+
+    connect, _, _ = _backends([_claim()])
+    with (
+        patch.object(worker.RemoteBackend, "connect", connect),
+        patch.object(worker, "execute_run", execute),
+    ):
+        assert worker.main(["--once"]) == 0
+
+    assert not set(PROVIDER_CREDENTIALS) & set(seen)
+    assert not set(PROVIDER_CREDENTIALS) & set(os.environ)
+    assert seen["HACKAGENT_BASE_URL"] == "https://api.example"
+    assert seen["HACKAGENT_WORKER_POLL_S"] == "1"
+    assert seen["PATH_FOR_TEST"] == "/usr/bin"
+    assert f"Removed {len(PROVIDER_CREDENTIALS)} provider credential variables" in (
+        worker_log.text
+    )
+    for name, value in PROVIDER_CREDENTIALS.items():
+        assert name not in worker_log.text
+        assert value not in worker_log.text
 
 
 def test_missing_worker_token_exits_2(monkeypatch):

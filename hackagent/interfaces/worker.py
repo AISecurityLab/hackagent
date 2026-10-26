@@ -16,7 +16,7 @@ import signal
 import socket
 import threading
 from types import FrameType
-from typing import Optional, Sequence
+from typing import MutableMapping, Optional, Sequence
 from uuid import UUID
 
 from hackagent.core.logging import get_logger
@@ -32,6 +32,11 @@ POLL_INTERVAL_ENV = "HACKAGENT_WORKER_POLL_S"
 DEFAULT_POLL_S = 5.0
 #: The note of a run the worker was stopped in the middle of (SIGTERM).
 STOPPED_NOTE = "The cloud worker stopped before the run finished"
+#: Variables the worker reads itself, kept whatever their name.
+WORKER_ENV = frozenset({BASE_URL_ENV, POLL_INTERVAL_ENV})
+#: Names of cloud-provider credentials and provider API keys.
+CREDENTIAL_PREFIXES = ("AWS_", "AZURE_", "GOOGLE_", "GCP_", "VERTEX")
+CREDENTIAL_SUFFIXES = ("_API_KEY", "_API_TOKEN", "_SECRET", "_ACCESS_KEY")
 
 
 def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
@@ -86,6 +91,24 @@ def _execute_claim(
     return outcome.status, outcome.note
 
 
+def _drop_provider_credentials(environ: MutableMapping[str, str]) -> int:
+    """Remove cloud-provider credentials and provider API keys from
+    ``environ``, so a run reads only the secrets its claim injects; returns
+    how many variables were removed."""
+    names = [
+        name
+        for name in environ
+        if name not in WORKER_ENV
+        and (
+            name.upper().startswith(CREDENTIAL_PREFIXES)
+            or name.upper().endswith(CREDENTIAL_SUFFIXES)
+        )
+    ]
+    for name in names:
+        del environ[name]
+    return len(names)
+
+
 def _describe(error: Exception) -> str:
     """What to log about a failed iteration: the error's type, and for a
     refused claim the HTTP status and the server's short reason. Never the
@@ -107,6 +130,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     base_url = os.environ.get(BASE_URL_ENV)
     # Kept here only, so the runs this process executes never see it.
     token = os.environ.pop(WORKER_TOKEN_ENV, None)
+    removed = _drop_provider_credentials(os.environ)
+    if removed:
+        # The count only: names and values stay out of the log.
+        logger.info("Removed %d provider credential variables", removed)
     if not base_url or not token:
         logger.error("%s and %s must be set", BASE_URL_ENV, WORKER_TOKEN_ENV)
         return 2
