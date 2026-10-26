@@ -19,7 +19,7 @@ it needs is a callable supplied from outside:
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, ClassVar, get_args
 
 from pydantic import BaseModel, ConfigDict
@@ -68,6 +68,25 @@ class AttackParams(BaseModel):
     #: Read by campaign resolution (to report a missing role clearly) and by the
     #: documentation generator.
     REQUIRED_ROLES: ClassVar[frozenset[str]] = frozenset()
+
+    #: Parameters whose value is code the technique runs: a cloud run may
+    #: not set them. Read by :meth:`cloud_parameter_issues`.
+    CLOUD_FORBIDDEN_PARAMETERS: ClassVar[frozenset[str]] = frozenset()
+
+    @classmethod
+    def cloud_parameter_issues(cls, parameters: Mapping[str, Any]) -> dict[str, str]:
+        """Why a cloud run may not use ``parameters`` (the plain parameters
+        a campaign sets), as a reason per parameter name; empty when it may.
+
+        Every :attr:`CLOUD_FORBIDDEN_PARAMETERS` parameter that is set is
+        refused. A technique whose parameter carries code only in some of its
+        values overrides this to refuse just those values.
+        """
+        return {
+            name: f"{name} can't be set in the cloud"
+            for name in sorted(cls.CLOUD_FORBIDDEN_PARAMETERS)
+            if name in parameters
+        }
 
     @classmethod
     def _fields_of(cls, kind: Any) -> frozenset[str]:

@@ -60,7 +60,7 @@ logger = get_logger(__name__)
 OUT_OF_CREDITS_NOTE = "Out of credits"
 REJECTED_NOTE = "Your API key is no longer valid for this run"
 CANCELLED_NOTE = "Campaign cancelled"
-NOT_CLOUD_RUNNABLE_NOTE = "This campaign uses a model type that can't run in the cloud"
+NOT_CLOUD_RUNNABLE_NOTE = "This campaign can't run in the cloud"
 _NOTE_LIMIT = 500
 
 Status = Literal["COMPLETED", "FAILED", "CANCELLED"]

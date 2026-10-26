@@ -31,6 +31,8 @@ BASE_URL_ENV = "HACKAGENT_BASE_URL"
 DB_PATH_ENV = "HACKAGENT_DB_PATH"
 DASHBOARD_URL_ENV = "HACKAGENT_DASHBOARD_URL"
 DEFAULT_DASHBOARD_URL = "https://app.hackagent.dev"
+#: Set to ``1`` in the process that executes a cloud run, and nowhere else.
+CLOUD_RUN_ENV = "HACKAGENT_CLOUD_RUN"
 
 OLLAMA_BASE_URL_ENV_VARS = ("OLLAMA_BASE_URL", "OLLAMA_API_BASE", "OLLAMA_HOST")
 DEFAULT_OLLAMA_HOST = "localhost"
@@ -54,6 +56,11 @@ class Mode(str, Enum):
 
     LOCAL = "local"
     REMOTE = "remote"
+
+
+def is_cloud_run() -> bool:
+    """Whether this process executes a run for HackAgent cloud."""
+    return os.environ.get(CLOUD_RUN_ENV) == "1"
 
 
 def _normalize_ollama_base_url(raw: str) -> str:

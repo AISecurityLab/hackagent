@@ -13,6 +13,7 @@ from hackagent.orchestrator.campaign.cloud import (
     UNKNOWN_PROVIDER_REASON,
     CloudIssue,
     cloud_issues,
+    secret_name_reason,
 )
 
 from .fakes import campaign, model
@@ -148,7 +149,6 @@ def test_an_empty_endpoint_counts_as_none():
         ("LITELLM", "ollama/m", "ollama"),
         ("LITELLM", "lm_studio/m", "lm_studio"),
         ("LITELLM", "hosted_vllm/m", "hosted_vllm"),
-        ("LITELLM", "vllm/m", "vllm"),
     ],
 )
 def test_a_local_runtime_needs_an_endpoint(type_, name, provider):
@@ -286,4 +286,243 @@ def test_every_model_of_the_spec_is_checked():
         "guardrails.before",
         "guardrails.after",
         "dataset.classifier",
+    ]
+
+
+@pytest.mark.parametrize("endpoint", [None, ENDPOINT])
+def test_in_process_vllm_is_refused(endpoint):
+    assert issues_for(m("vllm/facebook/opt-125m", "LITELLM", endpoint)) == [
+        CloudIssue("target", "vllm models can't run in the cloud")
+    ]
+
+
+# --- secret variables -------------------------------------------------------------
+
+
+def keyed(name):
+    target = m("gpt-4o", "OPENAI", ENDPOINT)
+    target["connection"]["api_key_env"] = name
+    return target
+
+
+@pytest.mark.parametrize(
+    "name", ["OPENAI_API_KEY", "MY_LLM_KEY", "GROQ_TOKEN", "TOGETHERAPI_KEY"]
+)
+def test_a_secret_variable_named_as_a_key_is_allowed(name):
+    assert secret_name_reason(name) is None
+    assert issues_for(keyed(name)) == []
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "OPENAI_BASE_URL",
+        "HTTPS_PROXY",
+        "HF_ENDPOINT",
+        "HACKAGENT_GRAPHVIZ_DOT",
+        "PATH",
+        "HOME",
+        "LD_PRELOAD",
+        "openai_api_key",
+        "1_API_KEY",
+        "OPENAI_SECRET",
+    ],
+)
+def test_a_variable_that_is_not_a_key_is_refused(name):
+    assert secret_name_reason(name) is not None
+    assert paths(issues_for(keyed(name))) == ["target.connection.api_key_env"]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "HACKAGENT_API_KEY",
+        "HF_TOKEN",
+        "LITELLM_MASTER_KEY",
+        "SSL_KEY",
+        "REQUESTS_CA_KEY",
+        "CURL_TOKEN",
+        "PYTHONSTARTUP_KEY",
+        "XDG_KEY",
+        "HTTPS_PROXY_TOKEN",
+        "OPENAI_API_BASE_KEY",
+        "MODEL_URL_TOKEN",
+        "AZURE_ENDPOINT_KEY",
+        "OLLAMA_HOST_KEY",
+    ],
+)
+def test_a_key_named_variable_a_library_reads_settings_from_is_refused(name):
+    assert secret_name_reason(name) == f"{name} can't hold a secret in the cloud"
+    assert issues_for(keyed(name)) == [
+        CloudIssue(
+            "target.connection.api_key_env", f"{name} can't hold a secret in the cloud"
+        )
+    ]
+
+
+# --- gateway marker headers and generation ------------------------------------------
+
+
+def test_a_gateway_marker_with_headers_is_refused():
+    gateway = {**GW, "connection": {**GW["connection"], "headers": {"Host": "x"}}}
+    assert issues_for(gateway) == [
+        CloudIssue(
+            "target.connection.headers", "the HackAgent gateway takes no headers"
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "generation",
+    [
+        {"extra_body": {"api_base": "http://127.0.0.1"}},
+        {"response_format": {"type": "json_object"}},
+        {"seed": 1},
+        {"stop": "x"},
+        {"thinking": True},
+    ],
+)
+def test_a_gateway_marker_takes_only_plain_sampling(generation):
+    (key,) = generation
+    assert issues_for({**GW, "generation": generation}) == [
+        CloudIssue(
+            f"target.generation.{key}",
+            "the HackAgent gateway takes only temperature, top_p and max_tokens",
+        )
+    ]
+
+
+def test_a_gateway_marker_may_set_temperature_top_p_and_max_tokens():
+    generation = {"temperature": 0.2, "top_p": 0.9, "max_tokens": 64}
+    assert issues_for({**GW, "generation": generation}) == []
+
+
+# --- technique parameters -----------------------------------------------------------
+
+PROGRAM = (
+    'TransformFxDecorator(transform_fx="import os\\ndef transform(prompt, '
+    "assistant, random_state):\\n    return os.popen('id').read()\")"
+)
+
+
+def attack_issues(attack) -> list[CloudIssue]:
+    spec = campaign(target=m("gpt-4o", "OPENAI"), attacks=[attack])
+    return cloud_issues(CampaignSpec.model_validate(spec))
+
+
+@pytest.mark.parametrize(
+    "program",
+    [
+        PROGRAM,
+        f"IdentityDecorator().then({PROGRAM})",
+        # v1: one constructor per statement.
+        f"IdentityDecorator()\n{PROGRAM}",
+        # Not a program the compiler builds, refused by the name it contains.
+        "TransformFxDecorator(",
+    ],
+)
+def test_an_h4rm3l_program_that_runs_code_is_refused(program):
+    syntax_version = 1 if "\n" in program else 2
+    attack = {
+        "name": "h4rm3l",
+        "parameters": {"program": program, "syntax_version": syntax_version},
+        "roles": {"decorator": GW},
+    }
+    assert attack_issues(attack) == [
+        CloudIssue(
+            "attacks.0.parameters.program",
+            "TransformFxDecorator can't run in the cloud",
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "program",
+    [
+        "refusal_suppression",
+        "translate_zulu",
+        "Base64Decorator().then(RoleplayingDecorator(prefix='TransformFxDecorator'))",
+    ],
+)
+def test_an_h4rm3l_program_of_plain_decorators_is_allowed(program):
+    attack = {
+        "name": "h4rm3l",
+        "parameters": {"program": program},
+        "roles": {"decorator": GW},
+    }
+    assert attack_issues(attack) == []
+
+
+# --- goals, paths and repository code ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "dataset",
+    [
+        {"source": {"type": "provider", "provider": "file", "path": "/etc/passwd"}},
+        {"source": {"type": "provider", "provider": "huggingface", "path": "x/y"}},
+    ],
+)
+def test_goals_come_from_a_preset_or_the_campaign(dataset):
+    spec = campaign(target=m("gpt-4o", "OPENAI"), dataset=dataset)
+    assert cloud_issues(CampaignSpec.model_validate(spec)) == [
+        CloudIssue(
+            "dataset.source",
+            "dataset source 'provider' can't be used in the cloud; use a preset or "
+            "inline goals",
+        )
+    ]
+
+
+def test_inline_goals_are_allowed():
+    spec = campaign(
+        target=m("gpt-4o", "OPENAI"),
+        dataset={"source": {"type": "inline", "goals": ["a goal"]}},
+    )
+    assert cloud_issues(CampaignSpec.model_validate(spec)) == []
+
+
+def test_trust_remote_code_is_refused_wherever_it_is():
+    spec = campaign(
+        target=m("gpt-4o", "OPENAI"),
+        dataset={
+            "source": {
+                "type": "provider",
+                "provider": "huggingface",
+                "path": "x/y",
+                "options": {"trust_remote_code": True},
+            }
+        },
+    )
+    issues = cloud_issues(CampaignSpec.model_validate(spec))
+    assert (
+        CloudIssue(
+            "dataset.source.options.trust_remote_code",
+            "trust_remote_code can't be used in the cloud",
+        )
+        in issues
+    )
+
+
+@pytest.mark.parametrize(
+    ("key", "value"), [("cache_dir", "/tmp/anywhere"), ("revision", "attacker/main")]
+)
+def test_audit_dataset_paths_are_refused(key, value):
+    spec = campaign(
+        target=m("gpt-4o", "OPENAI"),
+        evaluation={"audit": {"enabled": True, "dataset": {key: value}}},
+    )
+    assert cloud_issues(CampaignSpec.model_validate(spec)) == [
+        CloudIssue(
+            f"evaluation.audit.dataset.{key}", f"{key} can't be set in the cloud"
+        )
+    ]
+
+
+def test_a_fixed_run_id_is_refused():
+    spec = campaign(
+        target=m("gpt-4o", "OPENAI"), execution={"output": {"run_id": "../../x"}}
+    )
+    assert cloud_issues(CampaignSpec.model_validate(spec)) == [
+        CloudIssue("execution.output.run_id", "run_id can't be set in the cloud")
     ]

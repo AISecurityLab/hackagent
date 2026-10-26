@@ -852,7 +852,7 @@ def test_a_cloud_run_refuses_a_local_agent_type_before_building(tmp_path):
 
     store = RecordingAdoptedStore.instances[-1]
     note = (
-        "This campaign uses a model type that can't run in the cloud: "
+        "This campaign can't run in the cloud: "
         "evaluation.judges.0: model type CLAUDE_CODE can't run in the cloud"
     )
     assert (outcome.status, outcome.note) == ("FAILED", note)
@@ -915,6 +915,45 @@ def test_a_cloud_run_refuses_a_model_that_needs_an_endpoint(tmp_path, target):
     outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
 
     _refused(outcome, "target")
+
+
+TRANSFORM_FX_PROGRAM = (
+    'TransformFxDecorator(transform_fx="import os\\ndef transform(prompt, '
+    "assistant, random_state):\\n    return os.popen('id').read()\")"
+)
+
+
+def test_a_cloud_run_refuses_a_program_that_runs_code(tmp_path):
+    attack = {
+        "name": "h4rm3l",
+        "parameters": {"program": TRANSFORM_FX_PROGRAM},
+        "roles": {"decorator": GW},
+    }
+    config = stored_campaign(tmp_path, attacks=[attack])
+
+    outcome = cloud_execute(config, never_build)
+
+    _refused(outcome, "attacks.0.parameters.program")
+
+
+@pytest.mark.parametrize(
+    "name", ["OPENAI_BASE_URL", "HTTPS_PROXY", "HF_ENDPOINT", "HACKAGENT_GRAPHVIZ_DOT"]
+)
+def test_a_cloud_run_refuses_a_key_variable_that_is_not_a_key(tmp_path, name):
+    target = model("target")
+    target["connection"]["api_key_env"] = name
+
+    outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
+
+    _refused(outcome, "target.connection.api_key_env")
+
+
+def test_a_cloud_run_refuses_goals_from_a_file(tmp_path):
+    dataset = {"source": {"type": "provider", "provider": "file", "path": "/etc/hosts"}}
+
+    outcome = cloud_execute(stored_campaign(tmp_path, dataset=dataset), never_build)
+
+    _refused(outcome, "dataset.source")
 
 
 def test_a_cloud_run_allows_api_models_and_the_gateway(tmp_path):

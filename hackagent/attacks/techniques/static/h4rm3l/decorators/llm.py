@@ -9,6 +9,8 @@ import inspect
 import logging
 from typing import Optional
 
+from hackagent.core.settings import is_cloud_run
+
 from ...base import Completion
 from .base import LLMPromptDecorator
 
@@ -253,6 +255,8 @@ class TransformFxDecorator(LLMPromptDecorator):
     - ``assistant``: LLM prompting function (may be a no-op)
     - ``random_state``: ``numpy.random.RandomState`` instance
 
+    It cannot be constructed in a cloud run.
+
     Args:
         transform_fx: Python source code defining ``transform``.
         seed: Random seed for the internal RandomState.
@@ -264,6 +268,8 @@ class TransformFxDecorator(LLMPromptDecorator):
         transform_fx: str,
         seed: int = 42,
     ) -> None:
+        if is_cloud_run():
+            raise ValueError("TransformFxDecorator can't run in the cloud")
         super().__init__(completion, seed=seed)
         self._transform_fx = transform_fx
 
