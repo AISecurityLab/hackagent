@@ -27,6 +27,8 @@ from hackagent.interfaces.worker_run import EXIT_COMPLETED, EXIT_ENDED, STOPPED_
 from hackagent.storage.remote import ClaimFailed, ClaimResult
 
 RUN_ID = str(uuid4())
+#: The fixture below replaces it; its own tests call this.
+HARDEN_PROCESS = worker.harden_process
 CLAIM_ENV = {
     "OPENAI_API_KEY": "sk-allowed",
     "OPENAI_BASE_URL": "http://injected.example",
@@ -46,6 +48,8 @@ def _env(monkeypatch):
     monkeypatch.setenv("PARENT_ONLY_SETTING", "parent-value")
     monkeypatch.delenv("HACKAGENT_WORKER_POLL_S", raising=False)
     monkeypatch.setattr(worker, "setup_package_logging", lambda **_: None)
+    # Leave the test process as it is: hardening is tested on its own.
+    monkeypatch.setattr(worker, "harden_process", lambda: False)
 
 
 @pytest.fixture
@@ -387,6 +391,106 @@ def test_loop_survives_a_failed_claim_and_keeps_polling(monkeypatch, tmp_path):
         assert worker.main(["--interval", "0"]) == 0
     assert (tmp_path / "record.json").exists()
     assert store.claim_next_run.call_count == 3
+
+
+class _FakeLibc:
+    def __init__(self):
+        self.calls = []
+
+    def prctl(self, *args):
+        self.calls.append(args)
+        return 0
+
+
+def test_hardening_on_linux_hides_the_worker_and_adopts_orphans(monkeypatch):
+    libc = _FakeLibc()
+    monkeypatch.setattr(worker.sys, "platform", "linux")
+    monkeypatch.setattr(worker.ctypes, "CDLL", MagicMock(return_value=libc))
+    assert HARDEN_PROCESS() is True
+    assert libc.calls == [
+        (worker.PR_SET_DUMPABLE, 0, 0, 0, 0),
+        (worker.PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0),
+    ]
+
+
+def test_hardening_elsewhere_does_nothing(monkeypatch):
+    cdll = MagicMock()
+    monkeypatch.setattr(worker.sys, "platform", "darwin")
+    monkeypatch.setattr(worker.ctypes, "CDLL", cdll)
+    assert worker._prctl(worker.PR_SET_DUMPABLE, 0) is False
+    cdll.assert_not_called()
+
+
+def test_the_worker_hardens_itself_before_the_first_claim(monkeypatch):
+    order = []
+    monkeypatch.setattr(worker, "harden_process", lambda: order.append("harden"))
+    connect, store, _ = _backends([])
+    store.claim_next_run.side_effect = lambda _: order.append("claim")
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 0
+    assert order == ["harden", "claim"]
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    try:  # Linux: a zombie nobody reaped yet is not running either.
+        with open(f"/proc/{pid}/stat") as stat:
+            return stat.read().rsplit(")", 1)[1].split()[0] != "Z"
+    except OSError:
+        return True
+
+
+def test_processes_a_run_leaves_behind_are_ended(monkeypatch, tmp_path):
+    grandchild = tmp_path / "grandchild"
+    _child(
+        monkeypatch,
+        tmp_path,
+        f"""
+        import pathlib, subprocess, sys
+        sys.stdin.read()
+        sleeper = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        pathlib.Path({str(grandchild)!r}).write_text(str(sleeper.pid))
+        sys.exit({EXIT_COMPLETED})
+        """,
+    )
+    connect, _, _ = _backends([_claim()])
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 0
+    pid = int(grandchild.read_text())
+    deadline = time.monotonic() + 10
+    while _alive(pid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _alive(pid)
+
+
+def test_as_subreaper_the_worker_ends_and_reaps_orphans(monkeypatch):
+    rounds = iter([[101, 102], [103], []])
+    killed, reaped = [], []
+    monkeypatch.setattr(worker, "_children", lambda: next(rounds))
+    monkeypatch.setattr(worker.os, "kill", lambda pid, sig: killed.append((pid, sig)))
+    monkeypatch.setattr(worker.os, "waitpid", lambda pid, flags: reaped.append(pid))
+    monkeypatch.setattr(worker.os, "killpg", MagicMock(side_effect=ProcessLookupError))
+    worker._RunProcess(subreaper=True)._end_leftovers(100)
+    worker.os.killpg.assert_called_once_with(100, signal.SIGKILL)
+    assert killed == [
+        (101, signal.SIGKILL),
+        (102, signal.SIGKILL),
+        (103, signal.SIGKILL),
+    ]
+    assert reaped == [101, 102, 103]
+
+
+def test_a_run_whose_process_cannot_start_is_finished_failed(monkeypatch, tmp_path):
+    monkeypatch.setattr(worker, "CHILD_COMMAND", (str(tmp_path / "missing-python"),))
+    connect, _, run_store = _backends([_claim()])
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 1
+    run_store.finish_run.assert_called_once_with(
+        UUID(RUN_ID), "FAILED", worker.NOT_STARTED_NOTE
+    )
 
 
 def test_worker_not_listed_in_cli_help():
