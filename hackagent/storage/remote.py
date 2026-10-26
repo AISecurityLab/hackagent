@@ -96,6 +96,8 @@ _STOP = object()
 # pending writes, enqueue() blocks until the worker catches up. Keeps memory
 # bounded without ever dropping a trace.
 _WRITE_QUEUE_MAXSIZE = 1000
+#: Longest server reason a refused claim carries.
+_DETAIL_LIMIT = 200
 
 #: The statuses a run's executor ends it with (POST /run/{id}/finish).
 _FINAL_STATUSES = frozenset(status.value for status in FinishStatusEnum)
@@ -110,6 +112,19 @@ class RunNotClaimable(RuntimeError):
         self.claimed_by = claimed_by
         self.status = status
         self.note = note
+
+
+class ClaimFailed(RuntimeError):
+    """The server refused a claim with ``status_code``; ``detail`` is its
+    short reason, if it gave one. Neither carries the response body."""
+
+    def __init__(self, what: str, status_code: int, detail: str = "") -> None:
+        super().__init__(
+            f"RemoteBackend: {what} returned {status_code}"
+            + (f": {detail}" if detail else "")
+        )
+        self.status_code = status_code
+        self.detail = detail
 
 
 class InvalidApiKey(RuntimeError):
@@ -967,9 +982,11 @@ class RemoteBackend:
 
     def _claim_result(self, resp: Any, what: str) -> ClaimResult:
         if resp.status_code != 200:
-            raise RuntimeError(
-                f"RemoteBackend: {what} returned {resp.status_code} "
-                f"(body={resp.content!r})"
+            detail = self._parse_json_response(resp).get("detail")
+            raise ClaimFailed(
+                what,
+                resp.status_code,
+                detail[:_DETAIL_LIMIT] if isinstance(detail, str) else "",
             )
         run = self._parse_json_response(resp)
         run_token = run.pop("run_token", None)

@@ -19,7 +19,7 @@ from click.testing import CliRunner
 from hackagent.interfaces import worker
 from hackagent.interfaces.cli.main import cli
 from hackagent.orchestrator.execution.execute import ExecutionOutcome
-from hackagent.storage.remote import ClaimResult
+from hackagent.storage.remote import ClaimFailed, ClaimResult
 
 RUN_ID = str(uuid4())
 
@@ -30,6 +30,18 @@ def _env(monkeypatch):
     monkeypatch.setenv("HACKAGENT_WORKER_TOKEN", "hworker_secret")
     monkeypatch.delenv("HACKAGENT_WORKER_POLL_S", raising=False)
     monkeypatch.setattr(worker, "setup_package_logging", lambda **_: None)
+
+
+@pytest.fixture
+def worker_log(caplog):
+    """caplog wired to the ``hackagent`` logger, which may not propagate."""
+    package = logging.getLogger("hackagent")
+    package.addHandler(caplog.handler)
+    caplog.set_level(logging.DEBUG, logger="hackagent")
+    try:
+        yield caplog
+    finally:
+        package.removeHandler(caplog.handler)
 
 
 def _claim():
@@ -71,7 +83,10 @@ def test_claimed_run_executed_with_run_token():
     assert kwargs["env"] == {"OPENAI_KEY": "sk"}
     assert kwargs["claim"].run_token == "hart_x"
     assert kwargs["claimed_by"].startswith("cloud-worker:")
-    run_store.close.assert_called_once()
+    # Stopping the worker mid-run fails the run rather than cancelling it.
+    assert kwargs["interrupted_as"] == ("FAILED", worker.STOPPED_NOTE)
+    # The per-run client is closed with its run, not left to the process exit.
+    run_store.close.assert_called_once_with(close_client=True)
 
 
 def test_failed_run_exits_1():
@@ -84,19 +99,47 @@ def test_failed_run_exits_1():
         assert worker.main(["--once"]) == 1
 
 
-def test_env_values_not_logged(caplog):
+def test_env_values_not_logged(worker_log):
     connect, _, _ = _backends([_claim()])
     ex = MagicMock(side_effect=RuntimeError("leaked sk hart_x hworker_secret"))
     with (
-        caplog.at_level(logging.DEBUG),
         patch.object(worker.RemoteBackend, "connect", connect),
         patch.object(worker, "execute_run", ex),
     ):
         assert worker.main(["--once"]) == 1
-    text = caplog.text
+    text = worker_log.text
     assert RUN_ID in text
     for secret in ("sk", "hart_x", "hworker_secret", "OPENAI_KEY"):
         assert not re.search(rf"\b{secret}\b", text)
+
+
+def test_a_refused_claim_logs_its_status_and_no_secret(worker_log):
+    connect, store, _ = _backends([])
+    store.claim_next_run.side_effect = ClaimFailed(
+        "claim of the next run", 401, "Invalid worker token."
+    )
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 1
+    text = worker_log.text
+    assert "ClaimFailed (HTTP 401: Invalid worker token.)" in text
+    assert "hworker_secret" not in text
+
+
+def test_other_errors_log_only_their_type(worker_log):
+    connect, store, _ = _backends([])
+    store.claim_next_run.side_effect = ValueError("hworker_secret in a message")
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 1
+    assert "Worker iteration failed: ValueError" in worker_log.text
+    assert "hworker_secret" not in worker_log.text
+
+
+def test_worker_token_kept_out_of_the_environment():
+    connect, _, _ = _backends([None])
+    with patch.object(worker.RemoteBackend, "connect", connect):
+        assert worker.main(["--once"]) == 0
+    connect.assert_any_call("https://api.example", "hworker_secret")
+    assert "HACKAGENT_WORKER_TOKEN" not in os.environ
 
 
 def test_missing_worker_token_exits_2(monkeypatch):
@@ -139,7 +182,7 @@ def test_loop_survives_a_failed_claim_and_keeps_polling():
     assert store.claim_next_run.call_count == 3
 
 
-def test_sigterm_during_run_cancels_it_and_exits():
+def test_sigterm_during_run_stops_it_and_exits():
     connect, _, _ = _backends([_claim()])
 
     def during_run(*a, **k):

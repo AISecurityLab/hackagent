@@ -22,7 +22,12 @@ from hackagent.storage._http.api.run import (
     run_finish_create,
     run_partial_update,
 )
-from hackagent.storage import ClaimResult, ExecutorRejected, RunNotClaimable
+from hackagent.storage import (
+    ClaimFailed,
+    ClaimResult,
+    ExecutorRejected,
+    RunNotClaimable,
+)
 from hackagent.storage.remote import RemoteBackend
 from hackagent.storage.records import (
     AgentRecord,
@@ -1479,6 +1484,27 @@ class TestRemoteBackendRunCampaignLink(unittest.TestCase):
         self.assertEqual(result.total, 10)
 
 
+class TestRemoteBackendClose(unittest.TestCase):
+    """Closing a backend releases what it holds, so many can come and go."""
+
+    def test_close_drops_the_exit_hook(self):
+        with patch("hackagent.storage.remote.atexit") as mock_atexit:
+            backend = RemoteBackend(_mock_client())
+            mock_atexit.register.assert_called_once_with(backend.close)
+            backend.close()
+            backend.close()
+        mock_atexit.unregister.assert_called_once_with(backend.close)
+
+    def test_close_keeps_a_shared_client_open_unless_asked(self):
+        client = _mock_client()
+        backend = RemoteBackend(client)
+        backend.close()
+        client.get_httpx_client.return_value.close.assert_not_called()
+
+        backend.close(close_client=True)
+        client.get_httpx_client.return_value.close.assert_called_once()
+
+
 class TestRemoteBackendExecutorProtocol(unittest.TestCase):
     """Claim, heartbeat and finish: the calls an executor makes on a run."""
 
@@ -1577,6 +1603,17 @@ class TestRemoteBackendExecutorProtocol(unittest.TestCase):
             mock_claim.sync_detailed.return_value = _mock_response(403)
             with self.assertRaisesRegex(RuntimeError, "403"):
                 self.backend.claim_run(_uid(), "local:host (me)")
+
+    def test_a_refused_claim_carries_its_status_and_reason_only(self):
+        content = b'{"detail": "Invalid token.", "echo": "secret-value"}'
+        with patch("hackagent.storage.remote.run_claim_next_create") as mock_next:
+            mock_next.sync_detailed.return_value = _mock_response(401, content=content)
+            with self.assertRaises(ClaimFailed) as caught:
+                self.backend.claim_next_run("cloud-worker:pod-1")
+
+        self.assertEqual(caught.exception.status_code, 401)
+        self.assertEqual(caught.exception.detail, "Invalid token.")
+        self.assertNotIn("secret-value", str(caught.exception))
 
     def test_claim_next_returns_a_claim(self):
         content = b'{"id": "x", "status": "RUNNING", "run_token": "tok", "env": {}}'

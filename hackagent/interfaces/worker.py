@@ -22,7 +22,7 @@ from uuid import UUID
 from hackagent.core.logging import get_logger
 from hackagent.interfaces.cli.logging_setup import setup_package_logging
 from hackagent.orchestrator.execution import execute_run
-from hackagent.storage.remote import ClaimResult, RemoteBackend
+from hackagent.storage.remote import ClaimFailed, ClaimResult, RemoteBackend
 
 logger = get_logger(__name__)
 
@@ -30,6 +30,8 @@ BASE_URL_ENV = "HACKAGENT_BASE_URL"
 WORKER_TOKEN_ENV = "HACKAGENT_WORKER_TOKEN"
 POLL_INTERVAL_ENV = "HACKAGENT_WORKER_POLL_S"
 DEFAULT_POLL_S = 5.0
+#: The note of a run the worker was stopped in the middle of (SIGTERM).
+STOPPED_NOTE = "The cloud worker stopped before the run finished"
 
 
 def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
@@ -75,11 +77,26 @@ def _execute_claim(
             claimed_by=claimed_by,
             env=claim.env,
             claim=claim,
+            interrupted_as=("FAILED", STOPPED_NOTE),
         )
     finally:
-        run_store.close()
+        # A long-lived worker opens a client per run: close it with the run.
+        run_store.close(close_client=True)
     logger.info("Run %s %s: %s", run_id, outcome.status, outcome.note)
     return outcome.status, outcome.note
+
+
+def _describe(error: Exception) -> str:
+    """What to log about a failed iteration: the error's type, and for a
+    refused claim the HTTP status and the server's short reason. Never the
+    error's own text, which may quote env values or tokens."""
+    if isinstance(error, ClaimFailed):
+        reason = f": {error.detail}" if error.detail else ""
+        return f"{type(error).__name__} (HTTP {error.status_code}{reason})"
+    status_code = getattr(error, "status_code", None)
+    if isinstance(status_code, int):
+        return f"{type(error).__name__} (HTTP {status_code})"
+    return type(error).__name__
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -88,7 +105,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     setup_package_logging(default_level_str="INFO")
 
     base_url = os.environ.get(BASE_URL_ENV)
-    token = os.environ.get(WORKER_TOKEN_ENV)
+    # Kept here only, so the runs this process executes never see it.
+    token = os.environ.pop(WORKER_TOKEN_ENV, None)
     if not base_url or not token:
         logger.error("%s and %s must be set", BASE_URL_ENV, WORKER_TOKEN_ENV)
         return 2
@@ -105,7 +123,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     def on_sigterm(signum: int, frame: Optional[FrameType]) -> None:
         stop.set()
         if running:
-            # execute_run records the interrupt as a cancellation.
+            # execute_run finishes the run FAILED with STOPPED_NOTE.
             raise KeyboardInterrupt
 
     previous = signal.signal(signal.SIGTERM, on_sigterm)
@@ -124,11 +142,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         running = False
                     failed = status != "COMPLETED"
             except KeyboardInterrupt:
-                logger.info("Stopping: the run in progress was cancelled")
+                logger.info("Stopping: the run in progress was ended as failed")
                 return 1 if args.once else 0
             except Exception as exc:
-                # Never include env values or tokens: only the error's type.
-                logger.error("Worker iteration failed: %s", type(exc).__name__)
+                logger.error("Worker iteration failed: %s", _describe(exc))
                 failed = True
             if args.once and (claim is not None or failed):
                 return 1 if failed else 0
@@ -139,7 +156,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
     finally:
         signal.signal(signal.SIGTERM, previous)
-        store.close()
+        store.close(close_client=True)
 
 
 if __name__ == "__main__":

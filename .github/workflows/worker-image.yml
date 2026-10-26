@@ -1,38 +1,64 @@
-name: Publish worker image
+name: Worker image
 
 on:
   push:
     tags:
       - 'v*'
-  # Called by release.yml once it has tagged a merge to main; a tag pushed with
-  # GITHUB_TOKEN never triggers the push trigger above.
-  workflow_call:
-    inputs:
-      tag:
-        description: Tag to build and publish.
-        required: true
-        type: string
+  pull_request:
+    paths:
+      - Dockerfile.worker
+      - .dockerignore
+      - pyproject.toml
+      - uv.lock
+      - 'hackagent/**'
+      - .github/workflows/worker-image.yml
 
 env:
   IMAGE: ghcr.io/aisecuritylab/hackagent-worker
 
 jobs:
-  image:
+  build:
+    name: Build worker image
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: false
+          tags: ${{ env.IMAGE }}:pr-${{ github.event.pull_request.number }}
+
+  publish:
     name: Build and push worker image
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.tag || github.ref_name }}
 
-      - name: Compute image version
-        id: version
+      - name: Compute image tags
+        id: tags
         env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:${version}"
+            # Only a stable release (X.Y.Z) moves :latest; pre-releases don't.
+            if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "${IMAGE}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -47,6 +73,4 @@ jobs:
           context: .
           file: Dockerfile.worker
           push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
-            ${{ env.IMAGE }}:latest
+          tags: ${{ steps.tags.outputs.tags }}
