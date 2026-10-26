@@ -73,15 +73,6 @@ class ModelConnection(BaseModel)
 
 Validated LiteLLM provider and transport settings.
 
-#### validate\_api\_key\_source
-
-```python
-@model_validator(mode="after")
-def validate_api_key_source() -> "ModelConnection"
-```
-
-Require an unambiguous API-key source.
-
 #### to\_litellm
 
 ```python

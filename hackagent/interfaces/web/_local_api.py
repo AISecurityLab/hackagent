@@ -3,16 +3,14 @@
 
 """Offline REST surface: the HackAgent API contract served from local SQLite.
 
-When no API key is configured there is no remote to proxy to, so this blueprint
-answers the same routes ``api.hackagent.dev`` exposes, reading from the
-``LocalBackend`` the SDK writes its runs into. The bundled SPA therefore works
-unchanged offline.
+With the local backend selected, this blueprint answers dashboard requests
+from the SQLite store through the facade. Local is the default backend.
 
-Reads go through the facade. ``DELETE /run/<id>`` is the one explicit write
-(``delete_run``). Launching a campaign needs a generator, a judge and credits,
-none of which exist offline, so the other write routes answer 501. The technique
-catalogue and campaign schema need no account and are served so the builder
-works offline.
+``DELETE /run/<id>`` deletes a local run. Launching a campaign needs a
+generator, a judge and credits, none of which exist offline, so the other write
+routes return 501; start campaigns through the CLI or the Python campaign
+runner. The technique catalogue and campaign schema need no account and are
+served so the builder works offline.
 """
 
 from __future__ import annotations

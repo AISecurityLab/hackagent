@@ -27,7 +27,11 @@ from textual.binding import Binding
 from textual.widgets import Static, Tree
 from textual.widgets.tree import TreeNode
 
+from hackagent.evaluation.audit import AuditReport
+from hackagent.core.settings import Mode, Settings
 from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.interfaces.audit import audit_summary
+from hackagent.orchestrator.campaign.audit import format_report
 from hackagent.interfaces.tui.base import BaseTab
 from hackagent.interfaces.tui.theme import (
     MITIGATED,
@@ -130,13 +134,12 @@ class ResultsTab(ResultsExportMixin, BaseTab):
     def _stores(self) -> list["_Store"]:
         """The stores that may hold runs, in the order they are tried.
 
-        Where a run was recorded is the campaign's choice, not the account's:
-        a campaign records here unless it names a server, and an account can
-        hold runs this machine has never seen. So the account is read first
-        when there is one, and this machine after it.
+        Offer the account only when the session selects remote storage.
+        The local database is always available as a separate source.
         """
         stores = []
-        if getattr(self.cli_config, "api_key", None):
+        settings = getattr(self.cli_config, "settings", None)
+        if isinstance(settings, Settings) and settings.mode is Mode.REMOTE:
             stores.append(_Store("the account", self.client))
         stores.append(_Store("this machine", self.local_client))
         return stores
@@ -329,6 +332,7 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         for campaign in campaigns:
             runs = self._runs_of(str(campaign.id))
             node = tree.root.add(self._campaign_label(campaign, runs), expand=False)
+            self._add_audit(node, getattr(campaign, "audit", None))
             for run in runs:
                 self._add_attack(node, run)
         # Which store this is, and that there is another one, are part of
@@ -349,7 +353,26 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         when = _ago(getattr(campaign, "created_at", None))
         trailer = f" · {_escape(target)}" if target else ""
         outcome = _outcome(broken, goals, getattr(campaign, "status", ""), recorded)
-        return f"[b]{name}[/b] · {when}{trailer}   {outcome}"
+        label = f"[b]{name}[/b] · {when}{trailer}   {outcome}"
+        audit = getattr(campaign, "audit", None)
+        if audit:
+            try:
+                label += f"   {audit_summary(audit)}"
+            except (TypeError, ValueError):
+                pass
+        return label
+
+    def _add_audit(self, parent: TreeNode[Any], audit: Any) -> None:
+        """The judge audit qualifies every attack of the campaign, so it sits first."""
+        if not audit:
+            return
+        try:
+            report = AuditReport.model_validate(dict(audit))
+        except (TypeError, ValueError):
+            return
+        node = parent.add(f"[cyan]judge audit[/cyan] · {audit_summary(report)}")
+        for line in format_report(report).splitlines():
+            node.add_leaf(f"[dim]{_escape(line)}[/dim]")
 
     def _add_attack(self, parent: TreeNode[Any], run: Any) -> None:
         broken, goals, recorded = self._totals_of([run])

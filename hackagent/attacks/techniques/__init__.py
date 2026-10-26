@@ -13,9 +13,9 @@ Techniques are grouped by category, the same grouping the docs use:
   static_template, flipattack, cipherchat, h4rm3l, mml, fc/tfc)
 - adaptive/: independent attempts that refine or search (pair, tap, pap,
   bon, advprefix, autodan_turbo)
-- multi_turn/: one growing conversation with the target (crescendo)
-- indirect/: payload delivered through retrieved content or tool output
-  (rag, tool_output_ipi)
+- multi_turn/: one growing conversation with the target (crescendo, stac)
+- indirect/: payload delivered through retrieved content, tool output or tool
+  registry descriptions (rag, tool_output_ipi, toolhijacker)
 
 The folder follows :mod:`hackagent.catalog.taxonomy`: the ``indirect`` tag
 decides first, otherwise the primary category does.

@@ -16,11 +16,12 @@ import getpass
 import logging
 import queue
 import socket
+import ssl
 import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import AnyUrl
@@ -293,11 +294,18 @@ class RemoteBackend:
         *,
         timeout: Optional[float] = 120.0,
         raise_on_unexpected_status: bool = False,
+        verify: Union[bool, ssl.SSLContext] = True,
     ) -> "RemoteBackend":
-        """Create a backend for ``base_url`` authenticated with ``api_key``."""
+        """Create a backend for ``base_url`` authenticated with ``api_key``.
+
+        ``base_url`` may carry a path prefix (``https://host/api``); every
+        request is made relative to it. ``verify`` is the TLS verification
+        setting, e.g. :attr:`Settings.verify` for a private CA bundle.
+        """
         return cls(
             AuthenticatedClient(
-                base_url=base_url,
+                base_url=base_url.strip().rstrip("/"),
+                verify_ssl=verify,
                 token=api_key,
                 prefix="Bearer",
                 raise_on_unexpected_status=raise_on_unexpected_status,

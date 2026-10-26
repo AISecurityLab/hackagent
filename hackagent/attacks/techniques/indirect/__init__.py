@@ -5,7 +5,8 @@
 
 The payload reaches the target through content it retrieves or a tool
 returns, not through the user turn: rag (poisoned retrieval documents) and
-tool_output_ipi (poisoned tool output). Their primary category in
+tool_output_ipi (poisoned tool output), and toolhijacker (poisoned tool
+registry descriptions). Their primary category in
 :mod:`hackagent.catalog.taxonomy` is still static or adaptive; the
 ``indirect`` tag decides the folder, as it does in the docs.
 

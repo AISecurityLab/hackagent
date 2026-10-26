@@ -50,7 +50,7 @@ Initialize base tab.
 def client()
 ```
 
-Session used for reads. Remote when an API key is configured.
+Session using the explicitly selected storage backend.
 
 #### local\_client
 

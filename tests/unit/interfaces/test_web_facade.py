@@ -14,7 +14,7 @@ from tests.fakes import RecordingStore
 
 def _settings():
     return Settings.resolve(
-        api_key="",
+        backend="local",
         db_path=":memory:",
         env={},
         config_path="/nonexistent/hackagent/config.json",

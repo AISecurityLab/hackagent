@@ -60,10 +60,12 @@ def test_the_database_path_comes_from_the_settings_in_hand():
 
 def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch):
     monkeypatch.setenv("OTHER_HACKAGENT_KEY", "other-secret")
+    monkeypatch.delenv("REQUESTS_CA_BUNDLE", raising=False)
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     storage = StorageSpec(
         backend="remote",
         base_url="https://other.example.test",
-        api_key_env="OTHER_HACKAGENT_KEY",
+        api_key="${OTHER_HACKAGENT_KEY}",
     )
     with (
         patch("hackagent.storage.remote.RemoteBackend.connect") as connect,
@@ -74,10 +76,13 @@ def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch)
     ):
         open_store(storage)
 
-    connect.assert_called_once_with("https://other.example.test", "other-secret")
+    connect.assert_called_once_with(
+        "https://other.example.test", "other-secret", verify=True
+    )
 
 
-def test_register_target_stores_the_target_model_config():
+def test_register_target_stores_the_target_model_config(monkeypatch):
+    monkeypatch.setenv("BOT_KEY", "bot-secret")
     target = ModelConfig.model_validate(
         {
             "name": "support-bot",
@@ -85,7 +90,7 @@ def test_register_target_stores_the_target_model_config():
                 "provider": "openai",
                 "type": "OPENAI",
                 "endpoint": "https://bot.example.test/v1",
-                "api_key_env": "BOT_KEY",
+                "api_key": "${BOT_KEY}",
             },
             "generation": {"temperature": 0.3, "max_tokens": 128},
         }
@@ -123,3 +128,43 @@ def test_register_target_never_stores_a_credential_written_into_the_file():
     _name, (_, config), _kwargs = store.calls[0]
     assert config["connection"]["headers"] == {"Authorization": "[REDACTED]"}
     assert "literal-value" not in repr(config)
+
+
+def test_each_result_carries_what_the_dashboard_reads():
+    """Goal, reply, latency and status land in the metadata both stores keep."""
+    from unittest.mock import MagicMock
+    from uuid import uuid4
+
+    from hackagent.models.response import ModelResponse
+    from hackagent.orchestrator.campaign.results import Attempt
+    from hackagent.orchestrator.campaign.spec import OutputSpec
+    from hackagent.orchestrator.campaign.tracking import RunTracker
+
+    store = MagicMock()
+    tracker = RunTracker(
+        store,
+        agent_id=uuid4(),
+        attack_name="baseline",
+        configuration={},
+        expected_goals=1,
+        output=OutputSpec(),
+    )
+    response = ModelResponse(text="no", latency_ms=42)
+    tracker.record(
+        Attempt(
+            goal_index=3,
+            request_index=0,
+            goal="do something",
+            messages=({"role": "user", "content": "hi"},),
+            response=response,
+        )
+    )
+
+    created = store.create_result.call_args.args
+    assert created[4]["goal"] == "do something"
+    assert created[4]["goal_index"] == 3
+    data = store.update_result.call_args.kwargs["agent_specific_data"]
+    assert data["goal"] == "do something"
+    assert data["goal_index"] == 3
+    assert data["response_body"] == "no"
+    assert data["latency_ms"] == 42

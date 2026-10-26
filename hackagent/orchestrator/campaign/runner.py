@@ -200,7 +200,7 @@ async def arun_campaign(
             resolved=resolved,
         )
     resolved = resolved or resolve_campaign(
-        spec, build=build, load=load, build_embed=build_embed
+        spec, build=build, load=load, build_embed=build_embed, settings=settings
     )
     logger.info(
         "campaign %s | resolved %d goals, %d attacks, %d judges",

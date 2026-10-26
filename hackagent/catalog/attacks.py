@@ -33,6 +33,11 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "description": "Multi-turn escalation attack that gradually steers a persistent "
         "conversation toward the goal, with judge-driven backtracking on refusals.",
     },
+    "stac": {
+        "label": "STAC",
+        "description": "Sequential tool attack chaining in a persistent conversation, "
+        "verified by ordered tool execution and final sandbox state.",
+    },
     "flipattack": {
         "label": "FlipAttack",
         "description": "Prompt obfuscation via character/word flipping modes.",
@@ -81,5 +86,9 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
     "tool_output_ipi": {
         "label": "Tool-output IPI",
         "description": "Indirect prompt injection via poisoned tool observations (InjecAgent / OPI).",
+    },
+    "toolhijacker": {
+        "label": "ToolHijacker",
+        "description": "Poison a tool registry description to steer retrieval and tool selection across task paraphrases.",
     },
 }

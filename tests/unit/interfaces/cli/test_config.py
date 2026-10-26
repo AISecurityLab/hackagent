@@ -1,449 +1,116 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
-"""
-Unit tests for CLI configuration functionality.
-"""
+"""CLI settings use the same credential contract as the SDK."""
 
 import json
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
+
 import pytest
+
+from hackagent.core.credentials import CredentialError
 from hackagent.interfaces.cli.config import CLIConfig
 
 
-def _env(home=Path("/fake/home"), **variables: str) -> dict:
-    """An environment that names ``home`` as the home directory everywhere.
-
-    ``~`` expands from HOME on POSIX but from USERPROFILE on Windows, so a
-    test that replaces the environment has to set both.
-    """
-    return {"HOME": str(home), "USERPROFILE": str(home), **variables}
-
-
-class TestCLIConfig:
-    """Test CLI configuration management"""
-
-    def test_default_config(self):
-        """Test default configuration values"""
-        # Mock the default config file to not exist and clear env vars
-        with (
-            patch("pathlib.Path.exists", return_value=False),
-            patch("pathlib.Path.home", return_value=Path("/fake/home")),
-            patch.dict("os.environ", _env(), clear=True),
-        ):
-            config = CLIConfig()
-
-            assert config.api_key is None
-            assert config.base_url == "https://api.hackagent.dev"
-            assert config.verbose == 1  # Default is VERBOSITY_WARNING
-
-    def test_explicit_none_args_fall_back_to_defaults(self):
-        """cli/main.py always passes every option, so None must mean 'not provided'."""
-        with (
-            patch("pathlib.Path.exists", return_value=False),
-            patch("pathlib.Path.home", return_value=Path("/fake/home")),
-            patch.dict("os.environ", _env(), clear=True),
-        ):
-            config = CLIConfig(
-                config_file=None, api_key=None, base_url=None, verbose=None
-            )
-
-            assert config.base_url == "https://api.hackagent.dev"
-            assert config.verbose == 1  # Default is VERBOSITY_WARNING
-            config.validate()  # must not raise "Base URL is required"
-
-    def test_env_variable_loading(self):
-        """Test loading from environment variables"""
-        with (
-            patch.dict(
-                "os.environ",
-                {
-                    "HACKAGENT_API_KEY": "test-key",
-                    "HACKAGENT_BASE_URL": "https://test.example.com",
-                },
-            ),
-            patch("pathlib.Path.exists", return_value=False),
-        ):
-            config = CLIConfig()
-
-            assert config.api_key == "test-key"
-            assert config.base_url == "https://test.example.com"
-
-    def test_config_file_loading(self):
-        """Test loading from configuration file"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {
-                "api_key": "file-key",
-                "base_url": "https://file.example.com",
-            }
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            # Clear env vars to ensure we're only testing file loading
-            with patch.dict("os.environ", _env(), clear=True):
-                config = CLIConfig(config_file=config_file)
-
-                assert config.api_key == "file-key"
-                assert config.base_url == "https://file.example.com"
-        finally:
-            Path(config_file).unlink()
-
-    def test_cli_args_override(self):
-        """Test that CLI arguments override other sources"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {
-                "api_key": "file-key",
-                "base_url": "https://file.example.com",
-            }
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            with patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-key"}):
-                config = CLIConfig(
-                    config_file=config_file,
-                    api_key="cli-key",
-                    base_url="https://cli.example.com",
-                )
-
-                # CLI args should take precedence
-                assert config.api_key == "cli-key"
-                assert config.base_url == "https://cli.example.com"
-        finally:
-            Path(config_file).unlink()
-
-    # NEW TESTS FOR STANDARDIZED PRIORITY ORDER
-    def test_env_beats_config_file(self):
-        """Environment variables take priority over the config file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {"api_key": "config-file-key"}
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            with patch.dict(
-                "os.environ",
-                {"HACKAGENT_API_KEY": "env-key-wins"},
-            ):
-                config = CLIConfig(config_file=config_file)
-
-                assert config.api_key == "env-key-wins"
-                assert config.source_of("api_key") == "Environment"
-        finally:
-            Path(config_file).unlink()
-
-    def test_standardized_priority_env_fallback(self):
-        """Test environment variable as fallback when no config file"""
-        with patch("pathlib.Path.exists", return_value=False):
-            with patch.dict(
-                "os.environ",
-                {"HACKAGENT_API_KEY": "env-fallback-key"},
-            ):
-                config = CLIConfig()
-
-                # Environment should be used as fallback
-                assert config.api_key == "env-fallback-key"
-
-    def test_standardized_priority_cli_over_config_and_env(self):
-        """Test CLI arguments override both config file and environment"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {"api_key": "config-key"}
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            with patch.dict(
-                "os.environ",
-                {"HACKAGENT_API_KEY": "env-key"},
-            ):
-                config = CLIConfig(config_file=config_file, api_key="cli-wins")
-
-                # CLI should win over everything
-                assert config.api_key == "cli-wins"
-        finally:
-            Path(config_file).unlink()
-
-    def test_env_beats_default_config_file(self):
-        """The environment also beats the default config file."""
-        config_data = {"api_key": "default-config-key"}
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create a writable fake home directory inside temp_dir
-            fake_home = Path(temp_dir) / "home"
-            fake_home.mkdir()
-
-            # Create the .config/hackagent directory structure inside fake_home
-            config_dir = fake_home / ".config" / "hackagent"
-            config_dir.mkdir(parents=True, exist_ok=True)
-            (config_dir / "config.json").write_text(json.dumps(config_data))
-
-            with patch.dict(
-                "os.environ",
-                _env(fake_home, HACKAGENT_API_KEY="env-wins"),
-            ):
-                config = CLIConfig()
-
-                assert config.default_config_path == config_dir / "config.json"
-                assert config.api_key == "env-wins"
-
-            with patch.dict("os.environ", _env(fake_home), clear=True):
-                assert CLIConfig().api_key == "default-config-key"
-
-    def test_env_only_when_no_config_and_no_cli(self):
-        """Test environment variables work when no config file or CLI args"""
-        with (
-            patch("pathlib.Path.exists", return_value=False),
-            patch.dict(
-                "os.environ",
-                {"HACKAGENT_API_KEY": "env-only-key"},
-            ),
-        ):
-            config = CLIConfig()
-
-            assert config.api_key == "env-only-key"
-
-    def test_partial_config_file_with_env_fallback(self):
-        """Test config file with partial settings, env provides rest"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            # Config file only has api_key, not base_url
-            config_data = {"api_key": "config-api-key"}
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            with patch.dict(
-                "os.environ",
-                _env(HACKAGENT_BASE_URL="https://env.example.com"),
-                clear=True,
-            ):
-                config = CLIConfig(config_file=config_file)
-
-                # Config file value should be used for api_key
-                assert config.api_key == "config-api-key"
-                # Environment value should be used for base_url
-                assert config.base_url == "https://env.example.com"
-        finally:
-            Path(config_file).unlink()
-
-    def test_config_file_ignores_cli_overrides_tracking(self):
-        """Test config file doesn't override CLI arguments due to override tracking"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {
-                "api_key": "config-should-not-win",
-                "base_url": "https://config.example.com",
-            }
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            # Set CLI argument for api_key but not base_url
-            config = CLIConfig(config_file=config_file, api_key="cli-should-win")
-
-            # CLI argument should be preserved
-            assert config.api_key == "cli-should-win"
-            # Config file should provide base_url
-            assert config.base_url == "https://config.example.com"
-        finally:
-            Path(config_file).unlink()
-
-    def test_save_config(self):
-        """Test saving configuration to file"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_path = Path(temp_dir) / "test_config.json"
-
-            config = CLIConfig(
-                api_key="test-key",
-                base_url="https://test.example.com",
-            )
-
-            config.save(str(config_path))
-
-            assert config_path.exists()
-
-            # Load and verify
-            with open(config_path, encoding="utf-8") as f:
-                saved_data = json.load(f)
-
-            assert saved_data["api_key"] == "test-key"
-            assert saved_data["base_url"] == "https://test.example.com"
-
-    def test_validate_success(self):
-        """Test successful validation"""
-        config = CLIConfig(api_key="valid-key", base_url="https://example.com")
-
-        # Should not raise an exception
-        config.validate()
-
-    def test_validate_missing_api_key(self):
-        """Test that validation succeeds with missing API key (local mode supported)"""
-        with (
-            patch("pathlib.Path.exists", return_value=False),
-            patch("pathlib.Path.home", return_value=Path("/fake/home")),
-            patch.dict("os.environ", _env(), clear=True),
-        ):
-            config = CLIConfig(base_url="https://example.com")
-
-            # Should NOT raise — running locally without API key is valid
-            config.validate()
-
-    def test_empty_base_url_is_rejected(self):
-        """An explicitly empty base URL is a configuration error."""
-        with pytest.raises(ValueError, match="Base URL is required"):
-            CLIConfig(api_key="test-key", base_url="")
-
-    def test_default_config_path(self):
-        """Test default configuration path"""
-        fake_home = Path("/fake/home")
-        with patch.dict("os.environ", _env(fake_home), clear=True):
-            config = CLIConfig()
-
-            expected_path = fake_home / ".config" / "hackagent" / "config.json"
-            assert config.default_config_path == expected_path
-
-    def test_yaml_config_loading(self):
-        """Test loading YAML configuration"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml_content = """
-api_key: yaml-key
-base_url: https://yaml.example.com
-"""
-            f.write(yaml_content)
-            config_file = f.name
-
-        try:
-            # This should work if PyYAML is available
-            try:
-                import importlib.util
-
-                yaml_spec = importlib.util.find_spec("yaml")
-                if yaml_spec is not None:
-                    # Clear env vars to ensure we're only testing file loading
-                    with patch.dict("os.environ", _env(), clear=True):
-                        config = CLIConfig(config_file=config_file)
-
-                    assert config.api_key == "yaml-key"
-                    assert config.base_url == "https://yaml.example.com"
-            except ImportError:
-                # PyYAML not available, should raise appropriate error
-                with pytest.raises(ImportError, match="PyYAML required"):
-                    CLIConfig(config_file=config_file)
-        finally:
-            Path(config_file).unlink()
-
-    def test_invalid_json_config(self):
-        """Test handling of invalid JSON configuration"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            f.write("invalid json content")
-            config_file = f.name
-
-        try:
-            with patch.dict("os.environ", _env(), clear=True):
-                with pytest.raises(ValueError, match="Failed to load config file"):
-                    CLIConfig(config_file=config_file)
-        finally:
-            Path(config_file).unlink()
-
-    def test_nonexistent_config_file(self):
-        """Test handling of non-existent configuration file"""
-        # Should not raise an error, just continue with defaults
-        with patch.dict("os.environ", _env(), clear=True):
-            config = CLIConfig(config_file="/nonexistent/config.json")
-
-            # Should use defaults
-            assert config.base_url == "https://api.hackagent.dev"
-
-    # EDGE CASE TESTS
-    def test_empty_config_file(self):
-        """Test handling of empty configuration file"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump({}, f)  # Empty JSON object
-            config_file = f.name
-
-        try:
-            with patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-fallback"}):
-                config = CLIConfig(config_file=config_file)
-
-                # Should fallback to environment
-                assert config.api_key == "env-fallback"
-        finally:
-            Path(config_file).unlink()
-
-    def test_config_file_with_none_values(self):
-        """Test config file with explicit None values"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {
-                "api_key": None,
-            }
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            with patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-fallback"}):
-                config = CLIConfig(config_file=config_file)
-
-                # Should fallback to environment for None api_key
-                assert config.api_key == "env-fallback"
-        finally:
-            Path(config_file).unlink()
-
-    def test_config_file_with_unknown_fields(self):
-        """Test config file with unknown fields (should be ignored)"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {
-                "api_key": "test-key",
-                "unknown_field": "should-be-ignored",
-                "another_unknown": 123,
-            }
-            json.dump(config_data, f)
-            config_file = f.name
-
-        try:
-            with patch.dict("os.environ", _env(), clear=True):
-                config = CLIConfig(config_file=config_file)
-
-                # Known field should be loaded
-                assert config.api_key == "test-key"
-                # Unknown fields should be ignored (no error)
-                assert not hasattr(config, "unknown_field")
-                assert not hasattr(config, "another_unknown")
-        finally:
-            Path(config_file).unlink()
-
-    def test_multiple_priority_scenarios_comprehensive(self):
-        """Comprehensive test of all priority scenarios"""
-        scenarios = [
-            # (cli_arg, config_value, env_value, expected, description)
-            ("cli-key", "config-key", "env-key", "cli-key", "CLI beats all"),
-            (None, "config-key", "env-key", "env-key", "Env beats config"),
-            (None, "config-key", None, "config-key", "Config when no env"),
-            (None, None, "env-key", "env-key", "Env as fallback"),
-            (None, None, None, None, "No sources"),
-            ("cli-key", None, "env-key", "cli-key", "CLI beats env when no config"),
-            ("cli-key", "config-key", None, "cli-key", "CLI beats config when no env"),
-        ]
-
-        for cli_arg, config_value, env_value, expected, description in scenarios:
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".json", delete=False
-            ) as f:
-                if config_value is not None:
-                    config_data = {"api_key": config_value}
-                    json.dump(config_data, f)
-                else:
-                    json.dump({}, f)
-                config_file = f.name
-
-            try:
-                env_dict = {"HACKAGENT_API_KEY": env_value} if env_value else {}
-                with patch.dict("os.environ", _env(**env_dict), clear=True):
-                    if cli_arg is not None:
-                        config = CLIConfig(config_file=config_file, api_key=cli_arg)
-                    else:
-                        config = CLIConfig(config_file=config_file)
-
-                    assert config.api_key == expected, f"Failed scenario: {description}"
-            finally:
-                Path(config_file).unlink()
+def test_defaults_are_local_and_do_not_use_provider_keys(tmp_path, monkeypatch):
+    monkeypatch.delenv("HACKAGENT_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "provider-secret")
+    config = CLIConfig(config_file=tmp_path / "absent")
+    assert config.api_key is None
+    assert config.backend == "local"
+    assert config.base_url == "https://api.hackagent.dev"
+    config.validate()
+
+
+def test_environment_default_and_explicit_runtime_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "default-secret")
+    path = tmp_path / "absent"
+    assert CLIConfig(config_file=path).api_key == "default-secret"
+    config = CLIConfig(config_file=path, api_key="injected-secret")
+    assert config.api_key == "injected-secret"
+    assert config.source_of("api_key") == "CLI argument"
+
+
+def test_file_reference_overrides_default_and_runtime_value_overrides_reference(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "default-secret")
+    monkeypatch.setenv("TEAM_KEY", "team-secret")
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"api_key": "${TEAM_KEY}"}))
+    assert CLIConfig(config_file=path).api_key == "team-secret"
+    assert (
+        CLIConfig(config_file=path, api_key="runtime-secret").api_key
+        == "runtime-secret"
+    )
+
+
+def test_literal_file_key_is_rejected(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"api_key": "file-secret"}))
+    with pytest.raises(CredentialError) as error:
+        CLIConfig(config_file=path)
+    assert "file-secret" not in str(error.value)
+
+
+def test_save_never_writes_injected_or_default_secret(tmp_path, monkeypatch):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "default-secret")
+    for key in (None, "injected-secret"):
+        path = tmp_path / "config.json"
+        config = CLIConfig(
+            config_file=tmp_path / "absent",
+            api_key=key,
+            base_url="https://example.test",
+            ca_bundle="/test/ca.pem",
+        )
+        config.save(str(path))
+        saved = json.loads(path.read_text())
+        assert "api_key" not in saved
+        assert "default-secret" not in path.read_text()
+        assert "injected-secret" not in path.read_text()
+        assert saved["base_url"] == "https://example.test"
+
+
+def test_save_preserves_file_reference(tmp_path, monkeypatch):
+    monkeypatch.setenv("TEAM_KEY", "team-secret")
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"api_key": "${TEAM_KEY}"}))
+    config = CLIConfig(config_file=path)
+    config.save()
+    assert json.loads(path.read_text())["api_key"] == "${TEAM_KEY}"
+    assert "team-secret" not in path.read_text()
+
+
+def test_non_secret_settings_follow_argument_environment_file_order(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {"base_url": "https://file.test", "verbose": 2, "ca_bundle": "/file/ca.pem"}
+        )
+    )
+    monkeypatch.setenv("HACKAGENT_BASE_URL", "https://env.test")
+    config = CLIConfig(config_file=path, base_url="https://arg.test", verbose=3)
+    assert config.base_url == "https://arg.test"
+    assert config.verbose == 3
+    assert config.ca_bundle == "/file/ca.pem"
+    assert CLIConfig(config_file=path).base_url == "https://env.test"
+    monkeypatch.delenv("HACKAGENT_BASE_URL")
+    assert CLIConfig(config_file=path).base_url == "https://file.test"
+
+
+@pytest.mark.parametrize(
+    "value,level", [(0, "ERROR"), (1, "WARNING"), (2, "INFO"), (3, "DEBUG")]
+)
+def test_verbosity_helpers(tmp_path, value, level):
+    config = CLIConfig(config_file=tmp_path / "absent")
+    config.verbose = value
+    assert config.get_verbosity_name() == level
+    assert config.should_show_info() is (value >= 2)
+    assert config.should_show_warning() is (value >= 1)
+    assert config.should_show_debug() is (value >= 3)
+
+
+def test_invalid_json_is_reported_without_parser_input(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"api_key":"sensitive-test-value-721",broken')
+    with pytest.raises(ValueError, match="Failed to load config file") as error:
+        CLIConfig(config_file=path)
+    assert "sensitive-test-value-721" not in str(error.value)

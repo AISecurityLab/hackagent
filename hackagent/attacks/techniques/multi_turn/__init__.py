@@ -3,7 +3,7 @@
 
 """Multi-turn techniques.
 
-One growing conversation with the target: crescendo.
+One growing conversation with the target: crescendo and stac.
 
 Importing this package does not import the techniques in it.
 """

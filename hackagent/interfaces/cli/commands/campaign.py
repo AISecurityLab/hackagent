@@ -32,6 +32,26 @@ def campaign() -> None:
     """🎯 Run declarative campaign files (campaign.yaml)."""
 
 
+@campaign.command("list")
+def list_attacks() -> None:
+    """List available attack techniques, their category and tags."""
+    from hackagent.client import catalog_entries
+
+    table = Table(title="Campaign attacks")
+    table.add_column("Name", no_wrap=True)
+    table.add_column("Category")
+    table.add_column("Tags")
+    table.add_column("Description")
+    for entry in catalog_entries():
+        table.add_row(
+            entry["attack_type"],
+            entry["category"],
+            ", ".join(entry["tags"]),
+            entry["description"],
+        )
+    console.print(table)
+
+
 def _runtime_settings():
     """Return settings resolved by the root CLI, when invoked through it.
 
@@ -273,7 +293,7 @@ def validate(file: str) -> None:
 
     try:
         spec = load_campaign(Path(file))
-        resolved = resolve_campaign(spec)
+        resolved = resolve_campaign(spec, settings=_runtime_settings())
     except Exception as exc:
         display_error(f"Invalid campaign: {exc}")
         raise SystemExit(1) from exc

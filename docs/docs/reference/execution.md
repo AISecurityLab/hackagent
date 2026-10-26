@@ -20,7 +20,7 @@ Every field has a safe default.
 | `preflight` | boolean | `true` | Check every model the campaign uses (target, guardrails, attack roles and embedders, judges, goal classifier) before attacking, so an unreachable endpoint fails fast with a clear message instead of mid-run. Turn it off to let a run proceed and record such failures as attempt errors. |
 | `on_error` | one of `continue`, `stop` | `continue` | After an attack fails, run the remaining ones or stop. |
 | `escalate` | boolean | `false` | Run attacks in order and drop a goal once an attack jailbreaks it, so later attacks only face the goals still standing. Implies sequential order; the remaining attacks are skipped once every goal has fallen. |
-| `per_attack_timeout` | `typing.Annotated[float, Gt(gt=0)]` | unset | Maximum seconds a single attack may run before it is stopped and marked failed. Leave unset for no limit. |
+| `per_attack_timeout` | number | unset | Maximum seconds a single attack may run before it is stopped and marked failed. Leave unset for no limit. |
 | `concurrency` | [ConcurrencySpec](#concurrencyspec) | see [ConcurrencySpec](#concurrencyspec) | How much work may run in parallel. |
 | `retries` | [RetrySpec](#retryspec) | see [RetrySpec](#retryspec) | Extra attempts after a provider error. |
 | `output` | [OutputSpec](#outputspec) | see [OutputSpec](#outputspec) | Files written for the run. |
@@ -65,9 +65,9 @@ Where results are recorded so they can be browsed later.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `backend` | one of `local`, `remote` | `local` | `local` writes to a SQLite file on this machine; `remote` sends results to the HackAgent server named below, authenticated with the key in the environment variable that `api_key_env` names. |
-| `base_url` | string | unset | Address of the remote server. Required when `backend` is `remote`. |
-| `api_key_env` | string | unset | Name of the environment variable holding the remote server's API key. Required when `backend` is `remote`. |
+| `backend` | one of `local`, `remote` | `local` | `local` writes to a SQLite file on this machine; `remote` sends results to the HackAgent server. The backend is always chosen here, never inferred from which API keys happen to be set, and `remote` fails before the run starts if its key is missing. |
+| `base_url` | string | unset | Address of the remote server. Defaults to `HACKAGENT_BASE_URL` or the hosted service. |
+| `api_key` | string | unset | Runtime API key, defaulting to HACKAGENT_API_KEY. In a file use an explicit reference such as ${HACKAGENT_API_KEY}. |
 
 ## Examples
 

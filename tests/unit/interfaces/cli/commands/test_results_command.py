@@ -3,6 +3,7 @@
 
 """Unit tests for the `hackagent results` command group."""
 
+from hackagent.core.settings import Settings
 import unittest
 from datetime import datetime, timedelta
 from enum import Enum
@@ -66,6 +67,15 @@ class TestResultsShow(unittest.TestCase):
         self.config = MagicMock()
         self.config.api_key = None
         self.config.base_url = None
+        self.config.ca_bundle = None
+        self.config.settings = Settings.resolve(
+            api_key=self.config.api_key,
+            backend="remote" if self.config.api_key else "local",
+            base_url=self.config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
 
     def test_fetches_the_result_by_uuid_and_renders_details(self):
         result_id = uuid4()
@@ -312,6 +322,15 @@ class TestResultsSummaryCommand(unittest.TestCase):
         self.config = MagicMock()
         self.config.api_key = None
         self.config.base_url = None
+        self.config.ca_bundle = None
+        self.config.settings = Settings.resolve(
+            api_key=self.config.api_key,
+            backend="remote" if self.config.api_key else "local",
+            base_url=self.config.base_url,
+            db_path=":memory:",
+            config_path="/nonexistent",
+            env={},
+        )
 
     def _invoke(self, pages, args=()):
         backend = MagicMock()

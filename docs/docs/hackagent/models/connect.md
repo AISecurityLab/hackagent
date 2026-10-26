@@ -12,8 +12,7 @@ built straight from the spec so their `extra` options (binary, url, user_id…)
 survive; LiteLLM chat providers go through the same `build_model` path as a
 campaign, via a spec → :class:`ModelConfig` projection.
 
-No network I/O happens here; an `api_key_env` that is not set fails when the
-underlying model is built, so configuration errors surface before a run starts.
+No network I/O happens here. Credentials are resolved before requests are sent.
 
 #### check\_supported
 

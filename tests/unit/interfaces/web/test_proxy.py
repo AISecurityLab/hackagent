@@ -23,7 +23,8 @@ from hackagent.interfaces.web import _static, create_app
 def _session(api_key: str = "", base_url: str = "https://api.example.test"):
     return HackAgent(
         Settings.resolve(
-            api_key=api_key,
+            api_key=api_key or None,
+            backend="remote" if api_key else "local",
             base_url=base_url,
             db_path=":memory:",
             env={},

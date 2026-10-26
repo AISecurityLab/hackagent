@@ -10,8 +10,7 @@ built straight from the spec so their ``extra`` options (binary, url, user_id…
 survive; LiteLLM chat providers go through the same ``build_model`` path as a
 campaign, via a spec → :class:`ModelConfig` projection.
 
-No network I/O happens here; an ``api_key_env`` that is not set fails when the
-underlying model is built, so configuration errors surface before a run starts.
+No network I/O happens here. Credentials are resolved before requests are sent.
 """
 
 from __future__ import annotations
@@ -75,8 +74,8 @@ def _config_from_spec(spec: ModelSpec) -> ModelConfig:
     }
     if spec.timeout:
         connection["timeout"] = spec.timeout
-    if spec.api_key_env:
-        connection["api_key_env"] = spec.api_key_env
+    if spec.api_key is not None:
+        connection["api_key"] = spec.api_key
     headers = spec.extra.get("extra_headers")
     if isinstance(headers, dict) and headers:
         connection["headers"] = headers

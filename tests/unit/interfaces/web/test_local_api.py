@@ -67,7 +67,7 @@ class _WebUITestCase(unittest.TestCase):
 
         session = HackAgent(
             Settings.resolve(
-                api_key="",
+                backend="local",
                 db_path=":memory:",
                 env={},
                 config_path="/nonexistent",
@@ -273,7 +273,7 @@ class TestStaticServing(_WebUITestCase):
         _static.static_dir = lambda: link
         session = HackAgent(
             Settings.resolve(
-                api_key="",
+                backend="local",
                 db_path=":memory:",
                 env={},
                 config_path="/nonexistent",

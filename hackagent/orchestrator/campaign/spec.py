@@ -17,6 +17,8 @@ import re
 from typing import Any, Literal, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from hackagent.core.credentials import ApiKey
+
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, model_validator
 
 from hackagent.attacks.techniques.registry import ATTACKS
@@ -339,27 +341,26 @@ class StorageSpec(_Spec):
         default="local",
         description=(
             "``local`` writes to a SQLite file on this machine; ``remote`` sends "
-            "results to the HackAgent server named below, authenticated with the "
-            "key in the environment variable that ``api_key_env`` names."
+            "results to the HackAgent server. The backend is always chosen "
+            "here, never inferred from which API keys happen to be set, and "
+            "``remote`` fails before the run starts if its key is missing."
         ),
     )
     base_url: Optional[str] = Field(
         default=None,
-        description="Address of the remote server. Required when ``backend`` is ``remote``.",
-    )
-    api_key_env: Optional[str] = Field(
-        default=None,
         description=(
-            "Name of the environment variable holding the remote server's API key. "
-            "Required when ``backend`` is ``remote``."
+            "Address of the remote server. Defaults to ``HACKAGENT_BASE_URL`` "
+            "or the hosted service."
         ),
     )
-
-    @model_validator(mode="after")
-    def validate_remote(self) -> "StorageSpec":
-        if self.backend == "remote" and not (self.base_url and self.api_key_env):
-            raise ValueError("Remote storage requires 'base_url' and 'api_key_env'.")
-        return self
+    api_key: Optional[ApiKey] = Field(
+        default=None,
+        repr=False,
+        description=(
+            "Runtime API key, defaulting to HACKAGENT_API_KEY. In a file use "
+            "an explicit reference such as ${HACKAGENT_API_KEY}."
+        ),
+    )
 
 
 class ExecutionSpec(_Spec):
@@ -496,7 +497,16 @@ def _redacted(value: Any) -> Any:
     """
     if isinstance(value, dict):
         return {
-            key: _REDACTED if _is_credential_name(key) else _redacted(child)
+            key: (
+                child
+                if key == "api_key"
+                and isinstance(child, str)
+                and child.startswith("${")
+                and child.endswith("}")
+                else _REDACTED
+            )
+            if _is_credential_name(key)
+            else _redacted(child)
             for key, child in value.items()
         }
     if isinstance(value, list):

@@ -7,12 +7,12 @@ Build role-model LLMs, with credentials from :class:`Settings`.
 
 :class:`ModelFactory` implements the `LLMFactory` protocol. A role model
 uses the key its spec names. The only credential the factory adds is the
-HackAgent API key, and only for a spec whose endpoint is the hosted LLM
+HackAgent API key, and only for a spec whose endpoint is the configured HackAgent LLM
 gateway; it is never sent to any other provider.
 
 :func:`spec_from_config` reads the role-model dicts attack configs still
-use (`identifier`, `endpoint`, `agent_type`, `api_key` given as a
-literal or an environment variable name, ...).
+use (`identifier`, `endpoint`, `agent_type`, `api_key` as a secret
+value or explicit $\{VARIABLE\} reference, ...).
 
 #### PASSTHROUGH\_REQUEST\_KEYS
 
@@ -63,7 +63,7 @@ Builds the LLM for a role model. Implements `LLMFactory`.
 def is_gateway(endpoint: Optional[str]) -> bool
 ```
 
-Whether `endpoint` is the hosted LLM gateway of a remote run.
+Whether `endpoint` is the configured LLM gateway and a platform key is set.
 
 #### with\_credentials
 
@@ -72,4 +72,12 @@ def with_credentials(spec: SpecT) -> SpecT
 ```
 
 Add the gateway key to a gateway spec that names no key.
+
+#### with\_model\_credentials
+
+```python
+def with_model_credentials(config: ModelConfig) -> ModelConfig
+```
+
+Bind only this settings instance's gateway credential to a model.
 

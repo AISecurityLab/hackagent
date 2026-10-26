@@ -183,7 +183,7 @@ Use multiple judges for validation:
 ```python
 GPT4 = {"name": "gpt-4", "connection": {
     "provider": "openai", "type": "OPENAI",
-    "endpoint": "https://api.openai.com/v1", "api_key_env": "OPENAI_API_KEY"},
+    "endpoint": "https://api.openai.com/v1", "api_key": "${OPENAI_API_KEY}"},
     "scoring": {"type": "nuanced"}}
 
 result = run_campaign({
