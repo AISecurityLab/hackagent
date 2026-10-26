@@ -34,11 +34,8 @@ from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals
 from hackagent.models import build_embedder, build_model
 from hackagent.orchestrator.campaign.audit import CalibrationLoader
-from hackagent.orchestrator.campaign.gateway import (
-    GATEWAY_KEY_ENV,
-    bind_gateway,
-    cloud_runnable,
-)
+from hackagent.orchestrator.campaign.cloud import CloudIssue, cloud_issues
+from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV, bind_gateway
 from hackagent.orchestrator.campaign.resolve import (
     EmbedderBuilder,
     GoalLoader,
@@ -114,9 +111,9 @@ def execute_run(
     ``KeyboardInterrupt`` finishes the run with ``interrupted_as`` and is
     then passed on. A run claimed with a run token (in the cloud) writes its
     output files to a temporary folder, removed afterwards: its results are
-    on the server, and runs only models the cloud can reach (see
-    :func:`~hackagent.orchestrator.campaign.gateway.cloud_runnable`); any
-    other ends it FAILED before a model is built. Raises
+    on the server, and it runs only a campaign the cloud may run (see
+    :func:`~hackagent.orchestrator.campaign.cloud.cloud_issues`); any other
+    ends FAILED before a model is built. Raises
     :class:`~hackagent.storage.RunNotClaimable` when the run cannot be
     claimed.
     """
@@ -142,8 +139,9 @@ def execute_run(
                 base_url,
                 output_directory=scratch,
             )
-            if claim.run_token and not cloud_runnable(spec):
-                raise _NotCloudRunnable()
+            issues = cloud_issues(spec) if claim.run_token else []
+            if issues:
+                raise _NotCloudRunnable(issues[0])
         except BaseException as exc:
             outcome = _ended_by(exc, interrupted_as)
             _finish(adopted, adopted.run_id, outcome)
@@ -447,7 +445,11 @@ def _outcome(
 
 
 class _NotCloudRunnable(Exception):
-    """A cloud run whose campaign uses a model the cloud cannot run."""
+    """A cloud run whose campaign the cloud may not run, for ``issue``."""
+
+    def __init__(self, issue: CloudIssue) -> None:
+        super().__init__(issue.reason)
+        self.issue = issue
 
 
 def _ended_by(
@@ -455,7 +457,8 @@ def _ended_by(
 ) -> ExecutionOutcome:
     """How a run ends when ``error`` stops it before its campaign starts."""
     if isinstance(error, _NotCloudRunnable):
-        return ExecutionOutcome("FAILED", NOT_CLOUD_RUNNABLE_NOTE)
+        note = f"{NOT_CLOUD_RUNNABLE_NOTE}: {error.issue.path}: {error.issue.reason}"
+        return ExecutionOutcome("FAILED", note[:_NOTE_LIMIT])
     if isinstance(error, KeyboardInterrupt):
         return ExecutionOutcome(*interrupted_as)
     if isinstance(error, Exception):

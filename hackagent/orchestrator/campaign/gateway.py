@@ -18,8 +18,6 @@ from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 GATEWAY_PROVIDER = "hackagent"
 GATEWAY_KEY_ENV = "HACKAGENT_GATEWAY_KEY"
-#: Model types the cloud worker runs: chat APIs it calls over HTTP.
-CLOUD_MODEL_TYPES = frozenset({AgentType.OPENAI, AgentType.LITELLM, AgentType.OLLAMA})
 
 M = TypeVar("M", bound=ModelConfig)
 
@@ -32,6 +30,11 @@ def is_gateway(config: ModelConfig) -> bool:
 def _bind(config: M, endpoint: str) -> M:
     if not is_gateway(config):
         return config
+    if config.connection.type != AgentType.OPENAI:
+        raise ValueError(
+            "The HackAgent gateway is an OPENAI model; "
+            f"got type {config.connection.type.value}."
+        )
     connection = config.connection.model_copy(
         update={"endpoint": endpoint, "api_key_env": GATEWAY_KEY_ENV}
     )
@@ -42,21 +45,34 @@ def _bind_optional(config: Optional[M], endpoint: str) -> Optional[M]:
     return None if config is None else _bind(config, endpoint)
 
 
-def _models(spec: CampaignSpec) -> list[ModelConfig]:
-    models: list[ModelConfig] = [spec.target]
-    for attack in spec.attacks:
-        models.extend(attack.roles.values())
-    models.extend(spec.evaluation.judges)
+def spec_models(spec: CampaignSpec) -> list[tuple[str, ModelConfig]]:
+    """``(path, model)`` of every model ``spec`` names: the target, attack
+    roles (embedders included), judges, guardrails and the goal classifier.
+    ``path`` is dotted, e.g. ``attacks.0.roles.attacker``."""
+    models: list[tuple[str, ModelConfig]] = [("target", spec.target)]
+    for index, attack in enumerate(spec.attacks):
+        models.extend(
+            (f"attacks.{index}.roles.{role}", config)
+            for role, config in attack.roles.items()
+        )
     models.extend(
-        m for m in (spec.guardrails.before, spec.guardrails.after) if m is not None
+        (f"evaluation.judges.{index}", judge)
+        for index, judge in enumerate(spec.evaluation.judges)
     )
+    for side in ("before", "after"):
+        guardrail = getattr(spec.guardrails, side)
+        if guardrail is not None:
+            models.append((f"guardrails.{side}", guardrail))
     if spec.dataset.classifier is not None:
-        models.append(spec.dataset.classifier)
+        models.append(("dataset.classifier", spec.dataset.classifier))
     return models
 
 
 def bind_gateway(spec: CampaignSpec, base_url: str) -> CampaignSpec:
-    """Point every gateway model of ``spec`` at ``base_url`` and its key variable."""
+    """Point every gateway model of ``spec`` at ``base_url`` and its key variable.
+
+    Raises ``ValueError`` for a gateway model whose type is not ``OPENAI``.
+    """
     endpoint = f"{base_url.rstrip('/')}/v1"
     attacks = tuple(
         attack.model_copy(
@@ -96,22 +112,11 @@ def key_envs(spec: CampaignSpec) -> set[str]:
     """Every non-gateway API-key variable the spec reads."""
     return {
         m.connection.api_key_env
-        for m in _models(spec)
+        for _, m in spec_models(spec)
         if not is_gateway(m) and m.connection.api_key_env
     }
 
 
 def uses_gateway(spec: CampaignSpec) -> bool:
     """Whether any model of ``spec`` is the gateway."""
-    return any(is_gateway(m) for m in _models(spec))
-
-
-def cloud_runnable(spec: CampaignSpec) -> bool:
-    """Whether the cloud worker can run every model of ``spec``: each one is
-    the gateway, or an API of a :data:`CLOUD_MODEL_TYPES` type that names no
-    local program (``options.binary``)."""
-    return all(
-        is_gateway(m)
-        or (m.connection.type in CLOUD_MODEL_TYPES and "binary" not in m.options)
-        for m in _models(spec)
-    )
+    return any(is_gateway(m) for _, m in spec_models(spec))

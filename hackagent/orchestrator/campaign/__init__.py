@@ -5,6 +5,7 @@
 
 - :mod:`.spec`: the campaign file schema
 - :mod:`.gateway`: the symbolic HackAgent gateway model and its binding
+- :mod:`.cloud`: what a campaign may contain to run on HackAgent cloud
 - :mod:`.loader`: YAML → :class:`CampaignSpec`
 - :mod:`.resolve`: spec → goals, models, judge panel, constructed attacks
 - :mod:`.runner`: the async goal pipeline and :func:`run_campaign`

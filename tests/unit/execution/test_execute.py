@@ -851,22 +851,70 @@ def test_a_cloud_run_refuses_a_local_agent_type_before_building(tmp_path):
     outcome = cloud_execute(config, never_build)
 
     store = RecordingAdoptedStore.instances[-1]
-    assert (outcome.status, outcome.note) == ("FAILED", execute.NOT_CLOUD_RUNNABLE_NOTE)
-    assert store.finished == [
-        (
-            store.run_id,
-            "FAILED",
-            "This campaign uses a model type that can't run in the cloud",
-        )
-    ]
+    note = (
+        "This campaign uses a model type that can't run in the cloud: "
+        "evaluation.judges.0: model type CLAUDE_CODE can't run in the cloud"
+    )
+    assert (outcome.status, outcome.note) == ("FAILED", note)
+    assert store.finished == [(store.run_id, "FAILED", note)]
 
 
-def test_a_cloud_run_refuses_a_model_that_names_a_program(tmp_path):
+def _refused(outcome, path):
+    assert outcome.status == "FAILED"
+    assert outcome.note.startswith(f"{execute.NOT_CLOUD_RUNNABLE_NOTE}: {path}: ")
+
+
+def test_a_cloud_run_refuses_a_model_option_outside_the_allowlist(tmp_path):
     target = {**model("target"), "options": {"binary": "/usr/bin/agent"}}
 
     outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
 
-    assert (outcome.status, outcome.note) == ("FAILED", execute.NOT_CLOUD_RUNNABLE_NOTE)
+    _refused(outcome, "target.options.binary")
+
+
+@pytest.mark.parametrize(
+    "agent_type", ["CLAUDE_CODE", "CODEX", "HERMES", "WEB", "GOOGLE_ADK"]
+)
+def test_a_cloud_run_refuses_a_gateway_marker_of_another_type(tmp_path, agent_type):
+    gateway = {
+        "name": "gateway",
+        "connection": {"provider": "hackagent", "type": agent_type},
+        "options": {"extra_args": ["--dangerously-skip-permissions"]},
+    }
+    config = stored_campaign(
+        tmp_path, attacks=[{"name": "pair", "roles": {"attacker": gateway}}]
+    )
+
+    outcome = cloud_execute(config, never_build)
+
+    _refused(outcome, "attacks.0.roles.attacker")
+
+
+def test_a_cloud_run_refuses_gateway_options(tmp_path):
+    gateway = {**GW, "options": {"extra_args": ["--x"]}}
+    config = stored_campaign(
+        tmp_path, evaluation={"judges": [{**gateway, "scoring": {"type": "harmbench"}}]}
+    )
+
+    outcome = cloud_execute(config, never_build)
+
+    _refused(outcome, "evaluation.judges.0")
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        {"name": "ollama/llama3", "connection": {"provider": "p", "type": "OPENAI"}},
+        {"name": "ollama_chat/m", "connection": {"provider": "p", "type": "OPENAI"}},
+        {"name": "lemonade/m", "connection": {"provider": "p", "type": "LITELLM"}},
+        {"name": "bedrock/m", "connection": {"provider": "p", "type": "LITELLM"}},
+        {"name": "llama3", "connection": {"provider": "p", "type": "OLLAMA"}},
+    ],
+)
+def test_a_cloud_run_refuses_a_model_that_needs_an_endpoint(tmp_path, target):
+    outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
+
+    _refused(outcome, "target")
 
 
 def test_a_cloud_run_allows_api_models_and_the_gateway(tmp_path):
