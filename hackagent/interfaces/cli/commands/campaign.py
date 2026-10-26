@@ -251,7 +251,7 @@ def validate(file: str) -> None:
 
     try:
         spec = load_campaign(Path(file))
-        resolved = resolve_campaign(spec)
+        resolved = resolve_campaign(spec, settings=_runtime_settings())
     except Exception as exc:
         display_error(f"Invalid campaign: {exc}")
         raise SystemExit(1) from exc

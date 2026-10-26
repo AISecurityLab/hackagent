@@ -28,6 +28,7 @@ from textual.widgets import Static, Tree
 from textual.widgets.tree import TreeNode
 
 from hackagent.evaluation.audit import AuditReport
+from hackagent.core.settings import Mode, Settings
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.audit import audit_summary
 from hackagent.orchestrator.campaign.audit import format_report
@@ -133,13 +134,12 @@ class ResultsTab(ResultsExportMixin, BaseTab):
     def _stores(self) -> list["_Store"]:
         """The stores that may hold runs, in the order they are tried.
 
-        Where a run was recorded is the campaign's choice, not the account's:
-        a campaign records here unless it names a server, and an account can
-        hold runs this machine has never seen. So the account is read first
-        when there is one, and this machine after it.
+        Offer the account only when the session selects remote storage.
+        The local database is always available as a separate source.
         """
         stores = []
-        if getattr(self.cli_config, "api_key", None):
+        settings = getattr(self.cli_config, "settings", None)
+        if isinstance(settings, Settings) and settings.mode is Mode.REMOTE:
             stores.append(_Store("the account", self.client))
         stores.append(_Store("this machine", self.local_client))
         return stores

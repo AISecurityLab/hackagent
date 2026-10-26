@@ -21,6 +21,8 @@ from hackagent.attacks.techniques.registry import get_attack_class
 from hackagent.attacks.techniques.static.base import StaticAttack
 from hackagent.attacks.techniques.trace import traced_completion
 from hackagent.core.contracts import Goal
+from hackagent.core.settings import Settings
+from hackagent.models.factory import ModelFactory
 from hackagent.datasets.config import DatasetSpec, load_goals
 from hackagent.evaluation.panel import ModelJudge, Panel
 from hackagent.models import (
@@ -75,22 +77,28 @@ def resolve_campaign(
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
     build_embed: EmbedderBuilder = build_embedder,
+    settings: Optional[Settings] = None,
 ) -> ResolvedCampaign:
-    """Instantiate everything ``spec`` describes."""
+    """Instantiate everything ``spec`` describes.
+
+    Gateway credentials come from ``settings``, resolved once if omitted.
+    An explicit model connection ``api_key`` takes precedence.
+    """
     from hackagent.orchestrator.campaign.preflight import model_probes
 
     # What each model config was built into, so preflight can check them all
     # (roles and embedders are otherwise hidden inside attack callables).
+    factory = ModelFactory(settings if settings is not None else Settings.resolve())
     models: dict[int, Model] = {}
     embedders: dict[int, Any] = {}
 
     def recorded_build(config: ModelConfig, *, retries: int = 0) -> Model:
-        model = build(config, retries=retries)
+        model = build(factory.with_model_credentials(config), retries=retries)
         models.setdefault(id(config), model)
         return model
 
     def recorded_embed(config: ModelConfig) -> Any:
-        embed = build_embed(config)
+        embed = build_embed(factory.with_model_credentials(config))
         embedders.setdefault(id(config), embed)
         return embed
 

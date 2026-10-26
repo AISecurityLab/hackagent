@@ -42,7 +42,21 @@ install(show_locals=True)
 console = Console()
 
 
-@click.group(invoke_without_command=True, add_help_option=False)
+class _CLIGroup(click.Group):
+    """Apply subcommand storage overrides before resolving root settings."""
+
+    def resolve_command(self, ctx, args):
+        name, command, remaining = super().resolve_command(ctx, args)
+        if name == "web":
+            with command.make_context(
+                name, list(remaining), parent=ctx, resilient_parsing=True
+            ) as subcontext:
+                if subcontext.params.get("force_local"):
+                    ctx.params["backend"] = "local"
+        return name, command, remaining
+
+
+@click.group(cls=_CLIGroup, invoke_without_command=True, add_help_option=False)
 @click.option(
     "--help",
     "-h",

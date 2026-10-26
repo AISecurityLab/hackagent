@@ -165,3 +165,153 @@ def test_transport_does_not_fall_back_to_provider_environment(monkeypatch):
 
     monkeypatch.setenv("OPENAI_API_KEY", "must-not-use")
     assert ModelConnection().to_litellm()["api_key"] == "not-needed"
+
+
+@pytest.mark.parametrize(
+    "endpoint", ["https://api.hackagent.dev/v1", "https://other.example/v1"]
+)
+def test_builders_never_reselect_an_ambient_gateway(endpoint, monkeypatch):
+    from hackagent.models.factory import ModelFactory
+    from hackagent.models.embeddings import embedding_request_kwargs
+
+    monkeypatch.setenv("HACKAGENT_API_KEY", "must-not-leak")
+    monkeypatch.setenv("HACKAGENT_BASE_URL", endpoint.removesuffix("/v1"))
+    settings = Settings.resolve(
+        api_key="selected-private-key",
+        base_url="https://private.example",
+        config_path="/nonexistent",
+        env={},
+    )
+    model = ModelFactory(settings).for_role(
+        ModelSpec(identifier="model", endpoint=endpoint)
+    )
+    kwargs = model._litellm_kwargs([], {})
+    assert kwargs["api_key"] == "not-needed"
+    embedded = embedding_request_kwargs({"identifier": "model", "endpoint": endpoint})
+    assert embedded["api_key"] == "not-needed"
+
+
+@pytest.mark.parametrize("explicit_key", [None, "own-model-key"])
+def test_campaign_binds_selected_gateway_to_chat_and_embedding(
+    explicit_key, monkeypatch
+):
+    from hackagent.models.factory import ModelFactory
+    from hackagent.orchestrator.campaign import CampaignSpec, resolve_campaign
+    from tests.unit.campaign.fakes import campaign, ScriptedModel
+
+    monkeypatch.setenv("HACKAGENT_API_KEY", "wrong-ambient-key")
+    settings = Settings.resolve(
+        api_key="selected-key",
+        base_url="https://private.example/prefix",
+        env={},
+        config_path="/nonexistent",
+    )
+    config = ModelConfig(
+        name="model",
+        connection=ConnectionSpec(
+            provider="gateway",
+            type="OPENAI",
+            endpoint="https://private.example/prefix/v1",
+            api_key=explicit_key,
+        ),
+    )
+    expected = explicit_key or "selected-key"
+    bound = ModelFactory(settings).with_model_credentials(config)
+    assert bound.connection.api_key == expected
+    assert config.connection.api_key == explicit_key
+    assert "selected-key" not in bound.model_dump_json()
+    with patch("hackagent.models.build.LiteLLMModel") as chat:
+        build_model(bound)
+    assert chat.call_args.kwargs["connection"].api_key.get_secret_value() == expected
+    import asyncio
+
+    with patch(
+        "litellm.embedding", return_value={"data": [{"embedding": [1.0]}]}
+    ) as embedding:
+        asyncio.run(build_embedder(bound)(["hello"]))
+    assert embedding.call_args.kwargs["api_key"] == expected
+
+    spec = CampaignSpec.model_validate(campaign())
+    spec = spec.model_copy(update={"target": config})
+    seen = []
+
+    def build(config, **kwargs):
+        seen.append(config)
+        return ScriptedModel()
+
+    resolve_campaign(spec, settings=settings, build=build, load=lambda _: [])
+    assert seen[0].connection.api_key == expected
+    assert spec.target.connection.api_key == explicit_key
+
+
+@pytest.mark.parametrize(
+    "name", ["ollama_chat/llama3", "bedrock/anthropic.claude", "vertex_ai/gemini-pro"]
+)
+def test_alternative_auth_chat_does_not_require_or_inject_an_api_key(name, monkeypatch):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "not-for-provider")
+    monkeypatch.setenv("OPENAI_API_KEY", "not-for-provider")
+    config = ModelConfig(
+        name=name, connection=ConnectionSpec(provider="provider", type="LITELLM")
+    )
+    kwargs = build_model(config)._litellm_kwargs([], {})
+    assert kwargs["model"] == name
+    assert "api_key" not in kwargs
+
+
+@pytest.mark.parametrize(
+    "name", ["bedrock/amazon.titan-embed-text-v1", "vertex_ai/text-embedding-004"]
+)
+def test_cloud_identity_embeddings_do_not_require_an_api_key(name):
+    import asyncio
+
+    config = ModelConfig(
+        name=name, connection=ConnectionSpec(provider="cloud", type="LITELLM")
+    )
+    with patch(
+        "litellm.embedding", return_value={"data": [{"embedding": [1.0]}]}
+    ) as embedding:
+        asyncio.run(build_embedder(config)(["hello"]))
+    assert embedding.call_args.kwargs["model"] == name
+    assert "api_key" not in embedding.call_args.kwargs
+
+
+@pytest.mark.parametrize(
+    "name", ["openai/gpt-4o-mini", "anthropic/claude", "groq/llama"]
+)
+def test_api_key_providers_still_require_an_explicit_key(name, monkeypatch):
+    monkeypatch.setenv("HACKAGENT_API_KEY", "not-for-provider")
+    monkeypatch.setenv("OPENAI_API_KEY", "not-for-provider")
+    config = ModelConfig(
+        name=name, connection=ConnectionSpec(provider="external", type="LITELLM")
+    )
+    with pytest.raises(CredentialError):
+        build_model(config)
+
+
+def test_embedding_timeout_reaches_both_request_paths():
+    import asyncio
+    from hackagent.models.embeddings import request_embedding
+
+    config = ModelConfig(
+        name="embed",
+        connection=ConnectionSpec(
+            provider="local",
+            type="OPENAI",
+            endpoint="http://localhost:8000/v1",
+            timeout=7.5,
+        ),
+    )
+    with patch(
+        "litellm.embedding", return_value={"data": [{"embedding": [1.0]}]}
+    ) as embedding:
+        asyncio.run(build_embedder(config)(["hello"]))
+        assert embedding.call_args.kwargs["timeout"] == 7.5
+        request_embedding(
+            {
+                "identifier": "embed",
+                "endpoint": "http://localhost:8000/v1",
+                "request_timeout": 3.5,
+            },
+            "hello",
+        )
+        assert embedding.call_args.kwargs["timeout"] == 3.5

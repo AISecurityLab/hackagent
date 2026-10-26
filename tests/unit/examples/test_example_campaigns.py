@@ -40,8 +40,11 @@ class _Fake(Model):
 
 
 @pytest.fixture(autouse=True)
-def example_credentials(monkeypatch):
+def example_credentials(monkeypatch, tmp_path):
     """Load-only example checks use dummy credentials, never real providers."""
+    monkeypatch.setattr(
+        "hackagent.core.settings.DEFAULT_CONFIG_PATH", tmp_path / "config.json"
+    )
     for name in (
         "HACKAGENT_API_KEY",
         "OPENAI_API_KEY",

@@ -7,9 +7,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, Optional
 from urllib.parse import urlsplit
 
-from hackagent.core.credentials import resolve_api_key, is_gateway_endpoint
+from hackagent.core.credentials import resolve_api_key
 from hackagent.core.contracts import AgentType
-from hackagent.core.settings import resolve_ollama_base_url, resolve_remote_base_url
+from hackagent.core.settings import resolve_ollama_base_url
+from hackagent.models.completions.litellm import uses_alternative_auth
 
 if TYPE_CHECKING:
     import numpy as np
@@ -95,9 +96,6 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
 
     key = resolve_api_key(
         config.get("api_key"),
-        use_default=is_gateway_endpoint(
-            kwargs.get("api_base"), resolve_remote_base_url()
-        ),
         purpose="Embedding API key",
     )
     if key is not None:
@@ -106,9 +104,12 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
         kwargs["api_key"] = "ollama"
     elif agent_type == "OPENAI" and endpoint:
         kwargs["api_key"] = "not-needed"
-    else:
+    elif not uses_alternative_auth(model):
         resolve_api_key(required=True, purpose="Embedding API key")
 
+    timeout = config.get("timeout", config.get("request_timeout"))
+    if timeout is not None:
+        kwargs["timeout"] = float(timeout)
     return kwargs
 
 

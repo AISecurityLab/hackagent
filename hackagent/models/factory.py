@@ -5,7 +5,7 @@
 
 :class:`ModelFactory` implements the ``LLMFactory`` protocol. A role model
 uses the key its spec names. The only credential the factory adds is the
-HackAgent API key, and only for a spec whose endpoint is the hosted LLM
+HackAgent API key, and only for a spec whose endpoint is the configured HackAgent LLM
 gateway; it is never sent to any other provider.
 
 :func:`spec_from_config` reads the role-model dicts attack configs still
@@ -22,6 +22,7 @@ from hackagent.core.logging import get_logger
 from hackagent.core.credentials import is_gateway_endpoint, CredentialError
 from hackagent.core.settings import Settings
 from hackagent.models.connect import connect
+from hackagent.models.config import ModelConfig
 from hackagent.models.model import Model
 
 logger = get_logger(__name__)
@@ -162,7 +163,7 @@ class ModelFactory:
         self.settings = settings
 
     def is_gateway(self, endpoint: Optional[str]) -> bool:
-        """Whether ``endpoint`` is the hosted LLM gateway and a platform key is set."""
+        """Whether ``endpoint`` is the configured LLM gateway and a platform key is set."""
         if not self.settings.api_key or not endpoint:
             return False
         return is_gateway_endpoint(endpoint, self.settings.base_url)
@@ -172,6 +173,19 @@ class ModelFactory:
         if spec.api_key is not None or not self.is_gateway(spec.endpoint):
             return spec
         return spec.model_copy(update={"api_key": self.settings.api_key})
+
+    def with_model_credentials(self, config: ModelConfig) -> ModelConfig:
+        """Bind only this settings instance's gateway credential to a model."""
+        connection = config.connection
+        if connection.api_key is not None or not self.is_gateway(connection.endpoint):
+            return config
+        return config.model_copy(
+            update={
+                "connection": connection.model_copy(
+                    update={"api_key": self.settings.api_key}
+                )
+            }
+        )
 
     def for_role(self, spec: ModelSpec) -> Model:
         return connect(self.with_credentials(spec))

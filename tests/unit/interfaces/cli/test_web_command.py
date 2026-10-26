@@ -325,3 +325,45 @@ class TestFreePort(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_root_cli_applies_web_local_before_requiring_remote_credentials(
+    tmp_path, monkeypatch
+):
+    from hackagent.core.settings import Mode
+    from hackagent.interfaces.cli.main import cli
+
+    monkeypatch.delenv("HACKAGENT_API_KEY", raising=False)
+    config_path = tmp_path / "config.json"
+    config_path.write_text('{"backend":"remote"}')
+    for remote_source in ("file", "environment", "argument"):
+        monkeypatch.setenv(
+            "HACKAGENT_BACKEND", "remote" if remote_source == "environment" else ""
+        )
+        config_path.write_text(
+            '{"backend":"remote"}' if remote_source == "file" else "{}"
+        )
+        args = ["--config-file", str(config_path)]
+        if remote_source == "argument":
+            args += ["--backend", "remote"]
+        app = MagicMock()
+        with (
+            patch("hackagent.interfaces.web.create_app", return_value=app) as create,
+            patch(
+                "hackagent.interfaces.cli.commands.web._free_port", return_value=True
+            ),
+        ):
+            result = CliRunner().invoke(
+                cli,
+                [
+                    *args,
+                    "web",
+                    "--local",
+                    "--no-browser",
+                    "--db-path",
+                    str(tmp_path / "local.db"),
+                ],
+            )
+        assert result.exit_code == 0, result.output
+        assert create.call_args.args[0].settings.mode is Mode.LOCAL
+        app.run.assert_called_once()
