@@ -13,6 +13,9 @@
 - **execution**: end a run as "Out of credits" on the gateway's first 402
 - **storage**: finish runs only after their writes land, without reading back
 - **core**: keep the handled error on exceptions from `run_coroutine_blocking`
+- **web**: the offline dashboard (`hackagent web --local`) serves the technique catalogue, the campaign schema and an empty campaign list, so the campaign builder works without an account
+- **web**: offline launch routes answer 501 with how to run a campaign file instead
+- **cli**: hints and help point at `hackagent campaign run` instead of removed commands
 
 ## v0.13.0a1 (2026-10-25)
 

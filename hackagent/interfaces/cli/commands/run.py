@@ -10,11 +10,9 @@ progress back to the server so the dashboard shows it live.
 
 from __future__ import annotations
 
-import getpass
 import json
 import os
 import signal
-import socket
 import sys
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
@@ -89,10 +87,10 @@ def _refuse_unless_runnable(detail: dict[str, Any]) -> None:
             f"This run executes on '{detail.get('executor')}', not on a local "
             "machine, so it cannot be run here."
         )
-    if detail.get("claimed_by"):
-        _fail(f"This run was already claimed by {detail['claimed_by']}.")
     if status != "PENDING":
         _fail(f"This run is {status}; only a queued (PENDING) run can be started.")
+    if detail.get("claimed_by"):
+        _fail(f"This run was already claimed by {detail['claimed_by']}.")
 
 
 def _check_sdk_version(run_config: dict[str, Any]) -> None:
@@ -159,7 +157,7 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
     from hackagent.orchestrator.execution import execute_run
     from hackagent.orchestrator.execution.execute import executable_spec
     from hackagent.storage import RunNotClaimable
-    from hackagent.storage.remote import RemoteBackend
+    from hackagent.storage.remote import RemoteBackend, _local_executor
 
     config = ctx.obj["config"]
     config.require_remote()
@@ -198,7 +196,7 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
                     run_uuid,
                     base_url=settings.base_url,
                     gateway_key=settings.api_key,
-                    claimed_by=f"local:{socket.gethostname()} ({getpass.getuser()})",
+                    claimed_by=_local_executor(),
                     on_event=event_printer(as_json),
                 )
         except RunNotClaimable as exc:
@@ -206,7 +204,7 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
         except KeyboardInterrupt:
             _fail("Run cancelled.")
     finally:
-        store.close()
+        store.close(close_client=True)
 
     if as_json:
         click.echo(

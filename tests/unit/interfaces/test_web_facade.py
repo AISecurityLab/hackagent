@@ -77,7 +77,7 @@ class TestWebReadsThroughFacade(unittest.TestCase):
         self.assertNotIn("delete_run", names)
 
     def test_delete_run_is_the_only_local_write(self):
-        refused = self.client.post("/api/proxy/run/run_tests", json={})
+        refused = self.client.post("/api/proxy/run", json={})
         self.assertEqual(refused.status_code, 501)
         self.assertNotIn("delete_run", self.store.call_names())
 

@@ -81,3 +81,28 @@ def test_on_change_fires_once_per_event():
         assert _wait(hb.cancel_requested)
         time.sleep(0.1)
     assert changes == [1]
+
+
+def test_a_late_answer_after_exit_signals_nothing():
+    """A heartbeat in flight when the run ends must not report a rejection."""
+    answering = threading.Event()
+    release = threading.Event()
+
+    class SlowStore:
+        def heartbeat_run(self, run_id):
+            answering.set()
+            release.wait(2.0)
+            raise ExecutorRejected("403")
+
+    changes = []
+    hb = RunHeartbeat(SlowStore(), uuid4(), interval_s=0.01)
+    hb.on_change = lambda: changes.append(1)
+    thread_exit = threading.Thread(target=lambda: hb.__exit__(None, None, None))
+    hb.__enter__()
+    assert _wait(answering)
+    thread_exit.start()
+    time.sleep(0.05)  # __exit__ has set the stop flag and is joining
+    release.set()
+    thread_exit.join(2.0)
+    assert not hb.rejected.is_set()
+    assert changes == []

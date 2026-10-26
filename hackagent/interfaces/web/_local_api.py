@@ -340,7 +340,6 @@ def create_local_api(client) -> Blueprint:
         ("/attack", ("POST",)),
         ("/attack/<attack_id>", ("PUT", "PATCH", "DELETE")),
         ("/run", ("POST",)),
-        ("/run/run_tests", ("POST",)),
         ("/result", ("POST",)),
         ("/key", ("POST",)),
         ("/credits/request", ("POST",)),

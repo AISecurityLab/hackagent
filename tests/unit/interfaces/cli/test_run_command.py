@@ -86,6 +86,11 @@ def test_old_sdk_refuses(store):
         ({"claimed_by": "local:other (bob)"}, "already claimed by local:other (bob)"),
         ({"status": "RUNNING"}, "RUNNING"),
         ({"executor": "cloud"}, "'cloud'"),
+        # A finished run says so, not who claimed it once.
+        (
+            {"status": "COMPLETED", "claimed_by": "local:other (bob)"},
+            "This run is COMPLETED",
+        ),
     ],
 )
 def test_already_claimed_message(store, over, expected):
@@ -121,6 +126,25 @@ def test_outcome_sets_exit_code(store, monkeypatch, status, code):
     assert captured["base_url"] == "https://api.example.test"
     assert captured["gateway_key"] == "k"
     assert captured["claimed_by"].startswith("local:")
+
+
+def test_a_machine_without_a_login_name_can_still_claim(store, monkeypatch):
+    monkeypatch.setenv("OPENAI_KEY", "sk")
+
+    def no_login():
+        raise OSError("no login name")
+
+    monkeypatch.setattr("getpass.getuser", no_login)
+    captured = {}
+
+    def fake(store_, run_id, **kwargs):
+        captured.update(kwargs)
+        return ExecutionOutcome("COMPLETED", "")
+
+    with patch("hackagent.orchestrator.execution.execute_run", side_effect=fake):
+        result = _invoke(RUN_ID)
+    assert result.exit_code == 0, result.output
+    assert captured["claimed_by"].endswith("(unknown)")
 
 
 def test_completed_exit_0(store, monkeypatch):

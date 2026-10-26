@@ -71,7 +71,8 @@ class RunHeartbeat:
                 return
 
     def _signal(self, event: threading.Event) -> None:
-        if event.is_set():
+        # After __exit__ the run is over: a late answer changes nothing.
+        if self._stop.is_set() or event.is_set():
             return
         event.set()
         callback = self.on_change

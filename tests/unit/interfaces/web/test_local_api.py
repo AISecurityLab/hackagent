@@ -147,7 +147,7 @@ class TestRunEndpoints(_WebUITestCase):
         self.assertEqual(summary["not_evaluated"], 0)
         self.assertEqual(summary["attack_type"], "tap")
         self.assertEqual(summary["organization"], str(self.org_id))
-        self.assertTrue(summary["is_client_executed"])
+        self.assertEqual(summary["executor"], "cli")
 
     def test_operational_failures_count_as_errors_not_mitigated(self):
         failed = self.backend.create_result(self.run.id, "g", 2, {}, {})
@@ -207,7 +207,7 @@ class TestResultEndpoints(_WebUITestCase):
 
 class TestWriteRoutesAreRejected(_WebUITestCase):
     def test_launching_an_attack_offline_is_refused_with_guidance(self):
-        response = self.client.post("/api/proxy/run/run_tests", json={})
+        response = self.client.post("/api/proxy/run", json={})
         self.assertEqual(response.status_code, 501)
         self.assertIn("read-only", response.get_json()["detail"])
 
