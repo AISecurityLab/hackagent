@@ -9,10 +9,11 @@ Non-secret values are resolved with the same priority order::
 
     explicit argument  &gt;  environment variable  &gt;  config file  &gt;  default
 
-An empty environment variable counts as unset. API keys are never read from or
-written to config files: the platform key is resolved by
-:func:`hackagent.core.credentials.resolve_api_key` from an explicit runtime
-`api_key` value or $\{VARIABLE\} reference, defaulting to `HACKAGENT_API_KEY`.
+Empty non-secret environment settings use the next source in that order.
+The platform `api_key` defaults to `HACKAGENT_API_KEY`. Python callers pass
+resolved values; configuration files contain explicit `${VARIABLE}`
+references. Resolved secret values are held in memory. The selected reference
+must contain a nonempty value.
 
 The storage backend is chosen explicitly (`local` by default) and never
 inferred from the presence of a key. Nothing is resolved at import time; call

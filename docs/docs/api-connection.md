@@ -1,7 +1,7 @@
 ---
 title: "API connection settings"
 slug: "/reference/api-connection"
-description: "Base URLs, CA bundles and proxy settings for API clients."
+description: "API keys, result storage, base URLs, CA bundles and proxies."
 ---
 
 These settings apply to connections to the HackAgent API.
@@ -21,32 +21,45 @@ requested at `https://api.example.com/prefix/agent/`.
 
 ## API key
 
-The default platform credential variable is `HACKAGENT_API_KEY`.
-Credentials do not select storage: choose `backend: remote` explicitly when
-results should be stored remotely.
+Set `HACKAGENT_API_KEY` before starting the SDK or CLI:
 
-Python callers can supply a runtime value:
+```bash
+export HACKAGENT_API_KEY="your_api_key"
+```
+
+Settings read this variable when `api_key` is omitted. In Python, pass a
+resolved value through `api_key`:
 
 ```python
 import os
 from hackagent import Settings
 
-settings = Settings.resolve(
-    api_key=os.environ["HACKAGENT_API_KEY"], backend="remote"
-)
+settings = Settings.resolve(api_key=os.environ["HACKAGENT_API_KEY"])
 ```
 
-Configuration files use the same `api_key` field with an explicit reference:
+In a YAML or JSON configuration, write an environment reference in `api_key`:
 
 ```yaml
 api_key: "${HACKAGENT_API_KEY}"
 ```
 
-Other variables may be selected explicitly with `${VARIABLE}`. Missing or
-empty selected variables fail before execution. Literal keys are rejected
-in configuration files; resolved values are never written back to them.
-Model connections select their own credential explicitly. A platform key
-is only supplied automatically to the configured HackAgent gateway.
+The reference is resolved when the configuration is loaded. A missing or
+empty referenced variable is a configuration error. Files store references;
+resolved secret values stay in memory and are excluded from saved settings
+and run metadata.
+
+Model connections use the `api_key` reference written in their connection
+configuration. Provider examples name the credential for that provider
+explicitly. The default platform key is supplied to the configured HackAgent
+gateway only.
+
+## Result storage
+
+Results are stored locally by default. Select `backend="remote"` in SDK
+settings or `--backend remote` for CLI sessions to use remote storage.
+Campaigns select remote storage with `execution.storage.backend: remote`.
+Remote storage requires a valid platform key. Model endpoints determine
+where model requests are sent independently of result storage.
 
 ## CA bundle
 

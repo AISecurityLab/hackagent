@@ -50,7 +50,7 @@ Re-resolve every value from CLI flags, environment and config file.
 def save(path: Optional[str] = None)
 ```
 
-Save the non-secret configuration to file. API keys are never saved.
+Save non-secret settings and credential references.
 
 #### validate
 
@@ -58,7 +58,7 @@ Save the non-secret configuration to file. API keys are never saved.
 def validate()
 ```
 
-Validate configuration — warns if no api_key but does NOT raise (local mode).
+Require a nonempty base URL. Credentials are checked during settings resolution.
 
 #### require\_remote
 

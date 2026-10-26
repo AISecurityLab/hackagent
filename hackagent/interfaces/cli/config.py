@@ -101,7 +101,7 @@ class CLIConfig:
             self._sources["verbose"] = Source.DEFAULT
 
     def save(self, path: Optional[str] = None):
-        """Save the non-secret configuration to file. API keys are never saved."""
+        """Save non-secret settings and credential references."""
         path = Path(path) if path else self.default_config_path
         path.parent.mkdir(parents=True, exist_ok=True)
         config_dict = {}
@@ -129,7 +129,7 @@ class CLIConfig:
             json.dump(config_dict, f, indent=2)
 
     def validate(self):
-        """Validate configuration — warns if no api_key but does NOT raise (local mode)."""
+        """Require a nonempty base URL. Credentials are checked during settings resolution."""
         if not self.base_url:
             raise ValueError("Base URL is required")
 

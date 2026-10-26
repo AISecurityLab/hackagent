@@ -42,7 +42,7 @@ def config()
 def set(ctx, backend, base_url, ca_bundle, verbose)
 ```
 
-Set configuration values (API keys are never saved: use env variables)
+Set storage, API location, CA bundle and verbosity defaults
 
 #### show
 

@@ -74,7 +74,7 @@ That extra installs Flask and the dashboard bundle. A bare `pip install hackagen
 ```bash
 hackagent web                    # http://127.0.0.1:7860 (default)
 hackagent web --port 8080        # custom port
-hackagent web --local            # ignore the API key, read local runs
+hackagent web --local            # read local runs
 hackagent web --no-browser       # skip opening a browser tab
 ```
 
@@ -108,7 +108,7 @@ which dashboard bundle is in use — the first things to include in a bug report
 | "Port 7860 is already in use by another process" | An unrelated process holds the port — a previous HackAgent dashboard is reclaimed automatically, anything else never is. Use `--port` |
 | Every panel is empty (local mode) | No runs recorded in that database yet, or they went to another one. Check `hackagent results list` |
 | Creating or launching returns "read-only" | Expected in local mode — see above |
-| 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `hackagent config show` |
+| 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `HACKAGENT_API_KEY` and `hackagent config show` |
 
 ## See also
 

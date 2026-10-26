@@ -1,52 +1,34 @@
-# Multi-provider LiteLLM demo
+# LiteLLM provider example
 
-Since [#379](https://github.com/AISecurityLab/hackagent/issues/379)
-every chat-completion AgentType goes through LiteLLM, so HackAgent
-transparently supports the ~140 providers LiteLLM speaks. Picking a
-different provider is a model-string change, not a different adapter.
+`tap-any-provider.yaml` runs TAP against an Anthropic target. Anthropic models
+also generate and judge the attack prompts. Each model connection contains
+`api_key: "${ANTHROPIC_API_KEY}"`, so the campaign reads that variable.
 
-## Quick run
+## Run
 
-```sh
-# Anthropic Claude
-ANTHROPIC_API_KEY=sk-…  hackagent campaign run tap-any-provider.yaml --provider anthropic
+From this example directory:
 
-# Google Gemini
-GEMINI_API_KEY=…        hackagent campaign run tap-any-provider.yaml --provider gemini
-
-# AWS Bedrock
-AWS_REGION=us-east-1    hackagent campaign run tap-any-provider.yaml --provider bedrock
-
-# Groq
-GROQ_API_KEY=…          hackagent campaign run tap-any-provider.yaml --provider groq
-
-# OpenRouter
-OPENROUTER_API_KEY=…    hackagent campaign run tap-any-provider.yaml --provider openrouter
+```bash
+export ANTHROPIC_API_KEY="your_anthropic_key"
+hackagent campaign run tap-any-provider.yaml
 ```
 
-`anthropic`, `gemini`, `bedrock`, `groq`, `mistral`, `together`,
-`openrouter`, `openai` are wired up out of the box. Add more by
-editing the `_PROVIDERS` table in [tap-any-provider.yaml](tap-any-provider.yaml).
+## Model connection
 
-## Why this works
+The provider prefix in each model name selects LiteLLM's provider. The
+connection's `api_key` contains an explicit environment reference:
 
-```python
-HackAgent(
-    name="my-target",
-    agent_type=AgentType.LITELLM,
-    endpoint="",
-    adapter_operational_config={
-        # LiteLLM's model-string convention: "<provider>/<model>"
-        "name": "anthropic/claude-3-5-sonnet-20241022",
-        # API key resolution: either an env-var name or the raw value.
-        "api_key": "ANTHROPIC_API_KEY",
-    },
-)
+```yaml
+connection:
+  provider: anthropic
+  type: LITELLM
+  api_key: "${ANTHROPIC_API_KEY}"
 ```
 
-The full LiteLLM provider catalogue (with the exact prefix for each
-provider) is at <https://docs.litellm.ai/docs/providers>.
+To use another API-key provider, update the target, attacker and judge model
+names, their provider labels and their `api_key` references in the YAML.
+The provider table in the campaign lists examples. Provider credentials are
+selected by these references; they are separate from the default
+`HACKAGENT_API_KEY` used for HackAgent platform connections.
 
-For protocols LiteLLM can't speak natively (Google ADK servers, MCP,
-A2A), HackAgent registers a per-instance `litellm.CustomLLM` provider;
-those keep their own AgentType entries (`GOOGLE_ADK` today).
+This campaign stores results in the local SQLite database.

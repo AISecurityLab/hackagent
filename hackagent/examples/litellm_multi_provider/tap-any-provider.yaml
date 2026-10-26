@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=../../../docs/static/schema/campaign.schema.json
 #
 # One campaign, any provider. LiteLLM routes by the model string, so moving
-# this run from Anthropic to Groq to Bedrock means editing three names and an
-# environment variable — nothing structural changes.
+# this run to another API-key provider means updating the three model names
+# and their explicit api_key environment references.
 #
 #   1. export ANTHROPIC_API_KEY=...        # whichever provider you pick below
 #   2. hackagent campaign run tap-any-provider.yaml
@@ -19,9 +19,6 @@
 #   together    together_ai/meta-llama/Llama-3-70b-chat-hf   TOGETHER_API_KEY
 #   openrouter  openrouter/anthropic/claude-3.5-sonnet   OPENROUTER_API_KEY
 #   openai      openai/gpt-4o-mini                       OPENAI_API_KEY
-#   bedrock     bedrock/anthropic.claude-3-haiku-20240307-v1:0
-#               bedrock/anthropic.claude-3-sonnet-20240229-v1:0
-#               (no api_key: "${Bedrock}" uses AWS_REGION and the credential chain)
 version: 1
 
 campaign:

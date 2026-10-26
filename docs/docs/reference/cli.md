@@ -121,7 +121,7 @@ hackagent config reset [OPTIONS]
 
 ### `hackagent config set`
 
-Set configuration values (API keys are never saved: use env variables)
+Set storage, API location, CA bundle and verbosity defaults
 
 ```text
 hackagent config set [OPTIONS]

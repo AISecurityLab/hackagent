@@ -236,7 +236,7 @@ curl -sS "https://api.hackagent.dev/result?run=$RUN_ID&evaluation_status=SUCCESS
 
 ## LLM gateway
 
-`POST /v1/chat/completions` is an OpenAI-compatible chat endpoint. HackAgent's default attacker, judge and category classifier use it in remote mode, and you can call it from any OpenAI client by setting the base URL to `https://api.hackagent.dev/v1`.
+`POST /v1/chat/completions` is an OpenAI-compatible chat endpoint. A campaign model uses it when its connection endpoint is `https://api.hackagent.dev/v1`. The gateway authenticates with `HACKAGENT_API_KEY`. Model connections are independent of the result-storage backend. The same endpoint can be called from an OpenAI-compatible client:
 
 <Tabs groupId="http-client">
 <TabItem value="curl" label="curl" default>
