@@ -8,8 +8,10 @@ a campaign it runs is either the HackAgent gateway marker, exactly as
 :mod:`.gateway` describes it, or a model of a :data:`CLOUD_MODEL_TYPES` type
 with only the :data:`CLOUD_OPTIONS` of its type. A model without an endpoint
 must name a hosted API: an ``OPENAI`` model a bare OpenAI model name, a
-``LITELLM`` model one with a :data:`HOSTED_LITELLM_PREFIXES` prefix. Anything
-not listed here is refused.
+``LITELLM`` model one with a :data:`HOSTED_LITELLM_PREFIXES` prefix. A model
+with an endpoint may name no other LiteLLM provider than those of
+:data:`ENDPOINT_LITELLM_PREFIXES`, whose clients call that endpoint with the
+key the campaign names. Anything not listed here is refused.
 
 Whether an endpoint's address is reachable from the cloud is up to whoever
 queues the run: :func:`cloud_issues` resolves no host names.
@@ -22,6 +24,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from hackagent.core.contracts import AgentType
+from hackagent.models.completions.litellm import KNOWN_LITELLM_PROVIDER_PREFIXES
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.gateway import is_gateway, spec_models
 from hackagent.orchestrator.campaign.spec import CampaignSpec
@@ -53,6 +56,17 @@ HOSTED_LITELLM_PREFIXES = (
     "fireworks_ai/",
     "perplexity/",
     "xai/",
+)
+
+#: LiteLLM model prefixes a model with an endpoint may start with.
+ENDPOINT_LITELLM_PREFIXES = (
+    *HOSTED_LITELLM_PREFIXES,
+    "hosted_vllm/",
+    "vllm/",
+    "ollama/",
+    "ollama_chat/",
+    "lm_studio/",
+    "llamafile/",
 )
 
 
@@ -93,10 +107,12 @@ def model_cloud_issues(config: ModelConfig, path: str) -> list[CloudIssue]:
         for key in config.options
         if key not in allowed
     ]
-    if not connection.endpoint:
+    if connection.endpoint:
+        reason = _provider_reason(connection.type, config.name)
+    else:
         reason = _endpointless_reason(connection.type, config.name)
-        if reason:
-            issues.append(CloudIssue(path, reason))
+    if reason:
+        issues.append(CloudIssue(path, reason))
     return issues
 
 
@@ -109,7 +125,30 @@ def _gateway_reasons(config: ModelConfig) -> list[str]:
         reasons.append("the HackAgent gateway must not set endpoint or api_key_env")
     if config.options:
         reasons.append("the HackAgent gateway takes no options")
+    # Bound, the gateway is an OPENAI model with an endpoint.
+    provider = _provider_reason(AgentType.OPENAI, config.name)
+    if provider:
+        reasons.append(provider)
     return reasons
+
+
+def _provider_reason(model_type: AgentType, name: str) -> str | None:
+    """Why a model of ``model_type`` named ``name`` cannot run in the cloud
+    at an endpoint, or None when its LiteLLM provider calls that endpoint.
+
+    ``OPENAI`` and ``OLLAMA`` models get their own provider prefix unless the
+    name already starts with a known LiteLLM one (see
+    :func:`~hackagent.models.completions.litellm.resolve_litellm_model`); a
+    ``LITELLM`` model's prefix is its provider.
+    """
+    if "/" not in name:
+        return None
+    prefix = name.split("/", 1)[0] + "/"
+    if prefix in ENDPOINT_LITELLM_PREFIXES:
+        return None
+    if model_type == AgentType.LITELLM or prefix in KNOWN_LITELLM_PROVIDER_PREFIXES:
+        return f"{prefix} models can't run in the cloud"
+    return None
 
 
 def _endpointless_reason(model_type: AgentType, name: str) -> str | None:
@@ -126,6 +165,10 @@ def _endpointless_reason(model_type: AgentType, name: str) -> str | None:
         )
     if model_type == AgentType.LITELLM and name.startswith(HOSTED_LITELLM_PREFIXES):
         return None
+    # A provider an endpoint does not help.
+    provider = _provider_reason(model_type, name)
+    if provider:
+        return provider
     prefix = name.split("/", 1)[0] + "/"
     return f"set an endpoint; {prefix} models can't run in the cloud without one"
 
@@ -133,6 +176,7 @@ def _endpointless_reason(model_type: AgentType, name: str) -> str | None:
 __all__ = [
     "CLOUD_MODEL_TYPES",
     "CLOUD_OPTIONS",
+    "ENDPOINT_LITELLM_PREFIXES",
     "HOSTED_LITELLM_PREFIXES",
     "CloudIssue",
     "cloud_issues",

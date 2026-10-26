@@ -51,7 +51,8 @@ def test_api_models_with_an_endpoint_and_the_gateway_are_allowed():
     [
         m("gpt-4o-mini", "OPENAI"),
         *(m(f"{prefix}some-model", "LITELLM") for prefix in HOSTED_LITELLM_PREFIXES),
-        m("org/model", "LITELLM", "https://llm.example/v1"),
+        m("gpt-4o", "LITELLM", "https://llm.example/v1"),
+        m("hosted_vllm/org/model", "LITELLM", "https://llm.example/v1"),
         m("org/model", "OPENAI", "https://llm.example/v1"),
         m("llama3", "OLLAMA", "https://ollama.example", options={"top_k": 5}),
     ],
@@ -140,28 +141,33 @@ def test_an_openai_model_without_endpoint_needs_a_bare_name(name):
 
 
 @pytest.mark.parametrize(
+    "prefix", ["ollama/", "ollama_chat/", "lm_studio/", "hosted_vllm/", "vllm/"]
+)
+def test_a_litellm_model_of_a_local_runtime_needs_an_endpoint(prefix):
+    assert issues_for(m(f"{prefix}model", "LITELLM")) == [
+        CloudIssue(
+            "target",
+            f"set an endpoint; {prefix} models can't run in the cloud without one",
+        )
+    ]
+
+
+@pytest.mark.parametrize(
     "prefix",
     [
-        "ollama/",
-        "ollama_chat/",
         "docker_model_runner/",
         "lemonade/",
         "langgraph/",
         "langflow/",
-        "lm_studio/",
-        "hosted_vllm/",
         "bedrock/",
         "vertex_ai/",
         "sagemaker/",
         "azure/",
     ],
 )
-def test_a_litellm_model_without_endpoint_needs_a_hosted_prefix(prefix):
+def test_a_litellm_model_of_another_provider_is_refused_without_endpoint(prefix):
     assert issues_for(m(f"{prefix}model", "LITELLM")) == [
-        CloudIssue(
-            "target",
-            f"set an endpoint; {prefix} models can't run in the cloud without one",
-        )
+        CloudIssue("target", f"{prefix} models can't run in the cloud")
     ]
 
 
@@ -173,6 +179,56 @@ def test_a_litellm_model_without_endpoint_or_prefix_is_refused():
 
 def test_an_empty_endpoint_counts_as_none():
     assert paths(issues_for(m("llama3", "OLLAMA", ""))) == ["target"]
+
+
+# --- models with an endpoint name no other provider ------------------------------
+
+ENDPOINT = "https://llm.example/v1"
+
+
+@pytest.mark.parametrize(
+    "prefix", ["bedrock/", "vertex_ai/", "sagemaker/", "azure/", "langgraph/"]
+)
+def test_a_litellm_model_at_an_endpoint_needs_an_allowlisted_prefix(prefix):
+    assert issues_for(m(f"{prefix}model", "LITELLM", ENDPOINT)) == [
+        CloudIssue("target", f"{prefix} models can't run in the cloud")
+    ]
+
+
+@pytest.mark.parametrize("model_type", ["OPENAI", "OLLAMA"])
+@pytest.mark.parametrize(
+    "prefix", ["bedrock/", "vertex_ai/", "azure/", "huggingface/", "replicate/"]
+)
+def test_a_model_at_an_endpoint_names_no_passthrough_provider(model_type, prefix):
+    assert issues_for(m(f"{prefix}model", model_type, ENDPOINT)) == [
+        CloudIssue("target", f"{prefix} models can't run in the cloud")
+    ]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "openai/gpt-4o",
+        "meta-llama/Llama-3.1-8B",
+        "ollama/llama3",
+        # Not a provider an OPENAI model passes through: sent as openai/sagemaker/x.
+        "sagemaker/model",
+    ],
+)
+def test_an_openai_model_at_an_endpoint_may_name_a_repository(name):
+    assert issues_for(m(name, "OPENAI", ENDPOINT)) == []
+
+
+@pytest.mark.parametrize("name", ["openai/gpt-4o", "anthropic/claude", "llamafile/m"])
+def test_a_litellm_model_at_an_endpoint_with_an_allowlisted_prefix(name):
+    assert issues_for(m(name, "LITELLM", ENDPOINT)) == []
+
+
+def test_a_gateway_marker_names_no_passthrough_provider():
+    assert issues_for({**GW, "name": "bedrock/model"}) == [
+        CloudIssue("target", "bedrock/ models can't run in the cloud")
+    ]
+    assert issues_for({**GW, "name": "Qwen/Qwen3-8B"}) == []
 
 
 # --- every model of the spec ----------------------------------------------------
