@@ -1,8 +1,9 @@
 # Cloud worker image: claims queued cloud runs and executes them.
 # Configure with HACKAGENT_BASE_URL and HACKAGENT_WORKER_TOKEN.
 #
-# Dependencies come from uv.lock (with the `hf` extra, so dataset presets
-# load), so the image runs the exact versions the SDK release was tested with.
+# Dependencies come from uv.lock, with the `hf` extra (dataset presets) and the
+# `vision` extra (techniques that send images, such as mml), so the image runs
+# the exact versions the SDK release was tested with.
 # The source stays in the build stage; only the virtualenv is copied over.
 
 FROM ghcr.io/astral-sh/uv:0.11.14 AS uv
@@ -15,7 +16,7 @@ ENV PIP_NO_CACHE_DIR=1 \
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /src
 COPY . .
-RUN uv export --frozen --no-dev --no-emit-project --extra hf \
+RUN uv export --frozen --no-dev --no-emit-project --extra hf --extra vision \
         --output-file requirements.txt \
     && python -m venv /opt/venv \
     && /opt/venv/bin/pip install --require-hashes -r requirements.txt \
