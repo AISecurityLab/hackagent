@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <style>html, body {height: 100%;}</style>
+</head>
+<body>
+    <div style="height:100%; width:100%;">                        <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-4.1.1.min.js" integrity="sha256-O24V1F27f8pb0glCkelh3cVHLNiHAJ5gCaVtq2aNch8=" crossorigin="anonymous"></script>                <div id="93b248a4-b8e3-4ff4-bf1f-0c6e4b6db995" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("93b248a4-b8e3-4ff4-bf1f-0c6e4b6db995")) {                    Plotly.newPlot(                        "93b248a4-b8e3-4ff4-bf1f-0c6e4b6db995",                        [{"customdata":[["gemma4_31b_instruct_abliterated_gguf",680,195,19.87,0.0,"no (weights only)",31.0,31.0,19.87,"32,768","262,144","#1f77b4"],["glm47_abliterated_gguf",680,123,18.77,0.0,"no (weights only)",31.0,31.0,18.77,"32,768","202,752","#1f77b4"],["qwen35_4b_abliterated_gguf",680,46,3.32,0.0,"no (weights only)",4.0,4.0,3.32,"32,768","262,144","#1f77b4"],["qwen38_27b_abliterated_gguf",680,328,16.81,0.0,"no (weights only)",27.8,27.8,17.74,"32,768","262,144","#1f77b4"]],"hoverlabel":{"bgcolor":"rgba(255,255,255,0)","bordercolor":"rgba(0,0,0,0)","font":{"color":"rgba(0,0,0,0)","size":1}},"marker":{"color":"#1f77b4","line":{"color":"black","width":1.5},"size":[31.0,31.0,4.0,27.8],"sizemin":6,"sizemode":"area","sizeref":0.8196428571428571,"symbol":"circle"},"mode":"markers+text","name":"Ollama GGUF Q4_K","text":["Gemma-31B","GLM-4.7","Qwen-3.5-4B","Qwen-3.8 GGUF"],"textfont":{"color":"black","size":14},"textposition":["top center","top center","bottom right","top center"],"x":{"dtype":"f8","bdata":"H4XrUbjeM0CF61G4HsUyQI\u002fC9ShcjwpAj8L1KFzPMEA="},"y":{"dtype":"f8","bdata":"rkfhehSuPEDXo3A9ChcyQArXo3A9ChtAH4XrUbgeSEA="},"type":"scatter"},{"customdata":[["qwen38_27b_abliterated_bf16_thinkon",680,368,52.66,90.22,"yes",27.8,27.8,51.75,"262,144","262,144","#2ca02c"]],"hoverlabel":{"bgcolor":"rgba(255,255,255,0)","bordercolor":"rgba(0,0,0,0)","font":{"color":"rgba(0,0,0,0)","size":1}},"marker":{"color":"#2ca02c","line":{"color":"black","width":1.5},"size":[27.8],"sizemin":6,"sizemode":"area","sizeref":0.8196428571428571,"symbol":"circle"},"mode":"markers+text","name":"vLLM BF16 (TP1)","text":["Qwen-3.8 BF16"],"textfont":{"color":"black","size":14},"textposition":["top center"],"x":{"dtype":"f8","bdata":"XI\u002fC9SjcYUA="},"y":{"dtype":"f8","bdata":"kML1KFwPS0A="},"type":"scatter"},{"customdata":[["glm53_flash_abliterated_fp8_thinkon",680,332,318.4,211.48,"yes",321.3,18.0,305.79,"32,768","1,048,576","#ff7f0e"]],"hoverlabel":{"bgcolor":"rgba(255,255,255,0)","bordercolor":"rgba(0,0,0,0)","font":{"color":"rgba(0,0,0,0)","size":1}},"marker":{"color":"#ff7f0e","line":{"color":"black","width":1.5},"size":[321.3],"sizemin":6,"sizemode":"area","sizeref":0.8196428571428571,"symbol":"circle"},"mode":"markers+text","name":"vLLM FP8 (TP4)","text":["GLM-5.3"],"textfont":{"color":"black","size":14},"textposition":["top center"],"x":{"dtype":"f8","bdata":"16NwPQqPgEA="},"y":{"dtype":"f8","bdata":"KVyPwvVoSEA="},"type":"scatter"},{"customdata":[["deepseek_v4_flash_0731__crack_nvfp4_thinkon",680,224,178.08,373.4,"yes",304.0,13.0,155.43,"393,216","1,048,576","#d62728"]],"hoverlabel":{"bgcolor":"rgba(255,255,255,0)","bordercolor":"rgba(0,0,0,0)","font":{"color":"rgba(0,0,0,0)","size":1}},"marker":{"color":"#d62728","line":{"color":"black","width":1.5},"size":[304.0],"sizemin":6,"sizemode":"area","sizeref":0.8196428571428571,"symbol":"circle"},"mode":"markers+text","name":"vLLM NVFP4 (TP4)","text":["Deepseek V4 Flash 0731"],"textfont":{"color":"black","size":14},"textposition":["bottom left"],"x":{"dtype":"f8","bdata":"pHA9Ctc7gUA="},"y":{"dtype":"f8","bdata":"uR6F61F4QEA="},"type":"scatter"}],                        {"legend":{"title":{"text":"Serving"}},"template":{"data":{"barpolar":[{"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"#C8D4E3","linecolor":"#C8D4E3","minorgridcolor":"#C8D4E3","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"#C8D4E3","linecolor":"#C8D4E3","minorgridcolor":"#C8D4E3","startlinecolor":"#2a3f5f"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergl"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"geo":{"bgcolor":"white","lakecolor":"white","landcolor":"white","showlakes":true,"showland":true,"subunitcolor":"#C8D4E3"},"hoverlabel":{"align":"left"},"hovermode":"closest","paper_bgcolor":"white","plot_bgcolor":"white","polar":{"angularaxis":{"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":""},"bgcolor":"white","radialaxis":{"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"},"yaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"},"zaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"ternary":{"aaxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""},"baxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""},"bgcolor":"white","caxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""}},"title":{"x":0.05},"xaxis":{"automargin":true,"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":"","title":{"standoff":15},"zerolinecolor":"#EBF0F8","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":"","title":{"standoff":15},"zerolinecolor":"#EBF0F8","zerolinewidth":2}}},"title":{"font":{"size":22},"text":"Attack Success vs Memory Footprint (thinking-ON attackers)\u003cbr\u003e\u003csup\u003ePooled TAP+Crescendo goals; ASR = success \u002f n \u00b7 Judge: qwen3.5:9b vs target qwen3.8:27b\u003cbr\u003e\u003c\u002fsup\u003e\u003cbr\u003e"},"xaxis":{"range":[0.3979400086720376,2.9542425094393248],"title":{"text":"Peak VRAM allocated (GB, log scale)"},"type":"log"},"yaxis":{"range":[0,60.61440000000001],"title":{"text":"Attack success rate (%)"}},"autosize":true,"showlegend":false},                        {"responsive": true}                    ).then(function(){
+                            
+(function(){
+var gd = document.querySelector('.plotly-graph-div');
+if(!gd) return;
+// plotly's default body margin (8px) overflows height:100% containers by
+// exactly those 8px -> scrollbar inside docs iframes. Kill it.
+document.body.style.margin = '0';
+var css = document.createElement('style'); css.textContent = '.aa-card{position:fixed;z-index:50;display:none;max-width:370px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.14);font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#111827;pointer-events:none;}.aa-head{display:flex;align-items:center;gap:9px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;}.aa-dot{width:13px;height:13px;border-radius:50%;flex:none;border:2px solid rgba(0,0,0,0.55);}.aa-name{font-size:15px;font-weight:700;}.aa-row{display:flex;justify-content:space-between;gap:14px;padding:1px 0;}.aa-k{font-weight:700;color:#4b5563;white-space:nowrap;}.aa-v{text-align:right;word-break:break-all;}.aa-v.dim{color:#6b7280;font-size:12px;}.aa-legend{flex:none;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;gap:4px 16px;padding:6px 14px 9px;border-top:1px solid #ececec;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:12.5px;color:#374151;}.aa-lg{display:flex;flex-direction:column;gap:1px;padding:3px 8px;border-radius:8px;cursor:pointer;}.aa-lg:hover{background:#f3f4f6;}.aa-lg-h{font-weight:600;color:#111827;font-size:12px;cursor:pointer;padding-bottom:1px;}.aa-lg-e{display:flex;align-items:center;gap:7px;padding:1px 3px;border-radius:5px;cursor:pointer;}.aa-lg-e:hover{background:#e9eef5;}.aa-off{opacity:0.35;}.aa-sw{width:11px;height:11px;flex:none;box-sizing:border-box;}.aa-sw.circle{border-radius:50%;}.aa-sw.diamond{width:9px;height:9px;transform:rotate(45deg);}.aa-sw.line{width:15px;height:0;border-top-width:2.5px;border-top-style:solid;}';
+document.head.appendChild(css);
+var tip = document.createElement('div');
+tip.className = 'aa-card'; document.body.appendChild(tip);
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function row(k,v,dim){return '<div class="aa-row"><span class="aa-k">'+k+
+  '</span><span class="aa-v'+(dim?' dim':'')+'">'+esc(v)+'</span></div>';}
+gd.on('plotly_hover', function(data){
+  if(!data.points || !data.points.length) return;
+  var p = data.points[0], c = p.customdata;
+  if(!c) return;
+  tip.innerHTML =
+    '<div class="aa-head"><span class="aa-dot" style="background:'+c[c.length-1]+
+    '"></span><span class="aa-name">'+esc(p.text)+'</span></div>' +
+    row('ASR', Number(p.y).toFixed(1)+' %') +
+    row('Footprint', Number(p.x).toFixed(1)+' GB') +
+    row('Weights', c[3]+' GB') +
+    row('KV', c[4]+' GB ('+c[5]+')') +
+    row('Goals (n)', c[1]) +
+    row('Success', c[2]) +
+    row('Total params', c[6]+' B') +
+    row('Active', c[7]+'B') +
+    row('Context len', c[9]) +
+    row('Max len', c[10]);
+  tip.style.display = 'block';
+  var pad = 16, x = data.event.clientX + pad, y = data.event.clientY + pad;
+  var r = tip.getBoundingClientRect();
+  if(x + r.width > window.innerWidth - 8) x = data.event.clientX - r.width - pad;
+  if(y + r.height > window.innerHeight - 8) y = data.event.clientY - r.height - pad;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+gd.on('plotly_unhover', function(){ tip.style.display = 'none'; });
+// Container-size guard: plotly's responsive:true only listens to window
+// resizes; in docs tabs (display:none panes) the graph can load at 0x0 and
+// never re-fit when its pane becomes visible. Re-fit on real box changes.
+var lastW = 0, lastH = 0;
+if (window.ResizeObserver) {
+  new ResizeObserver(function(){
+    var w = gd.clientWidth, h = gd.clientHeight;
+    if (w && h && (w !== lastW || h !== lastH)) {
+      lastW = w; lastH = h;
+      if (window.Plotly) Plotly.Plots.resize(gd);
+    }
+  }).observe(gd);
+}
+// ---- custom legend bar (native legend is disabled on the web copy) ----
+// Layout: body = flex column; the plot flexes to fill; the bar sits beneath
+// it. Per legendgroup: group header with think-ON/OFF entries stacked under
+// it; groups laid out side by side (wraps on narrow containers). Swatches
+// match the plot (color + circle/diamond; dashed line for line-only traces).
+// Click parity with the native legend: entry toggles its trace, header
+// toggles the whole group.
+document.body.style.display = 'flex';
+document.body.style.flexDirection = 'column';
+document.body.style.height = '100%';
+gd.style.flex = '1 1 auto';
+gd.style.minHeight = '0';
+gd.style.width = '100%';
+var bar = document.createElement('div'); bar.className = 'aa-legend';
+document.body.appendChild(bar);
+function toggleIdx(i){
+  Plotly.restyle(gd, {visible: gd.data[i].visible === false}, [i]);
+}
+function toggleGroup(idxs){
+  var any = idxs.some(function(i){ return gd.data[i].visible !== false; });
+  Plotly.restyle(gd, {visible: !any}, idxs);
+}
+function swatch(tr){
+  var mode = tr.mode || 'markers', mk = tr.marker || {}, col = mk.color;
+  if (typeof col !== 'string') col = (tr.line && tr.line.color) || '#9ca3af';
+  if (mode.indexOf('lines') >= 0 && mode.indexOf('markers') < 0) {
+    var ln = document.createElement('span'); ln.className = 'aa-sw line';
+    ln.style.borderTopColor = col;
+    var d = (tr.line && tr.line.dash) || 'solid';
+    ln.style.borderTopStyle = (d === 'dot') ? 'dotted'
+      : (String(d).indexOf('dash') >= 0 ? 'dashed' : 'solid');
+    return ln;
+  }
+  var sym = mk.symbol; if (Array.isArray(sym)) sym = sym[0];
+  var el = document.createElement('span');
+  el.className = 'aa-sw ' +
+    (sym && String(sym).indexOf('diamond') >= 0 ? 'diamond' : 'circle');
+  el.style.background = col;
+  return el;
+}
+function mkEntry(e, text, onClick){
+  var row = document.createElement('div'); row.className = 'aa-lg-e';
+  if (e.trace.visible === false) row.className += ' aa-off';
+  row.appendChild(swatch(e.trace));
+  var sp = document.createElement('span'); sp.textContent = text;
+  row.appendChild(sp);
+  row.onclick = onClick;
+  return row;
+}
+function buildLegend(){
+  bar.innerHTML = '';
+  var groups = {}, order = [];
+  gd.data.forEach(function(tr, i){
+    var mode = tr.mode || 'markers';
+    if (tr.showlegend === false || !tr.name || mode === 'text') return;
+    var gk = tr.legendgroup || tr.name;
+    if (!groups[gk]) { groups[gk] = {header: null, entries: []}; order.push(gk); }
+    var g = groups[gk], parts = tr.name.split(' \u00b7 ');
+    if (parts.length >= 2) {
+      if (!g.header) g.header = parts[0];
+      g.entries.push({idx: i, label: parts.slice(1).join(' \u00b7 '), trace: tr});
+    } else {
+      g.entries.push({idx: i, label: tr.name, trace: tr, solo: true});
+    }
+  });
+  order.forEach(function(gk){
+    var g = groups[gk];
+    var box = document.createElement('div'); box.className = 'aa-lg';
+    if (g.entries.length === 1) {
+      // single entry (with or without header) -> one line, whole box clicks
+      var e0 = g.entries[0];
+      var text = g.header ? g.header + ' \u00b7 ' + e0.label : e0.label;
+      box.appendChild(mkEntry(e0, text, function(ev){
+        ev.stopPropagation(); toggleIdx(e0.idx); buildLegend();
+      }));
+      box.onclick = function(){ toggleGroup([e0.idx]); buildLegend(); };
+    } else {
+      if (g.header) {
+        var h = document.createElement('div'); h.className = 'aa-lg-h';
+        h.textContent = g.header;
+        h.onclick = function(ev){
+          ev.stopPropagation();
+          toggleGroup(g.entries.map(function(e){ return e.idx; }));
+          buildLegend();
+        };
+        box.appendChild(h);
+      }
+      g.entries.forEach(function(e){
+        box.appendChild(mkEntry(e, e.label, function(ev){
+          ev.stopPropagation(); toggleIdx(e.idx); buildLegend();
+        }));
+      });
+    }
+    bar.appendChild(box);
+  });
+  bar.style.display = order.length ? 'flex' : 'none';
+}
+buildLegend();
+// the bar just claimed height from the plot -> re-fit once (RO catches
+// later changes too)
+if (window.Plotly) Plotly.Plots.resize(gd);
+})();
+
+                        })                };            </script>        </div>
+</body>
+</html>
