@@ -25,6 +25,12 @@ const sidebars: SidebarsConfig = {
       ],
     },
     {
+      type: 'doc',
+      id: 'guides/choosing-an-attacker',
+      className: 'sidebar-icon sidebar-icon-sword',
+      label: 'Choosing an attacker',
+    },
+    {
       type: 'category',
       label: 'Concepts',
       className: 'sidebar-icon sidebar-icon-book',

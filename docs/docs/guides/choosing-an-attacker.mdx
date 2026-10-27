@@ -1,0 +1,144 @@
+---
+title: Choosing an attacker model
+description: Measured ASR, speed, size and memory for ten attacker configurations from a real HackAgent campaign and pick an attacker model with evidence instead of guesswork.
+---
+
+{/* Interactive figures served from static/attackers/ (URL: /attackers/<file>.html).
+    Regenerate plots in the campaign export, then refresh with:
+
+        python3 docs/scripts/sync_attacker_plots.py /path/to/plots_custom
+
+    The iframe list below and FILES in that script move together — update both
+    when adding/removing a figure. Figures built 2026-10-19 (export stamp in
+    plot_data_manifest.json). */}
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Choosing an attacker model
+
+Which attacker model you put behind your attacks is the single biggest
+lever on how much jailbreak success you get, how long each goal takes, and how
+much GPU you need. This page summarizes a **measured head-to-head of ten
+attacker configurations** run by HackAgent against one target, so you can pick
+with evidence instead of guesswork.
+
+Every figure below is **interactive**  hover any point for the full
+per-attacker card (ASR, goal counts, thinking mode, params, serving, memory).
+
+:::caution Comparison Limitation:
+These numbers come from a single benchmark campaign (OmniSafeBench goal set,
+10 goals per subcategory from categories A-F) against **target `qwen3.8:27b`** judged by **`qwen3.5:9b`**.
+Use them to compare attackers *against each other*, the target, goals and the judge was kept constant. Use these plots to
+compare the attackers against each other, not as absolute scores for other targets. Relative rankings and
+the thinking/serving effects are the transferable part; the percentages are not.
+:::
+
+## How the numbers were produced
+
+- **Attacks**: TAP + Crescendo pooled
+- **Denominator**: every attacker ran **340 goals per attack, 680 total per attacker**
+- **Scope**: 10 attacker variants = 3 model families (think ON/OFF) +
+  4 Ollama GGUF builds, on three serving setups (vLLM BF16 TP1, vLLM FP8/NVFP4
+  TP4, Ollama Q4_K).
+
+## Figures
+
+<Tabs groupId="attacker-plot">
+<TabItem value="frontier" label="Speed vs ASR" default>
+
+The main trade-off view: **attack success against mean minutes per goal**
+(log time axis). Top-left is better; the green quadrant is above-median ASR
+*and* below-median time. 
+
+<iframe
+  src="/attackers/frontier_asr_vs_time.html"
+  title="Attack success vs mean minutes per goal"
+  width="100%"
+  height="780"
+  loading="lazy"
+  style={{border: '1px solid var(--ifm-table-border-color)', borderRadius: '8px'}}
+/>
+
+</TabItem>
+<TabItem value="thinking" label="Thinking OFF → ON">
+
+Same models with reasoning on vs off, the campaign's cleanest controlled
+contrast (identical weights, judge and goals). Arrow labels show the ASR
+lift in percentage points and the change in minutes per goal when thinking was enabled.
+
+<iframe
+  src="/attackers/pairs_thinking.html"
+  title="Thinking OFF to ON transitions"
+  width="100%"
+  height="780"
+  loading="lazy"
+  style={{border: '1px solid var(--ifm-table-border-color)', borderRadius: '8px'}}
+/>
+
+</TabItem>
+<TabItem value="size" label="Size (total params)">
+
+ASR against **total parameters**. To convey how the no. of params affects ASR, all models are with thinking enabled.
+
+<iframe
+  src="/attackers/scaling_asr_vs_size.html"
+  title="Attack success vs total parameters"
+  width="100%"
+  height="780"
+  loading="lazy"
+  style={{border: '1px solid var(--ifm-table-border-color)', borderRadius: '8px'}}
+/>
+
+</TabItem>
+<TabItem value="memory" label="Memory footprint">
+
+ASR against **peak VRAM** (log axis): vLLM points are weights (cluster
+total) plus logged KV cache; Ollama GGUF points are weights only, so they might understate real usage.
+
+<iframe
+  src="/attackers/memory_asr_vs_vram.html"
+  title="Attack success vs peak VRAM"
+  width="100%"
+  height="780"
+  loading="lazy"
+  style={{border: '1px solid var(--ifm-table-border-color)', borderRadius: '8px'}}
+/>
+
+</TabItem>
+</Tabs>
+
+
+## Headline numbers (TAP+Crescendo, n=680 each)
+
+| Attacker | ASR | 95% CI | Avg min/goal | Serving |
+|---|---|---|---|---|
+| Qwen-3.8 BF16 **thinkON** | **54.1%** | 50.4–57.8 | 21.0 | vLLM BF16 TP1 |
+| GLM-5.3 FP8 thinkON | 48.8% | 45.1–52.6 | 25.3 | vLLM FP8 TP4 |
+| Qwen-3.8 GGUF | 48.2% | 44.5–52.0 | 41.9 | Ollama Q4_K |
+| GLM-5.3 FP8 thinkOFF | 44.7% | 41.0–48.5 | 24.8 | vLLM FP8 TP4 |
+| Deepseek V4 Flash thinkON | 32.9% | 29.5–36.5 | 22.6 | vLLM NVFP4 TP4 |
+| Gemma-31B GGUF | 28.7% | 25.4–32.2 | 46.1 | Ollama Q4_K |
+| Qwen-3.8 BF16 thinkOFF | 27.7% | 24.4–31.1 | 48.9 | vLLM BF16 TP1 |
+| Deepseek V4 Flash thinkOFF | 19.0% | 16.2–22.1 | 21.9 | vLLM NVFP4 TP4 |
+| GLM-4.7 GGUF | 18.1% | 15.4–21.1 | 47.6 | Ollama Q4_K |
+| Qwen-3.5-4B GGUF | 6.8% | 5.1–8.9 | 42.5 | Ollama Q4_K |
+
+Wilson 95% intervals; times are campaign wall-clock per goal including
+retries.
+
+## What to take from it
+
+- **Turn thinking on.** All three ON/OFF pairs improved with reasoning
+  enabled: Qwen-3.8 BF16 **+26.5 pp** (and *halved* time per goal, the
+  attacker stops earlier due to success), Deepseek +14.0 pp, GLM-5.3 +4.1 pp. Cost is
+  essentially zero on the two that were already fast.
+- **ASR scales with size, but not always** The 4B floor is weak (6.8%), but
+  in the 27–31B band ASR spans 18–54% at identical size, and the 300B+ MoE
+  pair splits 48.8% vs 32.9%. Serving and quantization matter as much as
+  parameter count.
+
+## Caveats
+1. The highest scoring model was Qwen-3.8, this is because its the abliterated version of the target model.
+2. Single judge, no panel comparison.
+3. Ollama points omit KV cache in the memory figure.
