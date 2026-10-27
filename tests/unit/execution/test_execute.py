@@ -824,187 +824,56 @@ def test_interrupt_ends_the_run_as_the_executor_says(tmp_path):
     assert store.finished == [(store.run_id, "FAILED", "The executor stopped")]
 
 
-def test_a_cloud_run_writes_its_files_to_a_removed_scratch_folder(tmp_path):
-    output = tmp_path / "out"
-    config = stored_campaign(tmp_path, execution={"output": {"directory": str(output)}})
-    run = run_detail(config)
-
-    outcome = execute.execute_run(
-        SimpleNamespace(client=MagicMock()),
-        run["id"],
-        base_url=BASE_URL,
-        gateway_key=GATEWAY_KEY,
-        claimed_by="cloud-worker:test",
-        claim=ClaimResult(run=run, run_token="run-token-for-test", env={}),
-        build=FakeBuilder(models()),
-        load=goals("goal one"),
+def test_an_output_directory_replaces_where_files_are_written(tmp_path):
+    configured, given = tmp_path / "configured", tmp_path / "given"
+    config = stored_campaign(
+        tmp_path, execution={"output": {"directory": str(configured)}}
     )
+
+    outcome, _, _ = execute_with(config, output_directory=str(given))
 
     assert outcome.status == "COMPLETED"
     assert outcome.result.outputs
-    assert not output.exists()
-    assert not any(path.exists() for path in outcome.result.outputs)
+    assert all(given in path.parents for path in outcome.result.outputs)
+    assert not configured.exists()
 
 
-def test_a_local_run_keeps_its_files(tmp_path):
+def test_a_run_keeps_the_campaign_s_output_directory_by_default(tmp_path):
     outcome, _, _ = execute_with(stored_campaign(tmp_path))
 
     assert outcome.result.outputs
     assert all(path.exists() for path in outcome.result.outputs)
 
 
-# --- cloud model types ---------------------------------------------------------
-
-CLAUDE_CODE_JUDGE = {
-    "name": "judge",
-    "connection": {"provider": "local", "type": "CLAUDE_CODE"},
-    "scoring": {"type": "harmbench"},
-}
+# --- check ----------------------------------------------------------------------
 
 
 def never_build(config, *, retries=0):
     raise AssertionError(f"built {config.name} for a run that must not start")
 
 
-def cloud_execute(config, build):
-    run = run_detail(config)
-    return execute.execute_run(
-        SimpleNamespace(client=MagicMock()),
-        run["id"],
-        base_url=BASE_URL,
-        gateway_key=GATEWAY_KEY,
-        claimed_by="cloud-worker:test",
-        claim=ClaimResult(run=run, run_token="run-token-for-test", env={}),
-        build=build,
-        load=goals("goal one"),
+def test_a_run_the_check_refuses_ends_failed_before_building(tmp_path):
+    seen = []
+
+    def check(spec):
+        seen.append(spec.campaign.name)
+        return "This executor does not run this campaign"
+
+    outcome, store, _ = execute_with(
+        stored_campaign(tmp_path), builder=never_build, check=check
     )
 
-
-def test_a_cloud_run_refuses_a_local_agent_type_before_building(tmp_path):
-    config = stored_campaign(tmp_path, evaluation={"judges": [CLAUDE_CODE_JUDGE]})
-
-    outcome = cloud_execute(config, never_build)
-
-    store = RecordingAdoptedStore.instances[-1]
-    note = (
-        "This campaign can't run in the cloud: "
-        "evaluation.judges.0: model type CLAUDE_CODE can't run in the cloud"
+    assert seen == ["test-campaign"]
+    assert (outcome.status, outcome.note) == (
+        "FAILED",
+        "This executor does not run this campaign",
     )
-    assert (outcome.status, outcome.note) == ("FAILED", note)
-    assert store.finished == [(store.run_id, "FAILED", note)]
+    assert store.finished == [
+        (store.run_id, "FAILED", "This executor does not run this campaign")
+    ]
 
 
-def _refused(outcome, path):
-    assert outcome.status == "FAILED"
-    assert outcome.note.startswith(f"{execute.NOT_CLOUD_RUNNABLE_NOTE}: {path}: ")
-
-
-def test_a_cloud_run_refuses_a_model_option_outside_the_allowlist(tmp_path):
-    target = {**model("target"), "options": {"binary": "/usr/bin/agent"}}
-
-    outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
-
-    _refused(outcome, "target.options.binary")
-
-
-@pytest.mark.parametrize(
-    "agent_type", ["CLAUDE_CODE", "CODEX", "HERMES", "WEB", "GOOGLE_ADK"]
-)
-def test_a_cloud_run_refuses_a_gateway_marker_of_another_type(tmp_path, agent_type):
-    gateway = {
-        "name": "gateway",
-        "connection": {"provider": "hackagent", "type": agent_type},
-        "options": {"extra_args": ["--dangerously-skip-permissions"]},
-    }
-    config = stored_campaign(
-        tmp_path, attacks=[{"name": "pair", "roles": {"attacker": gateway}}]
-    )
-
-    outcome = cloud_execute(config, never_build)
-
-    _refused(outcome, "attacks.0.roles.attacker")
-
-
-def test_a_cloud_run_refuses_gateway_options(tmp_path):
-    gateway = {**GW, "options": {"extra_args": ["--x"]}}
-    config = stored_campaign(
-        tmp_path, evaluation={"judges": [{**gateway, "scoring": {"type": "harmbench"}}]}
-    )
-
-    outcome = cloud_execute(config, never_build)
-
-    _refused(outcome, "evaluation.judges.0")
-
-
-@pytest.mark.parametrize(
-    "target",
-    [
-        {"name": "ollama/llama3", "connection": {"provider": "p", "type": "OPENAI"}},
-        {"name": "ollama_chat/m", "connection": {"provider": "p", "type": "OPENAI"}},
-        {"name": "lemonade/m", "connection": {"provider": "p", "type": "LITELLM"}},
-        {"name": "bedrock/m", "connection": {"provider": "p", "type": "LITELLM"}},
-        {"name": "llama3", "connection": {"provider": "p", "type": "OLLAMA"}},
-    ],
-)
-def test_a_cloud_run_refuses_a_model_that_needs_an_endpoint(tmp_path, target):
-    outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
-
-    _refused(outcome, "target")
-
-
-TRANSFORM_FX_PROGRAM = (
-    'TransformFxDecorator(transform_fx="import os\\ndef transform(prompt, '
-    "assistant, random_state):\\n    return os.popen('id').read()\")"
-)
-
-
-def test_a_cloud_run_refuses_a_program_that_runs_code(tmp_path):
-    attack = {
-        "name": "h4rm3l",
-        "parameters": {"program": TRANSFORM_FX_PROGRAM},
-        "roles": {"decorator": GW},
-    }
-    config = stored_campaign(tmp_path, attacks=[attack])
-
-    outcome = cloud_execute(config, never_build)
-
-    _refused(outcome, "attacks.0.parameters.program")
-
-
-@pytest.mark.parametrize(
-    "name", ["OPENAI_BASE_URL", "HTTPS_PROXY", "HF_ENDPOINT", "HACKAGENT_GRAPHVIZ_DOT"]
-)
-def test_a_cloud_run_refuses_a_key_variable_that_is_not_a_key(tmp_path, name):
-    target = model("target")
-    target["connection"]["api_key"] = "${" + name + "}"
-
-    outcome = cloud_execute(stored_campaign(tmp_path, target=target), never_build)
-
-    _refused(outcome, "target.connection.api_key")
-
-
-def test_a_cloud_run_refuses_goals_from_a_file(tmp_path):
-    dataset = {"source": {"type": "provider", "provider": "file", "path": "/etc/hosts"}}
-
-    outcome = cloud_execute(stored_campaign(tmp_path, dataset=dataset), never_build)
-
-    _refused(outcome, "dataset.source")
-
-
-def test_a_cloud_run_allows_api_models_and_the_gateway(tmp_path):
-    config = stored_campaign(
-        tmp_path,
-        evaluation={"judges": [{**GW, "scoring": {"type": "harmbench"}}]},
-    )
-
-    outcome = cloud_execute(config, FakeBuilder(models(gateway=ScriptedModel("yes"))))
-
-    assert outcome.status == "COMPLETED"
-
-
-def test_a_local_run_allows_every_model_type(tmp_path):
-    config = stored_campaign(tmp_path, evaluation={"judges": [CLAUDE_CODE_JUDGE]})
-
-    outcome, _, _ = execute_with(config)
+def test_a_run_the_check_accepts_executes(tmp_path):
+    outcome, _, _ = execute_with(stored_campaign(tmp_path), check=lambda spec: None)
 
     assert outcome.status == "COMPLETED"
