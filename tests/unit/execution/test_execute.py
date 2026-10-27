@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 from types import SimpleNamespace
@@ -648,6 +649,28 @@ def test_execute_spec_needs_the_storage_key(tmp_path, starting_store, monkeypatc
     assert starting_store == []
 
 
+def test_an_interrupted_async_campaign_finishes_then_passes_on(
+    tmp_path, starting_store
+):
+    def on_event(event, **payload):
+        if event == "goal_finished":
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        asyncio.run(
+            execute.arun_remote_campaign(
+                remote_spec(tmp_path),
+                on_event=on_event,
+                build=FakeBuilder(models()),
+                load=goals("goal one"),
+            )
+        )
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert store.finished == [(store.run_id, "CANCELLED", "Campaign cancelled")]
+    assert starting_store[-1].closed == [{"close_client": True}]
+
+
 def test_a_started_run_whose_setup_fails_is_finished_failed(
     tmp_path, starting_store, monkeypatch
 ):
@@ -871,6 +894,17 @@ def test_a_run_the_check_refuses_ends_failed_before_building(tmp_path):
     assert store.finished == [
         (store.run_id, "FAILED", "This executor does not run this campaign")
     ]
+
+
+def test_an_interrupt_before_building_finishes_cancelled_then_passes_on(tmp_path):
+    def check(spec):
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        execute_with(stored_campaign(tmp_path), builder=never_build, check=check)
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert store.finished == [(store.run_id, "CANCELLED", "Campaign cancelled")]
 
 
 def test_a_run_the_check_accepts_executes(tmp_path):

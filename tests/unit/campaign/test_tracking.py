@@ -125,7 +125,7 @@ def test_register_target_never_stores_a_credential_written_into_the_file():
 
     register_target(store, target)
 
-    _name, (_, config), _kwargs = store.calls[0]
+    _, (_, config), _ = store.calls[0]
     assert config["connection"]["headers"] == {"Authorization": "[REDACTED]"}
     assert "literal-value" not in repr(config)
 

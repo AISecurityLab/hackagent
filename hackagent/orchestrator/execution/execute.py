@@ -131,13 +131,14 @@ def execute_run(
             held.release()
             # Same client, so the adopted store writes with the key that claimed it.
             adopted = AdoptedRunStore.for_run(store.client, claim.run)
-        except BaseException as exc:
-            # Claimed but not runnable: end it now rather than leave it to the reaper.
+        # Claimed but not runnable: end it now rather than leave it to the reaper.
+        except Exception as exc:
             outcome = _ended_by(exc, interrupted_as)
             _finish(store, run_id, outcome)
-            if not isinstance(exc, Exception):
-                raise
             return outcome
+        except BaseException as exc:
+            _finish(store, run_id, _ended_by(exc, interrupted_as))
+            raise
     try:
         spec = executable_spec(
             claim.run["run_config"]["campaign_config"],
@@ -147,13 +148,15 @@ def execute_run(
         refusal = check(spec) if check is not None else None
         if refusal:
             raise _Refused(refusal)
-    except BaseException as exc:
+    except Exception as exc:
         outcome = _ended_by(exc, interrupted_as)
         _finish(adopted, adopted.run_id, outcome)
         adopted.close()
-        if not isinstance(exc, Exception):
-            raise
         return outcome
+    except BaseException as exc:
+        _finish(adopted, adopted.run_id, _ended_by(exc, interrupted_as))
+        adopted.close()
+        raise
     return _execute(
         _Execution(
             adopted,
@@ -242,8 +245,11 @@ async def arun_remote_campaign(
             with _environment(execution.environment):
                 try:
                     result = await execution.campaign()
-                except BaseException as exc:
+                except (Exception, asyncio.CancelledError) as exc:
                     error = exc
+                except BaseException as exc:
+                    execution.settle(None, exc)
+                    raise
             outcome = execution.settle(result, error)
         finally:
             execution.adopted.close()
@@ -453,14 +459,13 @@ def _execute(execution: _Execution) -> ExecutionOutcome:
         with _environment(execution.environment):
             try:
                 result = run_coroutine_blocking(execution.campaign)
-            except BaseException as exc:
+            except (Exception, asyncio.CancelledError) as exc:
                 error = exc
-        outcome = execution.settle(result, error)
-        if error is not None and not isinstance(
-            error, (Exception, asyncio.CancelledError)
-        ):
-            raise error  # KeyboardInterrupt, SystemExit: recorded, then passed on
-        return outcome
+            except BaseException as exc:
+                # KeyboardInterrupt, SystemExit: recorded, then passed on.
+                execution.settle(None, exc)
+                raise
+        return execution.settle(result, error)
     finally:
         execution.adopted.close()
 

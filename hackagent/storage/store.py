@@ -39,27 +39,22 @@ class Store(Protocol):
     # ── Context ──────────────────────────────────────────────────────────────
     def get_context(self) -> OrganizationContext:
         """Return the org / user context associated with this backend."""
-        ...
 
     def get_api_key(self) -> Optional[str]:
         """Return the API key used by this backend, or None (local mode)."""
-        ...
 
     # ── Lifecycle ──────────────────────────────────────────────────────────────
     def flush(self) -> None:
         """Block until all deferred writes are persisted (no-op if synchronous)."""
-        ...
 
     def close(self) -> None:
         """Release resources / stop background workers. Idempotent."""
-        ...
 
     # ── Agent ─────────────────────────────────────────────────────────────────
     def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:
         """Create the agent ``name``, or replace the config of the one that
         exists. ``config`` is a dumped ``ModelConfig``; the record's
         ``agent_type`` and ``endpoint`` come from its connection."""
-        ...
 
     def list_agents(
         self, page: int = 1, page_size: int = 100
@@ -86,7 +81,6 @@ class Store(Protocol):
     def start_campaign(self, agent_id: UUID, spec: Dict[str, Any]) -> CampaignRunRecord:
         """Record a run of the campaign ``spec`` (its recorded form) against
         the agent, already RUNNING. The run is named after the campaign."""
-        ...
 
     def update_campaign_run(
         self,
@@ -98,7 +92,6 @@ class Store(Protocol):
         """Change what was given. ``None`` leaves a field as it is; pass ``""``
         to clear a note an earlier update wrote. A final status (COMPLETED,
         FAILED, CANCELLED) ends the run with ``run_notes`` as its note."""
-        ...
 
     def list_campaign_runs(
         self, page: int = 1, page_size: int = 100
@@ -116,7 +109,6 @@ class Store(Protocol):
     ) -> RunRecord:
         """Record one attack run. The remote store creates it as a child of
         ``campaign_run_id``, which it therefore requires."""
-        ...
 
     def update_run(
         self,
@@ -182,4 +174,3 @@ class Store(Protocol):
 
     def count_result_buckets(self) -> Dict[str, int]:
         """Return {total, jailbreaks, mitigated, failed, pending} across all results."""
-        ...
