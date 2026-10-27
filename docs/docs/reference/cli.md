@@ -17,6 +17,7 @@ Every command the `hackagent` executable offers. Run any of them with `--help` t
 | `hackagent examples` | 🧪 Launch built-in examples from the CLI |
 | `hackagent init` | 🚀 Initialize HackAgent CLI configuration |
 | `hackagent results` | 📊 View and manage attack results |
+| `hackagent run` | Run a campaign queued from the dashboard on this machine. |
 | `hackagent tui` | 🖥️ Launch the campaign builder |
 | `hackagent version` | 📋 Show version information |
 | `hackagent web` | 🌐 Launch the web dashboard. |
@@ -341,6 +342,19 @@ hackagent results summary [OPTIONS]
 | `--agent` | option | no | Filter by agent name |
 | `--attack-type` | option | no | Filter by attack type |
 | `--days` | option | no | Number of days to include (default: 7) Defaults to `7`. |
+
+## `hackagent run`
+
+Run a campaign queued from the dashboard on this machine.
+
+```text
+hackagent run [OPTIONS] [RUN_ID]
+```
+
+| Name | Kind | Required | Description |
+|---|---|---|---|
+| `RUN_ID` | argument | no |  |
+| `--json` | flag | no | Emit events as JSON. |
 
 ## `hackagent tui`
 

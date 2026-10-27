@@ -13,6 +13,7 @@ def _get_kwargs(
     *,
     page: int | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["page"] = page
@@ -60,8 +61,8 @@ def sync_detailed(
 ) -> Response[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):
@@ -92,8 +93,8 @@ def sync(
 ) -> PaginatedOrganizationList | None:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):
@@ -119,8 +120,8 @@ async def asyncio_detailed(
 ) -> Response[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):
@@ -149,8 +150,8 @@ async def asyncio(
 ) -> PaginatedOrganizationList | None:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):

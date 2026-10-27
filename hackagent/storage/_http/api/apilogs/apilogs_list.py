@@ -13,6 +13,7 @@ def _get_kwargs(
     *,
     page: int | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["page"] = page
@@ -60,8 +61,9 @@ def sync_detailed(
 ) -> Response[PaginatedAPITokenLogList]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         page (int | Unset):
@@ -92,8 +94,9 @@ def sync(
 ) -> PaginatedAPITokenLogList | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         page (int | Unset):
@@ -119,8 +122,9 @@ async def asyncio_detailed(
 ) -> Response[PaginatedAPITokenLogList]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         page (int | Unset):
@@ -149,8 +153,9 @@ async def asyncio(
 ) -> PaginatedAPITokenLogList | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         page (int | Unset):

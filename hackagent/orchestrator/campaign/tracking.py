@@ -29,7 +29,11 @@ from hackagent.orchestrator.campaign.results import (
     trace_payload,
     trace_step_type,
 )
-from hackagent.orchestrator.campaign.spec import OutputSpec, StorageSpec
+from hackagent.orchestrator.campaign.spec import (
+    OutputSpec,
+    StorageSpec,
+    recorded_model,
+)
 from hackagent.storage.store import Store
 from hackagent.tracking.evaluation import eval_columns
 from hackagent.tracking.serialize import sanitize_for_json
@@ -61,14 +65,13 @@ def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Sto
 
 
 def register_target(store: Store, target: ModelConfig) -> UUID:
-    """Create or update the agent record that runs are attached to."""
-    agent = store.create_or_update_agent(
-        name=target.name,
-        agent_type=target.connection.type.value,
-        endpoint=target.connection.endpoint or "",
-        metadata=target.generation.model_dump(exclude_none=True),
-        overwrite_metadata=True,
-    )
+    """Create or update the agent record that runs are attached to.
+
+    The agent stores the target's whole model config, with any credential
+    written into the campaign file redacted: an API key is stored only as
+    its ``${VARIABLE}`` reference.
+    """
+    agent = store.create_or_update_agent(target.name, recorded_model(target))
     return agent.id
 
 

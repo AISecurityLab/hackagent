@@ -12,11 +12,14 @@ when an API key is available and selected automatically by HackAgent.__init__.
 from __future__ import annotations
 
 import atexit
+import getpass
 import logging
 import queue
+import socket
 import ssl
 import threading
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Union
 from uuid import UUID
@@ -29,18 +32,24 @@ from hackagent.storage._http.api.agent import (
     agent_list,
     agent_partial_update,
 )
+from hackagent.storage._http.api.key import key_context_retrieve
 from hackagent.storage._http.api.organization import organization_me_retrieve
 from hackagent.storage._http.api.attack import (
     attack_create,
     attack_destroy,
     attack_list,
 )
+from hackagent.storage._http.api.campaign import campaign_start_create
 from hackagent.storage._http.api.run import (
+    run_children_create,
+    run_claim_create,
+    run_claim_next_create,
     run_destroy,
+    run_finish_create,
+    run_heartbeat_create,
     run_list,
     run_partial_update,
     run_retrieve,
-    run_run_tests_create,
 )
 from hackagent.storage._http.api.result import (
     result_create,
@@ -52,14 +61,20 @@ from hackagent.storage._http.api.result import (
 from hackagent.storage._http.api.models import (
     AgentRequest,
     AttackRequest,
-    EvalStatus,
+    CampaignStartRequest,
+    ChildRunRequest,
+    ClaimRequest,
+    EvaluationStatusEnum,
+    FinishRequest,
+    FinishStatusEnum,
     PatchedAgentRequest,
     PatchedResultRequest,
-    PatchedRunRequest,
+    PatchedRunUpdateRequest,
+    RunListExecutor,
+    RunListStatus,
     ResultRequest,
-    RunRequest,
-    RunStatus,
-    StepKind,
+    Run,
+    StepTypeEnum,
     TraceRequest,
 )
 from hackagent.storage.records import (
@@ -82,6 +97,105 @@ _STOP = object()
 # pending writes, enqueue() blocks until the worker catches up. Keeps memory
 # bounded without ever dropping a trace.
 _WRITE_QUEUE_MAXSIZE = 1000
+#: Longest server reason a refused claim carries.
+_DETAIL_LIMIT = 200
+
+#: The statuses a run's executor ends it with (POST /run/{id}/finish).
+_FINAL_STATUSES = frozenset(status.value for status in FinishStatusEnum)
+
+
+class RunNotClaimable(RuntimeError):
+    """The run cannot be claimed: another executor holds it, or it is no
+    longer queued. ``note`` is the server's explanation."""
+
+    def __init__(self, claimed_by: Optional[str], status: str, note: str) -> None:
+        super().__init__(note)
+        self.claimed_by = claimed_by
+        self.status = status
+        self.note = note
+
+
+class ClaimFailed(RuntimeError):
+    """The server refused a claim with ``status_code``; ``detail`` is its
+    short reason, if it gave one. Neither carries the response body."""
+
+    def __init__(self, what: str, status_code: int, detail: str = "") -> None:
+        super().__init__(
+            f"RemoteBackend: {what} returned {status_code}"
+            + (f": {detail}" if detail else "")
+        )
+        self.status_code = status_code
+        self.detail = detail
+
+
+class InvalidApiKey(RuntimeError):
+    """The server does not accept the API key (401)."""
+
+
+class ExecutorRejected(RuntimeError):
+    """The server no longer accepts the caller as the run's executor (401 or
+    403): its key or run token was revoked, it is not the executor that
+    claimed the run, or the run is no longer running."""
+
+
+@dataclass(frozen=True)
+class ClaimResult:
+    """A claimed run. ``run_token`` and ``env`` (the secret values its spec
+    reads, by variable name) come with cloud claims only."""
+
+    run: Dict[str, Any]
+    run_token: Optional[str] = field(repr=False)
+    env: Dict[str, str] = field(repr=False)
+
+
+def _is_final(status: Optional[str]) -> bool:
+    """Whether an update to ``status`` ends the run.
+
+    Runs are created RUNNING, so RUNNING changes nothing; the executor ends
+    a run with a final status, and every other status is the server's.
+    """
+    if status is None or status == "RUNNING":
+        return False
+    if status in _FINAL_STATUSES:
+        return True
+    raise ValueError(f"RemoteBackend: an executor cannot set run status {status!r}")
+
+
+def _local_executor() -> str:
+    """How this process describes itself as a run's executor."""
+    try:
+        user = getpass.getuser()
+    except Exception:  # noqa: BLE001 - no login name (e.g. some containers)
+        user = "unknown"
+    return f"local:{socket.gethostname()} ({user})"
+
+
+def _parent_id(run: Any) -> Optional[UUID]:
+    """The campaign run an attack run belongs to."""
+    parent = getattr(run, "parent", None)
+    return parent if isinstance(parent, UUID) else None
+
+
+def _campaign_record(run: Any) -> CampaignRunRecord:
+    """A campaign run record from a parent run, or an error for any other run."""
+    config = run.run_config if isinstance(run.run_config, dict) else {}
+    if config.get("_record_type") != "campaign_run":
+        raise RuntimeError(f"RemoteBackend: Run {run.id} is not a campaign run")
+    return CampaignRunRecord(
+        id=run.id,
+        agent_id=run.agent,
+        name=str(config.get("campaign_name") or "Campaign"),
+        campaign_config=config.get("campaign_config")
+        if isinstance(config.get("campaign_config"), dict)
+        else {},
+        audit=config.get("evaluation_audit")
+        if isinstance(config.get("evaluation_audit"), dict)
+        else None,
+        status=run.status.value if hasattr(run.status, "value") else str(run.status),
+        run_notes=getattr(run, "run_notes", None),
+        created_at=_pick_dt(run, "timestamp", "created_at"),
+        updated_at=_pick_dt(run, "updated_at", "timestamp"),
+    )
 
 
 def _now() -> datetime:
@@ -145,15 +259,14 @@ def _result_goal(result) -> tuple[str, int]:
 
 
 def _to_agent_record(agent) -> AgentRecord:
-    """Convert an API Agent model to an AgentRecord."""
+    """Convert an API Agent model to an AgentRecord; its metadata is the
+    agent's model config."""
     return AgentRecord(
         id=agent.id,
         name=agent.name,
-        agent_type=agent.agent_type.value
-        if hasattr(agent.agent_type, "value")
-        else str(agent.agent_type),
+        agent_type=str(agent.agent_type or ""),
         endpoint=str(agent.endpoint) if agent.endpoint else "",
-        metadata=agent.metadata if isinstance(agent.metadata, dict) else {},
+        metadata=agent.config if isinstance(agent.config, dict) else {},
         organization=agent.organization,
         owner=str(agent.owner) if agent.owner is not None else "unknown",
         created_at=agent.created_at
@@ -207,6 +320,49 @@ class RemoteBackend:
         ``/organization/me`` are Auth0-only on the deployed API).
         """
         return agent_list.sync_detailed(client=self._client).status_code
+
+    def check_key(self) -> None:
+        """Raise :class:`InvalidApiKey` when the server refuses this key."""
+        resp = key_context_retrieve.sync_detailed(client=self._client)
+        if resp.status_code == 401:
+            raise InvalidApiKey("The server does not accept this API key.")
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"RemoteBackend: key check returned {resp.status_code} "
+                f"(body={resp.content!r})"
+            )
+
+    def list_queued_local_runs(self) -> List[Dict[str, Any]]:
+        """Campaign runs queued for a local machine, newest first, as
+        ``{id, agent_name, campaign, timestamp}`` (``timestamp`` is ISO 8601)."""
+        found: List[Any] = []
+        page = 1
+        while True:
+            resp = run_list.sync_detailed(
+                client=self._client,
+                executor=RunListExecutor.LOCAL,
+                status=RunListStatus.PENDING,
+                parent_isnull=True,
+                page=page,
+            )
+            if resp.status_code != 200 or not resp.parsed:
+                raise RuntimeError(
+                    f"RemoteBackend: run list returned {resp.status_code}"
+                )
+            found.extend(resp.parsed.results or [])
+            if not resp.parsed.next:
+                break
+            page += 1
+        found.sort(key=lambda run: run.timestamp, reverse=True)
+        return [
+            {
+                "id": str(run.id),
+                "agent_name": run.agent_name,
+                "campaign": str(run.campaign) if run.campaign else None,
+                "timestamp": run.timestamp.isoformat(),
+            }
+            for run in found
+        ]
 
     def __init__(self, client: AuthenticatedClient) -> None:
         self._client = client
@@ -271,8 +427,7 @@ class RemoteBackend:
         Called before any read that could observe a deferred write, and at run
         completion, so callers always see a consistent server state.
         """
-        if not self._closed:
-            self._write_queue.join()
+        self._drain()
         # Each failure is reported once: a later flush that finds nothing new
         # must not fail again over a write that was already reported.
         failures = self._take_failures()
@@ -280,6 +435,11 @@ class RemoteBackend:
             raise RuntimeError(
                 f"RemoteBackend: {failures} background audit write(s) failed"
             )
+
+    def _drain(self) -> None:
+        """Block until every queued write has been attempted."""
+        if not self._closed:
+            self._write_queue.join()
 
     def _count_failure(self) -> None:
         with self._failures_lock:
@@ -290,24 +450,36 @@ class RemoteBackend:
             failures, self._writer_failures = self._writer_failures, 0
         return failures
 
-    def close(self) -> None:
-        """Drain the queue, stop the worker, and report any write failures."""
-        if self._closed:
-            return
-        self._closed = True
-        self._write_queue.put(_STOP)
-        self._writer.join()
-        failures = self._take_failures()
-        if failures:
-            logger.warning(
-                "RemoteBackend: %d background write(s) failed and were never flushed",
-                failures,
-            )
+    def close(self, *, close_client: bool = False) -> None:
+        """Drain the queue, stop the worker, and report any write failures.
+
+        ``close_client`` then also closes the HTTP client; leave it open
+        while another store shares it (see :attr:`client`).
+        """
+        if not self._closed:
+            self._closed = True
+            atexit.unregister(self.close)
+            self._write_queue.put(_STOP)
+            self._writer.join()
+            failures = self._take_failures()
+            if failures:
+                logger.warning(
+                    "RemoteBackend: %d background write(s) failed and were never "
+                    "flushed",
+                    failures,
+                )
+        if close_client:
+            self._client.get_httpx_client().close()
 
     # ── Context ──────────────────────────────────────────────────────────────
 
     def get_api_key(self) -> Optional[str]:
         return self._client.token
+
+    @property
+    def client(self) -> AuthenticatedClient:
+        """The HTTP client, for another store that writes with the same key."""
+        return self._client
 
     def get_context(self) -> OrganizationContext:
         """Fetch org_id and user_id from the first agent (cached after first call)."""
@@ -345,59 +517,32 @@ class RemoteBackend:
 
     # ── Agent ─────────────────────────────────────────────────────────────────
 
-    def _update_existing_agent(
-        self,
-        existing: Any,
-        agent_type: str,
-        endpoint: str,
-        metadata: Dict[str, Any],
-        overwrite_metadata: bool,
+    def _update_agent_config(
+        self, existing: Any, config: Dict[str, Any]
     ) -> AgentRecord:
-        """Update an existing agent record, or return it unchanged."""
-        if not overwrite_metadata:
-            return _to_agent_record(existing)
-
-        patch_kwargs: Dict[str, Any] = {}
-        current_meta = existing.metadata if isinstance(existing.metadata, dict) else {}
-        merged_meta = {**current_meta, **metadata}
-        patch_kwargs["metadata"] = {
-            k: v for k, v in merged_meta.items() if v is not None
-        }
-        patch_kwargs["agent_type"] = agent_type
-        patch_kwargs["endpoint"] = endpoint
-
-        body = PatchedAgentRequest(**patch_kwargs)
+        """Replace an existing agent's config."""
         resp = agent_partial_update.sync_detailed(
-            id=existing.id, client=self._client, body=body
+            id=existing.id, client=self._client, body=PatchedAgentRequest(config=config)
         )
         if resp.status_code < 300 and resp.parsed:
             return _to_agent_record(resp.parsed)
+        logger.warning(
+            "RemoteBackend: updating the config of agent '%s' returned %s; "
+            "keeping the stored one",
+            existing.name,
+            resp.status_code,
+        )
         return _to_agent_record(existing)
 
-    def create_or_update_agent(
-        self,
-        name: str,
-        agent_type: str,
-        endpoint: str,
-        metadata: Dict[str, Any],
-        overwrite_metadata: bool = True,
-    ) -> AgentRecord:
+    def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:
         existing = self._find_agent_by_name(name)
 
         if existing:
-            return self._update_existing_agent(
-                existing=existing,
-                agent_type=agent_type,
-                endpoint=endpoint,
-                metadata=metadata,
-                overwrite_metadata=overwrite_metadata,
-            )
+            return self._update_agent_config(existing, config)
 
         body = AgentRequest(
             name=name,
-            endpoint=endpoint,
-            agent_type=agent_type,
-            metadata={k: v for k, v in metadata.items() if v is not None},
+            config=config,
             description=f"Agent managed by hackagent SDK: {name}",
         )
         resp = agent_create.sync_detailed(client=self._client, body=body)
@@ -414,13 +559,7 @@ class RemoteBackend:
                 name,
                 resp.status_code,
             )
-            return self._update_existing_agent(
-                existing=recovered_existing,
-                agent_type=agent_type,
-                endpoint=endpoint,
-                metadata=metadata,
-                overwrite_metadata=overwrite_metadata,
-            )
+            return self._update_agent_config(recovered_existing, config)
 
         raise RuntimeError(
             f"RemoteBackend: Failed to create agent '{name}' "
@@ -529,46 +668,27 @@ class RemoteBackend:
 
     # ── Campaign run ──────────────────────────────────────────────────────────
 
-    def create_campaign_run(
+    def start_campaign(
         self,
         agent_id: UUID,
-        name: str,
-        campaign_config: Dict[str, Any],
+        spec: Dict[str, Any],
+        *,
+        claimed_by: Optional[str] = None,
     ) -> CampaignRunRecord:
-        """Persist a campaign through the existing remote run endpoint.
-
-        The hosted API does not yet expose a dedicated campaign-run resource,
-        so a marker distinguishes this parent record from attack runs. Local
-        SQLite uses the normalized table and foreign key directly.
-        """
-
-        config = {
-            "_record_type": "campaign_run",
-            "campaign_name": name,
-            "campaign_config": campaign_config,
-            "evaluation_audit": None,
-        }
-        body = RunRequest(agent=agent_id, attack=None, run_config=config)
-        resp = run_run_tests_create.sync_detailed(client=self._client, body=body)
-        if resp.status_code not in (200, 201):
-            raise RuntimeError(
-                "RemoteBackend: Failed to create campaign run record "
-                f"(status {resp.status_code})"
-            )
-        data = self._parse_json_response(resp)
-        campaign_run_id = UUID(data.get("id") or str(data.get("pk", "")))
-        now = _now()
-        return CampaignRunRecord(
-            id=campaign_run_id,
-            agent_id=agent_id,
-            name=name,
-            campaign_config=campaign_config,
-            audit=None,
-            status="PENDING",
-            run_notes=None,
-            created_at=now,
-            updated_at=now,
+        """Save the campaign and create its run, claimed by this caller (the
+        ``cli`` executor): it is RUNNING, and heartbeats and finishes like
+        any executor's run. ``spec`` is the recorded campaign; ``claimed_by``
+        describes the executor, ``local:<hostname> (<user>)`` by default."""
+        body = CampaignStartRequest(
+            agent=agent_id, spec=spec, claimed_by=claimed_by or _local_executor()
         )
+        resp = campaign_start_create.sync_detailed(client=self._client, body=body)
+        if resp.status_code != 201 or resp.parsed is None:
+            raise RuntimeError(
+                "RemoteBackend: Failed to start campaign "
+                f"(status {resp.status_code}, body={resp.content!r})"
+            )
+        return _campaign_record(resp.parsed)
 
     def update_campaign_run(
         self,
@@ -577,39 +697,35 @@ class RemoteBackend:
         audit: Optional[Dict[str, Any]] = None,
         run_notes: Optional[str] = None,
     ) -> CampaignRunRecord:
-        current = self.get_campaign_run(campaign_run_id)
-        config = {
-            "_record_type": "campaign_run",
-            "campaign_name": current.name,
-            "campaign_config": current.campaign_config,
-            "evaluation_audit": audit if audit is not None else current.audit,
-        }
-        kwargs: Dict[str, Any] = {"run_config": config}
-        if status is not None:
-            try:
-                kwargs["status"] = RunStatus(status)
-            except ValueError:
-                kwargs["status"] = status
-        if run_notes is not None:
-            kwargs["run_notes"] = run_notes
-        response = run_partial_update.sync_detailed(
-            id=campaign_run_id,
-            client=self._client,
-            body=PatchedRunRequest(**kwargs),
-        )
-        if response.status_code >= 300:
-            raise RuntimeError(
-                "RemoteBackend: Failed to update campaign run record "
-                f"(status {response.status_code})"
+        final = _is_final(status)
+        # Lost result writes surface before the run can end as COMPLETED.
+        self.flush()
+        # The server merges run_config key by key, so the stored spec stays.
+        patch: Dict[str, Any] = {}
+        if audit is not None:
+            patch["run_config"] = {"evaluation_audit": audit}
+        if run_notes is not None and not final:
+            patch["run_notes"] = run_notes
+        run = None
+        if patch:
+            response = run_partial_update.sync_detailed(
+                id=campaign_run_id,
+                client=self._client,
+                body=PatchedRunUpdateRequest(**patch),
             )
-        return current.model_copy(
-            update={
-                "audit": audit if audit is not None else current.audit,
-                "status": status or current.status,
-                "run_notes": run_notes if run_notes is not None else current.run_notes,
-                "updated_at": _now(),
-            }
-        )
+            if response.status_code >= 300:
+                raise RuntimeError(
+                    "RemoteBackend: Failed to update campaign run record "
+                    f"(status {response.status_code})"
+                )
+            run = response.parsed
+        if final:
+            # Built from the finish response: finishing a campaign run revokes
+            # its run token, so it may not be read back afterwards.
+            run = self.finish_run(campaign_run_id, status, run_notes or "")
+        if run is None:
+            return self.get_campaign_run(campaign_run_id)
+        return _campaign_record(run)
 
     def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord:
         self.flush()
@@ -618,29 +734,7 @@ class RemoteBackend:
             raise RuntimeError(
                 f"RemoteBackend: Campaign run {campaign_run_id} not found"
             )
-        run = response.parsed
-        config = run.run_config if isinstance(run.run_config, dict) else {}
-        if config.get("_record_type") != "campaign_run":
-            raise RuntimeError(
-                f"RemoteBackend: Run {campaign_run_id} is not a campaign run"
-            )
-        return CampaignRunRecord(
-            id=run.id,
-            agent_id=run.agent,
-            name=str(config.get("campaign_name") or "Campaign"),
-            campaign_config=config.get("campaign_config")
-            if isinstance(config.get("campaign_config"), dict)
-            else {},
-            audit=config.get("evaluation_audit")
-            if isinstance(config.get("evaluation_audit"), dict)
-            else None,
-            status=run.status.value
-            if hasattr(run.status, "value")
-            else str(run.status),
-            run_notes=getattr(run, "run_notes", None),
-            created_at=_pick_dt(run, "timestamp", "created_at"),
-            updated_at=_pick_dt(run, "updated_at", "timestamp"),
-        )
+        return _campaign_record(response.parsed)
 
     def list_campaign_runs(
         self, page: int = 1, page_size: int = 100
@@ -658,27 +752,8 @@ class RemoteBackend:
                 break
             for run in rows:
                 config = run.run_config if isinstance(run.run_config, dict) else {}
-                if config.get("_record_type") != "campaign_run":
-                    continue
-                found.append(
-                    CampaignRunRecord(
-                        id=run.id,
-                        agent_id=run.agent,
-                        name=str(config.get("campaign_name") or "Campaign"),
-                        campaign_config=config.get("campaign_config")
-                        if isinstance(config.get("campaign_config"), dict)
-                        else {},
-                        audit=config.get("evaluation_audit")
-                        if isinstance(config.get("evaluation_audit"), dict)
-                        else None,
-                        status=run.status.value
-                        if hasattr(run.status, "value")
-                        else str(run.status),
-                        run_notes=getattr(run, "run_notes", None),
-                        created_at=_pick_dt(run, "timestamp", "created_at"),
-                        updated_at=_pick_dt(run, "updated_at", "timestamp"),
-                    )
-                )
+                if config.get("_record_type") == "campaign_run":
+                    found.append(_campaign_record(run))
             next_page = getattr(response.parsed, "next", None)
             if not next_page:
                 break
@@ -695,30 +770,29 @@ class RemoteBackend:
         run_config: Dict[str, Any],
         campaign_run_id: Optional[UUID] = None,
     ) -> RunRecord:
-        if campaign_run_id is not None:
-            run_config = {
-                **run_config,
-                "_campaign_run_id": str(campaign_run_id),
-            }
-        body = RunRequest(
-            attack=str(attack_id),
-            agent=str(agent_id),
-            run_config=run_config,
+        if campaign_run_id is None:
+            raise ValueError(
+                "RemoteBackend: an attack run is created under its campaign run; "
+                "campaign_run_id is required"
+            )
+        body = ChildRunRequest(attack=attack_id, agent=agent_id, run_config=run_config)
+        resp = run_children_create.sync_detailed(
+            id=campaign_run_id, client=self._client, body=body
         )
-        resp = run_run_tests_create.sync_detailed(client=self._client, body=body)
-        if resp.status_code in (200, 201):
+        if resp.status_code == 201:
             data = self._parse_json_response(resp)
             run_id = data.get("id") or str(data.get("pk", ""))
+            now = _now()
             return RunRecord(
                 id=UUID(run_id),
                 campaign_run_id=campaign_run_id,
                 attack_id=attack_id,
                 agent_id=agent_id,
                 run_config=run_config,
-                status="PENDING",
+                status="RUNNING",
                 run_notes=None,
-                created_at=_now(),
-                updated_at=_now(),
+                created_at=now,
+                updated_at=now,
             )
         raise RuntimeError(
             f"RemoteBackend: Failed to create run record (status {resp.status_code})"
@@ -731,36 +805,34 @@ class RemoteBackend:
         run_notes: Optional[str] = None,
         run_config: Optional[Dict[str, Any]] = None,
     ) -> RunRecord:
-        kwargs: Dict[str, Any] = {}
-        if status is not None:
-            try:
-                kwargs["status"] = RunStatus(status)
-            except ValueError:
-                kwargs["status"] = status
-        if run_notes is not None:
-            kwargs["run_notes"] = run_notes
+        final = _is_final(status)
+        if final:
+            # Lost result writes surface before the run can end as COMPLETED.
+            self.flush()
+        patch: Dict[str, Any] = {}
         if run_config is not None:
-            kwargs["run_config"] = run_config
-        body = PatchedRunRequest(**kwargs)
-        resp = run_partial_update.sync_detailed(
-            id=run_id, client=self._client, body=body
-        )
-        if resp.status_code < 300:
-            return RunRecord(
-                id=run_id,
-                campaign_run_id=UUID(str(run_config["_campaign_run_id"]))
-                if run_config and run_config.get("_campaign_run_id")
-                else None,
-                attack_id=UUID("00000000-0000-0000-0000-000000000000"),
-                agent_id=UUID("00000000-0000-0000-0000-000000000000"),
-                run_config=run_config or {},
-                status=status or "UNKNOWN",
-                run_notes=run_notes,
-                created_at=_now(),
-                updated_at=_now(),
+            patch["run_config"] = run_config
+        if run_notes is not None and not final:
+            patch["run_notes"] = run_notes
+        if patch:
+            resp = run_partial_update.sync_detailed(
+                id=run_id, client=self._client, body=PatchedRunUpdateRequest(**patch)
             )
-        raise RuntimeError(
-            f"RemoteBackend: update_run {run_id} returned {resp.status_code}"
+            if resp.status_code >= 300:
+                raise RuntimeError(
+                    f"RemoteBackend: update_run {run_id} returned {resp.status_code}"
+                )
+        if final:
+            self.finish_run(run_id, status, run_notes or "")
+        return RunRecord(
+            id=run_id,
+            attack_id=UUID("00000000-0000-0000-0000-000000000000"),
+            agent_id=UUID("00000000-0000-0000-0000-000000000000"),
+            run_config=run_config or {},
+            status=status or "UNKNOWN",
+            run_notes=run_notes,
+            created_at=_now(),
+            updated_at=_now(),
         )
 
     def list_runs(
@@ -833,9 +905,7 @@ class RemoteBackend:
             items.append(
                 RunRecord(
                     id=r.id,
-                    campaign_run_id=UUID(str(rc["_campaign_run_id"]))
-                    if rc.get("_campaign_run_id")
-                    else None,
+                    campaign_run_id=_parent_id(r),
                     attack_id=r.attack
                     if isinstance(r.attack, UUID)
                     else UUID(str(r.attack)),
@@ -866,10 +936,7 @@ class RemoteBackend:
             r = resp.parsed
             return RunRecord(
                 id=r.id,
-                campaign_run_id=UUID(str(r.run_config["_campaign_run_id"]))
-                if isinstance(r.run_config, dict)
-                and r.run_config.get("_campaign_run_id")
-                else None,
+                campaign_run_id=_parent_id(r),
                 attack_id=r.attack
                 if isinstance(r.attack, UUID)
                 else UUID(str(r.attack)),
@@ -881,6 +948,96 @@ class RemoteBackend:
                 updated_at=_pick_dt(r, "updated_at", "timestamp"),
             )
         raise RuntimeError(f"RemoteBackend: Run {run_id} not found")
+
+    # ── Executor protocol ─────────────────────────────────────────────────────
+
+    def get_run_detail(self, run_id: UUID) -> Dict[str, Any]:
+        """The run as the server returns it (``run_config``, ``status``,
+        ``executor``, ``claimed_by``…), without its results."""
+        resp = run_retrieve.sync_detailed(
+            id=run_id, client=self._client, include_results=False
+        )
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"RemoteBackend: Run {run_id} not found (status {resp.status_code})"
+            )
+        return self._parse_json_response(resp)
+
+    def claim_run(self, run_id: UUID, claimed_by: str) -> ClaimResult:
+        """Claim a queued run for this executor, described by ``claimed_by``.
+        Raises :class:`RunNotClaimable` when it cannot be claimed."""
+        resp = run_claim_create.sync_detailed(
+            id=run_id, client=self._client, body=ClaimRequest(claimed_by=claimed_by)
+        )
+        if resp.status_code == 409:
+            conflict = self._parse_json_response(resp)
+            raise RunNotClaimable(
+                claimed_by=conflict.get("claimed_by") or None,
+                status=str(conflict.get("status") or ""),
+                note=str(conflict.get("detail") or "The run cannot be claimed."),
+            )
+        return self._claim_result(resp, f"claim of run {run_id}")
+
+    def claim_next_run(self, claimed_by: str) -> Optional[ClaimResult]:
+        """Claim the oldest claimable cloud run (worker token only), or
+        return None when there is none."""
+        resp = run_claim_next_create.sync_detailed(
+            client=self._client, body=ClaimRequest(claimed_by=claimed_by)
+        )
+        if resp.status_code == 204:
+            return None
+        return self._claim_result(resp, "claim of the next run")
+
+    def _claim_result(self, resp: Any, what: str) -> ClaimResult:
+        if resp.status_code != 200:
+            detail = self._parse_json_response(resp).get("detail")
+            raise ClaimFailed(
+                what,
+                resp.status_code,
+                detail[:_DETAIL_LIMIT] if isinstance(detail, str) else "",
+            )
+        run = self._parse_json_response(resp)
+        run_token = run.pop("run_token", None)
+        env = run.pop("env", None) or {}
+        return ClaimResult(run=run, run_token=run_token, env=dict(env))
+
+    def heartbeat_run(self, run_id: UUID) -> bool:
+        """Report that the run's executor is alive; return whether a cancel
+        was requested. Raises :class:`ExecutorRejected` on 401 or 403."""
+        resp = run_heartbeat_create.sync_detailed(id=run_id, client=self._client)
+        if resp.status_code in (401, 403):
+            raise ExecutorRejected(
+                f"RemoteBackend: the server refused the heartbeat of run {run_id} "
+                f"({resp.status_code})"
+            )
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"RemoteBackend: heartbeat of run {run_id} returned {resp.status_code}"
+            )
+        return bool(self._parse_json_response(resp).get("cancel_requested"))
+
+    def finish_run(self, run_id: UUID, status: str, note: str = "") -> Run:
+        """End the run as COMPLETED, FAILED or CANCELLED, with ``note`` as its
+        run notes, and return the finished run. Queued writes go first:
+        finishing a campaign run revokes its run token. Raises
+        :class:`ExecutorRejected` on 401 or 403."""
+        if status not in _FINAL_STATUSES:
+            raise ValueError(f"RemoteBackend: {status!r} is not a final run status")
+        self._drain()
+        body = FinishRequest(status=FinishStatusEnum(status), note=note)
+        resp = run_finish_create.sync_detailed(
+            id=run_id, client=self._client, body=body
+        )
+        if resp.status_code in (401, 403):
+            raise ExecutorRejected(
+                f"RemoteBackend: the server refused to finish run {run_id} "
+                f"({resp.status_code})"
+            )
+        if resp.status_code != 200 or resp.parsed is None:
+            raise RuntimeError(
+                f"RemoteBackend: finish_run {run_id} returned {resp.status_code}"
+            )
+        return resp.parsed
 
     # ── Result ────────────────────────────────────────────────────────────────
 
@@ -897,7 +1054,7 @@ class RemoteBackend:
             goal=goal,
             goal_index=goal_index,
             request_payload=request_payload,
-            evaluation_status=EvalStatus.NOT_EVALUATED,
+            evaluation_status=EvaluationStatusEnum.NOT_EVALUATED,
             agent_specific_data=agent_specific_data,
         )
         resp = result_create.sync_detailed(client=self._client, body=body)
@@ -908,7 +1065,7 @@ class RemoteBackend:
                 run_id=run_id,
                 goal=goal,
                 goal_index=goal_index,
-                evaluation_status=EvalStatus.NOT_EVALUATED.value,
+                evaluation_status=EvaluationStatusEnum.NOT_EVALUATED.value,
                 evaluation_notes=None,
                 evaluation_metrics={},
                 metadata=agent_specific_data,
@@ -969,7 +1126,7 @@ class RemoteBackend:
         kwargs: Dict[str, Any] = {}
         if evaluation_status is not None:
             try:
-                kwargs["evaluation_status"] = EvalStatus(evaluation_status)
+                kwargs["evaluation_status"] = EvaluationStatusEnum(evaluation_status)
             except ValueError:
                 kwargs["evaluation_status"] = evaluation_status
         if evaluation_notes is not None:
@@ -1165,9 +1322,9 @@ class RemoteBackend:
     ) -> None:
         """Background worker body for create_trace: issue the POST."""
         try:
-            step_type_enum = StepKind(step_type)
+            step_type_enum = StepTypeEnum(step_type)
         except ValueError:
-            step_type_enum = StepKind.OTHER
+            step_type_enum = StepTypeEnum.OTHER
         body = TraceRequest(
             sequence=sequence, step_type=step_type_enum, content=content
         )

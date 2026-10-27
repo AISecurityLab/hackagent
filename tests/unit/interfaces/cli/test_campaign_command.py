@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import json
+import os
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from hackagent.interfaces.cli.main import cli
@@ -172,3 +174,68 @@ def test_run_rejects_an_incompatible_override():
     # The target is OPENAI_SDK, not Ollama.
     assert result.exit_code != 0
     assert "ollama" in result.output.lower()
+
+
+@pytest.mark.parametrize("ambient", [None, "key-of-another-deployment"])
+def test_campaign_run_binds_gateway(monkeypatch, ambient):
+    if ambient is None:
+        monkeypatch.delenv("HACKAGENT_GATEWAY_KEY", raising=False)
+    else:
+        monkeypatch.setenv("HACKAGENT_GATEWAY_KEY", ambient)
+    monkeypatch.setenv("HACKAGENT_API_KEY", "dashboard-key")
+    gateway = {"name": "gw", "connection": {"provider": "hackagent", "type": "OPENAI"}}
+    spec = CampaignSpec.model_validate(
+        MIN | {"attacks": [{"name": "pair", "roles": {"attacker": gateway}}]}
+    )
+    captured = {}
+
+    def fake_run(spec, **kwargs):
+        captured["spec"] = spec
+        captured["key"] = os.environ.get("HACKAGENT_GATEWAY_KEY")
+        return CampaignResult(campaign_name="demo", run_id="r1", dry_run=True)
+
+    with (
+        patch("hackagent.orchestrator.campaign.load_campaign", return_value=spec),
+        patch("hackagent.orchestrator.campaign.run_campaign", side_effect=fake_run),
+    ):
+        result = CliRunner().invoke(
+            cli,
+            [
+                "--config-file",
+                "/nonexistent-hackagent-test-config",
+                "--base-url",
+                "https://api.example.test",
+                "campaign",
+                "run",
+                "campaign.yaml",
+                "--dry-run",
+                "--json",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    connection = captured["spec"].attacks[0].roles["attacker"].connection
+    assert connection.endpoint == "https://api.example.test/v1"
+    assert connection.api_key == "${HACKAGENT_GATEWAY_KEY}"
+    assert captured["key"] == "dashboard-key"
+    os.environ.pop("HACKAGENT_GATEWAY_KEY", None)
+
+
+def test_campaign_run_gateway_without_api_key_fails(monkeypatch):
+    monkeypatch.delenv("HACKAGENT_GATEWAY_KEY", raising=False)
+    gateway = {"name": "gw", "connection": {"provider": "hackagent", "type": "OPENAI"}}
+    spec = CampaignSpec.model_validate(MIN | {"target": gateway})
+    settings = SimpleNamespace(api_key=None, base_url="https://api.example.test")
+    with (
+        patch("hackagent.orchestrator.campaign.load_campaign", return_value=spec),
+        patch(
+            "hackagent.interfaces.cli.commands.campaign._runtime_settings",
+            return_value=settings,
+        ),
+        patch("hackagent.orchestrator.campaign.run_campaign") as run_campaign,
+    ):
+        result = CliRunner().invoke(campaign, ["run", "campaign.yaml", "--dry-run"])
+
+    assert result.exit_code != 0
+    assert "hackagent config set --api-key" in result.output
+    run_campaign.assert_not_called()

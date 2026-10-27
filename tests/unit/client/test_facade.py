@@ -79,7 +79,14 @@ class TestReadApi(unittest.TestCase):
         self.store = RecordingStore()
         self.session = HackAgent(_settings(), backend=self.store)
         self.agent = self.store.create_or_update_agent(
-            "bot", "OPENAI_SDK", "http://localhost:8000", {"description": "d"}
+            "bot",
+            {
+                "connection": {
+                    "type": "OPENAI_SDK",
+                    "endpoint": "http://localhost:8000",
+                },
+                "generation": {"description": "d"},
+            },
         )
         self.attack = self.store.create_attack(
             "pair", self.agent.id, self.store.context.org_id, {"goals": ["g"]}

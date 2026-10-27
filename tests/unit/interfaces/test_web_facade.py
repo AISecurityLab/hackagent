@@ -32,7 +32,14 @@ class TestWebReadsThroughFacade(unittest.TestCase):
 
         self.store = RecordingStore()
         self.agent = self.store.create_or_update_agent(
-            "demo-agent", "OPENAI_SDK", "http://localhost:1234", {"description": "d"}
+            "demo-agent",
+            {
+                "connection": {
+                    "type": "OPENAI_SDK",
+                    "endpoint": "http://localhost:1234",
+                },
+                "generation": {"description": "d"},
+            },
         )
         attack = self.store.create_attack(
             "pair", self.agent.id, self.store.context.org_id, {"goals": ["g"]}
@@ -70,7 +77,7 @@ class TestWebReadsThroughFacade(unittest.TestCase):
         self.assertNotIn("delete_run", names)
 
     def test_delete_run_is_the_only_local_write(self):
-        refused = self.client.post("/api/proxy/run/run_tests", json={})
+        refused = self.client.post("/api/proxy/run", json={})
         self.assertEqual(refused.status_code, 501)
         self.assertNotIn("delete_run", self.store.call_names())
 

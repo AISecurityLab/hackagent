@@ -4,6 +4,8 @@
 """Declarative campaigns of static and iterative attacks.
 
 - :mod:`.spec`: the campaign file schema
+- :mod:`.gateway`: the symbolic HackAgent gateway model and its binding
+- :mod:`.cloud`: what a campaign may contain to run on HackAgent cloud
 - :mod:`.loader`: YAML → :class:`CampaignSpec`
 - :mod:`.resolve`: spec → goals, models, judge panel, constructed attacks
 - :mod:`.runner`: the async goal pipeline and :func:`run_campaign`
@@ -18,6 +20,13 @@ from hackagent.orchestrator.campaign.audit import (
     format_report,
     read_report,
     run_audit,
+)
+from hackagent.orchestrator.campaign.gateway import (
+    GATEWAY_KEY_ENV,
+    GATEWAY_PROVIDER,
+    bind_gateway,
+    is_gateway,
+    key_envs,
 )
 from hackagent.orchestrator.campaign.loader import load_campaign
 from hackagent.orchestrator.campaign.overrides import (
@@ -48,6 +57,8 @@ from hackagent.orchestrator.campaign.runner import (
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 __all__ = [
+    "GATEWAY_KEY_ENV",
+    "GATEWAY_PROVIDER",
     "AuditFailed",
     "Attempt",
     "AttackOutcome",
@@ -59,9 +70,12 @@ __all__ = [
     "ServerReadiness",
     "apply_endpoint_overrides",
     "arun_campaign",
+    "bind_gateway",
     "campaign_models",
     "format_report",
     "installed_models",
+    "is_gateway",
+    "key_envs",
     "PreflightError",
     "load_campaign",
     "preflight",

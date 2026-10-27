@@ -34,6 +34,17 @@ class TestRunCoroutineBlocking(unittest.TestCase):
             run_coroutine_blocking(boom)
         self.assertIn("bridge failed", str(ctx.exception))
 
+    def test_keeps_the_error_that_was_being_handled(self):
+        async def boom() -> None:
+            try:
+                raise KeyError("original")
+            except KeyError:
+                raise RuntimeError("while handling it")
+
+        with self.assertRaises(RuntimeError) as ctx:
+            run_coroutine_blocking(boom)
+        self.assertIsInstance(ctx.exception.__context__, KeyError)
+
 
 if __name__ == "__main__":
     unittest.main()

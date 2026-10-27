@@ -13,6 +13,7 @@ from ...types import Response
 def _get_kwargs(
     id: UUID,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "delete",
         "url": "/run/{id}".format(
@@ -51,13 +52,12 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[Any]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
+    """ViewSet for listing, retrieving, annotating and deleting runs.
+    Runs are created only by a campaign launch (POST /campaign/{id}/launch)
+    and by the executor protocol, never through this endpoint.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
@@ -87,13 +87,12 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[Any]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
+    """ViewSet for listing, retrieving, annotating and deleting runs.
+    Runs are created only by a campaign launch (POST /campaign/{id}/launch)
+    and by the executor protocol, never through this endpoint.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:

@@ -96,7 +96,7 @@ def test_recorded_campaign_redacts_credentials_wherever_they_are_written():
     }
     assert target["generation"] == {
         "max_tokens": 64,
-        "extra_body": {"api_key": "[REDACTED]"},
+        "extra_body": {},
     }
     assert target["options"] == {
         "password": "[REDACTED]",

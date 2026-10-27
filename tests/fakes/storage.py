@@ -71,29 +71,16 @@ class RecordingStore:
         self._note("close")
         self.closed = True
 
-    def create_or_update_agent(
-        self,
-        name: str,
-        agent_type: str,
-        endpoint: str,
-        metadata: Dict[str, Any],
-        overwrite_metadata: bool = True,
-    ) -> AgentRecord:
-        self._note(
-            "create_or_update_agent",
-            name,
-            agent_type,
-            endpoint,
-            metadata,
-            overwrite_metadata=overwrite_metadata,
-        )
+    def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:
+        self._note("create_or_update_agent", name, config)
+        connection = config.get("connection") or {}
         now = _now()
         record = AgentRecord(
             id=uuid4(),
             name=name,
-            agent_type=agent_type,
-            endpoint=endpoint,
-            metadata=dict(metadata),
+            agent_type=str(connection.get("type") or ""),
+            endpoint=str(connection.get("endpoint") or ""),
+            metadata=dict(config),
             organization=self.context.org_id,
             owner=self.context.user_id,
             created_at=now,
@@ -142,21 +129,16 @@ class RecordingStore:
     ) -> PaginatedResult[AttackRecord]:
         return self._page("list_attacks", list(self.attacks.values()), page, page_size)
 
-    def create_campaign_run(
-        self,
-        agent_id: UUID,
-        name: str,
-        campaign_config: Dict[str, Any],
-    ) -> CampaignRunRecord:
-        self._note("create_campaign_run", agent_id, name, campaign_config)
+    def start_campaign(self, agent_id: UUID, spec: Dict[str, Any]) -> CampaignRunRecord:
+        self._note("start_campaign", agent_id, spec)
         now = _now()
         record = CampaignRunRecord(
             id=uuid4(),
             agent_id=agent_id,
-            name=name,
-            campaign_config=dict(campaign_config),
+            name=str((spec.get("campaign") or {}).get("name") or "Campaign"),
+            campaign_config=dict(spec),
             audit=None,
-            status="PENDING",
+            status="RUNNING",
             run_notes=None,
             created_at=now,
             updated_at=now,

@@ -1,23 +1,23 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...types import Response
-from ..models import Run, RunRequest
+from ..models import Secret, SecretStoreError, SecretWriteRequest
 
 
 def _get_kwargs(
     *,
-    body: RunRequest,
+    body: SecretWriteRequest,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/run",
+        "url": "/secret",
     }
 
     _kwargs["json"] = body.model_dump(mode="json", exclude_unset=True)
@@ -30,11 +30,20 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Run | None:
+) -> Any | Secret | SecretStoreError | None:
     if response.status_code == 201:
-        response_201 = Run.model_validate(response.json())
+        response_201 = Secret.model_validate(response.json())
 
         return response_201
+
+    if response.status_code == 400:
+        response_400 = cast(Any, None)
+        return response_400
+
+    if response.status_code == 503:
+        response_503 = SecretStoreError.model_validate(response.json())
+
+        return response_503
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -44,7 +53,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Run]:
+) -> Response[Any | Secret | SecretStoreError]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,26 +65,19 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
-) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    body: SecretWriteRequest,
+) -> Response[Any | Secret | SecretStoreError]:
+    """Write-only secret store: values can be set and replaced, never read.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (SecretWriteRequest):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Run]
+        Response[Any | Secret | SecretStoreError]
     """
 
     kwargs = _get_kwargs(
@@ -92,26 +94,19 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
-) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    body: SecretWriteRequest,
+) -> Any | Secret | SecretStoreError | None:
+    """Write-only secret store: values can be set and replaced, never read.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (SecretWriteRequest):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Run
+        Any | Secret | SecretStoreError
     """
 
     return sync_detailed(
@@ -123,26 +118,19 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
-) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    body: SecretWriteRequest,
+) -> Response[Any | Secret | SecretStoreError]:
+    """Write-only secret store: values can be set and replaced, never read.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (SecretWriteRequest):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Run]
+        Response[Any | Secret | SecretStoreError]
     """
 
     kwargs = _get_kwargs(
@@ -157,26 +145,19 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
-) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    body: SecretWriteRequest,
+) -> Any | Secret | SecretStoreError | None:
+    """Write-only secret store: values can be set and replaced, never read.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (SecretWriteRequest):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Run
+        Any | Secret | SecretStoreError
     """
 
     return (

@@ -456,9 +456,10 @@ class CampaignSpec(_Spec):
     def recorded(self) -> dict[str, Any]:
         """The campaign as it is written to disk and stored with the run.
 
-        Environment-backed credentials remain references. Credentials written
-        into the file itself — in headers, ``options``, ``extra_body`` or a
-        URL — are replaced before the document crosses the storage boundary;
+        Environment-backed credentials remain references. An ``api_key`` given
+        as a value is left out, and other credentials written into the file
+        itself — in headers, ``options``, ``extra_body`` or a URL — are
+        replaced before the document crosses the storage boundary;
         such campaigns must restore those values from a
         trusted source before they can be repeated.
         """
@@ -482,32 +483,40 @@ def _is_credential_name(name: str) -> bool:
     return not normalized.endswith("_env") and bool(_CREDENTIAL_NAME.search(normalized))
 
 
+def recorded_model(model: ModelConfig) -> dict[str, Any]:
+    """One model's config as it is stored, credentials redacted as
+    :meth:`CampaignSpec.recorded` redacts them."""
+    return _redacted(model.model_dump(mode="json", exclude_none=True))
+
+
 def _redacted(value: Any) -> Any:
     """A dumped campaign with every credential it spells out replaced.
 
     Values are judged by the name they are stored under, in headers and in
     free-form mappings such as ``options`` and ``extra_body`` alike, and
-    URLs lose any user info and credential-named query parameters.
+    URLs lose any user info and credential-named query parameters. An
+    ``api_key`` is kept only as a ``${VARIABLE}`` reference, and left out
+    otherwise, so a stored campaign holds no ``api_key`` that is not one.
     """
     if isinstance(value, dict):
         return {
-            key: (
-                child
-                if key == "api_key"
-                and isinstance(child, str)
-                and child.startswith("${")
-                and child.endswith("}")
-                else _REDACTED
-            )
-            if _is_credential_name(key)
-            else _redacted(child)
+            key: _REDACTED if _is_credential_name(key) else _redacted(child)
             for key, child in value.items()
+            if key != "api_key"
+        } | {
+            "api_key": child
+            for key, child in value.items()
+            if key == "api_key" and _is_reference(child)
         }
     if isinstance(value, list):
         return [_redacted(child) for child in value]
     if isinstance(value, str):
         return _redacted_url(value)
     return value
+
+
+def _is_reference(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith("${") and value.endswith("}")
 
 
 def _redacted_url(text: str) -> str:
@@ -559,4 +568,5 @@ __all__ = [
     "ScoringSpec",
     "StorageSpec",
     "campaign_json_schema",
+    "recorded_model",
 ]

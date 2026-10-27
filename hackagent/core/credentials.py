@@ -10,10 +10,15 @@ import re
 from typing import Annotated, Any, Mapping, Optional
 from urllib.parse import urlsplit
 
-from pydantic import WrapValidator, PlainSerializer
+from pydantic import ValidationInfo, WrapValidator, PlainSerializer
 
 API_KEY_ENV = "HACKAGENT_API_KEY"
 _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}\Z")
+
+#: Validation context that keeps ``${VARIABLE}`` references unresolved, for
+#: checking a configuration where its variables are not set. Each reference
+#: is resolved when the client that uses it is built.
+REFERENCES_ONLY = {"credentials": "references"}
 
 
 class CredentialError(ValueError):
@@ -30,6 +35,14 @@ class _ResolvedKey(str):
 
     def __repr__(self) -> str:
         return "'[REDACTED]'"
+
+
+class _Reference(str):
+    """An unresolved ``${VARIABLE}`` reference; :func:`resolve_api_key` reads it."""
+
+    @property
+    def reference(self) -> str:
+        return str(self)
 
 
 def resolve_api_key(
@@ -76,9 +89,29 @@ def credential_reference(api_key: Optional[str]) -> Optional[str]:
     return getattr(api_key, "reference", None)
 
 
+def reference_name(api_key: Optional[str]) -> Optional[str]:
+    """The variable ``api_key`` was given as, or None for a value."""
+    match = _REFERENCE.fullmatch(credential_reference(api_key) or "")
+    return match[1] if match else None
+
+
+def env_reference(name: str) -> str:
+    """An unresolved reference to the variable ``name``."""
+    return _Reference("${" + name + "}")
+
+
+def _validate_api_key(value: Any, _handler: Any, info: ValidationInfo) -> str:
+    if (info.context or {}).get("credentials") != REFERENCES_ONLY["credentials"]:
+        return resolve_api_key(value)
+    reference = credential_reference(value) or value
+    if not isinstance(reference, str) or not _REFERENCE.fullmatch(reference):
+        raise CredentialError("api_key must be a ${VARIABLE} reference.")
+    return _Reference(reference)
+
+
 ApiKey = Annotated[
     str,
-    WrapValidator(lambda value, _: resolve_api_key(value)),
+    WrapValidator(_validate_api_key),
     PlainSerializer(credential_reference, return_type=Optional[str]),
 ]
 
@@ -161,8 +194,11 @@ __all__ = [
     "API_KEY_ENV",
     "ApiKey",
     "CredentialError",
+    "REFERENCES_ONLY",
     "resolve_api_key",
     "credential_reference",
+    "env_reference",
+    "reference_name",
     "prepare_credentials",
     "is_gateway_endpoint",
     "validate_file_credentials",

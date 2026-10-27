@@ -7,18 +7,28 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...types import Response
+from ...types import UNSET, Response, Unset
 from ..models import Run
 
 
 def _get_kwargs(
     id: UUID,
+    *,
+    include_results: bool | Unset = UNSET,
 ) -> dict[str, Any]:
+
+    params: dict[str, Any] = {}
+
+    params["include_results"] = include_results
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/run/{id}".format(
             id=quote(str(id), safe=""),
         ),
+        "params": params,
     }
 
     return _kwargs
@@ -53,18 +63,19 @@ def sync_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
+    include_results: bool | Unset = UNSET,
 ) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
+    """ViewSet for listing, retrieving, annotating and deleting runs.
+    Runs are created only by a campaign launch (POST /campaign/{id}/launch)
+    and by the executor protocol, never through this endpoint.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         id (UUID):
+        include_results (bool | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -76,6 +87,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         id=id,
+        include_results=include_results,
     )
 
     response = client.get_httpx_client().request(
@@ -89,18 +101,19 @@ def sync(
     id: UUID,
     *,
     client: AuthenticatedClient,
+    include_results: bool | Unset = UNSET,
 ) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
+    """ViewSet for listing, retrieving, annotating and deleting runs.
+    Runs are created only by a campaign launch (POST /campaign/{id}/launch)
+    and by the executor protocol, never through this endpoint.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         id (UUID):
+        include_results (bool | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -113,6 +126,7 @@ def sync(
     return sync_detailed(
         id=id,
         client=client,
+        include_results=include_results,
     ).parsed
 
 
@@ -120,18 +134,19 @@ async def asyncio_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
+    include_results: bool | Unset = UNSET,
 ) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
+    """ViewSet for listing, retrieving, annotating and deleting runs.
+    Runs are created only by a campaign launch (POST /campaign/{id}/launch)
+    and by the executor protocol, never through this endpoint.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         id (UUID):
+        include_results (bool | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,6 +158,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         id=id,
+        include_results=include_results,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -154,18 +170,19 @@ async def asyncio(
     id: UUID,
     *,
     client: AuthenticatedClient,
+    include_results: bool | Unset = UNSET,
 ) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
+    """ViewSet for listing, retrieving, annotating and deleting runs.
+    Runs are created only by a campaign launch (POST /campaign/{id}/launch)
+    and by the executor protocol, never through this endpoint.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         id (UUID):
+        include_results (bool | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -179,5 +196,6 @@ async def asyncio(
         await asyncio_detailed(
             id=id,
             client=client,
+            include_results=include_results,
         )
     ).parsed

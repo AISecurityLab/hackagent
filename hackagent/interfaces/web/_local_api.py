@@ -6,8 +6,11 @@
 With the local backend selected, this blueprint answers dashboard requests
 from the SQLite store through the facade. Local is the default backend.
 
-``DELETE /run/<id>`` deletes a local run. Other write routes return 501.
-Start campaigns through the CLI or Python campaign runner.
+``DELETE /run/<id>`` deletes a local run. Launching a campaign needs a
+generator, a judge and credits, none of which exist offline, so the other write
+routes return 501; start campaigns through the CLI or the Python campaign
+runner. The technique catalogue and campaign schema need no account and are
+served so the builder works offline.
 """
 
 from __future__ import annotations
@@ -60,20 +63,30 @@ def _not_found(what: str):
     return jsonify({"detail": f"{what} not found."}), 404
 
 
-def _read_only():
+def _read_only(**_route_args):
     return (
         jsonify(
             {
                 "detail": (
                     "This HackAgent dashboard is running offline against the local "
-                    "database and is read-only. Launch attacks with the CLI "
-                    "(`hackagent attack`), or configure an API key to use the "
+                    "database and is read-only. Launch campaigns with the CLI "
+                    "(`hackagent campaign run <file>`), or configure an API key to use the "
                     "hosted API."
                 )
             }
         ),
         501,
     )
+
+
+_LAUNCH_OFFLINE = (
+    "Launching needs a HackAgent account. Use `hackagent campaign run <file>` "
+    "offline, or connect the dashboard with an API key."
+)
+
+
+def _launch_offline(**_route_args):
+    return jsonify({"detail": _LAUNCH_OFFLINE}), 501
 
 
 def create_local_api(client) -> Blueprint:
@@ -292,14 +305,39 @@ def create_local_api(client) -> Blueprint:
             return _not_found("Result")
         return jsonify(ser.result(record, traces=client.traces(parsed)))
 
+    # ── Campaigns ────────────────────────────────────────────────────────────
+    # Campaigns are an account feature: offline there are none to list, but the
+    # catalogue and schema are static and let the builder export YAML.
+    @bp.get("/campaign")
+    def campaign_list():
+        page, page_size = _page_args()
+        return jsonify(ser.paginate([], 0, page, page_size))
+
+    @bp.get("/campaign/techniques")
+    def campaign_techniques():
+        from hackagent.client import technique_catalog
+
+        return jsonify(technique_catalog())
+
+    @bp.get("/campaign/schema")
+    def campaign_schema():
+        from hackagent.datasets.presets import list_presets
+        from hackagent.orchestrator.campaign.spec import campaign_json_schema
+
+        presets = [
+            {"name": name, "description": description}
+            for name, description in sorted(list_presets().items())
+        ]
+        return jsonify({"schema": campaign_json_schema(), "dataset_presets": presets})
+
     # ── Write routes ─────────────────────────────────────────────────────────
     for rule, methods in (
         ("/agent", ("POST",)),
         ("/agent/<agent_id>", ("PUT", "PATCH", "DELETE")),
+        ("/campaign", ("POST",)),
         ("/attack", ("POST",)),
         ("/attack/<attack_id>", ("PUT", "PATCH", "DELETE")),
         ("/run", ("POST",)),
-        ("/run/run_tests", ("POST",)),
         ("/result", ("POST",)),
         ("/key", ("POST",)),
         ("/credits/request", ("POST",)),
@@ -311,6 +349,14 @@ def create_local_api(client) -> Blueprint:
             endpoint=f"read_only_{rule}_{'_'.join(methods)}",
             view_func=_read_only,
             methods=list(methods),
+        )
+
+    for rule in ("/campaign/launch", "/campaign/<campaign_id>/launch"):
+        bp.add_url_rule(
+            rule,
+            endpoint=f"launch_offline_{rule}",
+            view_func=_launch_offline,
+            methods=["POST"],
         )
 
     return bp

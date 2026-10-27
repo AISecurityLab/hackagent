@@ -20,6 +20,7 @@ from hackagent.interfaces.cli.commands import (
     datasets as datasets_cmd,
     examples,
     results,
+    run as run_cmd,
     web as web_cmd,
 )
 from hackagent.interfaces.cli.commands import config
@@ -253,7 +254,7 @@ def init(ctx):
             )
         if cli_config.should_show_info():
             console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
-            console.print("  [green]hackagent eval advprefix --help[/green]")
+            console.print("  [green]hackagent campaign run --help[/green]")
             console.print("  [green]hackagent agent list[/green]")
 
     except Exception as e:
@@ -417,6 +418,7 @@ cli.add_command(campaign_cmd.campaign)
 cli.add_command(datasets_cmd.datasets)
 cli.add_command(examples.examples)
 cli.add_command(results.results)
+cli.add_command(run_cmd.run)
 cli.add_command(web_cmd.web)
 
 

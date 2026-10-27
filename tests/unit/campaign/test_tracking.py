@@ -9,8 +9,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hackagent.core.settings import Settings, Source
+from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.spec import StorageSpec
-from hackagent.orchestrator.campaign.tracking import open_store
+from hackagent.orchestrator.campaign.tracking import open_store, register_target
+from tests.fakes import RecordingStore
 
 
 def _settings(*, api_key: str | None = None) -> Settings:
@@ -77,6 +79,55 @@ def test_explicit_remote_storage_uses_its_own_environment_reference(monkeypatch)
     connect.assert_called_once_with(
         "https://other.example.test", "other-secret", verify=True
     )
+
+
+def test_register_target_stores_the_target_model_config(monkeypatch):
+    monkeypatch.setenv("BOT_KEY", "bot-secret")
+    target = ModelConfig.model_validate(
+        {
+            "name": "support-bot",
+            "connection": {
+                "provider": "openai",
+                "type": "OPENAI",
+                "endpoint": "https://bot.example.test/v1",
+                "api_key": "${BOT_KEY}",
+            },
+            "generation": {"temperature": 0.3, "max_tokens": 128},
+        }
+    )
+    store = RecordingStore()
+
+    agent_id = register_target(store, target)
+
+    assert store.calls[0] == (
+        "create_or_update_agent",
+        ("support-bot", target.model_dump(mode="json", exclude_none=True)),
+        {},
+    )
+    assert store.agents[agent_id].agent_type == "OPENAI"
+    assert store.agents[agent_id].endpoint == "https://bot.example.test/v1"
+
+
+def test_register_target_never_stores_a_credential_written_into_the_file():
+    """The agent's config is stored and shown; a header value is not."""
+    target = ModelConfig.model_validate(
+        {
+            "name": "support-bot",
+            "connection": {
+                "provider": "openai",
+                "type": "OPENAI",
+                "endpoint": "https://bot.example.test/v1",
+                "headers": {"Authorization": "Bearer literal-value"},
+            },
+        }
+    )
+    store = RecordingStore()
+
+    register_target(store, target)
+
+    _name, (_, config), _kwargs = store.calls[0]
+    assert config["connection"]["headers"] == {"Authorization": "[REDACTED]"}
+    assert "literal-value" not in repr(config)
 
 
 def test_each_result_carries_what_the_dashboard_reads():

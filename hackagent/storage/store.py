@@ -55,15 +55,10 @@ class Store(Protocol):
         ...
 
     # ── Agent ─────────────────────────────────────────────────────────────────
-    def create_or_update_agent(
-        self,
-        name: str,
-        agent_type: str,
-        endpoint: str,
-        metadata: Dict[str, Any],
-        overwrite_metadata: bool = True,
-    ) -> AgentRecord:
-        """Create a new agent or update an existing one with the same name."""
+    def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:
+        """Create the agent ``name``, or replace the config of the one that
+        exists. ``config`` is a dumped ``ModelConfig``; the record's
+        ``agent_type`` and ``endpoint`` come from its connection."""
         ...
 
     def list_agents(
@@ -88,12 +83,10 @@ class Store(Protocol):
     ) -> PaginatedResult[AttackRecord]: ...
 
     # ── Campaign run ─────────────────────────────────────────────────────────
-    def create_campaign_run(
-        self,
-        agent_id: UUID,
-        name: str,
-        campaign_config: Dict[str, Any],
-    ) -> CampaignRunRecord: ...
+    def start_campaign(self, agent_id: UUID, spec: Dict[str, Any]) -> CampaignRunRecord:
+        """Record a run of the campaign ``spec`` (its recorded form) against
+        the agent, already RUNNING. The run is named after the campaign."""
+        ...
 
     def update_campaign_run(
         self,
@@ -103,7 +96,8 @@ class Store(Protocol):
         run_notes: Optional[str] = None,
     ) -> CampaignRunRecord:
         """Change what was given. ``None`` leaves a field as it is; pass ``""``
-        to clear a note an earlier update wrote."""
+        to clear a note an earlier update wrote. A final status (COMPLETED,
+        FAILED, CANCELLED) ends the run with ``run_notes`` as its note."""
         ...
 
     def list_campaign_runs(
@@ -119,7 +113,10 @@ class Store(Protocol):
         agent_id: UUID,
         run_config: Dict[str, Any],
         campaign_run_id: Optional[UUID] = None,
-    ) -> RunRecord: ...
+    ) -> RunRecord:
+        """Record one attack run. The remote store creates it as a child of
+        ``campaign_run_id``, which it therefore requires."""
+        ...
 
     def update_run(
         self,

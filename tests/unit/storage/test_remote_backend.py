@@ -3,12 +3,31 @@
 
 """Unit tests for RemoteBackend (server/storage/remote.py)."""
 
+import threading
+import time
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
+from hackagent.storage import remote
+from hackagent.storage._http.api.models import PaginatedAgentList
+from hackagent.storage._http.api.agent import agent_create, agent_partial_update
+from hackagent.storage._http.api.campaign import campaign_start_create
 from hackagent.storage._http.api.result import result_create, result_partial_update
+from hackagent.storage._http.api.run import (
+    run_children_create,
+    run_claim_create,
+    run_claim_next_create,
+    run_finish_create,
+    run_partial_update,
+)
+from hackagent.storage import (
+    ClaimFailed,
+    ClaimResult,
+    ExecutorRejected,
+    RunNotClaimable,
+)
 from hackagent.storage.remote import RemoteBackend
 from hackagent.storage.records import (
     AgentRecord,
@@ -49,15 +68,27 @@ def _sent_json(endpoint, mock_endpoint) -> dict:
     return endpoint._get_kwargs(**kwargs)["json"]
 
 
+def _agent_config(name="test-agent") -> dict:
+    """A target's model config, as register_target sends it."""
+    return {
+        "name": name,
+        "connection": {
+            "type": "LITELLM",
+            "endpoint": "http://localhost:8000",
+            "api_key": "${TARGET_KEY}",
+        },
+        "generation": {"temperature": 0.2},
+    }
+
+
 def _mock_agent_model(name="test-agent"):
     """Build a minimal agent model mock matching the Django API shape."""
     m = MagicMock()
     m.id = _uid()
     m.name = name
-    m.agent_type = MagicMock()
-    m.agent_type.value = "LITELLM"
+    m.agent_type = "LITELLM"
     m.endpoint = "http://localhost:8000"
-    m.metadata = {"model": "gpt-4"}
+    m.config = _agent_config(name)
     m.organization = _uid()
     m.owner = 1
     m.created_at = _dt()
@@ -180,6 +211,33 @@ class TestRemoteBackendListAgents(unittest.TestCase):
         self.assertEqual(len(result.items), 1)
         self.assertEqual(result.items[0].name, "alpha")
 
+    def test_list_agents_parses_an_agent_without_an_endpoint(self):
+        backend = self._setup_backend_with_context()
+        org = str(_uid())
+        agent = {
+            "id": str(_uid()),
+            "name": "no-endpoint",
+            "endpoint": "",
+            "agent_type": "LITELLM",
+            "config": {},
+            "organization": org,
+            "organization_detail": {"id": org, "name": "org"},
+            "owner": None,
+            "owner_detail": None,
+            "created_at": "2026-10-25T10:00:00Z",
+            "updated_at": "2026-10-25T10:00:00Z",
+        }
+        parsed = PaginatedAgentList.model_validate(
+            {"count": 1, "next": None, "previous": None, "results": [agent]}
+        )
+        resp = _mock_response(200, parsed=parsed)
+
+        with patch("hackagent.storage.remote.agent_list") as mock_list:
+            mock_list.sync_detailed.return_value = resp
+            result = backend.list_agents()
+
+        self.assertEqual(result.items[0].name, "no-endpoint")
+
     def test_list_agents_empty_on_http_error(self):
         backend = self._setup_backend_with_context()
         resp = _mock_response(500, parsed=None)
@@ -210,6 +268,7 @@ class TestRemoteBackendCreateOrUpdateAgent(unittest.TestCase):
     def test_creates_new_agent_when_not_exists(self):
         agent_m = _mock_agent_model("new-agent")
         create_resp = _mock_response(201, parsed=agent_m)
+        config = _agent_config("new-agent")
 
         with (
             patch("hackagent.storage.remote.agent_list") as mock_list,
@@ -218,15 +277,16 @@ class TestRemoteBackendCreateOrUpdateAgent(unittest.TestCase):
             mock_list.sync_detailed.return_value = self._no_existing_agent_resp()
             mock_create.sync_detailed.return_value = create_resp
 
-            rec = self.backend.create_or_update_agent(
-                name="new-agent",
-                agent_type="LITELLM",
-                endpoint="http://localhost",
-                metadata={"model": "gpt-4"},
-            )
+            rec = self.backend.create_or_update_agent("new-agent", config)
 
         self.assertIsInstance(rec, AgentRecord)
-        mock_create.sync_detailed.assert_called_once()
+        self.assertEqual(rec.agent_type, "LITELLM")
+        self.assertEqual(rec.endpoint, "http://localhost:8000")
+        self.assertEqual(rec.metadata, config)
+        body = _sent_json(agent_create, mock_create)
+        # Type and endpoint are read-only copies the server derives from it.
+        self.assertEqual(set(body), {"name", "description", "config"})
+        self.assertEqual(body["config"], config)
 
     def test_raises_on_create_failure(self):
         err_resp = _mock_response(400)
@@ -239,11 +299,9 @@ class TestRemoteBackendCreateOrUpdateAgent(unittest.TestCase):
             mock_create.sync_detailed.return_value = err_resp
 
             with self.assertRaises(RuntimeError):
-                self.backend.create_or_update_agent(
-                    "agent", "LITELLM", "http://localhost", {}
-                )
+                self.backend.create_or_update_agent("agent", _agent_config("agent"))
 
-    def test_updates_existing_agent(self):
+    def test_updates_existing_agent_with_the_whole_config(self):
         agent_m = _mock_agent_model("existing")
         list_resp = MagicMock()
         list_resp.status_code = 200
@@ -253,6 +311,7 @@ class TestRemoteBackendCreateOrUpdateAgent(unittest.TestCase):
 
         updated_m = _mock_agent_model("existing")
         patch_resp = _mock_response(200, parsed=updated_m)
+        config = {**_agent_config("existing"), "generation": {"max_tokens": 64}}
 
         with (
             patch("hackagent.storage.remote.agent_list") as mock_list,
@@ -261,12 +320,12 @@ class TestRemoteBackendCreateOrUpdateAgent(unittest.TestCase):
             mock_list.sync_detailed.return_value = list_resp
             mock_patch.sync_detailed.return_value = patch_resp
 
-            rec = self.backend.create_or_update_agent(
-                "existing", "LITELLM", "http://localhost", {"new_key": "val"}
-            )
+            rec = self.backend.create_or_update_agent("existing", config)
 
         self.assertIsInstance(rec, AgentRecord)
-        mock_patch.sync_detailed.assert_called_once()
+        self.assertEqual(
+            _sent_json(agent_partial_update, mock_patch), {"config": config}
+        )
 
 
 class TestRemoteBackendRun(unittest.TestCase):
@@ -290,48 +349,138 @@ class TestRemoteBackendRun(unittest.TestCase):
         run_m.updated_at = _dt()
         return run_m
 
-    def test_create_run_success(self):
+    def test_create_run_uses_children_endpoint(self):
         run_id = str(_uid())
+        campaign_run_id, attack_id, agent_id = _uid(), _uid(), _uid()
         resp = _mock_response(201, content=f'{{"id": "{run_id}"}}'.encode())
 
-        with patch("hackagent.storage.remote.run_run_tests_create") as mock_run:
-            mock_run.sync_detailed.return_value = resp
+        with patch("hackagent.storage.remote.run_children_create") as mock_children:
+            mock_children.sync_detailed.return_value = resp
             rec = self.backend.create_run(
-                attack_id=_uid(),
-                agent_id=_uid(),
+                attack_id=attack_id,
+                agent_id=agent_id,
                 run_config={"batch_size": 4},
+                campaign_run_id=campaign_run_id,
             )
 
+        self.assertEqual(
+            mock_children.sync_detailed.call_args.kwargs["id"], campaign_run_id
+        )
+        self.assertEqual(
+            _sent_json(run_children_create, mock_children),
+            {
+                "attack": str(attack_id),
+                "agent": str(agent_id),
+                "run_config": {"batch_size": 4},
+            },
+        )
         self.assertIsInstance(rec, RunRecord)
         self.assertEqual(str(rec.id), run_id)
-        self.assertEqual(rec.status, "PENDING")
+        self.assertEqual(rec.campaign_run_id, campaign_run_id)
+        # Child runs are created already running.
+        self.assertEqual(rec.status, "RUNNING")
+
+    def test_create_run_needs_its_campaign_run(self):
+        with patch("hackagent.storage.remote.run_children_create") as mock_children:
+            with self.assertRaises(ValueError):
+                self.backend.create_run(_uid(), _uid(), {})
+        mock_children.sync_detailed.assert_not_called()
 
     def test_create_run_raises_on_error(self):
-        resp = _mock_response(500, content=b"{}")
+        resp = _mock_response(409, content=b"{}")
 
-        with patch("hackagent.storage.remote.run_run_tests_create") as mock_run:
-            mock_run.sync_detailed.return_value = resp
+        with patch("hackagent.storage.remote.run_children_create") as mock_children:
+            mock_children.sync_detailed.return_value = resp
             with self.assertRaises(RuntimeError):
-                self.backend.create_run(_uid(), _uid(), {})
+                self.backend.create_run(_uid(), _uid(), {}, campaign_run_id=_uid())
 
-    def test_update_run(self):
+    def test_running_status_is_noop(self):
         run_id = _uid()
-        resp = _mock_response(200)
 
-        with patch("hackagent.storage.remote.run_partial_update") as mock_patch:
-            mock_patch.sync_detailed.return_value = resp
+        with (
+            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+            patch("hackagent.storage.remote.run_finish_create") as mock_finish,
+        ):
             rec = self.backend.update_run(run_id, status="RUNNING")
 
         self.assertEqual(rec.id, run_id)
         self.assertEqual(rec.status, "RUNNING")
-        mock_patch.sync_detailed.assert_called_once()
+        mock_patch.sync_detailed.assert_not_called()
+        mock_finish.sync_detailed.assert_not_called()
+
+    def test_final_status_calls_finish(self):
+        run_id = _uid()
+
+        with (
+            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+            patch("hackagent.storage.remote.run_finish_create") as mock_finish,
+        ):
+            mock_finish.sync_detailed.return_value = _mock_response(
+                200, parsed=MagicMock()
+            )
+            rec = self.backend.update_run(
+                run_id, status="FAILED", run_notes="Execution failed: boom"
+            )
+
+        self.assertEqual(mock_finish.sync_detailed.call_args.kwargs["id"], run_id)
+        self.assertEqual(
+            _sent_json(run_finish_create, mock_finish),
+            {"status": "FAILED", "note": "Execution failed: boom"},
+        )
+        mock_patch.sync_detailed.assert_not_called()
+        self.assertEqual(rec.status, "FAILED")
+
+    def test_update_run_patches_the_run_config(self):
+        run_id = _uid()
+
+        with (
+            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+            patch("hackagent.storage.remote.run_finish_create") as mock_finish,
+        ):
+            mock_patch.sync_detailed.return_value = _mock_response(200)
+            self.backend.update_run(run_id, run_config={"done_goals": 3})
+
+        self.assertEqual(
+            _sent_json(run_partial_update, mock_patch),
+            {"run_config": {"done_goals": 3}},
+        )
+        mock_finish.sync_detailed.assert_not_called()
+
+    def test_update_run_raises_when_the_patch_fails(self):
+        with (
+            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+            patch("hackagent.storage.remote.run_finish_create") as mock_finish,
+        ):
+            mock_patch.sync_detailed.return_value = _mock_response(500)
+            with self.assertRaisesRegex(RuntimeError, "update_run"):
+                self.backend.update_run(
+                    _uid(), status="COMPLETED", run_config={"done_goals": 3}
+                )
+
+        # A run whose config could not be written is not finished either.
+        mock_finish.sync_detailed.assert_not_called()
+
+    def test_update_run_never_finishes_over_lost_writes(self):
+        """An attack run whose results did not all reach the server is not
+        COMPLETED: the failure surfaces first, and the tracker records it."""
+        self.backend._count_failure()
+
+        with patch("hackagent.storage.remote.run_finish_create") as mock_finish:
+            with self.assertRaisesRegex(RuntimeError, "background audit write"):
+                self.backend.update_run(_uid(), status="COMPLETED")
+
+        mock_finish.sync_detailed.assert_not_called()
+
+    def test_update_run_refuses_a_status_the_executor_cannot_set(self):
+        with self.assertRaises(ValueError):
+            self.backend.update_run(_uid(), status="PENDING")
 
     def test_update_run_raises_on_error(self):
         run_id = _uid()
 
-        with patch("hackagent.storage.remote.run_partial_update") as mock_patch:
-            mock_patch.sync_detailed.return_value = _mock_response(500)
-            with self.assertRaisesRegex(RuntimeError, "update_run"):
+        with patch("hackagent.storage.remote.run_finish_create") as mock_finish:
+            mock_finish.sync_detailed.return_value = _mock_response(500)
+            with self.assertRaisesRegex(RuntimeError, "finish"):
                 self.backend.update_run(run_id, status="FAILED")
 
     def test_list_runs_success(self):
@@ -1028,12 +1177,13 @@ class TestRemoteBackendDelete(unittest.TestCase):
         )
 
 
-def _mock_run_row(run_config, *, status="COMPLETED") -> MagicMock:
+def _mock_run_row(run_config, *, status="COMPLETED", parent=None) -> MagicMock:
     """One row as the hosted run endpoint returns it."""
     row = MagicMock()
     row.id = _uid()
     row.attack = _uid()
     row.agent = _uid()
+    row.parent = parent
     row.run_config = run_config
     row.status = MagicMock()
     row.status.value = status
@@ -1057,43 +1207,60 @@ def _campaign_marker(name="Nightly", config=None, audit=None) -> dict:
         "_record_type": "campaign_run",
         "campaign_name": name,
         "campaign_config": config if config is not None else {"version": 1},
-        "evaluation_audit": audit,
+        **({"evaluation_audit": audit} if audit is not None else {}),
     }
 
 
 class TestRemoteBackendCampaignRun(unittest.TestCase):
-    """Campaign parents ride on the hosted run endpoint behind a marker."""
+    """Campaign runs are parent runs whose run_config carries a marker."""
 
     def setUp(self):
         self.client = _mock_client()
         self.backend = RemoteBackend(self.client)
         self.backend._context = OrganizationContext(org_id=_uid(), user_id="1")
 
-    def test_create_campaign_run_posts_a_marked_parent_with_no_attack(self):
-        campaign_run_id = str(_uid())
+    def test_start_campaign_posts_spec(self):
         agent_id = _uid()
-        spec = {"version": 1, "campaign": {"name": "Nightly"}}
+        spec = {"version": 1, "campaign": {"name": "Nightly"}, "attacks": []}
+        stored = {"version": 1, "campaign": {"name": "Nightly"}}
+        row = _mock_run_row(_campaign_marker(config=stored), status="RUNNING")
 
-        with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
-            mock_create.sync_detailed.return_value = _mock_response(
-                201, content=f'{{"id": "{campaign_run_id}"}}'.encode()
-            )
-            record = self.backend.create_campaign_run(agent_id, "Nightly", spec)
+        with (
+            patch("hackagent.storage.remote.campaign_start_create") as mock_start,
+            patch("hackagent.storage.remote.socket.gethostname", return_value="box"),
+            patch("hackagent.storage.remote.getpass.getuser", return_value="ana"),
+        ):
+            mock_start.sync_detailed.return_value = _mock_response(201, parsed=row)
+            record = self.backend.start_campaign(agent_id, spec)
 
-        body = mock_create.sync_detailed.call_args.kwargs["body"]
-        self.assertIsNone(body.attack)
-        self.assertEqual(body.run_config["_record_type"], "campaign_run")
-        self.assertEqual(body.run_config["campaign_config"], spec)
-        self.assertEqual(str(record.id), campaign_run_id)
+        self.assertEqual(
+            _sent_json(campaign_start_create, mock_start),
+            {"agent": str(agent_id), "spec": spec, "claimed_by": "local:box (ana)"},
+        )
+        self.assertEqual(record.id, row.id)
         self.assertEqual(record.name, "Nightly")
-        self.assertEqual(record.status, "PENDING")
+        self.assertEqual(record.campaign_config, stored)
+        self.assertEqual(record.status, "RUNNING")
         self.assertIsNone(record.audit)
 
-    def test_create_campaign_run_raises_so_a_run_never_starts_unrecorded(self):
-        with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
-            mock_create.sync_detailed.return_value = _mock_response(500)
-            with self.assertRaisesRegex(RuntimeError, "campaign run"):
-                self.backend.create_campaign_run(_uid(), "Nightly", {})
+    def test_start_campaign_names_the_given_executor(self):
+        row = _mock_run_row(_campaign_marker(), status="RUNNING")
+
+        with patch("hackagent.storage.remote.campaign_start_create") as mock_start:
+            mock_start.sync_detailed.return_value = _mock_response(201, parsed=row)
+            self.backend.start_campaign(
+                _uid(), {"campaign": {"name": "Nightly"}}, claimed_by="ci:job-7"
+            )
+
+        self.assertEqual(
+            _sent_json(campaign_start_create, mock_start)["claimed_by"], "ci:job-7"
+        )
+
+    def test_start_campaign_raises_so_a_run_never_starts_unrecorded(self):
+        with patch("hackagent.storage.remote.campaign_start_create") as mock_start:
+            mock_start.sync_detailed.return_value = _mock_response(400)
+            with self.assertRaisesRegex(RuntimeError, "start campaign"):
+                self.backend.start_campaign(_uid(), {"campaign": {"name": "x"}})
 
     def test_get_campaign_run_reads_the_marker_back(self):
         audit = {"passed": True, "precision": 1.0}
@@ -1115,58 +1282,109 @@ class TestRemoteBackendCampaignRun(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "not a campaign run"):
                 self.backend.get_campaign_run(row.id)
 
-    def test_update_campaign_run_keeps_the_spec_and_writes_the_audit(self):
-        spec = {"version": 1, "campaign": {"name": "Nightly"}}
-        row = _mock_run_row(_campaign_marker(config=spec))
+    def test_update_campaign_run_merges_the_audit_then_finishes(self):
         audit = {"passed": False}
+        row = _mock_run_row(_campaign_marker(audit=audit), status="FAILED")
+        order = []
+
+        def _record(name):
+            def call(**_kwargs):
+                order.append(name)
+                return _mock_response(200, parsed=row)
+
+            return call
 
         with (
             patch("hackagent.storage.remote.run_retrieve") as mock_get,
             patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+            patch("hackagent.storage.remote.run_finish_create") as mock_finish,
         ):
-            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
-            mock_patch.sync_detailed.return_value = _mock_response(200)
+            mock_patch.sync_detailed.side_effect = _record("patch")
+            mock_finish.sync_detailed.side_effect = _record("finish")
             record = self.backend.update_campaign_run(
-                row.id, status="FAILED", audit=audit
+                row.id, status="FAILED", audit=audit, run_notes="Audit failed"
             )
 
-        body = mock_patch.sync_detailed.call_args.kwargs["body"]
-        # The spec is immutable: an update must not drop it.
-        self.assertEqual(body.run_config["campaign_config"], spec)
-        self.assertEqual(body.run_config["evaluation_audit"], audit)
+        # The server merges run_config key by key, so only the audit is sent;
+        # it is written while the run still accepts its executor's writes.
+        self.assertEqual(order, ["patch", "finish"])
+        self.assertEqual(
+            _sent_json(run_partial_update, mock_patch),
+            {"run_config": {"evaluation_audit": audit}},
+        )
+        self.assertEqual(
+            _sent_json(run_finish_create, mock_finish),
+            {"status": "FAILED", "note": "Audit failed"},
+        )
+        # The record comes from the finish response: no read-back.
+        mock_get.sync_detailed.assert_not_called()
         self.assertEqual(record.status, "FAILED")
         self.assertEqual(record.audit, audit)
 
-    def test_update_campaign_run_clears_a_note_with_an_empty_string(self):
-        row = _mock_run_row(_campaign_marker())
-        row.run_notes = "Attack runs failed: tap"
+    def test_update_campaign_run_does_not_read_back_after_finish(self):
+        """Finishing a campaign run revokes its run token, so a read after
+        the finish would be refused; the finished run is in the response."""
+        row = _mock_run_row(_campaign_marker(), status="COMPLETED")
+
+        with (
+            patch("hackagent.storage.remote.run_retrieve") as mock_get,
+            patch("hackagent.storage.remote.run_finish_create") as mock_finish,
+        ):
+            mock_get.sync_detailed.return_value = _mock_response(401)
+            mock_finish.sync_detailed.return_value = _mock_response(200, parsed=row)
+            record = self.backend.update_campaign_run(row.id, status="COMPLETED")
+
+        mock_get.sync_detailed.assert_not_called()
+        self.assertEqual(record.id, row.id)
+        self.assertEqual(record.status, "COMPLETED")
+
+    def test_update_campaign_run_running_is_noop(self):
+        row = _mock_run_row(_campaign_marker(), status="RUNNING")
 
         with (
             patch("hackagent.storage.remote.run_retrieve") as mock_get,
             patch("hackagent.storage.remote.run_partial_update") as mock_patch,
+            patch("hackagent.storage.remote.run_finish_create") as mock_finish,
         ):
             mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
-            mock_patch.sync_detailed.return_value = _mock_response(200)
+            record = self.backend.update_campaign_run(row.id, status="RUNNING")
+
+        mock_patch.sync_detailed.assert_not_called()
+        mock_finish.sync_detailed.assert_not_called()
+        self.assertEqual(record.status, "RUNNING")
+
+    def test_update_campaign_run_clears_a_note_with_an_empty_string(self):
+        row = _mock_run_row(_campaign_marker())
+        row.run_notes = ""
+
+        with patch("hackagent.storage.remote.run_finish_create") as mock_finish:
+            mock_finish.sync_detailed.return_value = _mock_response(200, parsed=row)
             record = self.backend.update_campaign_run(
                 row.id, status="COMPLETED", run_notes=""
             )
 
         self.assertEqual(
-            mock_patch.sync_detailed.call_args.kwargs["body"].run_notes, ""
+            _sent_json(run_finish_create, mock_finish),
+            {"status": "COMPLETED", "note": ""},
         )
         self.assertEqual(record.run_notes, "")
 
-    def test_update_campaign_run_raises_on_error(self):
-        row = _mock_run_row(_campaign_marker())
+    def test_update_campaign_run_never_finishes_over_lost_writes(self):
+        """A campaign whose results did not all reach the server is not
+        COMPLETED: the failure surfaces first, and the caller records it."""
+        self.backend._count_failure()
 
-        with (
-            patch("hackagent.storage.remote.run_retrieve") as mock_get,
-            patch("hackagent.storage.remote.run_partial_update") as mock_patch,
-        ):
-            mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
+        with patch("hackagent.storage.remote.run_finish_create") as mock_finish:
+            with self.assertRaisesRegex(RuntimeError, "background audit write"):
+                self.backend.update_campaign_run(_uid(), status="COMPLETED")
+
+        mock_finish.sync_detailed.assert_not_called()
+
+    def test_update_campaign_run_raises_on_error(self):
+        with patch("hackagent.storage.remote.run_partial_update") as mock_patch:
             mock_patch.sync_detailed.return_value = _mock_response(500)
             with self.assertRaisesRegex(RuntimeError, "campaign run"):
-                self.backend.update_campaign_run(row.id, status="FAILED")
+                self.backend.update_campaign_run(_uid(), audit={"passed": True})
 
     def test_list_campaign_runs_returns_only_the_markers(self):
         rows = [
@@ -1183,38 +1401,32 @@ class TestRemoteBackendCampaignRun(unittest.TestCase):
 
 
 class TestRemoteBackendRunCampaignLink(unittest.TestCase):
-    """An attack run carries its campaign parent through the run config."""
+    """An attack run is a child of its campaign run."""
 
     def setUp(self):
         self.client = _mock_client()
         self.backend = RemoteBackend(self.client)
         self.backend._context = OrganizationContext(org_id=_uid(), user_id="1")
 
-    def test_create_run_stamps_the_campaign_parent(self):
-        run_id = str(_uid())
-        campaign_run_id = _uid()
-
-        with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
-            mock_create.sync_detailed.return_value = _mock_response(
-                201, content=f'{{"id": "{run_id}"}}'.encode()
-            )
-            record = self.backend.create_run(
-                _uid(), _uid(), {"expected_total_goals": 3}, campaign_run_id
-            )
-
-        body = mock_create.sync_detailed.call_args.kwargs["body"]
-        self.assertEqual(body.run_config["_campaign_run_id"], str(campaign_run_id))
-        self.assertEqual(record.campaign_run_id, campaign_run_id)
-
     def test_get_run_reads_the_campaign_parent_back(self):
         campaign_run_id = _uid()
-        row = _mock_run_row({"_campaign_run_id": str(campaign_run_id)})
+        row = _mock_run_row({"expected_total_goals": 3}, parent=campaign_run_id)
 
         with patch("hackagent.storage.remote.run_retrieve") as mock_get:
             mock_get.sync_detailed.return_value = _mock_response(200, parsed=row)
             record = self.backend.get_run(row.id)
 
         self.assertEqual(record.campaign_run_id, campaign_run_id)
+
+    def test_list_runs_reads_the_campaign_parent(self):
+        campaign_run_id = _uid()
+        row = _mock_run_row({}, parent=campaign_run_id)
+
+        with patch("hackagent.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.return_value = _mock_page([row], count=1)
+            result = self.backend.list_runs()
+
+        self.assertEqual(result.items[0].campaign_run_id, campaign_run_id)
 
     def test_list_runs_hides_campaign_markers(self):
         attack_row = _mock_run_row({"batch_size": 4})
@@ -1272,5 +1484,283 @@ class TestRemoteBackendRunCampaignLink(unittest.TestCase):
         self.assertEqual(result.total, 10)
 
 
+class TestRemoteBackendClose(unittest.TestCase):
+    """Closing a backend releases what it holds, so many can come and go."""
+
+    def test_close_drops_the_exit_hook(self):
+        with patch("hackagent.storage.remote.atexit") as mock_atexit:
+            backend = RemoteBackend(_mock_client())
+            mock_atexit.register.assert_called_once_with(backend.close)
+            backend.close()
+            backend.close()
+        mock_atexit.unregister.assert_called_once_with(backend.close)
+
+    def test_close_keeps_a_shared_client_open_unless_asked(self):
+        client = _mock_client()
+        backend = RemoteBackend(client)
+        backend.close()
+        client.get_httpx_client.return_value.close.assert_not_called()
+
+        backend.close(close_client=True)
+        client.get_httpx_client.return_value.close.assert_called_once()
+
+
+class TestRemoteBackendExecutorProtocol(unittest.TestCase):
+    """Claim, heartbeat and finish: the calls an executor makes on a run."""
+
+    def setUp(self):
+        self.client = _mock_client()
+        self.backend = RemoteBackend(self.client)
+
+    def test_get_run_detail_returns_the_raw_run(self):
+        run_id = _uid()
+        content = (
+            f'{{"id": "{run_id}", "status": "PENDING", "executor": "local", '
+            '"claimed_by": "", "run_config": {"campaign_config": {"version": 1}}}'
+        ).encode()
+
+        with patch("hackagent.storage.remote.run_retrieve") as mock_get:
+            mock_get.sync_detailed.return_value = _mock_response(200, content=content)
+            detail = self.backend.get_run_detail(run_id)
+
+        self.assertEqual(detail["status"], "PENDING")
+        self.assertEqual(detail["executor"], "local")
+        self.assertEqual(detail["claimed_by"], "")
+        self.assertEqual(detail["run_config"], {"campaign_config": {"version": 1}})
+        # The executor needs the run, not every result it will produce.
+        self.assertIs(mock_get.sync_detailed.call_args.kwargs["include_results"], False)
+
+    def test_get_run_detail_raises_when_missing(self):
+        with patch("hackagent.storage.remote.run_retrieve") as mock_get:
+            mock_get.sync_detailed.return_value = _mock_response(404)
+            with self.assertRaisesRegex(RuntimeError, "not found"):
+                self.backend.get_run_detail(_uid())
+
+    def test_claim_returns_the_run_with_its_credentials(self):
+        run_id = _uid()
+        content = (
+            f'{{"id": "{run_id}", "status": "RUNNING", "run_token": "tok", '
+            '"env": {"OPENAI_KEY": "value"}}'
+        ).encode()
+
+        with patch("hackagent.storage.remote.run_claim_create") as mock_claim:
+            mock_claim.sync_detailed.return_value = _mock_response(200, content=content)
+            claim = self.backend.claim_run(run_id, "cloud-worker:pod-1")
+
+        self.assertEqual(mock_claim.sync_detailed.call_args.kwargs["id"], run_id)
+        self.assertEqual(
+            _sent_json(run_claim_create, mock_claim),
+            {"claimed_by": "cloud-worker:pod-1"},
+        )
+        self.assertIsInstance(claim, ClaimResult)
+        self.assertEqual(claim.run, {"id": str(run_id), "status": "RUNNING"})
+        self.assertEqual(claim.run_token, "tok")
+        self.assertEqual(claim.env, {"OPENAI_KEY": "value"})
+
+    def test_a_local_claim_has_no_credentials(self):
+        content = b'{"id": "x", "status": "RUNNING"}'
+
+        with patch("hackagent.storage.remote.run_claim_create") as mock_claim:
+            mock_claim.sync_detailed.return_value = _mock_response(200, content=content)
+            claim = self.backend.claim_run(_uid(), "local:host (me)")
+
+        self.assertIsNone(claim.run_token)
+        self.assertEqual(claim.env, {})
+
+    def test_claim_409_raises_not_claimable(self):
+        content = (
+            b'{"detail": "Run is already claimed by local:other.", '
+            b'"claimed_by": "local:other", "status": "RUNNING"}'
+        )
+
+        with patch("hackagent.storage.remote.run_claim_create") as mock_claim:
+            mock_claim.sync_detailed.return_value = _mock_response(409, content=content)
+            with self.assertRaises(RunNotClaimable) as caught:
+                self.backend.claim_run(_uid(), "local:host (me)")
+
+        self.assertEqual(caught.exception.claimed_by, "local:other")
+        self.assertEqual(caught.exception.status, "RUNNING")
+        self.assertEqual(
+            caught.exception.note, "Run is already claimed by local:other."
+        )
+
+    def test_claim_409_of_an_unclaimed_run_names_nobody(self):
+        content = (
+            b'{"detail": "Run is cancelled and cannot be claimed.", '
+            b'"claimed_by": "", "status": "CANCELLED"}'
+        )
+
+        with patch("hackagent.storage.remote.run_claim_create") as mock_claim:
+            mock_claim.sync_detailed.return_value = _mock_response(409, content=content)
+            with self.assertRaises(RunNotClaimable) as caught:
+                self.backend.claim_run(_uid(), "local:host (me)")
+
+        self.assertIsNone(caught.exception.claimed_by)
+        self.assertEqual(caught.exception.status, "CANCELLED")
+
+    def test_claim_raises_on_other_errors(self):
+        with patch("hackagent.storage.remote.run_claim_create") as mock_claim:
+            mock_claim.sync_detailed.return_value = _mock_response(403)
+            with self.assertRaisesRegex(RuntimeError, "403"):
+                self.backend.claim_run(_uid(), "local:host (me)")
+
+    def test_a_refused_claim_carries_its_status_and_reason_only(self):
+        content = b'{"detail": "Invalid token.", "echo": "secret-value"}'
+        with patch("hackagent.storage.remote.run_claim_next_create") as mock_next:
+            mock_next.sync_detailed.return_value = _mock_response(401, content=content)
+            with self.assertRaises(ClaimFailed) as caught:
+                self.backend.claim_next_run("cloud-worker:pod-1")
+
+        self.assertEqual(caught.exception.status_code, 401)
+        self.assertEqual(caught.exception.detail, "Invalid token.")
+        self.assertNotIn("secret-value", str(caught.exception))
+
+    def test_claim_next_returns_a_claim(self):
+        content = b'{"id": "x", "status": "RUNNING", "run_token": "tok", "env": {}}'
+
+        with patch("hackagent.storage.remote.run_claim_next_create") as mock_next:
+            mock_next.sync_detailed.return_value = _mock_response(200, content=content)
+            claim = self.backend.claim_next_run("cloud-worker:pod-1")
+
+        self.assertEqual(
+            _sent_json(run_claim_next_create, mock_next),
+            {"claimed_by": "cloud-worker:pod-1"},
+        )
+        self.assertEqual(claim.run_token, "tok")
+
+    def test_claim_next_returns_none_when_the_queue_is_empty(self):
+        with patch("hackagent.storage.remote.run_claim_next_create") as mock_next:
+            mock_next.sync_detailed.return_value = _mock_response(204, content=b"")
+            self.assertIsNone(self.backend.claim_next_run("cloud-worker:pod-1"))
+
+    def test_heartbeat_returns_whether_a_cancel_was_requested(self):
+        with patch("hackagent.storage.remote.run_heartbeat_create") as mock_hb:
+            mock_hb.sync_detailed.return_value = _mock_response(
+                200, content=b'{"cancel_requested": true}'
+            )
+            self.assertTrue(self.backend.heartbeat_run(_uid()))
+            mock_hb.sync_detailed.return_value = _mock_response(
+                200, content=b'{"cancel_requested": false}'
+            )
+            self.assertFalse(self.backend.heartbeat_run(_uid()))
+
+    def test_heartbeat_401_raises_executor_rejected(self):
+        for status in (401, 403):
+            with patch("hackagent.storage.remote.run_heartbeat_create") as mock_hb:
+                mock_hb.sync_detailed.return_value = _mock_response(status)
+                with self.assertRaises(ExecutorRejected):
+                    self.backend.heartbeat_run(_uid())
+
+    def test_heartbeat_raises_on_other_errors(self):
+        with patch("hackagent.storage.remote.run_heartbeat_create") as mock_hb:
+            mock_hb.sync_detailed.return_value = _mock_response(502)
+            with self.assertRaises(RuntimeError) as caught:
+                self.backend.heartbeat_run(_uid())
+        self.assertNotIsInstance(caught.exception, ExecutorRejected)
+
+    def test_finish_run_sends_status_and_note(self):
+        run_id = _uid()
+
+        finished = MagicMock()
+
+        with patch("hackagent.storage.remote.run_finish_create") as mock_finish:
+            mock_finish.sync_detailed.return_value = _mock_response(
+                200, parsed=finished
+            )
+            run = self.backend.finish_run(run_id, "CANCELLED", "Campaign cancelled")
+
+        self.assertIs(run, finished)
+
+        self.assertEqual(mock_finish.sync_detailed.call_args.kwargs["id"], run_id)
+        self.assertEqual(
+            _sent_json(run_finish_create, mock_finish),
+            {"status": "CANCELLED", "note": "Campaign cancelled"},
+        )
+
+    def test_finish_run_waits_for_queued_writes(self):
+        """Finishing a campaign run revokes its run token, so every queued
+        result and trace write must reach the server before the finish."""
+        started, release = threading.Event(), threading.Event()
+        order = []
+
+        def queued_write():
+            started.set()
+            release.wait(5)
+            order.append("write")
+
+        def finish(**_kwargs):
+            order.append("finish")
+            return _mock_response(200, parsed=MagicMock())
+
+        self.backend._enqueue(queued_write)
+        self.assertTrue(started.wait(5))
+        with patch("hackagent.storage.remote.run_finish_create") as mock_finish:
+            mock_finish.sync_detailed.side_effect = finish
+            finisher = threading.Thread(
+                target=self.backend.finish_run, args=(_uid(), "COMPLETED")
+            )
+            finisher.start()
+            time.sleep(0.1)  # time for a finish that does not wait to happen
+            self.assertEqual(order, [])
+            release.set()
+            finisher.join(5)
+
+        self.assertEqual(order, ["write", "finish"])
+
+    def test_finish_run_refuses_a_status_that_is_not_final(self):
+        with self.assertRaises(ValueError):
+            self.backend.finish_run(_uid(), "RUNNING")
+
+    def test_finish_run_403_raises_executor_rejected(self):
+        with patch("hackagent.storage.remote.run_finish_create") as mock_finish:
+            mock_finish.sync_detailed.return_value = _mock_response(403)
+            with self.assertRaises(ExecutorRejected):
+                self.backend.finish_run(_uid(), "COMPLETED")
+
+    def test_no_run_tests_calls(self):
+        """Runs are created by the campaign start and children endpoints only."""
+        import inspect
+
+        self.assertNotIn("run_run_tests", inspect.getsource(remote))
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_check_key_raises_invalid_api_key_on_401():
+    from hackagent.storage import InvalidApiKey
+    from hackagent.storage._http.api.key import key_context_retrieve
+
+    backend = RemoteBackend(MagicMock())
+    with patch.object(
+        key_context_retrieve, "sync_detailed", return_value=MagicMock(status_code=401)
+    ):
+        with unittest.TestCase().assertRaises(InvalidApiKey):
+            backend.check_key()
+    with patch.object(
+        key_context_retrieve, "sync_detailed", return_value=MagicMock(status_code=200)
+    ):
+        backend.check_key()
+
+
+def test_list_queued_local_runs_filters_and_orders_newest_first():
+    from hackagent.storage._http.api.run import run_list
+
+    def run(day):
+        return MagicMock(
+            id=_uid(),
+            agent_name="a",
+            campaign=None,
+            timestamp=datetime(2026, 1, day, tzinfo=timezone.utc),
+        )
+
+    old, new = run(1), run(2)
+    page = MagicMock(status_code=200, parsed=MagicMock(results=[old, new], next=None))
+    with patch.object(run_list, "sync_detailed", return_value=page) as listing:
+        runs = RemoteBackend(MagicMock()).list_queued_local_runs()
+    assert [r["id"] for r in runs] == [str(new.id), str(old.id)]
+    kwargs = listing.call_args.kwargs
+    assert kwargs["executor"].value == "local"
+    assert kwargs["status"].value == "PENDING"
+    assert kwargs["parent_isnull"] is True
