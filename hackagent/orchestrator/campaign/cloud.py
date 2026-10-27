@@ -12,10 +12,11 @@ type. Each model's LiteLLM provider, as LiteLLM itself infers it from the
 model string the model is built with, must be one of
 :data:`HOSTED_PROVIDERS` without an endpoint, or of
 :data:`ENDPOINT_PROVIDERS` with one, and its key must be a ``${VARIABLE}``
-reference whose variable passes :func:`secret_name_reason`. Goals come from a preset or the
-campaign itself; no technique parameter may carry code (see
-:meth:`~hackagent.attacks.techniques.contract.AttackParams.cloud_parameter_issues`),
-no setting may name a path, and ``trust_remote_code`` is never set.
+reference whose variable passes :func:`secret_name_reason`. Goals come from a
+preset or the campaign itself. No technique parameter may hold code the worker
+would run: today that is an h4rm3l program constructing one of
+:data:`H4RM3L_CODE_DECORATORS`. No setting may name a path, and
+``trust_remote_code`` is never set.
 Anything not listed here is refused.
 
 Whether an endpoint's address is reachable from the cloud is up to whoever
@@ -24,12 +25,13 @@ queues the run: :func:`cloud_issues` resolves no host names.
 
 from __future__ import annotations
 
+import ast
 import re
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Iterator, Mapping, Optional
 
-from hackagent.attacks.techniques.registry import get_attack_class
+from hackagent.attacks.techniques.static.h4rm3l.programs import resolve_program
 from hackagent.core.contracts import AgentType
 from hackagent.core.credentials import reference_name
 from hackagent.datasets.calibration import CalibrationSpec
@@ -50,6 +52,9 @@ CLOUD_OPTIONS: Mapping[AgentType, frozenset[str]] = MappingProxyType(
         AgentType.OLLAMA: frozenset({"num_ctx", "top_k"}),
     }
 )
+
+#: h4rm3l decorators that run Python code written into the program.
+H4RM3L_CODE_DECORATORS = frozenset({"TransformFxDecorator"})
 
 #: LiteLLM providers of hosted APIs: all a model without an endpoint may use.
 HOSTED_PROVIDERS = frozenset(
@@ -223,13 +228,37 @@ def _gateway_issues(config: ModelConfig, path: str) -> list[CloudIssue]:
 
 
 def _attack_issues(spec: CampaignSpec) -> Iterator[CloudIssue]:
-    """Technique parameters a cloud run may not use."""
+    """Technique parameters holding code the worker would run."""
     for index, attack in enumerate(spec.attacks):
-        params_type = get_attack_class(attack.name).params_type
-        for name, reason in params_type.cloud_parameter_issues(
-            attack.parameters
-        ).items():
-            yield CloudIssue(f"attacks.{index}.parameters.{name}", reason)
+        if attack.name != "h4rm3l":
+            continue
+        program = attack.parameters.get("program")
+        if not isinstance(program, str):
+            continue
+        names = _h4rm3l_code_decorators(
+            resolve_program(program), attack.parameters.get("syntax_version", 2)
+        )
+        if names:
+            yield CloudIssue(
+                f"attacks.{index}.parameters.program",
+                f"{', '.join(sorted(names))} can't run in the cloud",
+            )
+
+
+def _h4rm3l_code_decorators(program: str, syntax_version: Any) -> frozenset[str]:
+    """The :data:`H4RM3L_CODE_DECORATORS` an h4rm3l program constructs, read
+    from its syntax tree as h4rm3l's compiler reads it. A program that does
+    not parse is judged by the names it contains."""
+    mode = "exec" if syntax_version == 1 else "eval"
+    try:
+        tree = ast.parse(program, mode=mode)
+    except SyntaxError:
+        return frozenset(name for name in H4RM3L_CODE_DECORATORS if name in program)
+    return frozenset(
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and node.id in H4RM3L_CODE_DECORATORS
+    )
 
 
 def _setting_issues(spec: CampaignSpec) -> Iterator[CloudIssue]:

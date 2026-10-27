@@ -70,10 +70,6 @@ LLM_ASSISTED_DECORATOR_NAMES = {
 }
 
 
-#: Decorators that run code written in the program.
-CODE_DECORATOR_NAMES = frozenset({"TransformFxDecorator"})
-
-
 def is_llm_assisted_decorator_name(name: str) -> bool:
     """Return True if the decorator class name is LLM-assisted."""
     return name in LLM_ASSISTED_DECORATOR_NAMES
@@ -266,23 +262,4 @@ def program_uses_llm_assisted_decorators(
     return any(
         isinstance(node, ast.Name) and is_llm_assisted_decorator_name(node.id)
         for node in ast.walk(tree)
-    )
-
-
-def program_code_decorators(program: str, syntax_version: int = 2) -> frozenset[str]:
-    """The :data:`CODE_DECORATOR_NAMES` decorators a program constructs.
-
-    Read from the program's syntax tree, the way :func:`compile_program`
-    reads it; a program that does not parse is judged by the names it
-    contains.
-    """
-    mode = "exec" if syntax_version == 1 else "eval"
-    try:
-        tree = ast.parse(program, mode=mode)
-    except SyntaxError:
-        return frozenset(name for name in CODE_DECORATOR_NAMES if name in program)
-    return frozenset(
-        node.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Name) and node.id in CODE_DECORATOR_NAMES
     )

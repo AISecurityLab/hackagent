@@ -31,7 +31,6 @@ from typing import Mapping, MutableMapping, Optional, Sequence
 from uuid import UUID
 
 from hackagent.core.logging import get_logger
-from hackagent.core.settings import CLOUD_RUN_ENV
 from hackagent.interfaces.cli.logging_setup import setup_package_logging
 from hackagent.interfaces.worker_run import EXIT_COMPLETED, EXIT_ENDED, STOPPED_NOTE
 from hackagent.orchestrator.campaign.cloud import secret_name_reason
@@ -115,7 +114,6 @@ def child_environment(
             "HOME": home,
             "LANG": CHILD_LANG,
             BASE_URL_ENV: base_url,
-            CLOUD_RUN_ENV: "1",
         }
     )
     return environment

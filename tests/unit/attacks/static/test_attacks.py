@@ -253,50 +253,6 @@ def test_h4rm3l_rejects_unknown_decorators():
         H4rm3lAttack(H4rm3lParams(program="NoSuchDecorator()"))
 
 
-TRANSFORM_FX = (
-    'TransformFxDecorator(transform_fx="def transform(prompt, assistant, '
-    'random_state):\\n    return prompt.upper()")'
-)
-
-
-async def _unused_decorator(messages):
-    raise AssertionError("no model call expected")
-
-
-def test_h4rm3l_transform_fx_runs_its_code_locally(monkeypatch):
-    monkeypatch.delenv("HACKAGENT_CLOUD_RUN", raising=False)
-    params = H4rm3lParams(program=TRANSFORM_FX, decorator=_unused_decorator)
-    assert generate(H4rm3lAttack(params))[0][0]["content"] == GOAL.upper()
-
-
-def test_h4rm3l_transform_fx_cannot_be_built_in_a_cloud_run(monkeypatch):
-    monkeypatch.setenv("HACKAGENT_CLOUD_RUN", "1")
-    params = H4rm3lParams(program=TRANSFORM_FX, decorator=_unused_decorator)
-    with pytest.raises(ValueError, match="TransformFxDecorator can't run in the cloud"):
-        H4rm3lAttack(params)
-
-
-def test_h4rm3l_refuses_in_the_cloud_only_programs_that_run_code():
-    assert H4rm3lParams.cloud_parameter_issues({"program": TRANSFORM_FX}) == {
-        "program": "TransformFxDecorator can't run in the cloud"
-    }
-    assert H4rm3lParams.cloud_parameter_issues({"program": "dan_style"}) == {}
-    assert H4rm3lParams.cloud_parameter_issues({}) == {}
-
-
-def test_parameters_a_technique_forbids_in_the_cloud_are_refused_when_set():
-    class CodeParams(AttackParams):
-        CLOUD_FORBIDDEN_PARAMETERS = frozenset({"script"})
-        script: str = ""
-        rounds: int = 1
-
-    assert CodeParams.cloud_parameter_issues({"script": "x", "rounds": 2}) == {
-        "script": "script can't be set in the cloud"
-    }
-    assert CodeParams.cloud_parameter_issues({"rounds": 2}) == {}
-    assert BaselineParams.cloud_parameter_issues({"anything": 1}) == {}
-
-
 def test_every_attack_loads_without_the_optional_extras():
     """Reading an attack's settings must not need its extra; only running it does.
 

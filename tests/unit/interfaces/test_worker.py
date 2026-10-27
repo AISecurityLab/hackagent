@@ -134,7 +134,7 @@ def test_a_claimed_run_executes_in_its_own_process(monkeypatch, tmp_path):
     assert env["PATH"] == worker.CHILD_PATH
     assert env["LANG"] == worker.CHILD_LANG
     assert env["HACKAGENT_BASE_URL"] == "https://api.example"
-    assert env["HACKAGENT_CLOUD_RUN"] == "1"
+    assert "HACKAGENT_CLOUD_RUN" not in env
     assert os.path.realpath(env["HOME"]) == os.path.realpath(seen["cwd"])
     # Only the secrets a cloud run may read are passed on.
     assert env["OPENAI_API_KEY"] == "sk-allowed"
@@ -270,7 +270,6 @@ def test_child_environment_passes_on_only_cloud_secret_names():
         "HOME": "/tmp/home",
         "LANG": worker.CHILD_LANG,
         "HACKAGENT_BASE_URL": "https://api.example",
-        "HACKAGENT_CLOUD_RUN": "1",
     }
 
 

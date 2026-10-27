@@ -9,11 +9,9 @@ from .base import (
     PromptDecorator,
 )
 from .compiler import (
-    CODE_DECORATOR_NAMES,
     LLM_ASSISTED_DECORATOR_NAMES,
     compile_program,
     is_llm_assisted_decorator_name,
-    program_code_decorators,
     program_uses_llm_assisted_decorators,
 )
 from .llm import (
@@ -66,7 +64,6 @@ __all__ = [
     "AffirmativePrefixInjectionDecorator",
     "AnswerStyleDecorator",
     "Base64Decorator",
-    "CODE_DECORATOR_NAMES",
     "ChainofThoughtDecorator",
     "CharCorrupt",
     "CharDropout",
@@ -109,6 +106,5 @@ __all__ = [
     "WordMixInDecorator",
     "compile_program",
     "is_llm_assisted_decorator_name",
-    "program_code_decorators",
     "program_uses_llm_assisted_decorators",
 ]
