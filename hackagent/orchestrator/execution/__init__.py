@@ -4,8 +4,9 @@
 """Executing server-tracked runs on this machine.
 
 - :mod:`.execute`: :func:`execute_run` and :func:`execute_spec`, shared by
-  ``hackagent run``, ``hackagent campaign run`` and the cloud worker, and
-  the tracked run behind every campaign with remote storage
+  ``hackagent run``, ``hackagent campaign run`` and any other executor of
+  a queued run, and the tracked run behind every campaign with remote
+  storage
 - :mod:`.adopted`: the store that runs a campaign inside an existing run
 - :mod:`.credits`: stop a run on the gateway's first "out of credits" answer
 - :mod:`.heartbeat`: the background heartbeat with cancel and rejection signals

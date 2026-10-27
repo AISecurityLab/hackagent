@@ -1,10 +1,10 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Execute a campaign run the server tracks, here or in the cloud worker.
+"""Execute a campaign run the server tracks.
 
-:func:`execute_run` runs a queued run: ``hackagent run`` and the cloud worker
-both call it, so a run behaves the same wherever it executes. It claims the
+:func:`execute_run` runs a queued run for any executor, ``hackagent run``
+among them, so a run behaves the same wherever it executes. It claims the
 run, binds the gateway models of the run's campaign to this executor, runs
 the campaign while heartbeating, and finishes the run with a status and a
 note. :func:`execute_spec` does the same for a campaign whose results go to
@@ -18,10 +18,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
 import signal
-import tempfile
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import FrameType
@@ -41,7 +39,6 @@ from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals
 from hackagent.models import build_embedder, build_model
 from hackagent.orchestrator.campaign.audit import CalibrationLoader
-from hackagent.orchestrator.campaign.cloud import CloudIssue, cloud_issues
 from hackagent.orchestrator.campaign.loader import load_stored_campaign
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV, bind_gateway
 from hackagent.orchestrator.campaign.resolve import (
@@ -68,7 +65,6 @@ logger = get_logger(__name__)
 OUT_OF_CREDITS_NOTE = "Out of credits"
 REJECTED_NOTE = "Your API key is no longer valid for this run"
 CANCELLED_NOTE = "Campaign cancelled"
-NOT_CLOUD_RUNNABLE_NOTE = "This campaign can't run in the cloud"
 _NOTE_LIMIT = 500
 
 Status = Literal["COMPLETED", "FAILED", "CANCELLED"]
@@ -110,19 +106,20 @@ def execute_run(
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
     settings: Optional[Settings] = None,
+    check: Optional[Callable[[CampaignSpec], Optional[str]]] = None,
+    output_directory: Optional[str] = None,
 ) -> ExecutionOutcome:
     """Claim ``run_id`` (unless ``claim`` is given), execute it and finish it.
 
-    ``store`` is authenticated with the key this executor runs with: the
-    user's key locally, the run token in the cloud. ``gateway_key`` is the
-    key gateway models use, and ``env`` the secret values the campaign reads;
-    both are set in the environment for the duration of the run only. A
+    ``store`` is authenticated with the key this executor runs with, such as
+    the user's API key or a run token. ``gateway_key`` is the key gateway
+    models use, and ``env`` the secret values the campaign reads; both are
+    set in the environment for the duration of the run only. A
     ``KeyboardInterrupt`` finishes the run with ``interrupted_as`` and is
-    then passed on. A run claimed with a run token (in the cloud) writes its
-    output files to a temporary folder, removed afterwards: its results are
-    on the server, and it runs only a campaign the cloud may run (see
-    :func:`~hackagent.orchestrator.campaign.cloud.cloud_issues`); any other
-    ends FAILED before a model is built. ``settings`` are the ones the
+    then passed on. ``check`` is given the campaign before any model is built
+    and returns why this executor won't run it, or None; a run it refuses
+    ends FAILED with that reason as its note. A given ``output_directory``
+    replaces where the run's files are written. ``settings`` are the ones the
     campaign is resolved with (resolved when omitted). Raises
     :class:`~hackagent.storage.RunNotClaimable` when the run cannot be
     claimed.
@@ -141,41 +138,36 @@ def execute_run(
             if not isinstance(exc, Exception):
                 raise
             return outcome
-    scratch = tempfile.mkdtemp(prefix="hackagent-run-") if claim.run_token else None
     try:
-        try:
-            spec = executable_spec(
-                claim.run["run_config"]["campaign_config"],
-                base_url,
-                output_directory=scratch,
-            )
-            issues = cloud_issues(spec) if claim.run_token else []
-            if issues:
-                raise _NotCloudRunnable(issues[0])
-        except BaseException as exc:
-            outcome = _ended_by(exc, interrupted_as)
-            _finish(adopted, adopted.run_id, outcome)
-            adopted.close()
-            if not isinstance(exc, Exception):
-                raise
-            return outcome
-        return _execute(
-            _Execution(
-                adopted,
-                spec,
-                base_url=base_url,
-                gateway_key=gateway_key,
-                env=env,
-                on_event=on_event,
-                build=build,
-                load=load,
-                interrupted_as=interrupted_as,
-                settings=settings,
-            )
+        spec = executable_spec(
+            claim.run["run_config"]["campaign_config"],
+            base_url,
+            output_directory=output_directory,
         )
-    finally:
-        if scratch is not None:
-            shutil.rmtree(scratch, ignore_errors=True)
+        refusal = check(spec) if check is not None else None
+        if refusal:
+            raise _Refused(refusal)
+    except BaseException as exc:
+        outcome = _ended_by(exc, interrupted_as)
+        _finish(adopted, adopted.run_id, outcome)
+        adopted.close()
+        if not isinstance(exc, Exception):
+            raise
+        return outcome
+    return _execute(
+        _Execution(
+            adopted,
+            spec,
+            base_url=base_url,
+            gateway_key=gateway_key,
+            env=env,
+            on_event=on_event,
+            build=build,
+            load=load,
+            interrupted_as=interrupted_as,
+            settings=settings,
+        )
+    )
 
 
 def execute_spec(
@@ -495,21 +487,20 @@ def _outcome(
     return ExecutionOutcome("FAILED", failure_note(error))
 
 
-class _NotCloudRunnable(Exception):
-    """A cloud run whose campaign the cloud may not run, for ``issue``."""
+class _Refused(Exception):
+    """A run whose campaign the executor's ``check`` refused, with why."""
 
-    def __init__(self, issue: CloudIssue) -> None:
-        super().__init__(issue.reason)
-        self.issue = issue
+    def __init__(self, note: str) -> None:
+        super().__init__(note)
+        self.note = note
 
 
 def _ended_by(
     error: BaseException, interrupted_as: tuple[Status, str]
 ) -> ExecutionOutcome:
     """How a run ends when ``error`` stops it before its campaign starts."""
-    if isinstance(error, _NotCloudRunnable):
-        note = f"{NOT_CLOUD_RUNNABLE_NOTE}: {error.issue.path}: {error.issue.reason}"
-        return ExecutionOutcome("FAILED", note[:_NOTE_LIMIT])
+    if isinstance(error, _Refused):
+        return ExecutionOutcome("FAILED", error.note[:_NOTE_LIMIT])
     if isinstance(error, KeyboardInterrupt):
         return ExecutionOutcome(*interrupted_as)
     if isinstance(error, Exception):
@@ -642,7 +633,6 @@ def _environment(values: Mapping[str, str]) -> Iterator[None]:
 __all__ = [
     "CANCELLED_NOTE",
     "CANCELLED_ON_INTERRUPT",
-    "NOT_CLOUD_RUNNABLE_NOTE",
     "OUT_OF_CREDITS_NOTE",
     "REJECTED_NOTE",
     "ExecutionOutcome",
