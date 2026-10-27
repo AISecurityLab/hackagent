@@ -238,7 +238,9 @@ def run(
                 "hackagent config set --api-key"
             )
         if gateway_key:
-            os.environ.setdefault(GATEWAY_KEY_ENV, gateway_key)
+            # The selected key, never one already in the environment: the
+            # gateway models were just bound to the selected server.
+            os.environ[GATEWAY_KEY_ENV] = gateway_key
 
     setup_package_logging(default_level_str="INFO")
     suppress_noisy_libraries("httpx", "httpcore", "LiteLLM")

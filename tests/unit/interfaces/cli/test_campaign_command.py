@@ -10,6 +10,7 @@ import os
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from hackagent.interfaces.cli.main import cli
@@ -175,8 +176,12 @@ def test_run_rejects_an_incompatible_override():
     assert "ollama" in result.output.lower()
 
 
-def test_campaign_run_binds_gateway(monkeypatch):
-    monkeypatch.delenv("HACKAGENT_GATEWAY_KEY", raising=False)
+@pytest.mark.parametrize("ambient", [None, "key-of-another-deployment"])
+def test_campaign_run_binds_gateway(monkeypatch, ambient):
+    if ambient is None:
+        monkeypatch.delenv("HACKAGENT_GATEWAY_KEY", raising=False)
+    else:
+        monkeypatch.setenv("HACKAGENT_GATEWAY_KEY", ambient)
     monkeypatch.setenv("HACKAGENT_API_KEY", "dashboard-key")
     gateway = {"name": "gw", "connection": {"provider": "hackagent", "type": "OPENAI"}}
     spec = CampaignSpec.model_validate(
