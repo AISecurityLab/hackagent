@@ -11,6 +11,7 @@ default) they are answered read-only from the local SQLite store.
 """
 
 import os
+from pathlib import Path
 import signal
 import socket
 import subprocess
@@ -175,7 +176,10 @@ def web(ctx, host, port, db_path, force_local, no_browser):
     if force_local:
         settings = replace(settings, backend=Mode.LOCAL)
     if db_path:
-        settings = replace(settings, db_path=db_path)
+        resolved_db = (
+            db_path if db_path == ":memory:" else str(Path(db_path).expanduser())
+        )
+        settings = replace(settings, db_path=resolved_db)
     session = HackAgent(settings)
 
     try:
