@@ -359,7 +359,7 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             try:
                 label += f"   {audit_summary(audit)}"
             except (TypeError, ValueError):
-                pass
+                pass  # a malformed audit leaves the label without its summary
         return label
 
     def _add_audit(self, parent: TreeNode[Any], audit: Any) -> None:
