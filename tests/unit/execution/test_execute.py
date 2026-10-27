@@ -227,6 +227,29 @@ def test_402_from_a_gateway_role_stops_the_run(tmp_path):
     assert len(attacker.requests) == 1
 
 
+def test_402_from_a_gateway_role_is_not_retried(tmp_path):
+    from hackagent.models.retry import RetryingModel
+
+    attacker = ScriptedModel(out_of_credits)
+    fakes = FakeBuilder(models(gateway=attacker))
+
+    def build(config, *, retries=0):
+        model = fakes(config)
+        return RetryingModel(model, retries) if retries else model
+
+    outcome, _, _ = execute_with(
+        stored_campaign(
+            tmp_path,
+            attacks=[{**PAP, "roles": {"attacker": GW}}],
+            execution={"retries": {"roles": 2}},
+        ),
+        builder=build,
+    )
+
+    assert (outcome.status, outcome.note) == ("FAILED", "Out of credits")
+    assert len(attacker.requests) == 1
+
+
 def test_402_from_the_target_stays_an_attempt_error(tmp_path):
     target = ScriptedModel(out_of_credits)
 

@@ -19,6 +19,7 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 
 from hackagent.core.credentials import reference_name
 from hackagent.models import Model, ModelConfig, ModelResponse, Reachability
+from hackagent.models.retry import RetryingModel
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV
 from hackagent.orchestrator.campaign.resolve import ModelBuilder
 
@@ -51,11 +52,19 @@ class CreditGuard:
         )
 
     def wrap(self, build: ModelBuilder) -> ModelBuilder:
-        """``build``, with every gateway model it builds guarded."""
+        """``build``, with every gateway model it builds guarded.
 
-        def guarded_build(config: ModelConfig, **kwargs: Any) -> Model:
-            model = build(config, **kwargs)
-            return _GatewayModel(model, self) if self.is_gateway(config) else model
+        The guard sits inside the retries, so a gateway 402 stops the run at
+        once rather than being sent again (or hidden by a retry that works).
+        """
+
+        def guarded_build(
+            config: ModelConfig, *, retries: int = 0, **kwargs: Any
+        ) -> Model:
+            if not self.is_gateway(config):
+                return build(config, retries=retries, **kwargs)
+            model = _GatewayModel(build(config, retries=0, **kwargs), self)
+            return RetryingModel(model, retries) if retries else model
 
         return guarded_build
 
