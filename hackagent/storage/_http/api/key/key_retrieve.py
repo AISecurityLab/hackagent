@@ -13,6 +13,7 @@ from ..models import UserAPIKey
 def _get_kwargs(
     prefix: str,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/key/{prefix}".format(
@@ -55,8 +56,8 @@ def sync_detailed(
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         prefix (str):
@@ -87,8 +88,8 @@ def sync(
 ) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         prefix (str):
@@ -114,8 +115,8 @@ async def asyncio_detailed(
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         prefix (str):
@@ -144,8 +145,8 @@ async def asyncio(
 ) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         prefix (str):

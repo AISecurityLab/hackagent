@@ -18,6 +18,7 @@ import yaml
 from pydantic import ValidationError
 
 from hackagent.orchestrator.campaign import CampaignSpec
+from hackagent.core.credentials import CredentialError, validate_file_credentials
 
 from .schema import Path
 
@@ -138,6 +139,7 @@ class CampaignDraft:
     # -- persistence ----------------------------------------------------
 
     def to_yaml(self) -> str:
+        validate_file_credentials(self.data)
         ordered = {key: self.data[key] for key in _SECTION_ORDER if key in self.data}
         ordered.update(
             (key, value) for key, value in self.data.items() if key not in ordered
@@ -149,11 +151,15 @@ class CampaignDraft:
         data = yaml.safe_load(text)
         if not isinstance(data, dict):
             raise ValueError("A campaign file must be a YAML mapping.")
+        validate_file_credentials(data)
         return cls(data)
 
     # -- validation -----------------------------------------------------
 
     def validate(self) -> tuple[Optional[CampaignSpec], tuple[Issue, ...]]:
+        credential_issues = self._credential_issues(self.data)
+        if credential_issues:
+            return None, tuple(credential_issues)
         issues = list(self._attack_issues())
         try:
             spec: Optional[CampaignSpec] = CampaignSpec.model_validate(self.data)
@@ -170,6 +176,23 @@ class CampaignDraft:
                     )
                 )
         return (spec if not issues else None), tuple(issues)
+
+    @staticmethod
+    def _credential_issues(value: Any, path: Path = ()) -> list[Issue]:
+        issues = []
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {"api_key", "api_key_env"}:
+                    try:
+                        validate_file_credentials({key: child})
+                    except CredentialError as exc:
+                        issues.append(Issue((*path, key), str(exc)))
+                else:
+                    issues.extend(CampaignDraft._credential_issues(child, (*path, key)))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                issues.extend(CampaignDraft._credential_issues(child, (*path, index)))
+        return issues
 
     def _attack_issues(self) -> list[Issue]:
         """What campaign resolution would reject: bad parameters, missing roles."""

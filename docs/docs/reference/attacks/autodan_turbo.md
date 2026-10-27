@@ -8,7 +8,7 @@ sidebar_position: 2
 
 Lifelong jailbreak strategy search with warm-up and retrieval phases.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 A lifelong strategy search over a shared, growing library.
 

@@ -13,6 +13,7 @@ def _get_kwargs(
     *,
     page: int | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["page"] = page
@@ -61,8 +62,8 @@ def sync_detailed(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
-    Web-only endpoint - requires Auth0 authentication.
-    User profile management requires OAuth context and is not for SDK use.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):
@@ -94,8 +95,8 @@ def sync(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
-    Web-only endpoint - requires Auth0 authentication.
-    User profile management requires OAuth context and is not for SDK use.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):
@@ -122,8 +123,8 @@ async def asyncio_detailed(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
-    Web-only endpoint - requires Auth0 authentication.
-    User profile management requires OAuth context and is not for SDK use.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):
@@ -153,8 +154,8 @@ async def asyncio(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
-    Web-only endpoint - requires Auth0 authentication.
-    User profile management requires OAuth context and is not for SDK use.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         page (int | Unset):

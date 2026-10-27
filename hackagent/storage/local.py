@@ -223,41 +223,26 @@ class LocalBackend:
 
     # ── Agent ─────────────────────────────────────────────────────────────────
 
-    def create_or_update_agent(
-        self,
-        name: str,
-        agent_type: str,
-        endpoint: str,
-        metadata: Dict[str, Any],
-        overwrite_metadata: bool = True,
-    ) -> AgentRecord:
+    def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:
         ctx = self.get_context()
         now = _now_str()
-        meta_json = json.dumps({k: v for k, v in metadata.items() if v is not None})
+        connection = config.get("connection") or {}
+        agent_type = str(connection.get("type") or "")
+        endpoint = str(connection.get("endpoint") or "")
+        config_json = json.dumps(config)
 
         with self._lock:
-            cur = self._conn.execute(
-                "SELECT id, metadata_json, created_at FROM agents WHERE name = ? LIMIT 1",
+            row = self._conn.execute(
+                "SELECT id, created_at FROM agents WHERE name = ? LIMIT 1",
                 (name,),
-            )
-            row = cur.fetchone()
+            ).fetchone()
             if row:
                 agent_id = UUID(row["id"])
                 created_at = row["created_at"]
-                if overwrite_metadata:
-                    existing_meta = json.loads(row["metadata_json"] or "{}")
-                    merged = {**existing_meta, **metadata}
-                    merged_json = json.dumps(
-                        {k: v for k, v in merged.items() if v is not None}
-                    )
-                    self._conn.execute(
-                        "UPDATE agents SET agent_type=?, endpoint=?, metadata_json=?, updated_at=? WHERE id=?",
-                        (agent_type, endpoint, merged_json, now, str(agent_id)),
-                    )
-                    self._conn.commit()
-                    final_meta = json.loads(merged_json)
-                else:
-                    final_meta = json.loads(row["metadata_json"] or "{}")
+                self._conn.execute(
+                    "UPDATE agents SET agent_type=?, endpoint=?, metadata_json=?, updated_at=? WHERE id=?",
+                    (agent_type, endpoint, config_json, now, str(agent_id)),
+                )
             else:
                 agent_id = uuid.uuid4()
                 created_at = now
@@ -270,27 +255,24 @@ class LocalBackend:
                         name,
                         agent_type,
                         endpoint,
-                        meta_json,
+                        config_json,
                         str(ctx.org_id),
                         "local",
                         now,
                         now,
                     ),
                 )
-                self._conn.commit()
-                final_meta = metadata
+            self._conn.commit()
 
         return AgentRecord(
             id=agent_id,
             name=name,
             agent_type=agent_type,
             endpoint=endpoint,
-            metadata=final_meta,
+            metadata=json.loads(config_json),
             organization=ctx.org_id,
             owner="local",
-            created_at=_to_dt(
-                created_at if not isinstance(created_at, str) else created_at
-            ),
+            created_at=_to_dt(created_at),
             updated_at=_to_dt(now),
         )
 
@@ -395,13 +377,9 @@ class LocalBackend:
 
     # ── Campaign run ──────────────────────────────────────────────────────────
 
-    def create_campaign_run(
-        self,
-        agent_id: UUID,
-        name: str,
-        campaign_config: Dict[str, Any],
-    ) -> CampaignRunRecord:
+    def start_campaign(self, agent_id: UUID, spec: Dict[str, Any]) -> CampaignRunRecord:
         campaign_run_id = uuid.uuid4()
+        name = str((spec.get("campaign") or {}).get("name") or "Campaign")
         now = _now_str()
         with self._lock:
             self._conn.execute(
@@ -412,8 +390,8 @@ class LocalBackend:
                     str(campaign_run_id),
                     str(agent_id),
                     name,
-                    json.dumps(campaign_config),
-                    "PENDING",
+                    json.dumps(spec),
+                    "RUNNING",
                     now,
                     now,
                 ),
@@ -423,9 +401,9 @@ class LocalBackend:
             id=campaign_run_id,
             agent_id=agent_id,
             name=name,
-            campaign_config=campaign_config,
+            campaign_config=spec,
             audit=None,
-            status="PENDING",
+            status="RUNNING",
             run_notes=None,
             created_at=_to_dt(now),
             updated_at=_to_dt(now),

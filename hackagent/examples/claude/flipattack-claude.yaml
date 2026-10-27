@@ -38,6 +38,6 @@ evaluation:
       connection:
         provider: anthropic
         type: LITELLM
-        api_key_env: ANTHROPIC_API_KEY
+        api_key: "${ANTHROPIC_API_KEY}"
       scoring:
         type: harmbench

@@ -70,15 +70,13 @@ class BaseTab(Container):
         self._did_initial_refresh = False
 
     def client(self):
-        """Session used for reads. Remote when an API key is configured."""
+        """Session using the explicitly selected storage backend."""
         from hackagent import HackAgent, Settings
 
-        return HackAgent(
-            Settings.resolve(
-                api_key=self.cli_config.api_key or "",
-                base_url=self.cli_config.base_url,
-            )
-        )
+        settings = getattr(self.cli_config, "settings", None)
+        if not isinstance(settings, Settings):
+            settings = Settings.resolve(base_url=self.cli_config.base_url)
+        return HackAgent(settings)
 
     def local_client(self):
         """Session over this machine's database, whatever the account is.
@@ -96,7 +94,8 @@ class BaseTab(Container):
         # no resolved settings must not invent a database out of what it has.
         return HackAgent(
             Settings.resolve(
-                api_key="", db_path=db_path if isinstance(db_path, str) else None
+                backend="local",
+                db_path=db_path if isinstance(db_path, str) else None,
             )
         )
 
@@ -120,7 +119,7 @@ class BaseTab(Container):
                     "[red]Authentication Failed[/red]\n\n"
                     "[yellow]Your API key is invalid or expired[/yellow]\n\n"
                     "[cyan]To fix:[/cyan]\n"
-                    "Run: hackagent config set --api-key YOUR_KEY\n\n"
+                    "Export a valid key in HACKAGENT_API_KEY\n\n"
                     "[dim]Press F5 to retry after updating[/dim]"
                 )
             else:

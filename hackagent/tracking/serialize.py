@@ -38,6 +38,15 @@ _USAGE_COUNT_KEYS: frozenset = frozenset(
     }
 )
 
+_USAGE_DETAILS_KEYS: frozenset = frozenset(
+    {
+        "prompt_tokens_details",
+        "completion_tokens_details",
+        "input_tokens_details",
+        "output_tokens_details",
+    }
+)
+
 
 def deep_clean(obj: Any) -> Any:
     """
@@ -98,7 +107,12 @@ def sanitize_for_json(obj: Any) -> Any:
                 sanitized[k] = f"<{type(v).__name__}>"
                 continue
             usage_count = k in _USAGE_COUNT_KEYS and isinstance(v, (int, float))
-            if not usage_count and any(s in k.lower() for s in _SENSITIVE_SUBSTRINGS):
+            usage_details = k in _USAGE_DETAILS_KEYS and isinstance(v, dict)
+            if (
+                not usage_count
+                and not usage_details
+                and any(s in k.lower() for s in _SENSITIVE_SUBSTRINGS)
+            ):
                 sanitized[k] = "***REDACTED***"
                 continue
             sanitized[k] = sanitize_for_json(v)

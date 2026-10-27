@@ -9,6 +9,14 @@ Model implementation backed directly by LiteLLM.
 
 LiteLLM provider prefixes a model string may already carry.
 
+#### uses\_alternative\_auth
+
+```python
+def uses_alternative_auth(model: str) -> bool
+```
+
+Providers that use local access or cloud identity instead of an API key.
+
 #### resolve\_litellm\_model
 
 ```python

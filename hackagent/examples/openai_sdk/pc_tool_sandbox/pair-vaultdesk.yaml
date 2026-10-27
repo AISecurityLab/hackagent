@@ -44,7 +44,7 @@ attacks:
           provider: openrouter
           type: OPENAI
           endpoint: https://openrouter.ai/api/v1
-          api_key_env: OPENROUTER_API_KEY
+          api_key: "${OPENROUTER_API_KEY}"
         generation:
           max_tokens: 800
       scorer:
@@ -53,6 +53,6 @@ attacks:
           provider: openrouter
           type: OPENAI
           endpoint: https://openrouter.ai/api/v1
-          api_key_env: OPENROUTER_API_KEY
+          api_key: "${OPENROUTER_API_KEY}"
         generation:
           max_tokens: 120

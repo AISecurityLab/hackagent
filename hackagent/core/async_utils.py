@@ -21,6 +21,12 @@ def run_coroutine_blocking(coro_factory: Callable[[], Awaitable[T]]) -> T:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
+        running = False
+    else:
+        running = True
+    if not running:
+        # Outside the except block, so the coroutine's errors keep the error
+        # they were raised while handling instead of "no running event loop".
         return asyncio.run(coro_factory())
 
     from concurrent.futures import ThreadPoolExecutor

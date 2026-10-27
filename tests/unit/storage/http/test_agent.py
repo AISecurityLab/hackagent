@@ -30,6 +30,14 @@ from hackagent.storage._http.api.models import (
 )  # For agent_partial_update
 
 
+def _config(agent_type: str, endpoint: str) -> dict:
+    """An agent's model config, as the API stores it."""
+    return {
+        "name": "test-model",
+        "connection": {"type": agent_type, "endpoint": endpoint},
+    }
+
+
 class TestAgentListAPI(unittest.TestCase):
     @patch("hackagent.storage._http.api.agent.agent_list.AuthenticatedClient")
     def test_agent_list_sync_detailed_success(self, MockAuthenticatedClient):
@@ -51,7 +59,7 @@ class TestAgentListAPI(unittest.TestCase):
             },  # Added organization_detail
             "owner": None,
             "owner_detail": None,
-            "metadata": None,
+            "config": _config(AgentType.LITELLM.value, "http://example.com/agent"),
             "description": "A test agent",
             "created_at": "2023-01-01T12:00:00Z",
             "updated_at": "2023-01-01T12:00:00Z",
@@ -149,16 +157,15 @@ class TestAgentCreateAPI(unittest.TestCase):
         agent_id_for_request = uuid.uuid4()
         agent_request_data = AgentRequest(
             name="New Test Agent",
-            agent_type=AgentType.GOOGLE_ADK.value,
-            endpoint="http://example.com/adk",
+            config=_config(AgentType.GOOGLE_ADK.value, "http://example.com/adk"),
         )
 
         mock_created_agent_id = uuid.uuid4()
         mock_response_content = {
             "id": str(mock_created_agent_id),
             "name": agent_request_data.name,
-            "agent_type": agent_request_data.agent_type,
-            "endpoint": agent_request_data.endpoint,
+            "agent_type": agent_request_data.config["connection"]["type"],
+            "endpoint": agent_request_data.config["connection"]["endpoint"],
             "organization": str(agent_id_for_request),
             "organization_detail": {
                 "id": str(agent_id_for_request),
@@ -166,7 +173,7 @@ class TestAgentCreateAPI(unittest.TestCase):
             },
             "owner": None,
             "owner_detail": None,
-            "metadata": None,
+            "config": _config(AgentType.LITELLM.value, "http://example.com/agent"),
             "description": None,
             "created_at": "2023-01-01T12:00:00Z",
             "updated_at": "2023-01-01T12:00:00Z",
@@ -217,8 +224,7 @@ class TestAgentCreateAPI(unittest.TestCase):
 
         agent_request_data = AgentRequest(
             name="Error Agent",
-            agent_type=AgentType.GOOGLE_ADK.value,
-            endpoint="http://error-test.example.com",
+            config=_config(AgentType.GOOGLE_ADK.value, "http://error-test.example.com"),
         )
 
         mock_httpx_response = MagicMock()
@@ -246,8 +252,9 @@ class TestAgentCreateAPI(unittest.TestCase):
 
         agent_request_data = AgentRequest(
             name="Error Agent False",
-            agent_type=AgentType.GOOGLE_ADK.value,
-            endpoint="http://error-false-test.example.com",
+            config=_config(
+                AgentType.GOOGLE_ADK.value, "http://error-false-test.example.com"
+            ),
         )
 
         mock_httpx_response = MagicMock()
@@ -284,7 +291,7 @@ class TestAgentRetrieveAPI(unittest.TestCase):
             },
             "owner": None,
             "owner_detail": None,
-            "metadata": None,
+            "config": _config(AgentType.LITELLM.value, "http://example.com/agent"),
             "description": "A retrieved agent.",
             "created_at": "2023-01-02T10:00:00Z",
             "updated_at": "2023-01-02T11:00:00Z",
@@ -378,8 +385,9 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_to_update = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Updated Test Agent",
-            agent_type=AgentType.LITELLM.value,
-            endpoint="http://example.com/updated-litellm",
+            config=_config(
+                AgentType.LITELLM.value, "http://example.com/updated-litellm"
+            ),
             description="Updated description",
         )
 
@@ -387,8 +395,8 @@ class TestAgentUpdateAPI(unittest.TestCase):
         mock_updated_agent_response_content = {
             "id": str(agent_id_to_update),
             "name": agent_update_request_data.name,
-            "agent_type": agent_update_request_data.agent_type,
-            "endpoint": agent_update_request_data.endpoint,
+            "agent_type": agent_update_request_data.config["connection"]["type"],
+            "endpoint": agent_update_request_data.config["connection"]["endpoint"],
             "organization": mock_org_id_update,
             "organization_detail": {
                 "id": mock_org_id_update,
@@ -396,7 +404,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
             },
             "owner": None,
             "owner_detail": None,
-            "metadata": None,
+            "config": _config(AgentType.LITELLM.value, "http://example.com/agent"),
             "description": agent_update_request_data.description,
             "created_at": "2023-01-01T12:00:00Z",
             "updated_at": "2023-01-03T10:00:00Z",  # Updated time
@@ -453,8 +461,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_not_found = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="NonExistent Update",
-            agent_type=AgentType.GOOGLE_ADK.value,
-            endpoint="http://error-test.example.com",
+            config=_config(AgentType.GOOGLE_ADK.value, "http://error-test.example.com"),
         )
 
         mock_httpx_response = MagicMock()
@@ -485,8 +492,9 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_error = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Update Error False",
-            agent_type=AgentType.LITELLM.value,
-            endpoint="http://error-false-test.example.com",
+            config=_config(
+                AgentType.LITELLM.value, "http://error-false-test.example.com"
+            ),
         )
 
         mock_httpx_response = MagicMock()
@@ -606,7 +614,7 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
             },
             "owner": None,
             "owner_detail": None,
-            "metadata": {"info": "original metadata"},
+            "config": _config(AgentType.LITELLM.value, "http://example.com/agent"),
             "description": agent_patch_request_data.description,
             "created_at": "2023-01-01T12:00:00Z",
             "updated_at": "2023-01-04T10:00:00Z",
@@ -691,7 +699,9 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
 
         agent_id_error = uuid.uuid4()
         agent_patch_request_data = PatchedAgentRequest(
-            endpoint="http://invalid.example.com/url/for/patch"
+            config=_config(
+                AgentType.LITELLM.value, "http://invalid.example.com/url/for/patch"
+            )
         )
 
         mock_httpx_response = MagicMock()

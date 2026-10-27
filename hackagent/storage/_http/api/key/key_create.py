@@ -60,8 +60,8 @@ def sync_detailed(
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.
@@ -94,8 +94,8 @@ def sync(
 ) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.
@@ -123,8 +123,8 @@ async def asyncio_detailed(
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.
@@ -155,8 +155,8 @@ async def asyncio(
 ) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
-    Web-only endpoint - requires Auth0 authentication.
-    API keys cannot manage other API keys for security reasons.
+    Web-only endpoint - API keys cannot manage other API keys.
+    Only login token (session) authentication allowed.
 
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.

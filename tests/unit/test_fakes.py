@@ -10,7 +10,7 @@ def test_recording_store_remembers_reads_and_delete_run():
 
     store = RecordingStore()
     agent = store.create_or_update_agent(
-        name="bot", agent_type="OPENAI_SDK", endpoint="http://x", metadata={}
+        "bot", {"connection": {"type": "OPENAI_SDK", "endpoint": "http://x"}}
     )
     attack = store.create_attack("pair", agent.id, store.context.org_id, {})
     run = store.create_run(attack.id, agent.id, {})
@@ -27,7 +27,7 @@ def test_in_memory_store_is_isolated():
     first, second = in_memory_store(), in_memory_store()
     try:
         first.create_or_update_agent(
-            name="a", agent_type="OLLAMA", endpoint="http://x", metadata={}
+            "a", {"connection": {"type": "OLLAMA", "endpoint": "http://x"}}
         )
         assert first.list_agents().total == 1
         assert second.list_agents().total == 0

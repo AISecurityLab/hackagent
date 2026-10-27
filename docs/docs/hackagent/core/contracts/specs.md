@@ -13,6 +13,10 @@ class ModelSpec(BaseModel)
 
 How to reach one model: the target or any role model.
 
+#### api\_key
+
+Secret value injected at runtime. Excluded from dumps and repr.
+
 ## JudgeSpec Objects
 
 ```python

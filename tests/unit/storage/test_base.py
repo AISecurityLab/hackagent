@@ -276,7 +276,7 @@ class TestStorageBackendProtocol(unittest.TestCase):
                     "delete_agent",
                     "create_attack",
                     "list_attacks",
-                    "create_campaign_run",
+                    "start_campaign",
                     "update_campaign_run",
                     "list_campaign_runs",
                     "get_campaign_run",
