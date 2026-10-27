@@ -2954,7 +2954,7 @@ wheels = [
 
 [[package]]
 name = "hackagent"
-version = "0.13.0a2"
+version = "0.12.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
