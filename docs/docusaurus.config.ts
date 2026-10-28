@@ -28,6 +28,7 @@ const PAGE_REDIRECTS: Record<string, string> = {
   '/attacks/fc': '/reference/attacks/fc',
   '/attacks/flipattack': '/reference/attacks/flipattack',
   '/attacks/h4rm3l': '/reference/attacks/h4rm3l',
+  '/attacks/h4rm3l_synth': '/reference/attacks/h4rm3l_synth',
   '/attacks/mml': '/reference/attacks/mml',
   '/attacks/pair': '/reference/attacks/pair',
   '/attacks/pap': '/reference/attacks/pap',

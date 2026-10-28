@@ -42,6 +42,8 @@ attacks:
     roles: {attacker: *role}
   - name: advprefix
     roles: {attacker: *role}
+  - name: h4rm3l_synth
+    roles: {synthesizer: *role}
   - name: tool_output_ipi
   - name: rag
     parameters:

@@ -35,6 +35,7 @@ _ATTACKS: dict[str, str] = {
     "tool_output_ipi": "indirect.tool_output_ipi:ToolOutputIPIAttack",
     "rag": "indirect.rag:RagAttack",
     "autodan_turbo": "adaptive.autodan_turbo:AutoDANTurboAttack",
+    "h4rm3l_synth": "adaptive.h4rm3l_synth:H4rm3lSynthAttack",
 }
 
 ATTACKS = frozenset(_ATTACKS)

@@ -41,6 +41,7 @@ _ADAPTIVE = (
     "bon",
     "advprefix",
     "autodan_turbo",
+    "h4rm3l_synth",
     "tool_output_ipi",
 )
 _MULTI_TURN = ("crescendo",)

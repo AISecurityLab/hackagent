@@ -76,6 +76,7 @@ Every technique HackAgent can run.
 | [FC-Attack](fc.md) | Static | none | FC-Attack: auto-generated flowchart images to jailbreak VLMs. |
 | [FlipAttack](flipattack.md) | Static | none | Prompt obfuscation via character/word flipping modes. |
 | [h4rm3l](h4rm3l.md) | Static | none | Composable decorator-program attack chaining multiple obfuscations. |
+| [h4rm3l_synth](h4rm3l_synth.md) | Adaptive | `synthesizer` |  |
 | [MML](mml.md) | Static | none | Multi-Modal Linkage attack encoding harmful prompts into images for VLMs. |
 | [PAIR](pair.md) | Adaptive | `attacker` | Prompt Automatic Iterative Refinement with attacker/scorer loops. |
 | [PAP](pap.md) | Adaptive | `attacker` | Persuasive Adversarial Prompts using persuasion-technique taxonomies. |

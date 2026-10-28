@@ -11,6 +11,7 @@ from .base import (
 from .compiler import (
     LLM_ASSISTED_DECORATOR_NAMES,
     compile_program,
+    decorator_namespace,
     is_llm_assisted_decorator_name,
     program_uses_llm_assisted_decorators,
 )
@@ -105,6 +106,7 @@ __all__ = [
     "WikipediaDecorator",
     "WordMixInDecorator",
     "compile_program",
+    "decorator_namespace",
     "is_llm_assisted_decorator_name",
     "program_uses_llm_assisted_decorators",
 ]

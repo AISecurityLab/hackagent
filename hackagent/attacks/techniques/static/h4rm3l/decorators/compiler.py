@@ -127,6 +127,16 @@ _DECORATOR_NAMESPACE = {
 }
 
 
+def decorator_namespace() -> dict[str, type[PromptDecorator]]:
+    """The primitives a program may name, by the name it names them with.
+
+    This is what the compiler accepts, which is narrower than the package's
+    ``__all__``: that also exports the base classes and the compiler itself.
+    Anything offering a catalogue of primitives should read it from here.
+    """
+    return dict(_DECORATOR_NAMESPACE)
+
+
 def _missing_completion(name: str) -> Callable[..., PromptDecorator]:
     def constructor(*_args: object, **_kwargs: object) -> PromptDecorator:
         raise ValueError(
