@@ -82,6 +82,13 @@ _STOP = object()
 # bounded without ever dropping a trace.
 _WRITE_QUEUE_MAXSIZE = 1000
 
+# A campaign run is a parent marker, not an attack, but the hosted API rejects
+# a run whose `attack` is null (it answers 500, not 400, although its own
+# schema types the field as optional). One attack of this type per agent
+# stands in as the parent's owner; nothing reads it back — a campaign run is
+# recognised by the `_record_type` marker in its run_config.
+_CAMPAIGN_ATTACK_TYPE = "campaign"
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -203,6 +210,7 @@ class RemoteBackend:
     def __init__(self, client: AuthenticatedClient) -> None:
         self._client = client
         self._context: Optional[OrganizationContext] = None  # cached
+        self._campaign_attacks: Dict[UUID, UUID] = {}  # agent id → sentinel
 
         # Append-only writes (traces, result-status updates) are persistence
         # only — never read back during a run — so they are pushed onto a queue
@@ -521,6 +529,41 @@ class RemoteBackend:
 
     # ── Campaign run ──────────────────────────────────────────────────────────
 
+    def _campaign_attack_id(self, agent_id: UUID) -> UUID:
+        """Return the agent's campaign sentinel attack, creating it once.
+
+        See :data:`_CAMPAIGN_ATTACK_TYPE` for why a parent record needs one.
+        """
+        cached = self._campaign_attacks.get(agent_id)
+        if cached is not None:
+            return cached
+
+        page = 1
+        while True:
+            resp = attack_list.sync_detailed(client=self._client, page=page)
+            if resp.status_code != 200 or not resp.parsed:
+                break
+            for a in resp.parsed.results or []:
+                a_type = a.type.value if hasattr(a.type, "value") else str(a.type)
+                if a_type == _CAMPAIGN_ATTACK_TYPE and a.agent == agent_id:
+                    self._campaign_attacks[agent_id] = a.id
+                    return a.id
+            next_page = getattr(resp.parsed, "next", None)
+            if next_page is None:
+                next_page = getattr(resp.parsed, "next_", None)
+            if not next_page:
+                break
+            page += 1
+
+        sentinel = self.create_attack(
+            attack_type=_CAMPAIGN_ATTACK_TYPE,
+            agent_id=agent_id,
+            organization=self.get_context().org_id,
+            configuration={"_record_type": "campaign_attack"},
+        )
+        self._campaign_attacks[agent_id] = sentinel.id
+        return sentinel.id
+
     def create_campaign_run(
         self,
         agent_id: UUID,
@@ -540,7 +583,11 @@ class RemoteBackend:
             "campaign_config": campaign_config,
             "evaluation_audit": None,
         }
-        body = RunRequest(agent=agent_id, attack=None, run_config=config)
+        body = RunRequest(
+            agent=agent_id,
+            attack=self._campaign_attack_id(agent_id),
+            run_config=config,
+        )
         resp = run_run_tests_create.sync_detailed(client=self._client, body=body)
         if resp.status_code not in (200, 201):
             raise RuntimeError(

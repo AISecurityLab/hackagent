@@ -1069,9 +1069,11 @@ class TestRemoteBackendCampaignRun(unittest.TestCase):
         self.backend = RemoteBackend(self.client)
         self.backend._context = OrganizationContext(org_id=_uid(), user_id="1")
 
-    def test_create_campaign_run_posts_a_marked_parent_with_no_attack(self):
+    def test_create_campaign_run_posts_a_marked_parent_under_the_sentinel(self):
         campaign_run_id = str(_uid())
         agent_id = _uid()
+        sentinel_id = _uid()
+        self.backend._campaign_attacks[agent_id] = sentinel_id
         spec = {"version": 1, "campaign": {"name": "Nightly"}}
 
         with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
@@ -1081,7 +1083,9 @@ class TestRemoteBackendCampaignRun(unittest.TestCase):
             record = self.backend.create_campaign_run(agent_id, "Nightly", spec)
 
         body = mock_create.sync_detailed.call_args.kwargs["body"]
-        self.assertIsNone(body.attack)
+        # The hosted API answers 500 to a run whose attack is null, so the
+        # parent rides under the agent's campaign sentinel instead.
+        self.assertEqual(body.attack, sentinel_id)
         self.assertEqual(body.run_config["_record_type"], "campaign_run")
         self.assertEqual(body.run_config["campaign_config"], spec)
         self.assertEqual(str(record.id), campaign_run_id)
@@ -1090,10 +1094,57 @@ class TestRemoteBackendCampaignRun(unittest.TestCase):
         self.assertIsNone(record.audit)
 
     def test_create_campaign_run_raises_so_a_run_never_starts_unrecorded(self):
+        agent_id = _uid()
+        self.backend._campaign_attacks[agent_id] = _uid()
         with patch("hackagent.storage.remote.run_run_tests_create") as mock_create:
             mock_create.sync_detailed.return_value = _mock_response(500)
             with self.assertRaisesRegex(RuntimeError, "campaign run"):
-                self.backend.create_campaign_run(_uid(), "Nightly", {})
+                self.backend.create_campaign_run(agent_id, "Nightly", {})
+
+    def test_campaign_sentinel_is_reused_when_the_agent_already_has_one(self):
+        agent_id = _uid()
+        existing = MagicMock()
+        existing.id = _uid()
+        existing.agent = agent_id
+        existing.type = "campaign"
+        page = MagicMock()
+        page.results = [existing]
+        page.next = None
+        page.next_ = None
+
+        with (
+            patch("hackagent.storage.remote.attack_list") as mock_list,
+            patch("hackagent.storage.remote.attack_create") as mock_create,
+        ):
+            mock_list.sync_detailed.return_value = _mock_response(200, parsed=page)
+            found = self.backend._campaign_attack_id(agent_id)
+
+        self.assertEqual(found, existing.id)
+        mock_create.sync_detailed.assert_not_called()
+
+    def test_campaign_sentinel_is_created_once_then_cached(self):
+        agent_id = _uid()
+        sentinel_id = str(_uid())
+        empty = MagicMock()
+        empty.results = []
+        empty.next = None
+        empty.next_ = None
+
+        with (
+            patch("hackagent.storage.remote.attack_list") as mock_list,
+            patch("hackagent.storage.remote.attack_create") as mock_create,
+        ):
+            mock_list.sync_detailed.return_value = _mock_response(200, parsed=empty)
+            mock_create.sync_detailed.return_value = _mock_response(
+                201, content=f'{{"id": "{sentinel_id}"}}'.encode()
+            )
+            first = self.backend._campaign_attack_id(agent_id)
+            second = self.backend._campaign_attack_id(agent_id)
+
+        self.assertEqual(str(first), sentinel_id)
+        self.assertEqual(first, second)
+        # Cached: the second campaign of a session costs no extra round-trip.
+        self.assertEqual(mock_create.sync_detailed.call_count, 1)
 
     def test_get_campaign_run_reads_the_marker_back(self):
         audit = {"passed": True, "precision": 1.0}
