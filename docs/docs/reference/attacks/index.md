@@ -61,7 +61,7 @@ Every technique HackAgent can run.
 
 **Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it usually needs an attacker model.
 
 **Multi-turn.** Holds one growing conversation with the target, escalating turn by turn.
 
@@ -75,8 +75,7 @@ Every technique HackAgent can run.
 | [Crescendo](crescendo.md) | Multi-turn | `attacker` | Multi-turn escalation attack that gradually steers a persistent conversation toward the goal, with judge-driven backtracking on refusals. |
 | [FC-Attack](fc.md) | Static | none | FC-Attack: auto-generated flowchart images to jailbreak VLMs. |
 | [FlipAttack](flipattack.md) | Static | none | Prompt obfuscation via character/word flipping modes. |
-| [h4rm3l](h4rm3l.md) | Static | none | Composable decorator-program attack chaining multiple obfuscations. |
-| [h4rm3l_synth](h4rm3l_synth.md) | Adaptive | `synthesizer` |  |
+| [h4rm3l](h4rm3l.md) | Adaptive | none | Composable decorator-program attack chaining multiple obfuscations, with an optional search for the program that works best. |
 | [MML](mml.md) | Static | none | Multi-Modal Linkage attack encoding harmful prompts into images for VLMs. |
 | [PAIR](pair.md) | Adaptive | `attacker` | Prompt Automatic Iterative Refinement with attacker/scorer loops. |
 | [PAP](pap.md) | Adaptive | `attacker` | Persuasive Adversarial Prompts using persuasion-technique taxonomies. |

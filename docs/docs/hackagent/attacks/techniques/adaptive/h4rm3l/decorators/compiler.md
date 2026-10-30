@@ -1,6 +1,6 @@
 ---
 sidebar_label: compiler
-title: hackagent.attacks.techniques.static.h4rm3l.decorators.compiler
+title: hackagent.attacks.techniques.adaptive.h4rm3l.decorators.compiler
 ---
 
 Public facade and compiler for the h4rm3l decorator engine.
@@ -12,6 +12,18 @@ def is_llm_assisted_decorator_name(name: str) -> bool
 ```
 
 Return True if the decorator class name is LLM-assisted.
+
+#### decorator\_namespace
+
+```python
+def decorator_namespace() -> dict[str, type[PromptDecorator]]
+```
+
+The primitives a program may name, by the name it names them with.
+
+This is what the compiler accepts, which is narrower than the package&#x27;s
+`__all__`: that also exports the base classes and the compiler itself.
+Anything offering a catalogue of primitives should read it from here.
 
 #### compile\_program
 

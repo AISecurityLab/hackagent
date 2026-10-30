@@ -9,7 +9,7 @@ import inspect
 import logging
 from typing import Optional
 
-from ...base import Completion
+from ....contract import Completion
 from .base import LLMPromptDecorator
 
 logger = logging.getLogger(__name__)

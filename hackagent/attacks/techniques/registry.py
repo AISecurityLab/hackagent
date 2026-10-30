@@ -22,11 +22,11 @@ _ATTACKS: dict[str, str] = {
     "static_template": "static.static_template:StaticTemplateAttack",
     "flipattack": "static.flipattack:FlipAttack",
     "cipherchat": "static.cipherchat:CipherChatAttack",
-    "h4rm3l": "static.h4rm3l:H4rm3lAttack",
     "mml": "static.mml:MMLAttack",
     "fc": "static.fc:FCAttack",
     "tfc": "static.fc:tFCAttack",
     "bon": "adaptive.bon:BoNAttack",
+    "h4rm3l": "adaptive.h4rm3l:H4rm3lAttack",
     "pap": "adaptive.pap:PAPAttack",
     "pair": "adaptive.pair:PAIRAttack",
     "tap": "adaptive.tap:TAPAttack",
@@ -35,7 +35,6 @@ _ATTACKS: dict[str, str] = {
     "tool_output_ipi": "indirect.tool_output_ipi:ToolOutputIPIAttack",
     "rag": "indirect.rag:RagAttack",
     "autodan_turbo": "adaptive.autodan_turbo:AutoDANTurboAttack",
-    "h4rm3l_synth": "adaptive.h4rm3l_synth:H4rm3lSynthAttack",
 }
 
 ATTACKS = frozenset(_ATTACKS)

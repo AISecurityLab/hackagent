@@ -28,7 +28,6 @@ _STATIC = (
     "static_template",
     "flipattack",
     "cipherchat",
-    "h4rm3l",
     "mml",
     "fc",
     "tfc",
@@ -37,11 +36,11 @@ _STATIC = (
 _ADAPTIVE = (
     "pair",
     "tap",
+    "h4rm3l",
     "pap",
     "bon",
     "advprefix",
     "autodan_turbo",
-    "h4rm3l_synth",
     "tool_output_ipi",
 )
 _MULTI_TURN = ("crescendo",)

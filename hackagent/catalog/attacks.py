@@ -55,7 +55,10 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
     },
     "h4rm3l": {
         "label": "h4rm3l",
-        "description": "Composable decorator-program attack chaining multiple obfuscations.",
+        "description": (
+            "Composable decorator-program attack chaining multiple obfuscations, "
+            "with an optional search for the program that works best."
+        ),
     },
     "pap": {
         "label": "PAP",

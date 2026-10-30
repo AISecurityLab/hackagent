@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import inspect
 
-from ...static.h4rm3l.decorators import decorator_namespace
+from .decorators import decorator_namespace
 
 #: Supplied by the compiler, never written by a program.
 _SUPPLIED = frozenset({"self", "completion"})

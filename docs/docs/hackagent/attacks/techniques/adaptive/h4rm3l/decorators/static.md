@@ -1,6 +1,6 @@
 ---
 sidebar_label: static
-title: hackagent.attacks.techniques.static.h4rm3l.decorators.static
+title: hackagent.attacks.techniques.adaptive.h4rm3l.decorators.static
 ---
 
 Static h4rm3l prompt decorators.

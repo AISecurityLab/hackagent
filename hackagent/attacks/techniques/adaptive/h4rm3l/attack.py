@@ -1,11 +1,17 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""h4rm3l synthesis: search the decorator language for programs that work.
+"""h4rm3l: compose prompt decorators into a program, and search for one.
 
-Where ``h4rm3l`` runs a program you wrote, this searches for one. Synthesis
-happens once per run, in :meth:`prepare`: each round shows the synthesizer
-the programs that have scored best, compiles what it proposes, scores the
+A program is an expression in a small language of composable prompt
+decorators, and the attack sends the goal rewritten by it. Which program
+is the whole question, so this answers it two ways from one configuration.
+
+Without a ``synthesizer`` role it runs the program it was given — a preset
+or one written by hand — once per goal: no model in the loop, no search,
+the cheap repeatable baseline. With one, :meth:`prepare` searches the
+language first, as the paper does: each round shows the synthesizer the
+programs that have scored best, compiles what it proposes, scores the
 valid ones against the target on goals drawn afresh for each, and keeps
 those above the pool's mean. :meth:`search` then applies the best programs
 the pool ended with to each goal, one request each.
@@ -26,40 +32,48 @@ from typing import Callable, Optional
 
 from ...contract import Completion, Judge, Target
 from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
-from ...static.h4rm3l.decorators import compile_program
-from ...static.h4rm3l.programs import PRESET_PROGRAMS
 from ...trace import decision, phase
-from .config import H4rm3lSynthParams
+from .config import H4rm3lParams
+from .decorators import compile_program
 from .pool import ProgramPool
 from .primitives import primitive_signatures
+from .programs import PRESET_PROGRAMS, resolve_program
 from .prompts import SYSTEM_PROMPT, build_proposal_prompt, parse_programs
 
 Decorate = Callable[[str], object]
 
 
-class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
-    """A search over decorator programs, shared by every goal."""
+class H4rm3lAttack(IterativeAttack[H4rm3lParams]):
+    """A decorator program per goal, found by search when one is configured."""
 
-    name = "h4rm3l_synth"
-    params_type = H4rm3lSynthParams
+    name = "h4rm3l"
+    params_type = H4rm3lParams
 
-    def __init__(self, params: H4rm3lSynthParams) -> None:
+    def __init__(self, params: H4rm3lParams) -> None:
         super().__init__(params)
-        if params.synthesizer is None:
-            raise ValueError(
-                "h4rm3l_synth needs a 'synthesizer' role to write programs."
-            )
-        self.synthesizer: Completion = params.synthesizer
+        self.synthesizer: Optional[Completion] = params.synthesizer
+        self._compiled: dict[str, Decorate] = {}
+        self.program = resolve_program(params.program)
+        # Eagerly, so a program that cannot compile fails while the campaign
+        # is being built rather than against the first goal.
+        self._compiled[self.program] = self._build(self.program)
+
         self.pool = ProgramPool()
         self._rng = random.Random(params.seed)
         if params.seed is not None:
             self.pool._random.seed(params.seed)
-        self.pool.seed(list(PRESET_PROGRAMS.values()))
+        if self.synthesizer is not None:
+            self.pool.seed([self.program, *PRESET_PROGRAMS.values()])
         self.primitives = primitive_signatures(
             with_decorator_model=params.decorator is not None
         )
 
     # ── compilation ───────────────────────────────────────────────────────────
+
+    def _build(self, program: str) -> Decorate:
+        return compile_program(
+            program, self.params.syntax_version, completion=self.params.decorator
+        )
 
     def _compile(self, program: str) -> Optional[Decorate]:
         """Compile ``program``, or ``None`` when it is not a valid one.
@@ -68,12 +82,11 @@ class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
         the one failure that says nothing about the attack and everything
         about what the synthesizer was told, so it must not be silent.
         """
+        decorate = self._compiled.get(program)
+        if decorate is not None:
+            return decorate
         try:
-            return compile_program(
-                program,
-                self.params.syntax_version,
-                completion=self.params.decorator,
-            )
+            decorate = self._build(program)
         except (ValueError, TypeError, SyntaxError, KeyError) as error:
             decision(
                 "skipped",
@@ -81,20 +94,31 @@ class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
                 program=program,
             )
             return None
+        self._compiled[program] = decorate
+        return decorate
 
     async def _apply(self, decorate: Decorate, goal: str) -> Optional[str]:
-        """Run a compiled program over ``goal``; ``None`` when it fails."""
+        """Run a compiled program over ``goal``; ``None`` when it fails.
+
+        The reason is recorded: a decorator that needs a model and cannot
+        reach it fails here, and the trace is the only place that shows it.
+        """
         try:
             result = decorate(goal)
             prompt = await result if inspect.isawaitable(result) else result
-        except Exception:
+        except Exception as error:
+            decision("skipped", f"the program raised: {error}")
             return None
-        return prompt.strip() if isinstance(prompt, str) and prompt.strip() else None
+        if not isinstance(prompt, str) or not prompt.strip():
+            decision("skipped", "the program returned no prompt")
+            return None
+        return prompt.strip()
 
     # ── synthesis ─────────────────────────────────────────────────────────────
 
     async def _propose(self, round_number: int) -> list[str]:
         """Ask the synthesizer for new programs, shown what has worked."""
+        assert self.synthesizer is not None
         chosen = self.pool.sample(
             self.params.examples, round_number, self.params.concentration
         )
@@ -155,6 +179,14 @@ class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
         self, goals: list[str], target: Target, judge: Optional[Judge] = None
     ) -> None:
         """Search the language for programs, before any goal is attacked."""
+        if self.synthesizer is None:
+            decision(
+                "skipped",
+                "no synthesizer role is configured, so the given program is "
+                "run as it is",
+                program=self.program,
+            )
+            return
         if judge is None:
             decision(
                 "skipped",
@@ -207,11 +239,17 @@ class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
 
     # ── search ────────────────────────────────────────────────────────────────
 
+    def _programs(self) -> list[str]:
+        """The programs to attack one goal with, best first."""
+        if self.synthesizer is None:
+            return [self.program]
+        return self.pool.best(self.params.programs_per_goal)
+
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
         findings: list[Finding] = []
-        programs = self.pool.best(self.params.programs_per_goal)
+        programs = self._programs()
 
         for index, program in enumerate(programs):
             label = f"program {index + 1}/{len(programs)}"
@@ -222,16 +260,16 @@ class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
 
                 prompt = await self._apply(decorate, goal)
                 if prompt is None:
-                    decision("skipped", "the program produced no usable prompt")
                     continue
 
                 messages = [{"role": "user", "content": prompt}]
                 reply = await target(messages)
                 if not reply.ok or not reply.text:
-                    decision("skipped", "the target gave no usable reply")
+                    decision("skipped", _why_unusable(reply))
                     continue
 
                 verdict = await judge_reply(judge, goal, prompt, reply.text)
+                entry = self.pool.entries.get(program)
                 findings.append(
                     Finding(
                         messages=messages,
@@ -240,7 +278,7 @@ class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
                         metadata={
                             "program": program,
                             "program_index": index,
-                            "program_asr": self.pool.entries[program].asr,
+                            "program_asr": entry.asr if entry else 0.0,
                         },
                         path=path,
                     )
@@ -252,4 +290,20 @@ class H4rm3lSynthAttack(IterativeAttack[H4rm3lSynthParams]):
         return findings
 
 
-__all__ = ["H4rm3lSynthAttack"]
+def _why_unusable(reply: object) -> str:
+    """Why a reply cannot be judged, in the words the run should report.
+
+    A defence that blocked the prompt and a provider that errored are not
+    the same event as a model that answered with nothing, and a single
+    program per goal leaves this reason as the whole attempt's explanation.
+    """
+    guardrail = getattr(reply, "guardrail", None)
+    if guardrail is not None:
+        return f"blocked by {guardrail.side} guardrail"
+    error = getattr(reply, "error", None)
+    if error is not None:
+        return f"target error ({error.category}): {error.message}"
+    return "the target gave no usable reply"
+
+
+__all__ = ["H4rm3lAttack"]

@@ -9,7 +9,7 @@ import inspect
 from collections.abc import Awaitable
 from typing import TypeAlias
 
-from ...base import Completion
+from ....contract import Completion
 
 DecorationResult: TypeAlias = str | Awaitable[str]
 

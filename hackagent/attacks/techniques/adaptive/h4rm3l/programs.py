@@ -4,9 +4,8 @@
 """Named decorator programs from the h4rm3l paper, and ones measured here.
 
 ``H4rm3lParams.program`` accepts either one of these names or a raw program.
-They are also what :class:`~..adaptive.h4rm3l_synth.H4rm3lSynthAttack` seeds
-its pool with, so a program added here is both directly runnable and a
-starting point the search can build on.
+They are also what the search seeds its pool with, so a program added here
+is both directly runnable and a starting point synthesis can build on.
 """
 
 PRESET_PROGRAMS: dict[str, str] = {

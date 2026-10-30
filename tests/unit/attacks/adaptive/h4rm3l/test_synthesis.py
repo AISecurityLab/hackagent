@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import asyncio
 
-from hackagent.attacks.techniques.adaptive.h4rm3l_synth import (
-    H4rm3lSynthAttack,
-    H4rm3lSynthParams,
+from hackagent.attacks.techniques.adaptive.h4rm3l import (
+    H4rm3lAttack,
+    H4rm3lParams,
 )
 from hackagent.attacks.techniques.trace import recording
 from hackagent.core.contracts import Completion, Verdict
@@ -57,7 +57,7 @@ class Panel:
         return Verdict(success=score >= self.threshold, score=score)
 
 
-def params(**overrides) -> H4rm3lSynthParams:
+def params(**overrides) -> H4rm3lParams:
     base = dict(
         iterations=1,
         proposals=2,
@@ -68,11 +68,11 @@ def params(**overrides) -> H4rm3lSynthParams:
         synthesizer=Synthesizer(),
     )
     base.update(overrides)
-    return H4rm3lSynthParams(**base)
+    return H4rm3lParams(**base)
 
 
 def prepare_and_search(p, goals=(GOAL,), target=None, judge=None):
-    attack = H4rm3lSynthAttack(p)
+    attack = H4rm3lAttack(p)
     target = target or Target()
     judge = judge or Panel(10.0)
 
@@ -85,7 +85,7 @@ def prepare_and_search(p, goals=(GOAL,), target=None, judge=None):
 
 
 def test_seeds_the_pool_with_the_preset_programs():
-    attack = H4rm3lSynthAttack(params())
+    attack = H4rm3lAttack(params())
     assert attack.pool.size() > 0
 
 
@@ -107,7 +107,7 @@ def test_an_uncompilable_proposal_never_reaches_the_target():
 
 
 def test_a_proposal_below_the_pool_mean_is_dropped():
-    attack = H4rm3lSynthAttack(params(synthesizer=Synthesizer("Base64Decorator()")))
+    attack = H4rm3lAttack(params(synthesizer=Synthesizer("Base64Decorator()")))
     attack.pool.record("Seeded()", 5, 5)  # pool mean becomes 1.0
 
     async def go():
@@ -119,7 +119,7 @@ def test_a_proposal_below_the_pool_mean_is_dropped():
 
 
 def test_without_a_panel_synthesis_is_skipped_and_seeds_are_used():
-    attack = H4rm3lSynthAttack(params())
+    attack = H4rm3lAttack(params())
     seeded = attack.pool.size()
 
     async def go():

@@ -204,6 +204,59 @@ def test_pair_reports_one_attempt_per_stream_and_round(tmp_path):
         assert roles == ["attacker", "target", "panel"]
 
 
+def test_h4rm3l_without_a_synthesizer_costs_one_call_per_goal(tmp_path):
+    """It is adaptive, but only searches when a synthesizer is configured.
+
+    Without one it is the decorator program and nothing else, which is what
+    every h4rm3l example campaign relies on: one request, one verdict, no
+    role model built and no synthesis round before the goals.
+    """
+    values = campaign(
+        attacks=[{"name": "h4rm3l", "parameters": {"program": "Base64Decorator()"}}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    result, builder = run(values, models=models, texts=("goal one", "goal two"))
+
+    attempts = attempts_of(result)
+    assert len(attempts) == 2
+    assert len(models["target"].requests) == 2
+    assert len(models["judge"].requests) == 2
+    assert all(a.verdict is not None and a.verdict.success for a in attempts)
+    assert {name for name, _ in builder.built} == {"target", "judge"}
+    assert all(a.metadata["program"] == "Base64Decorator()" for a in attempts)
+
+
+def test_h4rm3l_with_a_synthesizer_searches_before_the_goals(tmp_path):
+    """The synthesizer's programs are scored once, then used on every goal."""
+    values = campaign(
+        attacks=[
+            {
+                "name": "h4rm3l",
+                "parameters": {
+                    "iterations": 1,
+                    "proposals": 1,
+                    "scoring_goals": 1,
+                    "programs_per_goal": 1,
+                    "seed": 0,
+                },
+                "roles": {"synthesizer": {**attacker_role(), "name": "synthesizer"}},
+            }
+        ],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    proposal = "AIMDecorator().then(Base64Decorator())"
+    models = models_for(synthesizer=ScriptedModel(proposal))
+    result, _builder = run(values, models=models, texts=("goal one", "goal two"))
+
+    assert models["synthesizer"].requests, "the synthesizer was never asked"
+    attempts = attempts_of(result)
+    assert len(attempts) == 2
+    # Scoring the proposal costs one call before the goals are attacked.
+    assert len(models["target"].requests) == 3
+    assert all(a.metadata["program"] == proposal for a in attempts)
+
+
 def test_each_attempt_carries_the_phase_that_produced_it(tmp_path):
     values = iterative_campaign(tmp_path, parameters={"steps": 2, "candidates": 1})
     result, _builder = run(values, models=models_for(judge="no"))

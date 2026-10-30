@@ -5,9 +5,9 @@
 
 A static attack turns one goal into one or more chat requests for the
 target. It never builds, configures, or calls a model on its own: when an
-algorithm needs an auxiliary model (a *role*, such as h4rm3l's decorator),
-its parameters declare a :data:`~..contract.Completion` field and whoever
-constructs the parameters supplies the callable.
+algorithm needs an auxiliary model (a *role*), its parameters declare a
+:data:`~..contract.Completion` field and whoever constructs the parameters
+supplies the callable.
 """
 
 from __future__ import annotations

@@ -14,20 +14,20 @@ from __future__ import annotations
 import asyncio
 import inspect
 
-from hackagent.attacks.techniques.adaptive.h4rm3l_synth import (
-    H4rm3lSynthAttack,
+from hackagent.attacks.techniques.adaptive.h4rm3l import (
+    H4rm3lAttack,
     primitive_signatures,
 )
-from hackagent.attacks.techniques.adaptive.h4rm3l_synth.primitives import (
+from hackagent.attacks.techniques.adaptive.h4rm3l.primitives import (
     needs_decorator_model,
 )
-from hackagent.attacks.techniques.static.h4rm3l.decorators import (
+from hackagent.attacks.techniques.adaptive.h4rm3l.decorators import (
     compile_program,
     decorator_namespace,
 )
 from hackagent.attacks.techniques.trace import recording
 
-from .test_attack import GOAL, Panel, Synthesizer, Target, params
+from .test_synthesis import GOAL, Panel, Synthesizer, Target, params
 
 
 def _names(signatures: list[str]) -> set[str]:
@@ -36,7 +36,7 @@ def _names(signatures: list[str]) -> set[str]:
 
 def _prepare_with(program: str):
     """Run one synthesis round over ``program`` and return the trace nodes."""
-    attack = H4rm3lSynthAttack(params(synthesizer=Synthesizer(program)))
+    attack = H4rm3lAttack(params(synthesizer=Synthesizer(program)))
 
     async def go():
         with recording(scope="run") as trace:
@@ -119,14 +119,14 @@ def test_a_compiling_proposal_is_not_counted_as_invalid():
 def test_scoring_goals_are_drawn_afresh_for_each_proposal():
     # A fixed slice would score every program on the same few goals.
     goals = [f"goal {i}" for i in range(20)]
-    attack = H4rm3lSynthAttack(params(scoring_goals=3, seed=1))
+    attack = H4rm3lAttack(params(scoring_goals=3, seed=1))
     draws = {tuple(attack._scoring_goals(goals)) for _ in range(12)}
     assert len(draws) > 1, "every proposal was scored on the same goals"
     assert all(len(d) == 3 and set(d) <= set(goals) for d in draws)
 
 
 def test_scoring_never_asks_for_more_goals_than_the_run_has():
-    attack = H4rm3lSynthAttack(params(scoring_goals=50, seed=1))
+    attack = H4rm3lAttack(params(scoring_goals=50, seed=1))
     assert attack._scoring_goals(["only one"]) == ["only one"]
 
 
@@ -137,7 +137,7 @@ def test_an_unreachable_synthesizer_says_so():
         async def __call__(self, messages):
             raise RuntimeError("connection refused")
 
-    attack = H4rm3lSynthAttack(params(synthesizer=Broken()))
+    attack = H4rm3lAttack(params(synthesizer=Broken()))
 
     async def go():
         with recording(scope="run") as trace:

@@ -47,7 +47,7 @@ JAILBREAK_PROFILE = ThreatProfile(
         atk(
             "h4rm3l",
             PRIMARY,
-            "Composable decorator-chain jailbreak for fast high-yield probing",
+            "Composable decorator-chain jailbreak, synthesised when a synthesizer is given",
         ),
         atk(
             "tap",

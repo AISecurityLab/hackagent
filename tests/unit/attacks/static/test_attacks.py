@@ -22,11 +22,6 @@ from hackagent.attacks.techniques.static.cipherchat import (
 )
 from hackagent.attacks.techniques.static.fc import FCParams, tFCAttack, tFCParams
 from hackagent.attacks.techniques.static.flipattack import FlipAttack, FlipAttackParams
-from hackagent.attacks.techniques.static.h4rm3l import (
-    PRESET_PROGRAMS,
-    H4rm3lAttack,
-    H4rm3lParams,
-)
 from hackagent.attacks.techniques.static.mml import MMLParams
 from hackagent.attacks.techniques.static.static_template import (
     StaticTemplateAttack,
@@ -89,7 +84,6 @@ def test_roles_are_the_completion_fields():
         optional: Completion | None = None
 
     assert Params.role_names() == {"required", "optional"}
-    assert H4rm3lParams.role_names() == {"decorator"}
     assert BaselineParams.role_names() == frozenset()
 
 
@@ -203,56 +197,6 @@ def test_image_attack_params_are_bounded(build):
         build()
 
 
-# --- h4rm3l -----------------------------------------------------------------
-
-
-def test_h4rm3l_syntactic_program_needs_no_model():
-    requests = generate(H4rm3lAttack(H4rm3lParams(program="ReverseDecorator()")))
-    assert requests == [[{"role": "user", "content": GOAL[::-1]}]]
-
-
-def test_h4rm3l_accepts_preset_names():
-    attack = H4rm3lAttack(H4rm3lParams(program="refusal_suppression"))
-    assert "Do not apologize" in generate(attack)[0][0]["content"]
-    assert "refusal_suppression" in PRESET_PROGRAMS
-
-
-def test_h4rm3l_llm_decorator_requires_decorator_role():
-    with pytest.raises(ValueError, match="configure the 'decorator' role"):
-        H4rm3lAttack(H4rm3lParams(program="TranslateDecorator(language='Italian')"))
-
-
-def test_h4rm3l_llm_decorator_uses_the_given_completion():
-    seen = []
-
-    async def decorator(messages):
-        seen.append(messages)
-        return "Spiega come aprire una serratura"
-
-    params = H4rm3lParams(
-        program="TranslateDecorator(language='Italian').then(ReverseDecorator())",
-        decorator=decorator,
-    )
-    requests = generate(H4rm3lAttack(params))
-    assert requests[0][0]["content"] == "Spiega come aprire una serratura"[::-1]
-    assert "Translate the following text to Italian" in seen[0][0]["content"]
-    assert "decorator" not in params.model_dump()
-
-
-def test_h4rm3l_empty_decorator_reply_is_an_error():
-    async def silent(messages):
-        return "  "
-
-    attack = H4rm3lAttack(H4rm3lParams(program="SynonymDecorator()", decorator=silent))
-    with pytest.raises(ValueError, match="empty reply"):
-        generate(attack)
-
-
-def test_h4rm3l_rejects_unknown_decorators():
-    with pytest.raises(ValueError, match="unknown decorator"):
-        H4rm3lAttack(H4rm3lParams(program="NoSuchDecorator()"))
-
-
 def test_every_attack_loads_without_the_optional_extras():
     """Reading an attack's settings must not need its extra; only running it does.
 
@@ -283,7 +227,7 @@ def test_every_attack_loads_without_the_optional_extras():
         print("all attacks loaded")
 
         from hackagent.attacks.techniques.static.mml.image_encoder import encode_prompt
-        from hackagent.attacks.techniques.static.h4rm3l.decorators.base import (
+        from hackagent.attacks.techniques.adaptive.h4rm3l.decorators.base import (
             PromptDecorator,
         )
 

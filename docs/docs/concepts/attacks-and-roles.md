@@ -17,20 +17,27 @@ flowchart TB
     S1["Fixed transformation of the goal"]
     S2["No model of its own"]
     S3["Cheap, repeatable, fast"]
-    S4["flipattack · cipherchat · h4rm3l · baseline · fc · mml"]
+    S4["flipattack · cipherchat · baseline · fc · mml"]
   end
   subgraph adaptive["Adaptive and multi-turn"]
     direction TB
     A1["Reads replies, rewrites prompts"]
     A2["Needs an attacker model"]
     A3["Stronger, slower, costs calls"]
-    A4["tap · pair · crescendo · advprefix · autodan_turbo"]
+    A4["tap · pair · h4rm3l · crescendo · advprefix · autodan_turbo"]
   end
 ```
 
 Start with a static attack to confirm the plumbing works end to end, then add
 adaptive ones. The [attack catalog](../reference/attacks/index.md) lists every
 technique with its kind and what it needs.
+
+h4rm3l sits across the line: it is listed as adaptive because it can search,
+but it only does so when you give it a `synthesizer` role. Without one it
+applies the decorator program you named and nothing else, which costs one call
+per goal like any static attack. `hackagent examples copy h4rm3l-synth-demo`
+writes out a runnable campaign with the search switched on, next to
+`h4rm3l-demo` which has it off.
 
 ## Roles: the models an attack drives
 
@@ -76,6 +83,7 @@ attacks:
 | `on_topic` | tap | Yes/no check that a branch still pursues the goal, so drifted branches are dropped before they cost a call. |
 | `scorer` | pair | PAIR's own 0–10 rater, so the panel only judges the best attempt. |
 | `decorator` | h4rm3l | Runs the obfuscation steps that need an LLM. |
+| `synthesizer` | h4rm3l | Writes new decorator programs. Leave it out and h4rm3l just runs the program you gave it, with no search. |
 | `embedder` | rag, autodan_turbo | An **embedding** model for retrieval. Not a chat model. |
 | `summarizer` | autodan_turbo | Turns a successful exchange into a reusable strategy. |
 

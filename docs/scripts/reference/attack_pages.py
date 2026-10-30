@@ -33,7 +33,7 @@ KINDS = {
     "adaptive": (
         "Adaptive",
         "Searches: it reads the target's replies and refines its prompts, which "
-        "is why it needs an attacker model.",
+        "is why it usually needs an attacker model.",
     ),
     "multi_turn": (
         "Multi-turn",

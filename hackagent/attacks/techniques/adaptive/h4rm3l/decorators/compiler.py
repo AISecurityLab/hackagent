@@ -9,7 +9,7 @@ import ast
 from collections.abc import Callable
 from functools import partial
 
-from ...base import Completion
+from ....contract import Completion
 from .base import DecorationResult, PromptDecorator
 from .llm import (
     PAPDecorator,
