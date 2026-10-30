@@ -13,7 +13,14 @@ import pytest
 
 from hackagent.core.contracts import LabelledSample, Sample
 from hackagent.datasets.calibration import CalibrationSpec
-from hackagent.evaluation.audit import PANEL, AuditReport, RobustnessSpec
+from hackagent.evaluation.audit import (
+    PANEL,
+    AuditReport,
+    JudgeReport,
+    RobustnessSpec,
+    binary_metrics,
+    compare_rules,
+)
 from hackagent.orchestrator.campaign import run_campaign, summary
 from hackagent.orchestrator.campaign.audit import (
     AuditFailed,
@@ -444,3 +451,82 @@ def test_run_audit_runs_even_when_the_campaign_disabled_it():
     report = audit(campaign())
 
     assert report.samples == 2
+
+
+# --- the ensemble lines read correctly in every direction --------------------
+
+
+def ensemble_report(panel_column: str, **judges: str) -> AuditReport:
+    """An audit built from vote columns, to exercise the formatter's prose."""
+    labels = [True, True, True, True, False, False, False, False]
+    votes = {
+        name: tuple(character == "1" for character in column)
+        for name, column in judges.items()
+    }
+    panel_votes = tuple(character == "1" for character in panel_column)
+    rows = [
+        JudgeReport(judge=name, metrics=binary_metrics(column, labels))
+        for name, column in votes.items()
+    ]
+    rows.append(JudgeReport(judge=PANEL, metrics=binary_metrics(panel_votes, labels)))
+    return AuditReport(
+        samples=len(labels),
+        contextual_samples=0,
+        judges=tuple(rows),
+        ensemble=compare_rules(votes, panel_votes, labels, aggregation="majority"),
+    )
+
+
+def test_a_panel_level_with_its_best_judge_is_not_called_a_loss():
+    # Identical judges: the panel can only reproduce them.
+    text = format_report(
+        ensemble_report("11000000", a="11000000", b="11000000", c="11000000")
+    )
+
+    assert "the two are level" in text
+    assert "behind" not in text and "ahead" not in text
+    assert "changed no verdict" in text
+
+
+def test_a_panel_behind_its_best_judge_says_so_with_the_gap():
+    text = format_report(
+        ensemble_report("10000000", sharp="11110000", blunt="10000000", dull="10000000")
+    )
+
+    assert "the panel is behind by 0.750" in text
+    # Three disagreements, all one way, is still not enough to call.
+    assert "too few to call" in text
+
+
+def test_judges_that_cover_each_other_are_not_reported_as_a_cost():
+    # Complementary blind spots: independence would do worse than reality.
+    text = format_report(
+        ensemble_report("11100000", a="11000000", b="01100000", c="10100000")
+    )
+
+    assert "cover each other" in " ".join(text.split())
+    assert "costs -" not in text
+
+
+def test_long_prose_is_folded_to_the_table_width():
+    text = format_report(
+        ensemble_report("10000000", sharp="11110000", blunt="10000000", dull="10000000")
+    )
+
+    assert max(len(line) for line in text.splitlines()) <= 78
+
+
+def test_a_judge_named_after_its_model_still_lines_up():
+    long_name = "harmbench:meta-llama/Llama-Guard-3-8B"
+    text = format_report(
+        ensemble_report("11000000", **{long_name: "11000000", "b": "11000000"})
+    )
+    rows = [
+        line
+        for line in text.splitlines()
+        if line.startswith((long_name, "judge", "b "))
+    ]
+
+    assert long_name in text
+    # Every column still starts in the same place.
+    assert len({len(row) for row in rows}) == 1
