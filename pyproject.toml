@@ -51,7 +51,9 @@ dev = [
     "mcp>=1.21.2",
     "vllm>=0.11.0; sys_platform != 'win32'",
     "fastapi[standard]>=0.136.3,<0.163; sys_platform != 'win32'",
-    "transformers>=4.55.2,<6.0; sys_platform != 'win32'",
+    # vllm 0.11 reads tokenizer.all_special_tokens_extended, which
+    # transformers 5 removed. Lift the cap together with a vllm upgrade.
+    "transformers>=4.55.2,<5.0; sys_platform != 'win32'",
     "pytest-textual-snapshot>=1.1.0",
     "import-linter>=2.3",
     # Optional runtime extras, installed here so unit tests and the docs
