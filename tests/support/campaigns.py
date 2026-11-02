@@ -187,7 +187,9 @@ def campaign_values(completion_server, tmp_path):
                 "type": "OPENAI",
                 "endpoint": completion_server.endpoint,
                 "api_key": "${TEST_PROVIDER_KEY}",
-                "timeout": 5,
+                # Covers cold provider/SDK initialization under CI coverage.
+                # Deadline tests set their own short per-attack timeout.
+                "timeout": 30,
             },
             "generation": {"temperature": 0, "max_tokens": 32},
         }

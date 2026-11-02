@@ -38,8 +38,9 @@ async def test_preflight_failure_records_failed_campaign_without_attack(
 ):
     execution.values["execution"]["preflight"] = True
     completion_server.defaults[failed_role] = Reply("model rejected the probe", 400)
-    with pytest.raises(PreflightError, match=failed_role):
+    with pytest.raises(PreflightError, match="model rejected the probe") as failure:
         await execution.run()
+    assert failed_role in str(failure.value)
     assert len(completion_server.calls("target")) == 1
     assert len(completion_server.calls("judge")) == 1
     assert all(
