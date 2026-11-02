@@ -155,17 +155,13 @@ jobs:
           flags: unit
           fail_ci_if_error: true
 
-  # ── Integration (offline) ─────────────────────────────────────────────────
-  # Covers tests/integration/tui/ — mock-based TUI integration tests
-  # that exercise widget composition + lifecycle without external
-  # services. (The former tests/integration/storage/ moved to
-  # tests/unit/server/storage/ since it only exercised the in-memory
-  # local backend.)
+  # Deterministic integrations use local HTTP fixtures and SQLite; no secrets
+  # or downloaded models. They protect every PR before it reaches stage.
   integration-offline:
     name: Integration Tests (Offline)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     steps:
       - uses: actions/checkout@v7
 
@@ -187,13 +183,22 @@ jobs:
         run: >
           uv run pytest
           tests/integration/tui/
-          --run-integration
+          tests/integration/offline/
+          --fail-on-skip
+          --junitxml=reports/integration.xml
           -n auto
           --dist=loadfile
           -m "not slow"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
+
+      - name: Upload integration results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-integration-offline
+          path: reports/integration.xml
 
       - name: Upload offline-integration coverage artifact
         uses: actions/upload-artifact@v7
@@ -297,19 +302,16 @@ jobs:
           retention-days: 1
 
   # ── E2E tests ─────────────────────────────────────────────────────────────
-  # Requires OPENROUTER_API_KEY (and optionally HACKAGENT_API_KEY).
-  # Skips gracefully when secrets are absent.
+  # Real CLI processes and local providers; all cases must execute.
   test-e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     env:
-      HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      TEST_MAX_TOKENS_FAST: "15"
-      TEST_MAX_TOKENS_MEDIUM: "25"
-      TEST_MAX_TOKENS_SLOW: "40"
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
+      HF_HUB_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
     steps:
       - uses: actions/checkout@v7
 
@@ -331,10 +333,18 @@ jobs:
         run: >
           uv run pytest
           tests/e2e/
-          --ignore=tests/e2e/attacks
+          --fail-on-skip
+          --junitxml=reports/e2e.xml
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
+
+      - name: Upload e2e results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-e2e
+          path: reports/e2e.xml
 
       - name: Upload e2e coverage artifact
         uses: actions/upload-artifact@v7
