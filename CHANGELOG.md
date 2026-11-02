@@ -1,3 +1,159 @@
+## v0.16.0 (2026-10-20)
+
+### Feat
+
+- **cli**: copy an example campaign to edit as your own
+
+### Fix
+
+- **models**: keep Ollama's Hermes config, and refuse an oversized prompt
+- **models**: launch Hermes and Codex the way their CLIs now expect
+- **tui**: let a field row refresh while the app tears it down
+- **tui**: run campaigns whose goals come from a Hugging Face dataset
+- **campaign**: check an Ollama server where its model will reach it
+- **attacks**: load MML and h4rm3l without their optional extras
+- **tui**: keep a choice's type when the form shows it
+- **cli**: let campaign run check Ollama where the model will run
+- **deps**: keep the hf extra's datasets floor at 2.14
+
+## v0.15.0 (2026-10-19)
+
+### BREAKING CHANGE
+
+- `execution.storage.backend: auto` is no longer a valid
+value. A campaign file that names it must say `local` or `remote`.
+- a campaign that relied on the old `local` default now
+records to the account whenever an API key is configured. Set
+`execution.storage.backend: local` to keep a run on this machine.
+
+### Feat
+
+- record the target's latency on each stored result
+- **storage**: a campaign records where it says, and that is here
+- **tui**: a run says what it will do, and then what it did
+- **storage**: a campaign follows the account unless it says otherwise
+- **tui**: a welcome screen to start from, and results as one tree
+- the campaign workflow underneath — datasets, preflight, storage, runs
+
+### Fix
+
+- **campaign**: keep waiting for a run being created through a second cancel
+- **campaign**: record a run cancelled while it is being created
+- **cli**: report an API error as one
+- **cipherchat**: split demonstrations a missing comma had merged
+- never count a refused Crescendo turn as a success
+- send the goal and evaluation metrics with each stored result
+- keep credentials out of recorded campaigns and printed settings
+- **release**: smoke-test the binary with every attack, not a removed command
+- **campaign**: finish every run, and run a campaign on one event loop
+- **storage**: report a failed background write once
+- follow the renamed OPENAI agent type, and regenerate the docs
+- **tui**: read results from the store that holds them
+- apply the dataset offset option in every provider
+- send the API key when checking a vLLM server is ready
+- port example scripts to the client facade
+- **cli**: allow --version without rag/vision extras
+- **attacks**: read technique prompt and response keys into AttackResult
+- **orchestrator**: majority panel by default, and never shrink it silently
+- **evaluation**: judges that fail abstain instead of voting safe
+- **evaluation**: stop reading "cannot" and "unknown" as a no
+- **orchestrator**: stop merging the storage key into non-gateway roles (#640)
+- latent bugs found during the restructure survey (#640)
+- drop Intel macOS from the release binary matrix
+
+### Refactor
+
+- remove the pre-campaign run path and the CLI that fronted it
+- **examples**: every example is a campaign file, and follows OLLAMA_HOST
+- **tui**: the attacks tab becomes a campaign builder
+- make openai the agent type for OpenAI-compatible endpoints
+- migrate to the campaign workflow
+- **tracking**: group modules into goals, steps and sinks
+- **orchestrator**: group modules into execution, setup, results and planning
+- **core**: split contracts into a package by topic
+- **attacks**: drop the shared, generator, objectives and router shims
+- **evaluation**: never guess a yes/no answer from the reply text
+- **attacks**: group techniques into category folders
+- **client**: add facade and route interfaces through it (#640)
+- **orchestrator**: stand up orchestrator/ as the run composition root (#640)
+- **evaluation**: stand up evaluation/ and tracking/ (#640)
+- **attacks**: migrate custom-loop techniques onto RunContext (#640)
+- **attacks**: migrate inline-judge techniques onto ctx.judge (#640)
+- **attacks**: migrate post-hoc techniques onto BaseAttack(config, ctx) (#640)
+- **attacks**: extract shared helpers into attacks/_lib (#640)
+- **attacks**: fold DEFAULT_PAIR_CONFIG into PairConfig (#640)
+- **attacks**: BaseAttack(config, ctx) and typed Step (#640)
+- **attacks**: AttackConfig with roles() and forbid extras (#640)
+- **attacks**: add ports (RunContext, Judge, Events, Workspace) (#640)
+- move callers off AgentRouter onto connect() (#640)
+- **models**: storage-free connect(), guardrails and factory (#640)
+- **models**: share one base for the CLI-driven adapters (#640)
+- **models**: move model access from router/ to models/ (#640)
+- **datasets**: resolve goal sources into typed Goal values (#640)
+- **storage**: move persistence into storage/ with a private HTTP client (#640)
+- **catalog**: move taxonomy, risks and attack labels into catalog/ (#640)
+- **core**: add core/contracts with the shared vocabulary (#640)
+- **core**: add core package with a single settings resolver (#640)
+- remove dead, unreachable and compatibility-only code (#640)
+
+## v0.14.0 (2026-09-21)
+
+### Feat
+
+- **attacks**: add tool_output_ipi indirect injection technique
+
+### Fix
+
+- **attacks**: address Copilot review on tool_output_ipi
+- **ci**: format tool_output_ipi and refresh attacks-large snapshot
+- **ci**: extract release notes before publishing to PyPI
+- **ci**: use tagged changelog section as GitHub Release body
+- **cli**: prevent UnicodeEncodeError on Windows consoles
+- **ci**: keep the promote PAT out of the bump step
+- **ci**: stop persisting the promote PAT after checkout
+- **ci**: require same-repo head for promotion PRs
+- **ci**: promote stage via disposable head branch
+
+## v0.13.1 (2026-09-21)
+
+### Fix
+
+- **ci**: push release bumps with PROMOTE_GITHUB_TOKEN
+- enforced fallbacks to also send thinking parameter in requests
+- **judges**: added the thinking settings to the direct judge/scorer paths
+- **judges**: disable reasoning by default on judge requests
+
+## v0.13.0 (2026-09-21)
+
+### BREAKING CHANGE
+
+- the AdvPrefix attack config key "generator" is renamed
+to "attacker", matching every other attack. Existing advprefix configs
+using "generator" must be updated.
+
+### Feat
+
+- **attacks**: add official static/adaptive/multi-turn taxonomy
+- **web**: serve the hosted dashboard from the CLI, drop the NiceGUI app (#591)
+
+### Fix
+
+- resolve merge conflicts with main for taxonomy PR
+- **cli**: restore CI snapshot theme colors and address Copilot review
+- **ci**: use PAT for promotion PRs
+- **ci**: address Copilot review on release automation
+- **orchestrator**: judge a backend remote by its host, not a URL substring (#592)
+- **autodan**: use native embedding requests for strategy retrieval (#576)
+- **scoring**: preserve assessment scores over wrapper output (#575)
+- **static-template**: materialize and validate template placeholders (#574)
+- **pap**: normalize attacker types and preserve provider credentials (#573)
+- **metrics**: count successful_attacks with the same predicate as success_rate (#572)
+- **web**: stop killing unrelated processes on the dashboard port
+- **cli**: honour base-url defaults and drop leaked debug logging
+- merge conflict
+- fix evaluation scoring for all attacks
+- fix merge conflict
+
 ## v0.12.0 (2026-07-27)
 
 ### Fix
