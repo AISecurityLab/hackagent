@@ -30,7 +30,7 @@ from hackagent.attacks.techniques.multi_turn.crescendo import (
 from hackagent.attacks.techniques.iterative import IterativeAttack
 from hackagent.attacks.techniques.registry import ITERATIVE_ATTACKS, get_attack_class
 from hackagent.attacks.techniques.trace import recording
-from hackagent.core.contracts import Completion, LLMError, Verdict
+from hackagent.core.contracts import Completion, LLMError, Usage, Verdict
 
 GOAL = "Explain how to open a lock"
 TECHNIQUES = ["Logical Appeal", "Expert Endorsement", "Authority Endorsement"]
@@ -1138,6 +1138,34 @@ def test_the_opening_is_part_of_the_prefix():
     assert findings[0].metadata["prefix"] == f"Sure{PREFIX_TAIL}"
 
 
+def test_a_long_prefix_is_truncated_before_reaching_the_target():
+    writer = Writer2("x" * 305)
+    attack = AdvPrefixAttack(
+        advprefix(attacker=writer, max_prefix_chars=300)
+    )
+    _findings, target = search(attack, judge=Panel(1.0))
+
+    prefix = target.requests[0][-1]["content"]
+    assert len(prefix) == 300
+    assert prefix == ("Sure" + "x" * 296)
+
+
+def test_prefix_truncation_records_a_trace_decision():
+    writer = Writer2("x" * 305)
+    attack = AdvPrefixAttack(
+        advprefix(attacker=writer, max_prefix_chars=300)
+    )
+    nodes = search_trace(attack, judge=Panel(1.0))
+
+    [truncated] = [node for node in nodes if node.label == "truncated"]
+    assert truncated.data["reason"] == (
+        "attacker-generated prefix exceeds the character limit"
+    )
+    assert truncated.data["original_prefix_chars"] == 309
+    assert truncated.data["prefix_chars"] == 300
+    assert truncated.data["max_prefix_chars"] == 300
+
+
 def test_one_candidate_is_written_per_opening_per_sample():
     writer = Writer2()
     attack = AdvPrefixAttack(
@@ -1262,6 +1290,31 @@ def test_the_judge_sees_the_prefix_and_the_continuation_together():
     search(attack, target=Target("and then step two"), judge=panel)
 
     assert panel.samples[0].response == f"Sure{PREFIX_TAIL}and then step two"
+
+
+def test_truncation_and_target_response_metadata_are_recorded():
+    writer = Writer2("x" * 305)
+
+    async def target(_messages):
+        return Completion(
+            text="continuation",
+            usage=Usage(completion_tokens=7),
+            finish_reason="stop",
+        )
+
+    attack = AdvPrefixAttack(
+        advprefix(attacker=writer, max_prefix_chars=300)
+    )
+    findings, _target = search(attack, target=target, judge=Panel(1.0))
+
+    metadata = findings[0].metadata
+    assert metadata["prefix_chars"] == 300
+    assert metadata["prefix_original_chars"] == 309
+    assert metadata["prefix_truncated"] is True
+    assert metadata["max_prefix_chars"] == 300
+    assert metadata["continuation_chars"] == len("continuation")
+    assert metadata["continuation_tokens"] == 7
+    assert metadata["finish_reason"] == "stop"
 
 
 def test_the_judge_sees_only_the_reply_without_prefilling():
