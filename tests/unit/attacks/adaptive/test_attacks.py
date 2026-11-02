@@ -843,7 +843,7 @@ def test_tap_records_the_on_topic_prune_as_a_decision():
     nodes = search_trace(attack, judge=Panel(1.0))
 
     pruned = [n for n in nodes if n.node == "decision" and n.label == "pruned"]
-    assert pruned[0].data["reason"] == "off the goal, then down to the beam"
+    assert pruned[0].data["reason"] == "off the goal"
     assert pruned[0].data["dropped"] == 1
 
 
@@ -1433,24 +1433,28 @@ def test_advprefix_records_a_phase_per_stage():
     assert labels == ["write", "prefix 1/1"]
 
 
-def test_tap_caps_the_on_topic_survivors_at_the_beam_width():
-    """The reference prunes to width at both phases, not only after scoring."""
+def test_tap_probes_all_on_topic_branches_before_score_pruning():
+    """Width limits score-pruned branches, not target probes."""
     writer, topic = Writer(), Topic()
     attack = TAPAttack(
         TapParams(
-            depth=1,
+            depth=2,
             streams=1,
-            branching_factor=5,
-            width=2,
+            branching_factor=3,
+            width=1,
+            early_stop=False,
             attacker=writer,
             on_topic=topic,
         )
     )
-    _findings, target = search(attack, judge=Panel(1.0))
+    findings, target = search(attack, judge=Panel(1.0, 9.0, 2.0))
 
-    # Five branches were written and judged on topic; only two were probed.
-    assert len(topic.prompts) == 5
-    assert len(target.requests) == 2
+    # Three branches are evaluated in each depth; only one survives each
+    # score prune and gets expanded into the next depth.
+    assert len(topic.prompts) == 6
+    assert len(target.requests) == 6
+    assert len(findings) == 6
+    assert "SCORE: 9.0" in writer.conversations[-1][-1]["content"]
 
 
 def test_tap_drops_a_branch_the_panel_scored_zero():
