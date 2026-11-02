@@ -286,12 +286,24 @@ jobs:
           tests/integration/models/
           tests/integration/attacks/
           --run-integration
+          --fail-on-skip
+          --junitxml=reports/integration-ollama.xml
           -n auto
           --dist=loadfile
           -m "${{ matrix.shard == 'slow' && 'slow' || 'not slow' }}"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
+
+      - name: Upload ADK diagnostics and test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-integration-ollama-${{ matrix.shard }}
+          path: |
+            reports/adk-server-*.log
+            reports/integration-ollama.xml
+          retention-days: 7
 
       - name: Upload Ollama-integration coverage artifact
         uses: actions/upload-artifact@v7

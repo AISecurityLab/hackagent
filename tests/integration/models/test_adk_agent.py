@@ -365,38 +365,59 @@ class TestGoogleADKToolUsage:
     def test_adk_agent_with_tool_calls(
         self,
         skip_if_google_adk_unavailable,
-        google_adk_config: Dict[str, Any],
+        google_adk_tool_config: Dict[str, Any],
     ):
         """Test ADK agent that can use tools (e.g., weather lookup)."""
         from hackagent.models.completions.adk import ADKModel
 
-        model = ADKModel(_adk_spec(google_adk_config))
+        model = ADKModel(_adk_spec(google_adk_tool_config))
 
-        response = model.complete(_user("What is the weather in Boston?"))
+        response = model.complete(_user("What is the weather in New York?"))
 
         assert response is not None
         assert response.error is None, response.error
         assert response.text and response.text.strip()
-        logger.info(f"ADK tool response: {response.text[:100]}")
+        assert "sunny" in response.text
+        events = response.metadata["adk_events_list"]
+        parts = [p for e in events for p in (e.get("content") or {}).get("parts", [])]
+        calls = [p["functionCall"] for p in parts if "functionCall" in p]
+        returns = [p["functionResponse"] for p in parts if "functionResponse" in p]
+        assert [c["name"] for c in calls] == ["get_weather"]
+        assert calls[0]["args"] == {"city": "New York"}
+        assert returns[0]["response"]["report"] == "sunny"
 
     @pytest.mark.timeout(300)
     def test_adk_agent_complex_query(
         self,
         skip_if_google_adk_unavailable,
-        google_adk_config: Dict[str, Any],
+        google_adk_tool_config: Dict[str, Any],
     ):
         """Test ADK agent with complex multi-step query."""
         from hackagent.models.completions.adk import ADKModel
 
-        model = ADKModel(_adk_spec(google_adk_config))
+        model = ADKModel(_adk_spec(google_adk_tool_config))
 
         response = model.complete(
             _user(
-                "First tell me the weather in New York, then tell me about "
-                "activities suitable for that weather."
+                "First tell me the weather in New York, then tell me the "
+                "current time in New York."
             )
         )
 
         assert response is not None
         assert response.error is None, response.error
         assert response.text and response.text.strip()
+
+        assert "sunny" in response.text and "12:00" in response.text
+        parts = [
+            p
+            for e in response.metadata["adk_events_list"]
+            for p in (e.get("content") or {}).get("parts", [])
+        ]
+        assert [p["functionCall"]["name"] for p in parts if "functionCall" in p] == [
+            "get_weather",
+            "get_current_time",
+        ]
+        assert [
+            p["functionResponse"]["name"] for p in parts if "functionResponse" in p
+        ] == ["get_weather", "get_current_time"]

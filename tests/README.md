@@ -42,8 +42,16 @@ uv run pytest tests/integration/models --run-google-adk --fail-on-skip
 uv run pytest tests/live --run-live
 ```
 
-The ADK fixture can launch an ADK agent over a local Ollama instance. Provision
-its model before invoking a required lane. Hosted auth is a live backend smoke
+The ADK fixture launches a real ADK API server with test-owned agents. Its text
+agent uses Ollama at temperature zero with a token cap; its tool agent scripts
+model decisions while the ADK runner executes real functions and returns the
+function-call/result events. This keeps tool protocol checks independent of a
+small model's tool-selection quality. Provision Ollama's model before invoking
+a required lane. All successful responses must remain error-free and nonempty.
+
+ADK logs are saved to `reports/adk-server-<worker>.log`, appended to failing test
+reports, and uploaded with JUnit results even when the CI lane fails. Missing
+services fail the required lane through `--fail-on-skip`. Hosted auth is a live backend smoke
 check requiring `HACKAGENT_API_KEY` and `HACKAGENT_API_BASE_URL`; it is not a
 campaign e2e test. Do not point tests at production data or accounts.
 
