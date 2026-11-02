@@ -70,12 +70,12 @@ No account or API key. Runs and results are stored in SQLite at `~/.local/share/
 </TabItem>
 <TabItem value="remote" label="Remote">
 
-Results sync to the HackAgent platform and `hackagent web` opens [app.hackagent.dev](https://app.hackagent.dev). Set the key in the environment or save it once:
+Select remote storage explicitly and provide its key through the environment.
+`hackagent web` then proxies API requests to show the remote results.
 
 ```bash
 export HACKAGENT_API_KEY="your_api_key"
-# or
-hackagent config set --api-key YOUR_KEY
+hackagent config set --backend remote
 ```
 
 `HACKAGENT_BASE_URL` (or `--base-url`) points at another host; the default is `https://api.hackagent.dev`.
@@ -83,7 +83,7 @@ hackagent config set --api-key YOUR_KEY
 </TabItem>
 </Tabs>
 
-`hackagent init` walks you through the same choice and saves it to `~/.config/hackagent/config.json`. [`hackagent config`](../reference/cli.md#hackagent-config) shows and changes every setting.
+`hackagent init` walks you through the same storage choice and saves it (never the key) to `~/.config/hackagent/config.json`. [`hackagent config`](../reference/cli.md#hackagent-config) shows and changes every setting.
 
 A campaign records its own results separately: `execution.storage.backend` is `local` unless the file names a server with `remote`, so being signed in changes what you can read, not where a new run is written.
 

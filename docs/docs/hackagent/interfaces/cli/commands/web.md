@@ -6,9 +6,9 @@ title: hackagent.interfaces.cli.commands.web
 `hackagent web` — serve the HackAgent dashboard locally.
 
 Serves the bundled single-page app (the same one hosted at app.hackagent.dev)
-from this process. With an API key configured its API calls are proxied to the
-hosted API, with the key attached server-side; without one they are answered
-read-only from the local SQLite store.
+from this process. With the `remote` storage backend its API calls are proxied
+to the hosted API, with the key attached server-side; with `local` (the
+default) they are answered read-only from the local SQLite store.
 
 #### web
 
@@ -38,7 +38,8 @@ read-only from the local SQLite store.
     "force_local",
     is_flag=True,
     default=False,
-    help="Read from the local database even when an API key is configured.",
+    help=
+    "Read from the local database even when the remote backend is configured.",
 )
 @click.option(
     "--no-browser",
@@ -52,9 +53,10 @@ def web(ctx, host, port, db_path, force_local, no_browser)
 
 🌐 Launch the web dashboard.
 
-With an API key configured, the dashboard shows your hosted HackAgent data;
-the key stays in this process and is never exposed to the browser. Without
-one, it shows the runs recorded in your local database (read-only).
+With `--backend remote`, the dashboard shows your hosted HackAgent data;
+the key stays in this process and is never exposed to the browser. With
+the default local backend, it shows the runs recorded in your local
+database (read-only).
 
 
 
@@ -62,6 +64,6 @@ one, it shows the runs recorded in your local database (read-only).
 
   hackagent web                    # http://127.0.0.1:7860 (default)
   hackagent web --port 8080        # custom port
-  hackagent web --local            # ignore the API key, read local runs
+  hackagent web --local            # force the local backend
   hackagent web --no-browser       # skip opening a browser tab
 

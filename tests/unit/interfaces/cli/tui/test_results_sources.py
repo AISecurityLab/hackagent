@@ -30,10 +30,8 @@ def _session(db_path: str, *, campaign: str = "") -> HackAgent:
     store = LocalBackend(db_path=db_path)
     if campaign:
         agent = store.create_or_update_agent(
-            name="target",
-            agent_type="OPENAI_SDK",
-            endpoint="http://host/v1",
-            metadata={},
+            "target",
+            {"connection": {"type": "OPENAI_SDK", "endpoint": "http://host/v1"}},
         )
         attack = store.create_attack(
             attack_type="baseline",
@@ -41,7 +39,9 @@ def _session(db_path: str, *, campaign: str = "") -> HackAgent:
             organization=store.get_context().org_id,
             configuration={},
         )
-        run_of_campaign = store.create_campaign_run(agent.id, campaign, {})
+        run_of_campaign = store.start_campaign(
+            agent.id, {"campaign": {"name": campaign}}
+        )
         run = store.create_run(
             attack.id, agent.id, {"expected_total_goals": 1}, run_of_campaign.id
         )
@@ -51,7 +51,7 @@ def _session(db_path: str, *, campaign: str = "") -> HackAgent:
         )
     return HackAgent(
         Settings.resolve(
-            api_key="", db_path=db_path, env={}, config_path="/nonexistent"
+            backend="local", db_path=db_path, env={}, config_path="/nonexistent"
         ),
         backend=store,
     )
@@ -63,7 +63,14 @@ def account_config():
     config = MagicMock(spec=CLIConfig)
     config.api_key = "test-key"
     config.base_url = "https://api.test.hackagent.dev"
-    config.settings = MagicMock(db_path=":memory:")
+    config.settings = Settings.resolve(
+        api_key=config.api_key,
+        backend="remote" if config.api_key else "local",
+        base_url=config.base_url,
+        db_path=":memory:",
+        env={},
+        config_path="/nonexistent",
+    )
     return config
 
 
@@ -176,7 +183,14 @@ async def test_without_an_account_only_this_machine_is_read(tmp_path: Path):
     config = MagicMock(spec=CLIConfig)
     config.api_key = None
     config.base_url = "https://api.test.hackagent.dev"
-    config.settings = MagicMock(db_path=":memory:")
+    config.settings = Settings.resolve(
+        api_key=config.api_key,
+        backend="remote" if config.api_key else "local",
+        base_url=config.base_url,
+        db_path=":memory:",
+        env={},
+        config_path="/nonexistent",
+    )
 
     account = MagicMock(name="account-session")
     tab = ResultsTab(config)
@@ -263,7 +277,14 @@ async def test_there_is_nothing_to_switch_to_without_an_account(tmp_path: Path):
     config = MagicMock(spec=CLIConfig)
     config.api_key = None
     config.base_url = "https://api.test.hackagent.dev"
-    config.settings = MagicMock(db_path=":memory:")
+    config.settings = Settings.resolve(
+        api_key=config.api_key,
+        backend="remote" if config.api_key else "local",
+        base_url=config.base_url,
+        db_path=":memory:",
+        env={},
+        config_path="/nonexistent",
+    )
 
     tab = ResultsTab(config)
     tab.client = MagicMock(name="account-session")
@@ -328,3 +349,12 @@ async def test_switching_to_a_store_that_fails_shows_nothing(
     assert labels == []
     assert "Could not read results" in hint
     assert "s: this machine" in hint
+
+
+def test_local_backend_with_key_only_offers_the_local_store(account_config):
+    from dataclasses import replace
+    from hackagent.core.settings import Mode
+
+    account_config.settings = replace(account_config.settings, backend=Mode.LOCAL)
+    tab = ResultsTab(account_config)
+    assert [store.label for store in tab._stores()] == ["this machine"]

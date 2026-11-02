@@ -10,6 +10,7 @@ from ..models import UserProfile
 
 
 def _get_kwargs() -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/user/me",
@@ -48,6 +49,7 @@ def sync_detailed(
     client: AuthenticatedClient,
 ) -> Response[UserProfile]:
     """Retrieve the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -71,6 +73,7 @@ def sync(
     client: AuthenticatedClient,
 ) -> UserProfile | None:
     """Retrieve the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -90,6 +93,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[UserProfile]:
     """Retrieve the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -111,6 +115,7 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> UserProfile | None:
     """Retrieve the profile for the currently authenticated user.
+    Accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

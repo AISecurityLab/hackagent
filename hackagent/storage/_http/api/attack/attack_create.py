@@ -72,14 +72,14 @@ def sync_detailed(
     (e.g., potentially a RunViewSet or similar).
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Attributes:
         queryset: The base queryset, retrieving all Attack objects with related
                   entities (agent, owner, organization) pre-fetched.
         serializer_class: The serializer (`AttackSerializer`) used for data
                           conversion for Attack configurations.
-        authentication_classes: API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes: API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes: List of permission enforcement classes.
         parser_classes: List of parsers for request data (JSONParser).
         lookup_field: The model field used for looking up individual instances ('id').
@@ -130,14 +130,14 @@ def sync(
     (e.g., potentially a RunViewSet or similar).
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Attributes:
         queryset: The base queryset, retrieving all Attack objects with related
                   entities (agent, owner, organization) pre-fetched.
         serializer_class: The serializer (`AttackSerializer`) used for data
                           conversion for Attack configurations.
-        authentication_classes: API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes: API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes: List of permission enforcement classes.
         parser_classes: List of parsers for request data (JSONParser).
         lookup_field: The model field used for looking up individual instances ('id').
@@ -183,14 +183,14 @@ async def asyncio_detailed(
     (e.g., potentially a RunViewSet or similar).
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Attributes:
         queryset: The base queryset, retrieving all Attack objects with related
                   entities (agent, owner, organization) pre-fetched.
         serializer_class: The serializer (`AttackSerializer`) used for data
                           conversion for Attack configurations.
-        authentication_classes: API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes: API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes: List of permission enforcement classes.
         parser_classes: List of parsers for request data (JSONParser).
         lookup_field: The model field used for looking up individual instances ('id').
@@ -239,14 +239,14 @@ async def asyncio(
     (e.g., potentially a RunViewSet or similar).
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Attributes:
         queryset: The base queryset, retrieving all Attack objects with related
                   entities (agent, owner, organization) pre-fetched.
         serializer_class: The serializer (`AttackSerializer`) used for data
                           conversion for Attack configurations.
-        authentication_classes: API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes: API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes: List of permission enforcement classes.
         parser_classes: List of parsers for request data (JSONParser).
         lookup_field: The model field used for looking up individual instances ('id').

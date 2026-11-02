@@ -53,7 +53,7 @@ def test_a_run_can_load_a_hugging_face_dataset_once_the_tui_is_up():
             print("lock created")
 
         App.run = textual_run
-        HackAgentTUI(CLIConfig()).run()
+        HackAgentTUI(CLIConfig(config_file="/nonexistent-test-config")).run()
         """
     )
     result = subprocess.run(

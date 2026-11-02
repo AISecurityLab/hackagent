@@ -92,7 +92,7 @@ def test_model_resolves_api_key_environment(monkeypatch):
 
     model = LiteLLMModel(
         "openai/gpt-4o",
-        connection=ModelConnection(api_key_env="MODEL_API_KEY"),
+        connection=ModelConnection(api_key="${MODEL_API_KEY}"),
     )
 
     with patch("litellm.completion", return_value="response") as completion:
@@ -122,6 +122,7 @@ def test_complete_preserves_multimodal_messages_and_applies_overrides():
     assert result.text == "response"
     completion.assert_called_once_with(
         model="openai/gpt-4o",
+        api_key="not-needed",
         messages=messages,
         timeout=120.0,
         max_tokens=100,
@@ -146,7 +147,7 @@ def test_missing_api_key_environment_fails_during_instantiation(monkeypatch):
     with pytest.raises(ValueError, match="MISSING_MODEL_API_KEY"):
         LiteLLMModel(
             "openai/gpt-4o",
-            connection=ModelConnection(api_key_env="MISSING_MODEL_API_KEY"),
+            connection=ModelConnection(api_key="${MISSING_MODEL_API_KEY}"),
         )
 
 
@@ -156,7 +157,7 @@ def test_empty_api_key_environment_fails_during_instantiation(monkeypatch):
     with pytest.raises(ValueError, match="EMPTY_MODEL_API_KEY.*empty"):
         LiteLLMModel(
             "openai/gpt-4o",
-            connection=ModelConnection(api_key_env="EMPTY_MODEL_API_KEY"),
+            connection=ModelConnection(api_key="${EMPTY_MODEL_API_KEY}"),
         )
 
 

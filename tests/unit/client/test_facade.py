@@ -18,7 +18,7 @@ from tests.fakes import RecordingStore
 
 
 def _settings(**kwargs):
-    kwargs.setdefault("api_key", "")
+    kwargs.setdefault("backend", "remote" if kwargs.get("api_key") else "local")
     kwargs.setdefault("db_path", ":memory:")
     kwargs.setdefault("env", {})
     kwargs.setdefault("config_path", "/nonexistent/hackagent/config.json")
@@ -54,9 +54,9 @@ class TestSettingsOnlyConstruction(unittest.TestCase):
         local.assert_not_called()
         self.assertIs(session.backend, remote)
 
-    def test_empty_key_opens_the_local_store_at_the_configured_path(self):
+    def test_local_backend_opens_the_local_store_at_the_configured_path(self):
         with patch("hackagent.storage.local.LocalBackend") as local:
-            HackAgent(_settings(api_key="", db_path="/tmp/phase8-facade.db"))
+            HackAgent(_settings(backend="local", db_path="/tmp/phase8-facade.db"))
         # Expanded to a native path: backslashes on Windows.
         local.assert_called_once_with(db_path=str(Path("/tmp/phase8-facade.db")))
 
@@ -79,7 +79,14 @@ class TestReadApi(unittest.TestCase):
         self.store = RecordingStore()
         self.session = HackAgent(_settings(), backend=self.store)
         self.agent = self.store.create_or_update_agent(
-            "bot", "OPENAI_SDK", "http://localhost:8000", {"description": "d"}
+            "bot",
+            {
+                "connection": {
+                    "type": "OPENAI_SDK",
+                    "endpoint": "http://localhost:8000",
+                },
+                "generation": {"description": "d"},
+            },
         )
         self.attack = self.store.create_attack(
             "pair", self.agent.id, self.store.context.org_id, {"goals": ["g"]}

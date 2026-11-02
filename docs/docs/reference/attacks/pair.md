@@ -8,7 +8,7 @@ sidebar_position: 11
 
 Prompt Automatic Iterative Refinement with attacker/scorer loops.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 Parallel streams of attacker-refined prompts.
 

@@ -47,10 +47,14 @@ def resolve_campaign(
         *,
         build: ModelBuilder = build_model,
         load: GoalLoader = load_goals,
-        build_embed: EmbedderBuilder = build_embedder) -> ResolvedCampaign
+        build_embed: EmbedderBuilder = build_embedder,
+        settings: Optional[Settings] = None) -> ResolvedCampaign
 ```
 
 Instantiate everything `spec` describes.
+
+Gateway credentials come from `settings`, resolved once if omitted.
+An explicit model connection `api_key` takes precedence.
 
 #### resolve\_attack
 

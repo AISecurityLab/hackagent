@@ -27,7 +27,7 @@ def basic_config():
 
 def _settings(api_key=None, base_url="https://api.hackagent.dev"):
     return Settings.resolve(
-        api_key=api_key or "",
+        api_key=api_key,
         base_url=base_url,
         env={},
         config_path="/nonexistent/hackagent/config.json",
@@ -60,13 +60,12 @@ class TestSpecFromConfig:
         basic_config["api_key"] = "sk-literal"
         spec = spec_from_config(basic_config)
         assert spec.api_key == "sk-literal"
-        assert spec.api_key_env is None
 
     def test_api_key_naming_a_set_env_var(self, basic_config):
         basic_config["api_key"] = "MY_API_KEY_VAR"
         with patch.dict("os.environ", {"MY_API_KEY_VAR": "env-value-123"}):
             spec = spec_from_config(basic_config)
-            assert spec.api_key_env == "MY_API_KEY_VAR"
+            assert spec.api_key == "MY_API_KEY_VAR"
 
     def test_api_key_from_agent_metadata(self, basic_config):
         basic_config["agent_metadata"] = {"api_key": "override-key"}
@@ -168,7 +167,7 @@ class TestModelFactoryCredentials:
         spec = ModelSpec(
             identifier="judge",
             endpoint="https://api.hackagent.dev/v1",
-            api_key_env="MY_KEY",
+            api_key="own-model-key",
         )
         assert factory.with_credentials(spec) is spec
 

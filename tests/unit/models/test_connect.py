@@ -68,7 +68,9 @@ class TestConnectProvider(unittest.TestCase):
 
     def test_instance_id_is_accepted_and_ignored(self):
         model = connect(
-            ModelSpec(identifier="gpt-4", agent_type=AgentType.OPENAI),
+            ModelSpec(
+                identifier="gpt-4", agent_type=AgentType.OPENAI, api_key="test-key"
+            ),
             instance_id="abc",
         )
         self.assertIsInstance(model, LiteLLMModel)

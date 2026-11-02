@@ -5,11 +5,12 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ..models import KeyContextRetrieveResponse200
 from ...types import Response
+from ..models import KeyContextRetrieveResponse200
 
 
 def _get_kwargs() -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/key/context",
@@ -49,9 +50,9 @@ def sync_detailed(
 ) -> Response[KeyContextRetrieveResponse200]:
     """Caller identity context
 
-     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
-    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
-    page through the agent list.
+     Returns the caller's user ID, username, and organization details. Accessible with both API key and
+    login (Auth0 or Keycloak) bearer tokens. The SDK uses this endpoint to bootstrap organization
+    context without needing to page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -76,9 +77,9 @@ def sync(
 ) -> KeyContextRetrieveResponse200 | None:
     """Caller identity context
 
-     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
-    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
-    page through the agent list.
+     Returns the caller's user ID, username, and organization details. Accessible with both API key and
+    login (Auth0 or Keycloak) bearer tokens. The SDK uses this endpoint to bootstrap organization
+    context without needing to page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -99,9 +100,9 @@ async def asyncio_detailed(
 ) -> Response[KeyContextRetrieveResponse200]:
     """Caller identity context
 
-     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
-    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
-    page through the agent list.
+     Returns the caller's user ID, username, and organization details. Accessible with both API key and
+    login (Auth0 or Keycloak) bearer tokens. The SDK uses this endpoint to bootstrap organization
+    context without needing to page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -124,9 +125,9 @@ async def asyncio(
 ) -> KeyContextRetrieveResponse200 | None:
     """Caller identity context
 
-     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
-    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
-    page through the agent list.
+     Returns the caller's user ID, username, and organization details. Accessible with both API key and
+    login (Auth0 or Keycloak) bearer tokens. The SDK uses this endpoint to bootstrap organization
+    context without needing to page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

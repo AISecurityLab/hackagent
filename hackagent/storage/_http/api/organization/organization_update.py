@@ -85,8 +85,8 @@ def sync_detailed(
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):
@@ -125,8 +125,8 @@ def sync(
 ) -> Organization | None:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):
@@ -160,8 +160,8 @@ async def asyncio_detailed(
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):
@@ -198,8 +198,8 @@ async def asyncio(
 ) -> Organization | None:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):

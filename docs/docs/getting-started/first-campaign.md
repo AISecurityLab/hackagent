@@ -134,15 +134,15 @@ hackagent tui              # the same results in a terminal app
 ```
 
 A run reaches the HackAgent platform when the campaign asks for it, which
-keeps a credential out of the file — `api_key_env` names the variable holding
-the key:
+keeps a credential out of the file — `api_key` contains an explicit environment
+reference:
 
 ```yaml
 execution:
   storage:
     backend: remote
     base_url: https://api.hackagent.dev
-    api_key_env: HACKAGENT_API_KEY
+    api_key: "${HACKAGENT_API_KEY}"
 ```
 
 In the TUI, the same setting is under **Execution → Storage**, and the

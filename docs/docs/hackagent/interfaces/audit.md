@@ -1,9 +1,9 @@
 ---
 sidebar_label: audit
-title: hackagent.interfaces.tui.views.audit
+title: hackagent.interfaces.audit
 ---
 
-Rich markup for judge audits shown by TUI run and result views.
+Rich markup for judge audits shown by the CLI and TUI run and result views.
 
 #### audit\_markup
 

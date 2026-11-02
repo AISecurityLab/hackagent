@@ -1,29 +1,20 @@
-# IBM Multi Judge (HackAgent)
+# FlipAttack with three judges
 
-This folder contains a HackAgent multi-judge FlipAttack script.
+`flipattack-multi-judge.yaml` tests `ibm-granite/granite-4.1-8b` through
+OpenRouter. Three judges use `openai/gpt-4o` with the `harmbench_variant`,
+`harmbench` and `jailbreakbench` scoring rubrics.
 
-Target:
-- Model: ibm-granite/granite-4.1-8b
-- Endpoint: https://openrouter.ai/api/v1
-
-Judges:
-- harmbench_variant
-- harmbench
-- jailbreakbench
-
-All judges use:
-- Model: openai/gpt-4o
-- Endpoint: https://openrouter.ai/api/v1
+The target and judges each use `api_key: "${OPENROUTER_API_KEY}"` in their
+connection configuration.
 
 ## Run
 
-```bash
-export OPENROUTER_API_KEY="..."
-python examples/openai_sdk/ibm_multi_judge/flipattack-multi-judge.yaml
-```
-
-Optional for remote HackAgent backend tracking:
+From this example directory:
 
 ```bash
-export HACKAGENT_API_KEY="..."
+export OPENROUTER_API_KEY="your_openrouter_key"
+hackagent campaign run flipattack-multi-judge.yaml
 ```
+
+Results are stored in the local SQLite database. The campaign does not select
+remote storage.

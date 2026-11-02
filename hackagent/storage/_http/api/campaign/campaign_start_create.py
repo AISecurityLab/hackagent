@@ -6,18 +6,18 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...types import Response
-from ..models import Run, RunRequest
+from ..models import CampaignStartRequest, Run
 
 
 def _get_kwargs(
     *,
-    body: RunRequest,
+    body: CampaignStartRequest,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/run/run_tests",
+        "url": "/campaign/start",
     }
 
     _kwargs["json"] = body.model_dump(mode="json", exclude_unset=True)
@@ -31,10 +31,10 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Run | None:
-    if response.status_code == 200:
-        response_200 = Run.model_validate(response.json())
+    if response.status_code == 201:
+        response_201 = Run.model_validate(response.json())
 
-        return response_200
+        return response_201
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -56,19 +56,17 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
+    body: CampaignStartRequest,
 ) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Save the campaign of ``hackagent campaign run FILE`` (by name, in
+    the caller's organization) and create its run, already claimed by
+    the calling process: it heartbeats and finishes like any executor.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (CampaignStartRequest): A campaign started by ``hackagent campaign run FILE``: the
+            SDK's
+            recorded spec, whose ``target`` and ``execution`` are the client's own and
+            are not stored.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -92,19 +90,17 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
+    body: CampaignStartRequest,
 ) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Save the campaign of ``hackagent campaign run FILE`` (by name, in
+    the caller's organization) and create its run, already claimed by
+    the calling process: it heartbeats and finishes like any executor.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (CampaignStartRequest): A campaign started by ``hackagent campaign run FILE``: the
+            SDK's
+            recorded spec, whose ``target`` and ``execution`` are the client's own and
+            are not stored.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,19 +119,17 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
+    body: CampaignStartRequest,
 ) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Save the campaign of ``hackagent campaign run FILE`` (by name, in
+    the caller's organization) and create its run, already claimed by
+    the calling process: it heartbeats and finishes like any executor.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (CampaignStartRequest): A campaign started by ``hackagent campaign run FILE``: the
+            SDK's
+            recorded spec, whose ``target`` and ``execution`` are the client's own and
+            are not stored.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -157,19 +151,17 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: RunRequest,
+    body: CampaignStartRequest,
 ) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Save the campaign of ``hackagent campaign run FILE`` (by name, in
+    the caller's organization) and create its run, already claimed by
+    the calling process: it heartbeats and finishes like any executor.
 
     Args:
-        body (RunRequest): Serializer for the Run model, used for both input and output.
+        body (CampaignStartRequest): A campaign started by ``hackagent campaign run FILE``: the
+            SDK's
+            recorded spec, whose ``target`` and ``execution`` are the client's own and
+            are not stored.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

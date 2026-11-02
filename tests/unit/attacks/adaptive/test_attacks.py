@@ -122,10 +122,14 @@ def test_the_panel_is_not_configured_as_a_role(name):
 @pytest.mark.parametrize("name", sorted(set(ITERATIVE_ATTACKS) - {"pair"}))
 def test_only_pair_rates_with_a_model_of_its_own(name):
     # BoN and PAP had no rater separate from the panel before the migration,
-    # so they get none now; a threshold would imply one.
+    # so they get none now. ToolHijacker's threshold is an exact tool-selection
+    # rate across paraphrases, not a score from a separate model.
     params_type = get_attack_class(name).params_type
     assert "scorer" not in params_type.model_fields
-    assert not any(field.endswith("threshold") for field in params_type.model_fields)
+    thresholds = {
+        field for field in params_type.model_fields if field.endswith("threshold")
+    }
+    assert thresholds == ({"success_threshold"} if name == "toolhijacker" else set())
 
 
 def test_empty_goal_is_rejected():

@@ -8,7 +8,7 @@ sidebar_position: 1
 
 Prefilling attack: opens the model's answer with an adversarial prefix and keeps the prefixes that work best.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 Prefill the answer's opening and measure which opening works.
 

@@ -7,16 +7,21 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...types import UNSET, Response, Unset
-from ..models import PaginatedResultList, ResultListEvaluationStatus
+from ..models import PaginatedResultList, ResultListEvaluationStatus, ResultListOrdering
 
 
 def _get_kwargs(
     *,
     evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
+    goal_index: int | Unset = UNSET,
+    include_traces: bool | Unset = UNSET,
+    ordering: ResultListOrdering | Unset = UNSET,
     page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     json_evaluation_status: str | Unset = UNSET
@@ -25,7 +30,19 @@ def _get_kwargs(
 
     params["evaluation_status"] = json_evaluation_status
 
+    params["goal_index"] = goal_index
+
+    params["include_traces"] = include_traces
+
+    json_ordering: str | Unset = UNSET
+    if not isinstance(ordering, Unset):
+        json_ordering = ordering.value
+
+    params["ordering"] = json_ordering
+
     params["page"] = page
+
+    params["page_size"] = page_size
 
     json_run: str | Unset = UNSET
     if not isinstance(run, Unset):
@@ -77,19 +94,27 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
+    goal_index: int | Unset = UNSET,
+    include_traces: bool | Unset = UNSET,
+    ordering: ResultListOrdering | Unset = UNSET,
     page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> Response[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         evaluation_status (ResultListEvaluationStatus | Unset):
+        goal_index (int | Unset):
+        include_traces (bool | Unset):
+        ordering (ResultListOrdering | Unset):
         page (int | Unset):
+        page_size (int | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -103,7 +128,11 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         evaluation_status=evaluation_status,
+        goal_index=goal_index,
+        include_traces=include_traces,
+        ordering=ordering,
         page=page,
+        page_size=page_size,
         run=run,
         run_organization=run_organization,
     )
@@ -119,19 +148,27 @@ def sync(
     *,
     client: AuthenticatedClient,
     evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
+    goal_index: int | Unset = UNSET,
+    include_traces: bool | Unset = UNSET,
+    ordering: ResultListOrdering | Unset = UNSET,
     page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> PaginatedResultList | None:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         evaluation_status (ResultListEvaluationStatus | Unset):
+        goal_index (int | Unset):
+        include_traces (bool | Unset):
+        ordering (ResultListOrdering | Unset):
         page (int | Unset):
+        page_size (int | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -146,7 +183,11 @@ def sync(
     return sync_detailed(
         client=client,
         evaluation_status=evaluation_status,
+        goal_index=goal_index,
+        include_traces=include_traces,
+        ordering=ordering,
         page=page,
+        page_size=page_size,
         run=run,
         run_organization=run_organization,
     ).parsed
@@ -156,19 +197,27 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
+    goal_index: int | Unset = UNSET,
+    include_traces: bool | Unset = UNSET,
+    ordering: ResultListOrdering | Unset = UNSET,
     page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> Response[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         evaluation_status (ResultListEvaluationStatus | Unset):
+        goal_index (int | Unset):
+        include_traces (bool | Unset):
+        ordering (ResultListOrdering | Unset):
         page (int | Unset):
+        page_size (int | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -182,7 +231,11 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         evaluation_status=evaluation_status,
+        goal_index=goal_index,
+        include_traces=include_traces,
+        ordering=ordering,
         page=page,
+        page_size=page_size,
         run=run,
         run_organization=run_organization,
     )
@@ -196,19 +249,27 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
+    goal_index: int | Unset = UNSET,
+    include_traces: bool | Unset = UNSET,
+    ordering: ResultListOrdering | Unset = UNSET,
     page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> PaginatedResultList | None:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         evaluation_status (ResultListEvaluationStatus | Unset):
+        goal_index (int | Unset):
+        include_traces (bool | Unset):
+        ordering (ResultListOrdering | Unset):
         page (int | Unset):
+        page_size (int | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -224,7 +285,11 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             evaluation_status=evaluation_status,
+            goal_index=goal_index,
+            include_traces=include_traces,
+            ordering=ordering,
             page=page,
+            page_size=page_size,
             run=run,
             run_organization=run_organization,
         )

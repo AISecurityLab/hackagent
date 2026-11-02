@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
+from hackagent.core.credentials import CredentialError
 from hackagent.core.settings import (
     DEFAULT_REMOTE_BASE_URL,
     Mode,
@@ -92,25 +93,29 @@ def _resolve(tmp_path, file_values=None, env=None, **explicit):
 
 
 @pytest.mark.parametrize(
-    "explicit,env,file_value,expected,source",
+    "explicit,env,expected,source",
     [
-        ("cli", "env", "file", "cli", Source.EXPLICIT),
-        (None, "env", "file", "env", Source.ENV),
-        (None, None, "file", "file", Source.FILE),
-        (None, None, None, None, Source.DEFAULT),
-        (None, "", "file", "file", Source.FILE),  # empty env counts as unset
+        ("cli", "env", "cli", Source.EXPLICIT),
+        (None, "env", "env", Source.ENV),
+        (None, None, None, Source.DEFAULT),
+        (None, "", None, Source.DEFAULT),  # empty env counts as unset
     ],
 )
-def test_api_key_priority(tmp_path, explicit, env, file_value, expected, source):
+def test_api_key_priority(tmp_path, explicit, env, expected, source):
     settings = _resolve(
         tmp_path,
-        file_values={"api_key": file_value} if file_value else {},
         env={"HACKAGENT_API_KEY": env} if env is not None else {},
         api_key=explicit,
     )
 
     assert settings.api_key == expected
     assert settings.api_key_source is source
+
+
+def test_a_literal_key_saved_in_a_file_is_rejected_without_exposing_it(tmp_path):
+    with pytest.raises(CredentialError) as error:
+        _resolve(tmp_path, file_values={"api_key": "stale-file-key"})
+    assert "stale-file-key" not in str(error.value)
 
 
 def test_the_api_key_never_appears_when_settings_are_printed(tmp_path):
@@ -122,16 +127,75 @@ def test_the_api_key_never_appears_when_settings_are_printed(tmp_path):
     assert "sk-do-not-print" not in str(settings)
 
 
-def test_explicit_empty_api_key_forces_local_mode(tmp_path):
+def test_explicit_empty_api_key_is_an_error_not_local_mode(tmp_path):
+    with pytest.raises(CredentialError, match="empty"):
+        _resolve(tmp_path, env={"HACKAGENT_API_KEY": "env-key"}, api_key="")
+
+
+def test_default_is_hackagent_not_openai(tmp_path):
+    settings = _resolve(tmp_path, env={"OPENAI_API_KEY": "provider-key"})
+    assert settings.api_key is None
+    with pytest.raises(CredentialError, match="HACKAGENT_API_KEY"):
+        _resolve(tmp_path, env={"OPENAI_API_KEY": "provider-key"}, backend="remote")
+
+
+def test_explicit_api_key_reference_is_resolved(tmp_path):
     settings = _resolve(
         tmp_path,
-        file_values={"api_key": "file-key"},
-        env={"HACKAGENT_API_KEY": "env-key"},
-        api_key="",
+        env={"MY_KEY": "mine", "HACKAGENT_API_KEY": "default"},
+        api_key="${MY_KEY}",
     )
 
-    assert settings.api_key is None
+    assert settings.api_key == "mine"
+    assert settings.api_key_source is Source.EXPLICIT
+
+
+@pytest.mark.parametrize("env", [{}, {"MY_KEY": ""}, {"MY_KEY": "  "}])
+def test_explicit_reference_that_is_unset_or_empty_never_falls_back(tmp_path, env):
+    with pytest.raises(CredentialError, match="MY_KEY"):
+        _resolve(
+            tmp_path,
+            env={**env, "HACKAGENT_API_KEY": "default"},
+            api_key="${MY_KEY}",
+        )
+
+
+def test_backend_defaults_to_local_whatever_keys_are_set(tmp_path):
+    settings = _resolve(tmp_path, env={"HACKAGENT_API_KEY": "env-key"})
+
+    assert settings.api_key == "env-key"
     assert settings.mode is Mode.LOCAL
+    assert settings.backend_source is Source.DEFAULT
+
+
+@pytest.mark.parametrize("env", [{}, {"HACKAGENT_API_KEY": ""}])
+def test_remote_backend_without_a_key_is_an_error_not_local(tmp_path, env):
+    with pytest.raises(CredentialError, match="HACKAGENT_API_KEY"):
+        _resolve(tmp_path, env=env, backend="remote")
+
+
+def test_backend_priority(tmp_path):
+    env = {"HACKAGENT_API_KEY": "k"}
+    assert _resolve(tmp_path, {"backend": "remote"}, env=env).mode is Mode.REMOTE
+    settings = _resolve(
+        tmp_path,
+        {"backend": "remote"},
+        env={**env, "HACKAGENT_BACKEND": "local"},
+    )
+    assert settings.mode is Mode.LOCAL
+    assert settings.backend_source is Source.ENV
+    settings = _resolve(
+        tmp_path,
+        env={**env, "HACKAGENT_BACKEND": "local"},
+        backend="remote",
+    )
+    assert settings.mode is Mode.REMOTE
+    assert settings.backend_source is Source.EXPLICIT
+
+
+def test_invalid_backend_is_an_error(tmp_path):
+    with pytest.raises(ValueError, match="Invalid storage backend"):
+        _resolve(tmp_path, backend="cloud")
 
 
 def test_base_url_priority_and_normalisation(tmp_path):
@@ -168,11 +232,11 @@ def test_db_path_from_env_including_memory(tmp_path):
 
 def test_yaml_config_file(tmp_path):
     config = tmp_path / "config.yaml"
-    config.write_text("api_key: yaml-key\nbase_url: https://yaml.example\n")
+    config.write_text("backend: remote\nbase_url: https://yaml.example\n")
 
-    settings = Settings.resolve(config_path=config, env={})
+    settings = Settings.resolve(config_path=config, env={"HACKAGENT_API_KEY": "k"})
 
-    assert settings.api_key == "yaml-key"
+    assert settings.mode is Mode.REMOTE
     assert settings.base_url == "https://yaml.example"
 
 
@@ -205,7 +269,24 @@ def test_hosted_gateway_needs_key_and_remote_host(tmp_path, base_url, hosted):
     remote = _resolve(tmp_path, api_key="key", base_url=base_url)
     local = _resolve(tmp_path, base_url=base_url)
 
-    assert remote.mode is Mode.REMOTE
+    # Storage stays local: the gateway follows the key, not the backend.
+    assert remote.mode is Mode.LOCAL
     assert remote.uses_hosted_gateway is hosted
     assert local.uses_hosted_gateway is False
     assert remote.gateway_endpoint == f"{base_url.rstrip('/')}/v1"
+
+
+def test_dashboard_url_defaults_only_for_the_hosted_api():
+    from hackagent.core.settings import Settings
+
+    hosted = Settings.resolve(config_path="/nonexistent.json", env={})
+    assert hosted.dashboard_url == "https://app.hackagent.dev"
+    own = Settings.resolve(
+        base_url="https://api.example.test", config_path="/nonexistent.json", env={}
+    )
+    assert own.dashboard_url is None
+    env = {"HACKAGENT_DASHBOARD_URL": "https://dash.test/"}
+    assert (
+        Settings.resolve(config_path="/nonexistent.json", env=env).dashboard_url
+        == "https://dash.test"
+    )

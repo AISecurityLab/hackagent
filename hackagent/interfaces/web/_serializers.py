@@ -188,7 +188,7 @@ def run(
         "status": record.status,
         "run_notes": record.run_notes,
         # Every local run was executed by this client, by definition.
-        "is_client_executed": True,
+        "executor": "cli",
         "results": results or [],
     }
 
