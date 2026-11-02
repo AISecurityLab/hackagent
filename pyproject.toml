@@ -148,6 +148,7 @@ include = [
 ]
 
 [tool.coverage.run]
+branch = true
 data_file = "reports/.coverage"
 source = ["hackagent"]
 omit = [
