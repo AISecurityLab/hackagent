@@ -110,21 +110,37 @@ jobs:
           # GitHub acts on "Fixes #N" only in PRs merged into the default
           # branch, so the closing keywords of PRs merged into stage do
           # nothing on their own. Repeat them here for the issues that are
-          # still open; merging the promotion PR then closes them.
+          # still open; merging the promotion PR then closes them. Errors are
+          # not inherited inside the loops, so each lookup exits on failure:
+          # an incomplete list must not replace the description below.
+          lookup_err="$(mktemp)"
           closes="$(
             gh api --paginate "repos/${REPO}/compare/main...${SHA}?per_page=100" \
               --jq '.commits[].sha' |
               while read -r commit; do
                 gh api "repos/${REPO}/commits/${commit}/pulls" \
-                  --jq '.[] | select(.base.ref == "stage" and .merged_at != null) | .body // ""'
+                  --jq '.[] | select(.base.ref == "stage" and .merged_at != null) | .body // ""' ||
+                  exit 1
               done |
-              jq -Rr 'scan("(?i)\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\\s+#([0-9]+)\\b")[0]' |
+              jq -Rr --arg repo "${REPO}" '
+                scan("(?i)\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\\s+(?:https://github\\.com/([\\w.-]+/[\\w.-]+)/issues/|([\\w.-]+/[\\w.-]+)?#)([0-9]+)\\b")
+                | select((.[0] // .[1] // $repo | ascii_downcase) == ($repo | ascii_downcase))
+                | .[2]' |
               sort -un |
               while read -r number; do
-                # A mistyped number must not block the promotion.
-                gh api "repos/${REPO}/issues/${number}" \
-                  --jq 'select(.state == "open" and .pull_request == null) | "Closes #\(.number)"' \
-                  2>/dev/null || true
+                if ! issue="$(gh api "repos/${REPO}/issues/${number}" \
+                  --jq 'select(.state == "open" and .pull_request == null) | "Closes #\(.number)"' 2>"${lookup_err}")"; then
+                  # A mistyped or deleted number must not block the promotion.
+                  if grep -qE 'HTTP (404|410)' "${lookup_err}"; then
+                    echo "Skipping #${number}: $(cat "${lookup_err}")" >&2
+                    continue
+                  fi
+                  cat "${lookup_err}" >&2
+                  exit 1
+                fi
+                if [[ -n "${issue}" ]]; then
+                  echo "${issue}"
+                fi
               done
           )"
 
