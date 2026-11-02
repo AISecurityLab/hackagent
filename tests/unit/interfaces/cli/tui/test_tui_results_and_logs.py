@@ -14,36 +14,19 @@ This module tests:
 import json
 import logging
 from io import StringIO
-from typing import Any
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 from rich.console import Console
+from rich.text import Text
+
+from hackagent.interfaces.tui.views.results.formatters.text import _escape
 
 
 # ============================================================================
 # Escape Function Tests
 # ============================================================================
-
-
-def _escape(value: Any) -> str:
-    """Escape a value for safe Rich markup rendering.
-
-    Args:
-        value: Any value to escape
-
-    Returns:
-        String with Rich markup characters escaped
-
-    Note:
-        We escape ALL square brackets to prevent any markup interpretation issues
-        in Rich's nested color contexts.
-    """
-    if value is None:
-        return ""
-    text = str(value)
-    return text.replace("[", "\\[").replace("]", "\\]")
 
 
 class TestEscapeFunction:
@@ -59,22 +42,23 @@ class TestEscapeFunction:
 
     def test_escape_single_brackets(self) -> None:
         """Test single brackets are escaped."""
-        assert _escape("[test]") == "\\[test\\]"
+        assert Text.from_markup(_escape("[test]")).plain == "[test]"
 
     def test_escape_nested_brackets(self) -> None:
         """Test nested brackets are escaped."""
-        assert _escape("[[nested]]") == "\\[\\[nested\\]\\]"
+        assert Text.from_markup(_escape("[[nested]]")).plain == "[[nested]]"
 
     def test_escape_rich_markup(self) -> None:
         """Test Rich markup tags are escaped."""
-        assert _escape("[bold]text[/bold]") == "\\[bold\\]text\\[/bold\\]"
+        assert (
+            Text.from_markup(_escape("[bold]text[/bold]")).plain == "[bold]text[/bold]"
+        )
 
     def test_escape_json_array(self) -> None:
         """Test JSON array brackets are escaped."""
         json_str = '["item1", "item2"]'
         escaped = _escape(json_str)
-        assert "\\[" in escaped
-        assert "\\]" in escaped
+        assert Text.from_markup(escaped).plain == json_str
 
     def test_escape_integer(self) -> None:
         """Test integers are converted to string."""
@@ -83,8 +67,7 @@ class TestEscapeFunction:
     def test_escape_dict(self) -> None:
         """Test dicts are converted to string and escaped."""
         result = _escape({"key": "[value]"})
-        assert "\\[" in result
-        assert "\\]" in result
+        assert Text.from_markup(result).plain == str({"key": "[value]"})
 
 
 # ============================================================================
@@ -387,25 +370,21 @@ class TestActionsViewer:
         args_str = json.dumps(arguments, indent=2)
         escaped_args = _escape(args_str)
 
-        # Should contain escaped brackets
-        assert "\\[" in escaped_args
-        assert "\\]" in escaped_args
+        assert Text.from_markup(escaped_args).plain == args_str
 
     def test_escape_in_http_request_display(self) -> None:
         """Test HTTP request URL escaping."""
         url = "http://example.com/api?filter=[active]"
         escaped_url = _escape(url)
 
-        assert "\\[" in escaped_url
-        assert "\\]" in escaped_url
+        assert Text.from_markup(escaped_url).plain == url
 
     def test_escape_in_adk_event_content(self) -> None:
         """Test ADK event content escaping."""
         content = "Tool returned [success] with data [1, 2, 3]"
         escaped = _escape(content)
 
-        assert "\\[" in escaped
-        assert "\\]" in escaped
+        assert Text.from_markup(escaped).plain == content
 
 
 # ============================================================================
@@ -738,9 +717,7 @@ class TestFormatChatMessage:
         msg = {"role": "user", "content": "Search for [internal] data"}
         result = _format_chat_message(msg)
 
-        # Should escape brackets
-        assert "\\[" in result or "[internal]" not in result
-        # Should render without error
+        assert msg["content"] in Text.from_markup(result).plain
         console.print(result)
 
 

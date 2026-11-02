@@ -101,24 +101,6 @@ def pytest_configure(config):
     )
 
 
-def pytest_collection_modifyitems(config, items):
-    """Skip integration tests unless explicitly requested."""
-    # Check if we should run integration tests
-    run_integration = config.getoption("--run-integration", default=False)
-
-    if not run_integration:
-        skip_integration = pytest.mark.skip(
-            reason="Integration tests skipped. Use --run-integration to run."
-        )
-        for item in items:
-            if "integration" in item.keywords:
-                item.add_marker(skip_integration)
-
-
-# NOTE: pytest_addoption has been moved to tests/conftest.py (root level)
-# to ensure options are registered before pytest processes command line arguments.
-
-
 # --- Token Limit Fixtures (Speed Optimization) ---
 
 

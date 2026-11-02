@@ -139,13 +139,8 @@ class TestGoogleADKBackendIntegration:
         response = model.complete(_user("What is 2 + 2? Answer briefly."))
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(
-                f"ADK returned error (may be LLM timeout): {response.error.message}"
-            )
-        else:
-            assert response.text is not None
-            logger.info(f"ADK response: {response.text[:100]}")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
 
     def test_complete_with_messages(
         self,
@@ -160,13 +155,8 @@ class TestGoogleADKBackendIntegration:
         response = model.complete([{"role": "user", "content": "Hello! Say hi."}])
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(
-                f"ADK returned error (may be LLM timeout): {response.error.message}"
-            )
-        else:
-            assert response.text is not None
-            logger.info(f"ADK chat response: {response.text[:100]}")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
 
     @pytest.mark.timeout(240)
     def test_multi_turn_conversation(
@@ -181,18 +171,14 @@ class TestGoogleADKBackendIntegration:
 
         response1 = model.complete(_user("Say hello."))
         assert response1 is not None
-        if response1.error is not None:
-            logger.warning(f"ADK turn 1 error: {response1.error.message}")
-        else:
-            logger.info(f"ADK turn 1 response: {(response1.text or '')[:50]}")
+        assert response1.error is None, response1.error
+        assert response1.text and response1.text.strip()
 
         # Second message in same session should have context.
         response2 = model.complete(_user("Say goodbye."))
         assert response2 is not None
-        if response2.error is not None:
-            logger.warning(f"ADK turn 2 error: {response2.error.message}")
-        else:
-            logger.info(f"ADK turn 2 response: {(response2.text or '')[:50]}")
+        assert response2.error is None, response2.error
+        assert response2.text and response2.text.strip()
 
     def test_session_reuse(
         self,
@@ -211,6 +197,8 @@ class TestGoogleADKBackendIntegration:
         for i in range(3):
             response = model.complete(_user(f"Request {i}"))
             assert response is not None
+            assert response.error is None, response.error
+            assert response.text and response.text.strip()
 
         # Session ID should remain the same.
         assert model.session_id == session_id
@@ -365,10 +353,8 @@ class TestGoogleADKConnectIntegration:
         )
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(f"ADK error: {response.error.message}")
-        elif response.text:
-            logger.info(f"ADK response: {response.text[:50]}")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
 
 
 @pytest.mark.integration
@@ -389,7 +375,8 @@ class TestGoogleADKToolUsage:
         response = model.complete(_user("What is the weather in Boston?"))
 
         assert response is not None
-        assert response.text is not None
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
         logger.info(f"ADK tool response: {response.text[:100]}")
 
     @pytest.mark.timeout(300)
@@ -411,9 +398,5 @@ class TestGoogleADKToolUsage:
         )
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(f"ADK complex query error: {response.error.message}")
-        elif response.text:
-            logger.info(f"ADK complex response: {response.text[:100]}")
-        else:
-            logger.warning("ADK complex query returned empty response")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
