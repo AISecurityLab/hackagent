@@ -14,7 +14,7 @@ if(!gd) return;
 // plotly's default body margin (8px) overflows height:100% containers by
 // exactly those 8px -> scrollbar inside docs iframes. Kill it.
 document.body.style.margin = '0';
-var css = document.createElement('style'); css.textContent = '.aa-card{position:fixed;z-index:50;display:none;max-width:370px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.14);font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#111827;pointer-events:none;}.aa-head{display:flex;align-items:center;gap:9px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;}.aa-dot{width:13px;height:13px;border-radius:50%;flex:none;border:2px solid rgba(0,0,0,0.55);}.aa-name{font-size:15px;font-weight:700;}.aa-row{display:flex;justify-content:space-between;gap:14px;padding:1px 0;}.aa-k{font-weight:700;color:#4b5563;white-space:nowrap;}.aa-v{text-align:right;word-break:break-all;}.aa-v.dim{color:#6b7280;font-size:12px;}.aa-legend{flex:none;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;gap:4px 16px;padding:6px 14px 9px;border-top:1px solid #ececec;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:12.5px;color:#374151;}.aa-lg{display:flex;flex-direction:column;gap:1px;padding:3px 8px;border-radius:8px;cursor:pointer;}.aa-lg:hover{background:#f3f4f6;}.aa-lg-h{font-weight:600;color:#111827;font-size:12px;cursor:pointer;padding-bottom:1px;}.aa-lg-e{display:flex;align-items:center;gap:7px;padding:1px 3px;border-radius:5px;cursor:pointer;}.aa-lg-e:hover{background:#e9eef5;}.aa-off{opacity:0.35;}.aa-sw{width:11px;height:11px;flex:none;box-sizing:border-box;}.aa-sw.circle{border-radius:50%;}.aa-sw.diamond{width:9px;height:9px;transform:rotate(45deg);}.aa-sw.line{width:15px;height:0;border-top-width:2.5px;border-top-style:solid;}';
+var css = document.createElement('style'); css.textContent = '.aa-card{position:fixed;z-index:50;display:none;max-width:370px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.14);font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#111827;pointer-events:none;}.aa-head{display:flex;align-items:center;gap:9px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;}.aa-dot{width:13px;height:13px;border-radius:50%;flex:none;border:2px solid rgba(0,0,0,0.55);}.aa-name{font-size:15px;font-weight:700;}.aa-row{display:flex;justify-content:space-between;gap:14px;padding:1px 0;}.aa-k{font-weight:700;color:#4b5563;white-space:nowrap;}.aa-v{text-align:right;word-break:break-all;}.aa-v.dim{color:#6b7280;font-size:12px;}.aa-legend{flex:none;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;gap:4px 16px;padding:6px 14px 9px;border-top:1px solid #ececec;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:12.5px;color:#374151;}.aa-lg{display:flex;flex-direction:column;gap:1px;padding:3px 8px;border-radius:8px;cursor:pointer;}.aa-lg:hover{background:#f3f4f6;}.aa-lg-h{font-weight:600;color:#111827;font-size:12px;cursor:pointer;padding:0 0 1px;}.aa-lg-e{display:flex;align-items:center;gap:7px;padding:1px 3px;border-radius:5px;cursor:pointer;}.aa-lg-e:hover{background:#e9eef5;}.aa-off{opacity:0.35;}button.aa-lg-e,button.aa-lg-h{font-family:inherit;line-height:inherit;background:none;border:0;margin:0;text-align:left;}button.aa-lg-e{font-size:inherit;color:inherit;}.aa-lg-e:focus-visible,.aa-lg-h:focus-visible{outline:2px solid #2563eb;outline-offset:1px;}.aa-sw{width:11px;height:11px;flex:none;box-sizing:border-box;}.aa-sw.circle{border-radius:50%;}.aa-sw.diamond{width:9px;height:9px;transform:rotate(45deg);}.aa-sw.line{width:15px;height:0;border-top-width:2.5px;border-top-style:solid;}';
 document.head.appendChild(css);
 var tip = document.createElement('div');
 tip.className = 'aa-card'; document.body.appendChild(tip);
@@ -57,8 +57,8 @@ if (window.ResizeObserver) {
   }).observe(gd);
 }
 // ---- custom legend bar (native legend is disabled on the web copy) ----
-// Layout: body = flex column; the plot flexes to fill; the bar sits beneath
-// it. Per legendgroup: group header with think-ON/OFF entries stacked under
+// Layout: body = flex column; the plot's wrapper flexes to fill (and shrinks
+// to make room for the bar); the bar sits beneath it. Per legendgroup: group header with think-ON/OFF entries stacked under
 // it; groups laid out side by side (wraps on narrow containers). Swatches
 // match the plot (color + circle/diamond; dashed line for line-only traces).
 // Click parity with the native legend: entry toggles its trace, header
@@ -66,17 +66,31 @@ if (window.ResizeObserver) {
 document.body.style.display = 'flex';
 document.body.style.flexDirection = 'column';
 document.body.style.height = '100%';
-gd.style.flex = '1 1 auto';
-gd.style.minHeight = '0';
+gd.parentElement.style.flex = '1 1 auto';
+gd.parentElement.style.minHeight = '0';
 gd.style.width = '100%';
 var bar = document.createElement('div'); bar.className = 'aa-legend';
 document.body.appendChild(bar);
+// A comparison line or its label (meta.pair: the two marker traces it joins)
+// is shown only while both of those markers are.
+function syncPairs(){
+  var idxs = [], vis = [];
+  gd.data.forEach(function(tr, i){
+    var pair = tr.meta && tr.meta.pair;
+    if (!pair) return;
+    idxs.push(i);
+    vis.push(gd.data[pair[0]].visible !== false && gd.data[pair[1]].visible !== false);
+  });
+  if (idxs.length) Plotly.restyle(gd, {visible: vis}, idxs);
+}
 function toggleIdx(i){
   Plotly.restyle(gd, {visible: gd.data[i].visible === false}, [i]);
+  syncPairs();
 }
 function toggleGroup(idxs){
   var any = idxs.some(function(i){ return gd.data[i].visible !== false; });
   Plotly.restyle(gd, {visible: !any}, idxs);
+  syncPairs();
 }
 function swatch(tr){
   var mode = tr.mode || 'markers', mk = tr.marker || {}, col = mk.color;
@@ -97,7 +111,9 @@ function swatch(tr){
   return el;
 }
 function mkEntry(e, text, onClick){
-  var row = document.createElement('div'); row.className = 'aa-lg-e';
+  var row = document.createElement('button'); row.type = 'button';
+  row.className = 'aa-lg-e'; row.dataset.key = 'e' + e.idx;
+  row.setAttribute('aria-pressed', String(e.trace.visible !== false));
   if (e.trace.visible === false) row.className += ' aa-off';
   row.appendChild(swatch(e.trace));
   var sp = document.createElement('span'); sp.textContent = text;
@@ -106,6 +122,9 @@ function mkEntry(e, text, onClick){
   return row;
 }
 function buildLegend(){
+  // Rebuilding replaces the buttons: keep keyboard focus on the same control.
+  var active = document.activeElement;
+  var focusKey = active && bar.contains(active) ? active.dataset.key : null;
   bar.innerHTML = '';
   var groups = {}, order = [];
   gd.data.forEach(function(tr, i){
@@ -121,37 +140,42 @@ function buildLegend(){
       g.entries.push({idx: i, label: tr.name, trace: tr, solo: true});
     }
   });
-  order.forEach(function(gk){
+  order.forEach(function(gk, gi){
     var g = groups[gk];
     var box = document.createElement('div'); box.className = 'aa-lg';
     if (g.entries.length === 1) {
       // single entry (with or without header) -> one line, whole box clicks
       var e0 = g.entries[0];
       var text = g.header ? g.header + ' \u00b7 ' + e0.label : e0.label;
-      box.appendChild(mkEntry(e0, text, function(ev){
-        ev.stopPropagation(); toggleIdx(e0.idx); buildLegend();
+      box.appendChild(mkEntry(e0, text, function(){
+        toggleIdx(e0.idx); buildLegend();
       }));
-      box.onclick = function(){ toggleGroup([e0.idx]); buildLegend(); };
     } else {
       if (g.header) {
-        var h = document.createElement('div'); h.className = 'aa-lg-h';
+        var h = document.createElement('button'); h.type = 'button';
+        h.className = 'aa-lg-h'; h.dataset.key = 'h' + gi;
         h.textContent = g.header;
-        h.onclick = function(ev){
-          ev.stopPropagation();
+        h.setAttribute('aria-pressed', String(g.entries.some(function(e){
+          return e.trace.visible !== false; })));
+        h.onclick = function(){
           toggleGroup(g.entries.map(function(e){ return e.idx; }));
           buildLegend();
         };
         box.appendChild(h);
       }
       g.entries.forEach(function(e){
-        box.appendChild(mkEntry(e, e.label, function(ev){
-          ev.stopPropagation(); toggleIdx(e.idx); buildLegend();
+        box.appendChild(mkEntry(e, e.label, function(){
+          toggleIdx(e.idx); buildLegend();
         }));
       });
     }
     bar.appendChild(box);
   });
   bar.style.display = order.length ? 'flex' : 'none';
+  if (focusKey) {
+    var again = bar.querySelector('[data-key="' + focusKey + '"]');
+    if (again) again.focus();
+  }
 }
 buildLegend();
 // the bar just claimed height from the plot -> re-fit once (RO catches
