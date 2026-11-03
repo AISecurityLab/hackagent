@@ -74,6 +74,7 @@ attacks:
 |---|---|---|
 | `attacker` | most adaptive attacks | Writes and refines the adversarial prompts. |
 | `on_topic` | tap | Yes/no check that a branch still pursues the goal, so drifted branches are dropped before they cost a call. |
+| `refusal` | crescendo | The Refusal Judge: decides whether a reply refuses the goal, which triggers a backtrack. Defaults to the attacker model. |
 | `scorer` | pair | PAIR's own 0–10 rater, so the panel only judges the best attempt. |
 | `decorator` | h4rm3l | Runs the obfuscation steps that need an LLM. |
 | `embedder` | rag, autodan_turbo | An **embedding** model for retrieval. Not a chat model. |

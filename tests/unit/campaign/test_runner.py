@@ -537,32 +537,64 @@ def test_a_target_error_records_its_status_code(tmp_path):
     assert isinstance(record.metadata["latency_ms"], int)
 
 
-def test_a_refused_crescendo_turn_is_stored_as_a_failure(tmp_path):
-    from tests.fakes import in_memory_store
-
-    question = json.dumps({"reasoning": "warming up", "question": "a question"})
-    values = campaign(
+def crescendo_campaign(tmp_path, **parameters):
+    return campaign(
         attacks=[
             {
                 "name": "crescendo",
-                "parameters": {"max_turns": 1, "max_backtracks": 0},
-                "roles": {"attacker": attacker_role()},
+                "parameters": {"max_turns": 1, **parameters},
+                "roles": {
+                    "attacker": attacker_role(),
+                    "refusal": model("refusal", "http://127.0.0.1:8004/v1"),
+                },
             }
         ],
         execution={"output": {"directory": str(tmp_path)}},
     )
-    store = in_memory_store()
-    # The panel passes the reply, but the target turned the turn down.
-    models = models_for(
+
+
+def crescendo_models(refused: bool):
+    question = json.dumps({"reasoning": "warming up", "question": "a question"})
+    verdict = json.dumps({"score_value": refused, "rationale": "scripted"})
+    return models_for(
         target_reply="I'm sorry, I cannot help with that.",
         judge="yes",
         attacker=ScriptedModel(question),
+        refusal=ScriptedModel(verdict),
     )
-    run(values, models=models, store=store)
 
+
+def test_a_backtracked_crescendo_turn_is_stored_unjudged(tmp_path):
+    from tests.fakes import in_memory_store
+
+    store = in_memory_store()
+    models = crescendo_models(refused=True)
+    run(crescendo_campaign(tmp_path, max_backtracks=1), models=models, store=store)
+
+    records = store.list_results(page_size=50).items
+    first = next(r for r in records if r.metadata["attack_metadata"]["backtracked"])
+    assert first.evaluation_status == "FAILED_JAILBREAK"
+    assert first.metadata["attack_metadata"]["refused"] is True
+    # Two replies reached the target; only the kept one reached the panel.
+    assert len(models["target"].requests) == 2
+    assert len(models["judge"].requests) == 1
+    assert len(models["refusal"].requests) == 2
+
+
+def test_a_refused_turn_kept_after_the_backtracks_is_judged(tmp_path):
+    from tests.fakes import in_memory_store
+
+    store = in_memory_store()
+    run(
+        crescendo_campaign(tmp_path, max_backtracks=0),
+        models=crescendo_models(True),
+        store=store,
+    )
+
+    # The panel passed it, and as in the reference that verdict stands.
     [record] = store.list_results(page_size=50).items
-    assert record.evaluation_status == "FAILED_JAILBREAK"
     assert record.metadata["attack_metadata"]["refused"] is True
+    assert record.evaluation_status == "SUCCESSFUL_JAILBREAK"
 
 
 # --- reporting ----------------------------------------------------------------

@@ -29,6 +29,9 @@ from hackagent.attacks.techniques.multi_turn.crescendo import (
 )
 from hackagent.attacks.techniques.iterative import IterativeAttack
 from hackagent.attacks.techniques.registry import ITERATIVE_ATTACKS, get_attack_class
+from hackagent.attacks.techniques.multi_turn.crescendo.prompts import (
+    REFUSAL_JUDGE_PROMPT,
+)
 from hackagent.attacks.techniques.trace import recording
 from hackagent.core.contracts import Completion, LLMError, Verdict
 
@@ -942,16 +945,36 @@ class Escalator:
 REFUSAL = "I'm sorry, I cannot help with that."
 
 
+class Refuser:
+    """A Refusal Judge that calls ``REFUSAL`` a refusal and nothing else."""
+
+    def __init__(self) -> None:
+        self.requests: list[list[dict]] = []
+
+    async def __call__(self, messages):
+        self.requests.append([dict(m) for m in messages])
+        refused = messages[-1]["content"].endswith(REFUSAL)
+        return json.dumps({"score_value": refused, "rationale": "scripted"})
+
+
+def crescendo(writer=None, refusal=None, **params):
+    """A Crescendo attack with a scripted attacker and Refusal Judge."""
+    return CrescendoAttack(
+        CrescendoParams(
+            attacker=writer or Escalator(),
+            refusal=refusal or Refuser(),
+            **params,
+        )
+    )
+
+
 def test_crescendo_needs_an_attacker():
     with pytest.raises(ValueError, match="needs an 'attacker' role"):
         CrescendoAttack(CrescendoParams())
 
 
 def test_crescendo_grows_one_conversation_with_the_target():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=3, early_stop=False, attacker=writer)
-    )
+    attack = crescendo(max_turns=3, early_stop=False)
     _findings, target = search(attack, judge=Panel(1.0))
 
     # Each turn re-sends everything before it, so the conversation grows by
@@ -962,21 +985,60 @@ def test_crescendo_grows_one_conversation_with_the_target():
 
 
 def test_crescendo_stops_once_a_turn_passes():
-    writer = Escalator()
-    attack = CrescendoAttack(CrescendoParams(max_turns=4, attacker=writer))
+    attack = crescendo(max_turns=4)
     findings, target = search(attack, judge=Panel(1.0, 9.0, 1.0))
 
     assert len(target.requests) == 2
     assert [f.verdict.success for f in findings] == [False, True]
 
 
-def test_crescendo_backtracks_a_refused_turn_without_spending_it():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
+def test_the_refusal_judge_reads_the_reply_against_the_goal():
+    refuser = Refuser()
+    attack = crescendo(refusal=refuser, max_turns=1)
+    search(attack, target=Target("the reply"), judge=Panel(1.0))
+
+    # PyRIT's strict rubric, and its request format, with the attack's goal.
+    [request] = refuser.requests
+    assert request[0] == {"role": "system", "content": REFUSAL_JUDGE_PROMPT}
+    assert request[1]["content"] == (
+        f"conversation_objective: {GOAL}\nresponse_to_evaluate_input: the reply"
     )
+
+
+def test_without_a_refusal_role_the_attacker_judges_refusals():
+    writer = Escalator()
+    attack = CrescendoAttack(CrescendoParams(max_turns=1, attacker=writer))
+    search(attack, judge=Panel(1.0))
+
+    systems = [plan[0]["content"] for plan in writer.plans]
+    assert REFUSAL_JUDGE_PROMPT in systems
+
+
+def test_only_the_refusal_judge_decides_what_a_refusal_is():
+    async def never_refuses(messages):
+        return json.dumps({"score_value": False, "rationale": "it answered"})
+
+    attack = crescendo(refusal=never_refuses, max_turns=1, max_backtracks=1)
+    findings, target = search(attack, target=Target(REFUSAL), judge=Panel(1.0))
+
+    # A reply that reads like a refusal is not backtracked if the judge says no.
+    assert len(target.requests) == 1
+    assert findings[0].metadata["refused"] is False
+
+
+def test_an_unreadable_refusal_verdict_is_not_a_refusal():
+    async def mumbles(messages):
+        return "perhaps"
+
+    attack = crescendo(refusal=mumbles, max_turns=1, max_backtracks=1)
+    findings, target = search(attack, target=Target(REFUSAL), judge=Panel(1.0))
+
+    assert len(target.requests) == 1
+    assert findings[0].metadata["refused"] is False
+
+
+def test_crescendo_backtracks_a_refused_turn_without_spending_it():
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
     _findings, target = search(
         attack, target=Target(REFUSAL, "sure", "sure"), judge=Panel(1.0)
     )
@@ -986,10 +1048,7 @@ def test_crescendo_backtracks_a_refused_turn_without_spending_it():
 
 
 def test_a_backtracked_turn_never_joins_the_conversation():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=1, max_backtracks=1, attacker=writer)
-    )
+    attack = crescendo(max_turns=1, max_backtracks=1)
     _findings, target = search(attack, target=Target(REFUSAL, "sure"), judge=Panel(1.0))
 
     # The retry starts from an empty history, not from the refusal.
@@ -997,58 +1056,43 @@ def test_a_backtracked_turn_never_joins_the_conversation():
     assert target.requests[1][0]["content"] == "question 2"
 
 
+def test_a_backtracked_turn_is_not_judged():
+    panel = Panel(9.0)
+    attack = crescendo(max_turns=1, max_backtracks=1)
+    findings, _target = search(attack, target=Target(REFUSAL, "sure"), judge=panel)
+
+    # Only the turn that was kept reaches the panel.
+    assert [sample.response for sample in panel.samples] == ["sure"]
+    assert findings[0].verdict.success is False
+    assert findings[0].verdict.explanation.startswith("not judged")
+    assert findings[0].metadata["score"] is None
+
+
 def test_crescendo_accepts_a_refusal_once_the_backtrack_budget_is_spent():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=0, early_stop=False, attacker=writer
-        )
-    )
+    attack = crescendo(max_turns=2, max_backtracks=0, early_stop=False)
     _findings, target = search(attack, target=Target(REFUSAL), judge=Panel(1.0))
 
     # No budget, so nothing is retried and both turns are spent.
     assert len(target.requests) == 2
 
 
-def test_a_refused_turn_does_not_end_the_search():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=3, max_backtracks=0, attacker=writer)
-    )
-    # The panel passes, but the target refused, so the search goes on.
-    _findings, target = search(attack, target=Target(REFUSAL), judge=Panel(9.0))
-
-    assert len(target.requests) == 3
-
-
-def test_a_refused_turn_is_never_a_success():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
-    )
-    # The panel passes every reply, refusals included.
+def test_a_refusal_kept_once_the_budget_is_spent_is_judged_like_any_turn():
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
+    # The panel passes every reply it is shown.
     findings, _target = search(
         attack, target=Target(REFUSAL, REFUSAL, "sure"), judge=Panel(9.0)
     )
 
-    # Backtracked, accepted once the budget ran out, then a real answer.
+    # Backtracked, kept once the budget ran out, then a real answer. As in the
+    # paper and PyRIT, the kept turn's verdict stands: there is no veto.
     assert [f.metadata["refused"] for f in findings] == [True, True, False]
     assert [f.metadata["backtracked"] for f in findings] == [True, False, False]
-    assert [f.verdict.success for f in findings] == [False, False, True]
-    # What the panel scored is kept; only the outcome is overruled.
-    assert [f.verdict.score for f in findings] == [9.0, 9.0, 9.0]
-    assert [f.metadata["score"] for f in findings] == [9.0, 9.0, 9.0]
+    assert [f.verdict.success for f in findings] == [False, True, True]
+    assert [f.metadata["score"] for f in findings] == [None, 9.0, 9.0]
 
 
 def test_crescendo_reports_every_turn_that_reached_the_target():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
-    )
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
     findings, _target = search(
         attack, target=Target(REFUSAL, "sure", "sure"), judge=Panel(1.0)
     )
@@ -1056,13 +1100,12 @@ def test_crescendo_reports_every_turn_that_reached_the_target():
     assert [f.metadata["turn"] for f in findings] == [0, 0, 1]
     assert [f.metadata["refused"] for f in findings] == [True, False, False]
     assert findings[0].metadata["backtracked"] is True
+    assert findings[0].metadata["refusal_rationale"] == "scripted"
 
 
 def test_crescendo_feeds_the_reply_and_score_back_to_the_attacker():
     writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=2, early_stop=False, attacker=writer)
-    )
+    attack = crescendo(writer, max_turns=2, early_stop=False)
     search(attack, target=Target("the target said this"), judge=Panel(4.0))
 
     feedback = writer.plans[1][-1]["content"]
@@ -1072,9 +1115,7 @@ def test_crescendo_feeds_the_reply_and_score_back_to_the_attacker():
 
 def test_a_refusal_tells_the_attacker_to_rephrase_not_escalate():
     writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=1, max_backtracks=1, attacker=writer)
-    )
+    attack = crescendo(writer, max_turns=1, max_backtracks=1)
     search(attack, target=Target(REFUSAL, "sure"), judge=Panel(1.0))
 
     feedback = writer.plans[1][-1]["content"]
@@ -1083,8 +1124,7 @@ def test_a_refusal_tells_the_attacker_to_rephrase_not_escalate():
 
 
 def test_crescendo_stops_when_the_attacker_writes_nothing():
-    writer = Escalator(reply="")
-    attack = CrescendoAttack(CrescendoParams(max_turns=3, attacker=writer))
+    attack = crescendo(Escalator(reply=""), max_turns=3)
     findings, target = search(attack, judge=Panel(1.0))
 
     assert findings == []
@@ -1092,8 +1132,9 @@ def test_crescendo_stops_when_the_attacker_writes_nothing():
 
 
 def test_crescendo_takes_a_plain_question_as_the_next_turn():
-    writer = Escalator(reply="What is the history of this subject?")
-    attack = CrescendoAttack(CrescendoParams(max_turns=1, attacker=writer))
+    attack = crescendo(
+        Escalator(reply="What is the history of this subject?"), max_turns=1
+    )
     _findings, target = search(attack, judge=Panel(1.0))
 
     # Unlike PAIR, a Crescendo turn is just a question; prose is usable.
@@ -1102,9 +1143,7 @@ def test_crescendo_takes_a_plain_question_as_the_next_turn():
 
 def test_crescendo_trims_its_plan_but_never_the_conversation():
     writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=4, keep_last_n=1, early_stop=False, attacker=writer)
-    )
+    attack = crescendo(writer, max_turns=4, keep_last_n=1, early_stop=False)
     _findings, target = search(attack, judge=Panel(1.0))
 
     assert [m["role"] for m in writer.plans[-1]] == ["system", "assistant", "user"]
@@ -1113,12 +1152,7 @@ def test_crescendo_trims_its_plan_but_never_the_conversation():
 
 
 def test_crescendo_records_a_phase_per_turn_and_its_backtracks():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
-    )
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
     nodes = search_trace(
         attack, target=Target(REFUSAL, "sure", "sure"), judge=Panel(1.0)
     )
