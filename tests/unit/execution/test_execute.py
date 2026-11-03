@@ -899,6 +899,19 @@ def test_a_run_the_check_refuses_ends_failed_before_building(tmp_path):
     ]
 
 
+def test_a_gateway_marker_the_gateway_does_not_serve_ends_the_run_failed(tmp_path):
+    gateway = {**GW, "name": "gateway"}
+    outcome, store, _ = execute_with(
+        stored_campaign(tmp_path, attacks=[{**PAP, "roles": {"attacker": gateway}}]),
+        builder=never_build,
+    )
+
+    assert outcome.status == "FAILED"
+    assert "hackagent-attacker or hackagent-judge" in outcome.note
+    assert store.finished == [(store.run_id, "FAILED", outcome.note)]
+    assert store._closed
+
+
 def test_an_interrupt_before_building_finishes_cancelled_then_passes_on(tmp_path):
     def check(spec):
         raise KeyboardInterrupt
