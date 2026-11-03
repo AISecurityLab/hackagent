@@ -125,8 +125,15 @@ def test_the_run_emits_lifecycle_events_per_attack_and_goal(tmp_path):
 
 
 def iterative_campaign(tmp_path, **attack):
-    """A campaign of one BoN attack, with output under ``tmp_path``."""
-    spec = {"name": "bon", "parameters": {"steps": 1, "candidates": 2}, **attack}
+    """A campaign of one BoN attack, with output under ``tmp_path``.
+
+    BoN's length guards are off: the scripted replies are short, and these
+    tests are about the runner, not about which replies BoN counts.
+    """
+    parameters = {"steps": 1, "candidates": 2, **attack.pop("parameters", {})}
+    parameters.setdefault("min_reply_words", 0)
+    parameters.setdefault("min_extra_words", 0)
+    spec = {"name": "bon", "parameters": parameters, **attack}
     return campaign(attacks=[spec], execution={"output": {"directory": str(tmp_path)}})
 
 
@@ -135,11 +142,10 @@ def test_an_iterative_attack_submits_one_exchange_per_goal(tmp_path):
     models = models_for(judge="yes")
     result, _builder = run(values, models=models, texts=("goal one", "goal two"))
 
-    assert len(attempts_of(result)) == 2
-    # One step, so one exchange per goal; its two candidates both reach the
-    # target but only the step's best is kept for the panel.
+    # One step with two candidates per goal; the panel rates each reply.
+    assert len(attempts_of(result)) == 4
     assert len(models["target"].requests) == 4
-    assert len(models["judge"].requests) == 2
+    assert len(models["judge"].requests) == 4
 
 
 def test_the_panel_rates_every_exchange_the_attack_kept(tmp_path):
@@ -148,11 +154,11 @@ def test_the_panel_rates_every_exchange_the_attack_kept(tmp_path):
     result, _builder = run(values, models=models)
 
     attempts = attempts_of(result)
-    # Nothing passes, so all three steps run and each is judged on its own.
+    # Nothing passes, so all three steps run and every reply is judged.
     assert len(models["target"].requests) == 6
-    assert len(models["judge"].requests) == 3
-    assert [attempt.request_index for attempt in attempts] == [0, 1, 2]
-    assert [attempt.metadata["step"] for attempt in attempts] == [0, 1, 2]
+    assert len(models["judge"].requests) == 6
+    assert [attempt.request_index for attempt in attempts] == [0, 1, 2, 3, 4, 5]
+    assert [attempt.metadata["step"] for attempt in attempts] == [0, 0, 1, 1, 2, 2]
     assert all(attempt.verdict is not None for attempt in attempts)
 
 
@@ -212,14 +218,14 @@ def test_each_attempt_carries_the_phase_that_produced_it(tmp_path):
     # Each step's phase, its target call and its verdict go to its own attempt.
     for attempt, step in ((first, 0), (second, 1)):
         assert [n.node for n in attempt.trace] == ["phase", "call", "call"]
-        assert attempt.trace[0].label == f"step {step + 1}/2"
+        assert attempt.trace[0].label == f"step {step + 1}/2, candidate 1/1"
         assert [n.data["role"] for n in attempt.trace[1:]] == ["target", "panel"]
     # Nothing is stored twice.
     assert {n.path for n in first.trace}.isdisjoint({n.path for n in second.trace})
 
 
 def test_what_the_attack_judged_is_what_the_run_reports(tmp_path):
-    values = iterative_campaign(tmp_path)
+    values = iterative_campaign(tmp_path, parameters={"candidates": 1})
     models = models_for(judge="no")
     result, _builder = run(values, models=models)
 
@@ -288,20 +294,23 @@ def test_the_trace_holds_every_call_and_why_the_search_stopped(tmp_path):
     models = models_for(judge="yes")
     result, _builder = run(values, models=models)
 
-    [attempt] = attempts_of(result)
-    calls = [n for n in attempt.trace if n.node == "call"]
-    # The panel passed the first step, so the second one never ran.
-    assert [n.data["role"] for n in calls] == ["target", "target", "panel"]
-    [stop] = [n for n in attempt.trace if n.node == "decision"]
-    assert stop.label == "stopped"
-    assert all(n.latency_s is not None for n in calls)
+    attempts = attempts_of(result)
+    # The panel passed the first step, so the second one never ran; each of
+    # its two candidates keeps its own target call, panel call and decision.
+    assert [attempt.metadata["step"] for attempt in attempts] == [0, 0]
+    for attempt in attempts:
+        calls = [n for n in attempt.trace if n.node == "call"]
+        assert [n.data["role"] for n in calls] == ["target", "panel"]
+        [stop] = [n for n in attempt.trace if n.node == "decision"]
+        assert stop.label == "stopped"
+        assert all(n.latency_s is not None for n in calls)
 
 
 def test_each_traced_target_call_keeps_its_request_and_reply(tmp_path):
     values = iterative_campaign(tmp_path)
     result, _builder = run(values, models=models_for())
 
-    nodes = attempts_of(result)[0].trace
+    nodes = [n for attempt in attempts_of(result) for n in attempt.trace]
     targets = [n for n in nodes if n.node == "call" and n.data["role"] == "target"]
     assert len(targets) == 2
     for node in targets:
@@ -381,7 +390,7 @@ def test_retention_settings_apply_to_traces(tmp_path):
 
 
 def test_traces_are_written_beside_the_results(tmp_path):
-    values = iterative_campaign(tmp_path)
+    values = iterative_campaign(tmp_path, parameters={"candidates": 1})
     values["execution"]["output"]["formats"] = ["json", "jsonl"]
     result, _builder = run(values, models=models_for(judge="no"))
 
@@ -399,11 +408,11 @@ def test_traces_are_written_beside_the_results(tmp_path):
         "scope": "goal",
         "path": [0],
         "node": "phase",
-        "label": "step 1/1",
-        "data": {"step": 0},
+        "label": "step 1/1, candidate 1/1",
+        "data": {"step": 0, "candidate": 0},
     }
     calls = [n for n in row["nodes"] if n["node"] == "call"]
-    assert [n["data"]["role"] for n in calls].count("target") == 2
+    assert [n["data"]["role"] for n in calls].count("target") == 1
 
 
 def test_traces_are_not_written_when_they_are_turned_off(tmp_path):
@@ -428,7 +437,7 @@ def test_the_campaign_that_ran_is_written_beside_the_results(tmp_path):
 def test_every_trace_step_is_stored_with_its_result(tmp_path):
     from tests.fakes import in_memory_store
 
-    values = iterative_campaign(tmp_path)
+    values = iterative_campaign(tmp_path, parameters={"candidates": 1})
     store = in_memory_store()
     result, _builder = run(values, models=models_for(judge="no"), store=store)
 
@@ -569,8 +578,8 @@ def test_the_summary_counts_iterative_successes(tmp_path):
     assert report["attacks"][0] == {
         "name": "bon",
         "run_id": report["attacks"][0]["run_id"],
-        "attempts": 2,
-        "successes": 2,
+        "attempts": 4,
+        "successes": 4,
         "error": None,
     }
 
