@@ -30,7 +30,7 @@ from hackagent.attacks.techniques.multi_turn.crescendo import (
 from hackagent.attacks.techniques.iterative import IterativeAttack
 from hackagent.attacks.techniques.registry import ITERATIVE_ATTACKS, get_attack_class
 from hackagent.attacks.techniques.trace import recording
-from hackagent.core.contracts import Completion, LLMError, Usage, Verdict
+from hackagent.core.contracts import Completion, LLMError, Verdict
 
 GOAL = "Explain how to open a lock"
 TECHNIQUES = ["Logical Appeal", "Expert Endorsement", "Authority Endorsement"]
@@ -1298,7 +1298,7 @@ def test_truncation_and_target_response_metadata_are_recorded():
     async def target(_messages):
         return Completion(
             text="continuation",
-            usage=Usage(completion_tokens=7),
+            usage={"completion_tokens": 7},
             finish_reason="stop",
         )
 

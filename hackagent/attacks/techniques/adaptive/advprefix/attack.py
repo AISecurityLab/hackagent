@@ -247,7 +247,9 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
                 "max_prefix_chars": self.params.max_prefix_chars,
                 "continuation_chars": len(continuation),
                 "continuation_tokens": (
-                    reply.usage.completion_tokens if reply.usage is not None else None
+                    reply.usage.get("completion_tokens")
+                    if reply.usage is not None
+                    else None
                 ),
                 "finish_reason": reply.finish_reason,
                 "prefix_index": index,
