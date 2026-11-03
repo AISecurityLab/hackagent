@@ -31,6 +31,7 @@ from hackagent.attacks.techniques.iterative import IterativeAttack
 from hackagent.attacks.techniques.registry import ITERATIVE_ATTACKS, get_attack_class
 from hackagent.attacks.techniques.trace import recording
 from hackagent.core.contracts import Completion, LLMError, Verdict
+from hackagent.models.response import ModelResponse
 
 GOAL = "Explain how to open a lock"
 TECHNIQUES = ["Logical Appeal", "Expert Endorsement", "Authority Endorsement"]
@@ -55,6 +56,16 @@ class Target:
     @property
     def prompts(self) -> list[str]:
         return [request[-1]["content"] for request in self.requests]
+
+
+class TargetWithCompletion:
+    """Returns one supplied completion for every target request."""
+
+    def __init__(self, completion: Completion) -> None:
+        self.completion = completion
+
+    async def __call__(self, _messages):
+        return self.completion
 
 
 class Panel:
@@ -1140,9 +1151,7 @@ def test_the_opening_is_part_of_the_prefix():
 
 def test_a_long_prefix_is_truncated_before_reaching_the_target():
     writer = Writer2("x" * 305)
-    attack = AdvPrefixAttack(
-        advprefix(attacker=writer, max_prefix_chars=300)
-    )
+    attack = AdvPrefixAttack(advprefix(attacker=writer, max_prefix_chars=300))
     _findings, target = search(attack, judge=Panel(1.0))
 
     prefix = target.requests[0][-1]["content"]
@@ -1152,9 +1161,7 @@ def test_a_long_prefix_is_truncated_before_reaching_the_target():
 
 def test_prefix_truncation_records_a_trace_decision():
     writer = Writer2("x" * 305)
-    attack = AdvPrefixAttack(
-        advprefix(attacker=writer, max_prefix_chars=300)
-    )
+    attack = AdvPrefixAttack(advprefix(attacker=writer, max_prefix_chars=300))
     nodes = search_trace(attack, judge=Panel(1.0))
 
     [truncated] = [node for node in nodes if node.label == "truncated"]
@@ -1296,15 +1303,13 @@ def test_truncation_and_target_response_metadata_are_recorded():
     writer = Writer2("x" * 305)
 
     async def target(_messages):
-        return Completion(
+        return ModelResponse(
             text="continuation",
             usage={"completion_tokens": 7},
             finish_reason="stop",
         )
 
-    attack = AdvPrefixAttack(
-        advprefix(attacker=writer, max_prefix_chars=300)
-    )
+    attack = AdvPrefixAttack(advprefix(attacker=writer, max_prefix_chars=300))
     findings, _target = search(attack, target=target, judge=Panel(1.0))
 
     metadata = findings[0].metadata
@@ -1315,6 +1320,38 @@ def test_truncation_and_target_response_metadata_are_recorded():
     assert metadata["continuation_chars"] == len("continuation")
     assert metadata["continuation_tokens"] == 7
     assert metadata["finish_reason"] == "stop"
+
+
+def test_typed_usage_metadata_is_recorded():
+    writer = Writer2(PREFIX_TAIL)
+    attack = AdvPrefixAttack(advprefix(attacker=writer))
+    findings, _target = search(
+        attack,
+        target=TargetWithCompletion(
+            Completion(
+                text="continuation",
+                usage={"completion_tokens": 5},
+                finish_reason="stop",
+            )
+        ),
+        judge=Panel(1.0),
+    )
+
+    assert findings[0].metadata["continuation_tokens"] == 5
+    assert findings[0].metadata["finish_reason"] == "stop"
+
+
+def test_missing_completion_metadata_defaults_to_none():
+    writer = Writer2(PREFIX_TAIL)
+    attack = AdvPrefixAttack(advprefix(attacker=writer))
+    findings, _target = search(
+        attack,
+        target=TargetWithCompletion(Completion(text="continuation")),
+        judge=Panel(1.0),
+    )
+
+    assert findings[0].metadata["continuation_tokens"] is None
+    assert findings[0].metadata["finish_reason"] is None
 
 
 def test_the_judge_sees_only_the_reply_without_prefilling():

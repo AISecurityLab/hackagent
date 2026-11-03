@@ -248,10 +248,12 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
                 "continuation_chars": len(continuation),
                 "continuation_tokens": (
                     reply.usage.get("completion_tokens")
-                    if reply.usage is not None
-                    else None
+                    if isinstance(getattr(reply, "usage", None), dict)
+                    else getattr(
+                        getattr(reply, "usage", None), "completion_tokens", None
+                    )
                 ),
-                "finish_reason": reply.finish_reason,
+                "finish_reason": getattr(reply, "finish_reason", None),
                 "prefix_index": index,
                 "prefilled": self.params.prefill,
                 "selected": False,
