@@ -20,8 +20,11 @@ from hackagent.orchestrator.campaign.gateway import (
 
 from .fakes import campaign, model
 
-GW = {"name": "gateway", "connection": {"provider": "hackagent", "type": "OPENAI"}}
-JUDGE_GW = {**GW, "scoring": {"type": "harmbench"}}
+GW = {
+    "name": "hackagent-attacker",
+    "connection": {"provider": "hackagent", "type": "OPENAI"},
+}
+JUDGE_GW = {**GW, "name": "hackagent-judge", "scoring": {"type": "harmbench"}}
 
 
 def _spec(**sections) -> CampaignSpec:
@@ -72,9 +75,18 @@ def test_bind_gateway_without_gateway_returns_equal_spec():
 
 @pytest.mark.parametrize("agent_type", ["CLAUDE_CODE", "WEB", "LITELLM"])
 def test_bind_gateway_refuses_a_gateway_marker_of_another_type(agent_type):
-    gateway = {"name": "g", "connection": {"provider": "hackagent", "type": agent_type}}
+    gateway = {**GW, "connection": {"provider": "hackagent", "type": agent_type}}
     spec = _spec(attacks=[{"name": "pair", "roles": {"attacker": gateway}}])
     with pytest.raises(ValueError, match="OPENAI"):
+        bind_gateway(spec, "https://h")
+
+
+@pytest.mark.parametrize("name", ["gateway", "gpt-4o", "hackagent"])
+def test_bind_gateway_refuses_a_name_the_gateway_does_not_serve(name):
+    spec = _spec(
+        attacks=[{"name": "pair", "roles": {"attacker": {**GW, "name": name}}}]
+    )
+    with pytest.raises(ValueError, match="hackagent-attacker or hackagent-judge"):
         bind_gateway(spec, "https://h")
 
 

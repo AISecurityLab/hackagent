@@ -25,7 +25,10 @@ from tests.unit.campaign.fakes import FakeBuilder, ScriptedModel, campaign, goal
 
 BASE_URL = "https://exec.example/api"
 GATEWAY_KEY = "gateway-key-for-test"
-GW = {"name": "gateway", "connection": {"provider": "hackagent", "type": "OPENAI"}}
+GW = {
+    "name": "hackagent-attacker",
+    "connection": {"provider": "hackagent", "type": "OPENAI"},
+}
 
 
 class RecordingAdoptedStore(AdoptedRunStore):
@@ -214,7 +217,7 @@ PAP = {
 
 def test_402_from_a_gateway_role_stops_the_run(tmp_path):
     attacker = ScriptedModel(out_of_credits)
-    builder = FakeBuilder(models(gateway=attacker))
+    builder = FakeBuilder(models(**{GW["name"]: attacker}))
 
     outcome, store, _ = execute_with(
         stored_campaign(tmp_path, attacks=[{**PAP, "roles": {"attacker": GW}}]),
@@ -232,7 +235,7 @@ def test_402_from_a_gateway_role_is_not_retried(tmp_path):
     from hackagent.models.retry import RetryingModel
 
     attacker = ScriptedModel(out_of_credits)
-    fakes = FakeBuilder(models(gateway=attacker))
+    fakes = FakeBuilder(models(**{GW["name"]: attacker}))
 
     def build(config, *, retries=0):
         model = fakes(config)
@@ -276,7 +279,7 @@ def test_402_at_preflight_on_a_gateway_judge(tmp_path):
             evaluation={"judges": [{**GW, "scoring": {"type": "harmbench"}}]},
             execution={"preflight": True},
         ),
-        builder=FakeBuilder(models(gateway=judge)),
+        builder=FakeBuilder(models(**{GW["name"]: judge})),
     )
 
     assert (outcome.status, outcome.note) == ("FAILED", "Out of credits")
@@ -484,7 +487,7 @@ def test_agent_not_reregistered(tmp_path, monkeypatch):
 
 def test_gateway_bound_with_executor_base_url(tmp_path):
     built = []
-    fakes = FakeBuilder(models(gateway=ScriptedModel("yes")))
+    fakes = FakeBuilder(models(**{GW["name"]: ScriptedModel("yes")}))
 
     def build(config, *, retries=0):
         built.append(config)
@@ -501,7 +504,7 @@ def test_gateway_bound_with_executor_base_url(tmp_path):
     )
 
     assert outcome.status == "COMPLETED"
-    gateway = next(c for c in built if c.name == "gateway")
+    gateway = next(c for c in built if c.name == GW["name"])
     assert gateway.connection.endpoint == "https://exec.example/api/v1"
     assert reference_name(gateway.connection.api_key) == GATEWAY_KEY_ENV
 
@@ -593,7 +596,7 @@ def test_execute_spec_starts_the_run_on_the_storage_server(
 ):
     monkeypatch.delenv(GATEWAY_KEY_ENV, raising=False)
     built, seen = [], {}
-    fakes = FakeBuilder(models(gateway=ScriptedModel("yes")))
+    fakes = FakeBuilder(models(**{GW["name"]: ScriptedModel("yes")}))
 
     def build(config, *, retries=0):
         built.append(config)
@@ -620,7 +623,7 @@ def test_execute_spec_starts_the_run_on_the_storage_server(
         remote_store.agent_id,
     )
     assert store.finished == [(remote_store.run_id, "COMPLETED", "")]
-    gateway = next(c for c in built if c.name == "gateway")
+    gateway = next(c for c in built if c.name == GW["name"])
     assert gateway.connection.endpoint == f"{STORAGE_URL}/v1"
     assert seen["key"] == "storage-key"
     # The stored campaign keeps the gateway marker, not this executor's address.
@@ -705,7 +708,7 @@ def test_run_campaign_with_remote_storage_is_a_tracked_run(
     FakeHeartbeat.instances = []
     monkeypatch.setattr(execute, "RunHeartbeat", EnteredHeartbeat)
     built = []
-    fakes = FakeBuilder(models(gateway=ScriptedModel("yes")))
+    fakes = FakeBuilder(models(**{GW["name"]: ScriptedModel("yes")}))
 
     def build(config, *, retries=0):
         built.append(config)
@@ -723,7 +726,7 @@ def test_run_campaign_with_remote_storage_is_a_tracked_run(
     assert len(remote_store.started) == 1
     assert FakeHeartbeat.instances[-1].entered
     assert store.finished == [(remote_store.run_id, "COMPLETED", "")]
-    gateway = next(c for c in built if c.name == "gateway")
+    gateway = next(c for c in built if c.name == GW["name"])
     assert gateway.connection.endpoint == f"{STORAGE_URL}/v1"
     assert reference_name(gateway.connection.api_key) == GATEWAY_KEY_ENV
 
@@ -894,6 +897,19 @@ def test_a_run_the_check_refuses_ends_failed_before_building(tmp_path):
     assert store.finished == [
         (store.run_id, "FAILED", "This executor does not run this campaign")
     ]
+
+
+def test_a_gateway_marker_the_gateway_does_not_serve_ends_the_run_failed(tmp_path):
+    gateway = {**GW, "name": "gateway"}
+    outcome, store, _ = execute_with(
+        stored_campaign(tmp_path, attacks=[{**PAP, "roles": {"attacker": gateway}}]),
+        builder=never_build,
+    )
+
+    assert outcome.status == "FAILED"
+    assert "hackagent-attacker or hackagent-judge" in outcome.note
+    assert store.finished == [(store.run_id, "FAILED", outcome.note)]
+    assert store._closed
 
 
 def test_an_interrupt_before_building_finishes_cancelled_then_passes_on(tmp_path):
