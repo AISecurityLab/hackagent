@@ -32,6 +32,7 @@ OpenRouter Support:
 """
 
 import os
+from pathlib import Path
 import atexit
 import logging
 from typing import Any, Dict, Generator, Optional
@@ -99,6 +100,25 @@ def pytest_configure(config):
         "markers",
         "hackagent_backend: mark test as requiring HackAgent backend API (may be rate limited)",
     )
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings_file(tmp_path, monkeypatch):
+    """Integration checks must not load the developer's account settings."""
+    monkeypatch.setattr(
+        "hackagent.core.settings.DEFAULT_CONFIG_PATH", tmp_path / "config.json"
+    )
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    log_path = getattr(item.config, "_adk_log_path", None)
+    if report.failed and log_path is not None and log_path.exists():
+        report.sections.append(
+            ("ADK server log", log_path.read_text(errors="replace")[-16000:])
+        )
 
 
 # --- Token Limit Fixtures (Speed Optimization) ---
@@ -268,13 +288,15 @@ ADK_TEST_SERVER_PORT = 8765
 def adk_server_with_ollama(
     ollama_available: bool,
     ollama_model: str,
-    tmp_path_factory: pytest.TempPathFactory,
+    ollama_base_url: str,
+    request: pytest.FixtureRequest,
 ) -> Generator[Optional[str], None, None]:
     """
     Start a Google ADK server in a subprocess that uses Ollama as the LLM backend.
 
-    This fixture starts an ADK api_server pointing to the example multi_tool_agent
-    which is configured to use Ollama via LiteLLM.
+    This fixture starts an ADK api_server with test-owned text and tool agents.
+    The text agent uses bounded Ollama
+    replies; the tool agent scripts model decisions while ADK executes tools.
 
     Returns:
         The URL of the ADK server (e.g., "http://localhost:8765") or None if unavailable.
@@ -291,18 +313,7 @@ def adk_server_with_ollama(
         yield None
         return
 
-    # Find the examples/google_adk directory (inside the hackagent package)
-    examples_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "hackagent",
-        "examples",
-        "google_adk",
-    )
-
-    if not os.path.exists(examples_dir):
-        logger.warning(f"ADK examples directory not found: {examples_dir}")
-        yield None
-        return
+    agents_dir = Path(__file__).parent / "fixtures" / "adk_agents"
 
     # Find an available port
     port = ADK_TEST_SERVER_PORT
@@ -321,6 +332,7 @@ def adk_server_with_ollama(
     # Set OLLAMA_MODEL environment variable for the agent
     env = os.environ.copy()
     env["OLLAMA_MODEL"] = ollama_model
+    env["OLLAMA_API_BASE"] = ollama_base_url
 
     # Start the ADK server as a subprocess
     cmd = [
@@ -334,7 +346,7 @@ def adk_server_with_ollama(
         str(port),
         "--session_service_uri",
         "memory://",  # Use in-memory sessions
-        examples_dir,
+        str(agents_dir),
     ]
 
     logger.info(f"Starting ADK server with Ollama ({ollama_model}) on port {port}...")
@@ -344,7 +356,10 @@ def adk_server_with_ollama(
     # tool call logs a full traceback, and once a pipe's buffer (64 KiB on
     # Linux) is full the server blocks on its next log line and stops
     # answering, so later tests time out.
-    log_path = tmp_path_factory.mktemp("adk-server") / "server.log"
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    log_path = request.config.rootpath / "reports" / f"adk-server-{worker}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    request.config._adk_log_path = log_path
     log_file = open(log_path, "w", encoding="utf-8")
     logger.info(f"ADK server output: {log_path}")
     process = subprocess.Popen(
@@ -447,6 +462,22 @@ def google_adk_config(google_adk_agent_url: Optional[str]) -> Dict[str, Any]:
         "endpoint": google_adk_agent_url or "http://localhost:8000",
         "user_id": "test_user",
         "timeout": max(1, adk_timeout),
+    }
+
+
+@pytest.fixture(scope="module")
+def google_adk_tool_config(
+    adk_server_with_ollama: Optional[str], google_adk_config: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Configure the test-owned tool agent, which only the local ADK server hosts."""
+    if adk_server_with_ollama is None:
+        pytest.skip(
+            "The local ADK server with the test-owned tool agent is not running"
+        )
+    return {
+        **google_adk_config,
+        "name": "tool_agent",
+        "endpoint": adk_server_with_ollama,
     }
 
 
