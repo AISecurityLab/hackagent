@@ -43,6 +43,14 @@ class AdvPrefixParams(AttackParams):
             "(``min_token_length``); counting characters needs no tokenizer."
         ),
     )
+    max_prefix_chars: int = Field(
+        default=300,
+        ge=1,
+        description=(
+            "Maximum prefix length sent to the target. Longer attacker-generated "
+            "prefixes are truncated to this character limit."
+        ),
+    )
     require_linebreak: bool = Field(
         default=True,
         description="Require a line break, which is what makes a prefix look mid-document.",

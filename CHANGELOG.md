@@ -1,3 +1,50 @@
+## v0.17.0 (2026-11-02)
+
+### Feat
+
+- **worker**: run each cloud run in its own process
+- **campaign**: cloud allowlist covers secrets, parameters and datasets
+- **worker**: start runs without provider credentials in the environment
+- **campaign**: cloud allowlist also covers models with an endpoint
+- **campaign**: one allowlist of what a campaign may contain to run in the cloud
+- **execution**: cloud worker runs only API-reachable model types
+- **worker**: cloud worker that claims and executes queued runs
+- **cli**: hackagent run executes a campaign queued from the dashboard
+- **execution**: execute a queued run with the same code locally and in the cloud
+- **execution**: background heartbeat with cancel and rejection signals
+- **storage**: remote backend uses the campaign start and executor endpoints
+- **client**: technique catalogue with parameter schemas and roles
+- **campaign**: portable HackAgent gateway marker for role and judge models
+- use one api_key field with HACKAGENT_API_KEY as the default
+- **attacks**: add ToolHijacker tool-document poisoning
+- **attacks**: add execution-verified STAC tool chains
+
+### Fix
+
+- **deps**: upgrade dev vllm to 0.32 and lift the transformers cap
+- **deps**: keep transformers below 5 while vllm is on 0.11
+- **execution**: a gateway 402 is not retried
+- **cli**: campaign run binds the gateway with the selected key
+- **worker**: install the vision extra in the worker image
+- **worker**: isolate run processes from the worker and from each other
+- **campaign**: cloud allowlist checks the provider each model resolves to
+- clearer run refusals, executor field offline, heartbeat stops at exit
+- **worker**: fail runs on shutdown, close per-run clients, build from the lock
+- **execution**: run every remote-storage campaign as a tracked server run
+- **web**: point stale CLI hints at campaign run and serve the builder offline
+- **execution**: end a run as "Out of credits" on the gateway's first 402
+- **core**: keep the handled error on exceptions from run_coroutine_blocking
+- **storage**: finish runs only after their writes land, without reading back
+- **stac**: advance scripted turns past completed batch steps
+- preserve nested token usage details
+
+### Refactor
+
+- **execution**: re-raise interrupts from their own handler
+- **execution**: the SDK no longer ships a cloud worker
+- **campaign**: the cloud allowlist owns the h4rm3l program rule
+- **execution**: campaign launch uses api_key references
+
 ## v0.16.0 (2026-10-20)
 
 ### Feat
