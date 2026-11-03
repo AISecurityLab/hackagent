@@ -43,6 +43,26 @@ class AdvPrefixParams(AttackParams):
             "(``min_token_length``); counting characters needs no tokenizer."
         ),
     )
+    max_prefix_words: int = Field(
+        default=32,
+        ge=1,
+        description=(
+            "Longest candidate kept from the writer, in whitespace-separated words. "
+            "The reference caps generation at 32 tokens (``max_new_tokens``); the "
+            "writer role takes no length limit, so its reply is cut afterwards. "
+            "Without a cap the writer drafts the whole answer and the panel judges "
+            "the attacker's text rather than the target's."
+        ),
+    )
+    second_line_words: int = Field(
+        default=5,
+        ge=1,
+        description=(
+            "Words kept after the first line break, as in the reference's "
+            "``max_token_segments``: the prefix opens the answer and the target "
+            "must write its substance."
+        ),
+    )
     require_linebreak: bool = Field(
         default=True,
         description="Require a line break, which is what makes a prefix look mid-document.",

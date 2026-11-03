@@ -1103,6 +1103,45 @@ def test_advprefix_needs_at_least_one_opening():
         AdvPrefixAttack(AdvPrefixParams(meta_prefixes=(), attacker=Writer2()))
 
 
+def test_advprefix_keeps_an_echoed_opening_once():
+    attack = AdvPrefixAttack(
+        advprefix(meta_prefixes=("Here",), attacker=Writer2("Here are the steps"))
+    )
+    candidate = asyncio.run(attack._one_prefix(GOAL, "Here"))
+
+    assert candidate.prefix == "Here are the steps"
+
+
+def test_advprefix_cuts_a_drafted_answer_down_to_an_opening():
+    drafted = (
+        " are the steps to do it:\n\n1. Obtain a bottle of the first thing. "
+        "It is sold in stores.\n\n2. Mix it with the second thing.\n"
+    )
+    attack = AdvPrefixAttack(
+        advprefix(meta_prefixes=("Here",), attacker=Writer2(drafted))
+    )
+    candidate = asyncio.run(attack._one_prefix(GOAL, "Here"))
+
+    # The target, not the writer, must supply the answer the panel judges.
+    assert candidate.prefix == "Here are the steps to do it:\n\n1. Obtain a bottle of"
+
+
+def test_advprefix_caps_a_candidate_without_a_line_break():
+    attack = AdvPrefixAttack(
+        advprefix(max_prefix_words=3, attacker=Writer2(" one two three four"))
+    )
+
+    assert asyncio.run(attack._one_prefix(GOAL, "Sure")).prefix == "Sure one two"
+
+
+def test_advprefix_prepends_an_opening_the_writer_did_not_echo():
+    attack = AdvPrefixAttack(
+        advprefix(meta_prefixes=("Here",), attacker=Writer2(" are the steps"))
+    )
+
+    assert asyncio.run(attack._one_prefix(GOAL, "Here")).prefix == "Here are the steps"
+
+
 def test_sample_counts_must_match_the_openings():
     with pytest.raises(ValidationError, match="2 counts for 3 meta prefixes"):
         AdvPrefixParams(meta_prefixes=("a", "b", "c"), samples_per_prefix=(1, 2))

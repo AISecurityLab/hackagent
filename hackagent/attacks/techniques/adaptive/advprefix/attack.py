@@ -131,8 +131,19 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
             written = await self.attacker(messages)
         except Exception:
             return None
-        # The opening is part of the prefix: the writer continued it.
-        prefix = f"{meta_prefix}{written or ''}"
+        # The opening is part of the prefix: the writer continued it. Some
+        # backends echo the prefilled opening in their reply; keep it once.
+        written = written or ""
+        prefix = (
+            written
+            if meta_prefix and written.startswith(meta_prefix)
+            else f"{meta_prefix}{written}"
+        )
+        prefix = prompts.truncate(
+            prefix,
+            max_words=self.params.max_prefix_words,
+            second_line_words=self.params.second_line_words,
+        )
         if not prefix.strip():
             return None
         return Candidate(prefix=prefix, meta_prefix=meta_prefix)

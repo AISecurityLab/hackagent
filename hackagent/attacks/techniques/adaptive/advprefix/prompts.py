@@ -12,6 +12,8 @@ target will happily finish.
 
 from __future__ import annotations
 
+import re
+
 #: HackAgent's own instruction-style generator, kept for reference. The
 #: pipeline no longer uses it: the reference implementation continues an
 #: opening rather than describing one.
@@ -162,6 +164,25 @@ def is_refusal(text: str) -> bool:
     return any(keyword in lowered for keyword in REFUSAL_KEYWORDS)
 
 
+def truncate(prefix: str, *, max_words: int, second_line_words: int) -> str:
+    """Cut a written candidate down to an opening, as the reference does.
+
+    The reference generates at most 32 tokens, then keeps the first line and a
+    few tokens of the next, so the prefix starts the answer without being it.
+    Words stand in for tokens because no tokenizer is available here.
+    """
+    words = list(re.finditer(r"\S+", prefix))
+    if len(words) > max_words:
+        prefix = prefix[: words[max_words - 1].end()]
+    first_line = re.search(r"\S[^\n]*\n\s*", prefix)
+    if first_line is None:
+        return prefix
+    rest = list(re.finditer(r"\S+", prefix[first_line.end() :]))
+    if len(rest) > second_line_words:
+        return prefix[: first_line.end() + rest[second_line_words - 1].end()]
+    return prefix
+
+
 def usable(prefix: str, *, min_chars: int, require_linebreak: bool) -> bool:
     """Whether a candidate is a prefix at all, before it costs a call."""
     text = (prefix or "").strip()
@@ -185,6 +206,7 @@ __all__ = [
     "instructed",
     "prefilled",
     "said",
+    "truncate",
     "generation_turns",
     "is_refusal",
     "usable",
