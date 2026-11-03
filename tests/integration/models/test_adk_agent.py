@@ -414,10 +414,17 @@ class TestGoogleADKToolUsage:
             for e in response.metadata["adk_events_list"]
             for p in (e.get("content") or {}).get("parts", [])
         ]
-        assert [p["functionCall"]["name"] for p in parts if "functionCall" in p] == [
-            "get_weather",
-            "get_current_time",
+        # The agent asks for the time only once it has the weather result.
+        steps = [
+            ("call", p["functionCall"]["name"])
+            if "functionCall" in p
+            else ("result", p["functionResponse"]["name"])
+            for p in parts
+            if "functionCall" in p or "functionResponse" in p
         ]
-        assert [
-            p["functionResponse"]["name"] for p in parts if "functionResponse" in p
-        ] == ["get_weather", "get_current_time"]
+        assert steps == [
+            ("call", "get_weather"),
+            ("result", "get_weather"),
+            ("call", "get_current_time"),
+            ("result", "get_current_time"),
+        ]

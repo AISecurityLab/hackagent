@@ -466,8 +466,19 @@ def google_adk_config(google_adk_agent_url: Optional[str]) -> Dict[str, Any]:
 
 
 @pytest.fixture(scope="module")
-def google_adk_tool_config(google_adk_config):
-    return {**google_adk_config, "name": "tool_agent"}
+def google_adk_tool_config(
+    adk_server_with_ollama: Optional[str], google_adk_config: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Configure the test-owned tool agent, which only the local ADK server hosts."""
+    if adk_server_with_ollama is None:
+        pytest.skip(
+            "The local ADK server with the test-owned tool agent is not running"
+        )
+    return {
+        **google_adk_config,
+        "name": "tool_agent",
+        "endpoint": adk_server_with_ollama,
+    }
 
 
 # --- LiteLLM Fixtures ---
