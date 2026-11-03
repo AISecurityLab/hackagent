@@ -603,6 +603,41 @@ def test_pair_without_a_scorer_still_lets_the_panel_judge_every_attempt():
 # --- tap ---------------------------------------------------------------------
 
 
+def test_tap_records_candidate_ancestry_and_pruned_paths():
+    attack = TAPAttack(
+        TapParams(
+            attacker=Writer(),
+            depth=2,
+            streams=1,
+            branching_factor=2,
+            width=1,
+            early_stop=False,
+        )
+    )
+    with recording() as trace:
+        findings, _ = search(attack, judge=Panel(1))
+    candidates = [
+        node
+        for node in trace.nodes
+        if node.node == "phase" and node.label == "candidate"
+    ]
+    assert len(candidates) == 4
+    roots = [node for node in candidates if not node.data["parent_path"]]
+    children = [node for node in candidates if node.data["parent_path"]]
+    assert len(roots) == len(children) == 2
+    assert all(
+        tuple(node.data["parent_path"]) in {r.path for r in roots} for node in children
+    )
+    assert {tuple(f.metadata["candidate_path"]) for f in findings} == {
+        node.path for node in candidates
+    }
+    assert any(
+        node.data.get("candidate_paths")
+        for node in trace.nodes
+        if node.label == "pruned"
+    )
+
+
 class Topic:
     """An on-topic judge: answers from a set of prompts it calls off-topic."""
 
