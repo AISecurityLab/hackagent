@@ -4,6 +4,7 @@
 """CLI subprocess → real HTTP provider → judge → SQLite → results command."""
 
 import json
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +17,7 @@ from hackagent.storage.local import LocalBackend
 pytestmark = pytest.mark.e2e
 
 
-def cli(tmp_path, env, *args):
+def cli(tmp_path, env, *args, expected_exit=0):
     result = subprocess.run(
         [
             sys.executable,
@@ -34,7 +35,7 @@ def cli(tmp_path, env, *args):
         text=True,
         timeout=45,
     )
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == expected_exit, result.stdout + result.stderr
     return result.stdout
 
 
@@ -105,3 +106,90 @@ def test_cli_dry_run_sends_nothing(
     )
     assert completion_server.requests == []
     assert not Path(isolated_campaign_env["HACKAGENT_DB_PATH"]).exists()
+
+
+def test_cli_preflight_failure_records_the_model_error_without_an_attack(
+    tmp_path,
+    isolated_campaign_env,
+    campaign_values,
+    completion_server,
+):
+    from tests.support.campaigns import Reply
+
+    campaign_values["execution"]["preflight"] = True
+    completion_server.defaults["target"] = Reply("probe rejected", 400)
+    path = tmp_path / "campaign.yaml"
+    path.write_text(yaml.safe_dump(campaign_values))
+    output = cli(
+        tmp_path, isolated_campaign_env, "campaign", "run", str(path), expected_exit=1
+    )
+    assert "Preflight failed" in output and "target" in output
+    assert len(completion_server.calls("target")) == 1
+    assert len(completion_server.calls("judge")) == 1
+    store = LocalBackend(isolated_campaign_env["HACKAGENT_DB_PATH"])
+    try:
+        [campaign] = store.list_campaign_runs().items
+        assert campaign.status == "FAILED"
+        assert "target" in campaign.run_notes
+        assert store.list_runs().total == 0
+    finally:
+        store.close()
+    assert not (tmp_path / "runs").exists()
+
+
+def test_cli_retention_settings_apply_to_files_database_and_traces(
+    tmp_path,
+    isolated_campaign_env,
+    campaign_values,
+    completion_server,
+):
+    campaign_values["execution"]["output"].update(
+        save_prompts=False, save_responses=False, save_traces=False
+    )
+    path = tmp_path / "campaign.yaml"
+    path.write_text(yaml.safe_dump(campaign_values))
+    cli(tmp_path, isolated_campaign_env, "campaign", "run", str(path), "--json")
+    assert (
+        len(completion_server.calls("target"))
+        == len(completion_server.calls("judge"))
+        == 2
+    )
+    folder = next((tmp_path / "runs").iterdir())
+    rows = json.loads((folder / "results.json").read_text())
+    assert len(rows) == 2
+    assert all(
+        not {
+            "prompt",
+            "messages",
+            "response",
+            "model_response",
+            "decoded_response",
+        }.intersection(row)
+        for row in rows
+    )
+    assert not (folder / "traces.jsonl").exists()
+    store = LocalBackend(isolated_campaign_env["HACKAGENT_DB_PATH"])
+    try:
+        [run] = store.list_runs().items
+        results = store.list_results(run_id=run.id).items
+        assert len(results) == 2
+        assert all(
+            not {
+                "messages",
+                "response",
+                "decoded_response",
+                "response_body",
+            }.intersection(r.metadata)
+            for r in results
+        )
+        assert all(store.list_traces(r.id) == [] for r in results)
+        assert all(r.evaluation_status == "SUCCESSFUL_JAILBREAK" for r in results)
+    finally:
+        store.close()
+    with sqlite3.connect(isolated_campaign_env["HACKAGENT_DB_PATH"]) as db:
+        payloads = db.execute("SELECT request_payload_json FROM results").fetchall()
+    assert [json.loads(row[0]) for row in payloads] == [{}, {}]
+    assert (
+        b"The target replied."
+        not in Path(isolated_campaign_env["HACKAGENT_DB_PATH"]).read_bytes()
+    )

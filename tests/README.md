@@ -51,12 +51,36 @@ campaign e2e test. Do not point tests at production data or accounts.
 checks. Use a specific provider flag for focused local runs. The existing live
 suite remains optional; this change does not create new scheduled jobs.
 
+## Campaign boundary coverage
+
+`tests/integration/offline/test_campaign_boundaries.py` covers failed and successful
+preflight, before/after guardrails, unavailable classifiers, shared HTTP concurrency
+limits across parallel attacks, cancellation and late replies, per-attack timeout
+with both error policies, listener cancellation/failure, escalation completion, and
+required-judge abstention. Gates synchronize in-flight replies; SQLite assertions
+check both terminal state and retained work after the requests finish.
+
+`test_attack_exchanges.py` exercises PAIR refinement and optional scorer feedback,
+panel review without duplicate judging, provider/scorer failures, and STAC tool
+continuations and duplicate call IDs. Structured tool calls travel through the
+real transport and require the project's declared MCP test dependency. Verify
+both persistent traces and output files, not only in-memory findings.
+
+CLI e2e checks cover failed preflight and retention switches in addition to the
+successful campaign and dry run. Retention is checked in JSON, trace output,
+record metadata, and the SQLite request column.
+
+Coverage collection now records branches by default. The existing TUI exclusion
+remains explicit in `pyproject.toml`; coverage percentages still describe that
+configured scope, not the entire product. Child CLI coverage also requires
+separate setup even though the CLI's behavior is exercised.
+
 ## Next implementation slices
 
 1. Extend the HTTP harness to stateful ADK and remote API protocol fixtures,
    validating the latter against the API schema and an isolated API deployment.
-2. Add adaptive/multi-turn exchanges, preflight failure, guardrail blocking,
-   concurrency and cancellation with exact request and terminal-state assertions.
+2. Extend the covered PAIR/STAC journeys to the remaining attack families and
+   broader provider contracts, including contextual RAG and multimodal fixtures.
 3. Cover claims, heartbeat, credit exhaustion and write/flush failures through real
    remote transport. Keep remote schema and fixture compatibility visible in CI.
 4. Maintain the compiled-dashboard Playwright smoke with expected record contents,
