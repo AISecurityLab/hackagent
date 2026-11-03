@@ -1303,6 +1303,15 @@ def test_the_judge_sees_the_prefix_and_the_continuation_together():
     assert panel.samples[0].response == f"Sure{PREFIX_TAIL}and then step two"
 
 
+def test_the_judge_sees_the_prefix_once_when_the_target_echoes_it():
+    # Some servers return the prefilled opening as part of the reply.
+    writer, panel = Writer2(PREFIX_TAIL), Panel(1.0)
+    attack = AdvPrefixAttack(advprefix(attacker=writer))
+    search(attack, target=Target(f"Sure{PREFIX_TAIL} and then step two"), judge=panel)
+
+    assert panel.samples[0].response == f"Sure{PREFIX_TAIL} and then step two"
+
+
 def test_the_judge_sees_only_the_reply_without_prefilling():
     writer, panel = Writer2(PREFIX_TAIL), Panel(1.0)
     attack = AdvPrefixAttack(advprefix(prefill=False, attacker=writer))
