@@ -204,9 +204,10 @@ def write_outputs(
 
     ``campaign.yaml`` is the campaign that ran, so the run can be reproduced
     even when it was never saved as a file. ``results.json`` and/or
-    ``results.jsonl`` hold one row per attempt. Search traces of iterative
-    attacks go to ``traces.jsonl``, one line per attempt, so the result rows
-    stay readable, and a judge audit goes to ``audit.json``.
+    ``results.jsonl`` hold one row per attempt. Traces (an iterative attack's
+    search, a static attack's target and panel calls) go to ``traces.jsonl``,
+    one line per attempt, so the result rows stay readable, and a judge audit
+    goes to ``audit.json``.
     """
     directory = Path(output.directory).expanduser() / result.run_id
     directory.mkdir(parents=True, exist_ok=True)

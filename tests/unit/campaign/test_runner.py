@@ -86,7 +86,79 @@ def test_a_static_attack_judges_every_request_it_generates(tmp_path):
     [attempt] = attempts_of(result)
     assert attempt.response.text == TARGET_REPLY
     assert attempt.verdict is not None and attempt.verdict.success is True
-    assert attempt.trace == ()
+    # The target call and the panel evaluation are traced like an iterative
+    # attack's, so the run's costs can be counted the same way.
+    assert [n.node for n in attempt.trace] == ["call", "call"]
+    assert [n.label for n in attempt.trace] == ["target", "panel"]
+    target, panel = attempt.trace
+    assert target.data["response"] == TARGET_REPLY
+    assert target.latency_s is not None and panel.latency_s is not None
+    assert panel.data["response"]["success"] is True
+
+
+def test_a_static_attack_without_judges_traces_only_the_target(tmp_path):
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        evaluation={"judges": []},
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    result, _builder = run(values, models=models_for())
+    [attempt] = attempts_of(result)
+    assert attempt.error is None and attempt.verdict is None
+    assert [n.label for n in attempt.trace] == ["target"]
+
+
+def test_a_static_target_failure_keeps_its_traced_call(tmp_path):
+    def broken(messages):
+        raise RuntimeError("connection reset")
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    models["target"] = ScriptedModel(broken)
+    result, _builder = run(values, models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error.startswith("target call failed: ")
+    [call] = attempt.trace
+    assert call.label == "target" and call.error.endswith("connection reset")
+    assert models["judge"].requests == []
+
+
+def test_a_static_provider_error_is_traced_and_not_judged(tmp_path):
+    from .fakes import failure
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    models["target"] = ScriptedModel(lambda messages: failure("rate limited"))
+    result, _builder = run(values, models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error.startswith("target error")
+    [call] = attempt.trace
+    assert call.label == "target" and call.error == "rate limited"
+
+
+def test_a_static_judge_failure_keeps_the_traced_calls(tmp_path):
+    def broken(messages):
+        raise RuntimeError("judge offline")
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    models["judge"] = ScriptedModel(broken)
+    result, _builder = run(values, models=models)
+    [attempt] = attempts_of(result)
+    if attempt.error is not None:
+        assert attempt.error.startswith("judging failed: ")
+    # Whatever the panel made of a failing judge, the target call is kept
+    # and the evaluation that was attempted is on the trace.
+    assert [n.label for n in attempt.trace] == ["target", "panel"]
 
 
 def test_the_run_emits_lifecycle_events_per_attack_and_goal(tmp_path):

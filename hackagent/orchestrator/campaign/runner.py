@@ -612,12 +612,27 @@ class _AttackRunner:
         request_index: int,
         messages: list[dict[str, Any]],
     ) -> Attempt:
-        """Send one request a static attack generated, and judge the reply."""
+        """Send one request a static attack generated, and judge the reply.
+
+        The target call and the panel evaluation are traced as they are for
+        an iterative attack, including on the paths that stop early.
+        """
+        with recording() as trace:
+            attempt = await self._send_and_judge(attack, goal, request_index, messages)
+        return replace(attempt, trace=tuple(trace.nodes))
+
+    async def _send_and_judge(
+        self,
+        attack: ResolvedAttack,
+        goal: Goal,
+        request_index: int,
+        messages: list[dict[str, Any]],
+    ) -> Attempt:
         attempt = Attempt(
             goal.index, request_index, goal.text, messages=tuple(messages)
         )
         try:
-            response = await self._complete(messages)
+            response = await self._send(messages)
         except Exception as exc:
             # A provider error arrives as a response; a transport failure
             # arrives as an exception, and is this request's alone.
@@ -647,7 +662,7 @@ class _AttackRunner:
                 attempt, response=response, error=f"decoding failed: {_describe(exc)}"
             )
         try:
-            verdict = await self._judge(
+            verdict = await self._traced_judge(
                 Sample(
                     goal=attempt.goal,
                     prompt=user_text(attempt.messages),
@@ -730,11 +745,30 @@ class _AttackRunner:
 
     async def _ask_panel(self, sample: Sample) -> Verdict:
         """The panel as an iterative attack sees it: limited and traced."""
-        started = monotonic()
-        verdict = await self._judge(sample)
+        verdict = await self._traced_judge(sample)
         if verdict is None:
             raise RuntimeError("this campaign configured no judges")
-        record_judge_call(sample, verdict, monotonic() - started)
+        return verdict
+
+    async def _traced_judge(self, sample: Sample) -> Optional[Verdict]:
+        """One panel evaluation, recorded as a ``panel`` call node.
+
+        Nothing is recorded when the campaign configured no judges.
+        """
+        started = monotonic()
+        try:
+            verdict = await self._judge(sample)
+        except Exception as exc:
+            record_call(
+                "panel",
+                {"prompt": sample.prompt, "response": sample.response},
+                None,
+                monotonic() - started,
+                error=_describe(exc),
+            )
+            raise
+        if verdict is not None:
+            record_judge_call(sample, verdict, monotonic() - started)
         return verdict
 
     async def _send(self, messages: Messages, **overrides: Any) -> ModelResponse:
