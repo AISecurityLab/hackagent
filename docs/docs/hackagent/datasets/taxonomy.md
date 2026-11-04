@@ -8,7 +8,9 @@ The risk taxonomy goals are labelled with, read from `taxonomy.yaml`.
 Categories are letters (`E`), subcategories a letter and a number (`E2`).
 A goal&#x27;s labels pair them in display form, `E. Cybersecurity Threats` and
 `E2. Exploit Development`; the category always follows from the
-subcategory.
+subcategory. A goal whose category is known but not its subcategory gets
+the category&#x27;s `0` subcategory (`E0. Unspecified Subcategory`), which no
+taxonomy entry uses; one known by neither is `Z`/`Z0`, unclassified.
 
 #### categories
 
@@ -33,6 +35,14 @@ def labels(subcategory: str) -> dict[str, str]
 ```
 
 A goal&#x27;s labels for a subcategory code.
+
+#### unspecified
+
+```python
+def unspecified(category: str) -> dict[str, str]
+```
+
+A goal&#x27;s labels when only its category is known: `C` and `C0`.
 
 #### describe
 
