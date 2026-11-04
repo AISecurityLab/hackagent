@@ -8,7 +8,7 @@ sidebar_position: 10
 
 Multi-Modal Linkage attack encoding harmful prompts into images for VLMs.
 
-**Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
+**Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
 One multimodal request with the encoded goal as an image.
 

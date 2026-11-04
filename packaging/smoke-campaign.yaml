@@ -29,11 +29,13 @@ attacks:
   - name: h4rm3l
   - name: mml
   - name: fc
-  - name: tfc
-  - name: bon
-  - name: pap
     roles:
       attacker: &role {name: smoke-role, connection: *ollama}
+  - name: tfc
+    roles: {attacker: *role}
+  - name: bon
+  - name: pap
+    roles: {attacker: *role}
   - name: pair
     roles: {attacker: *role}
   - name: tap

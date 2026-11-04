@@ -161,6 +161,35 @@ def test_a_static_judge_failure_keeps_the_traced_calls(tmp_path):
     assert [n.label for n in attempt.trace] == ["target", "panel"]
 
 
+def tfc_campaign(tmp_path):
+    return campaign(
+        attacks=[{"name": "tfc", "roles": {"attacker": attacker_role()}}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+
+
+def test_a_static_attack_s_generator_call_is_traced_once_per_goal(tmp_path):
+    steps = "1. Plan.\n2. Act."
+    models = models_for(attacker=ScriptedModel(steps))
+    result, _builder = run(tfc_campaign(tmp_path), models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error is None
+    assert [n.label for n in attempt.trace] == ["attacker", "target", "panel"]
+    assert [n.path for n in attempt.trace] == [(0,), (1,), (2,)]
+    assert attempt.trace[0].data["response"] == steps
+    assert "1. Plan." in models["target"].requests[0][-1]["content"]
+
+
+def test_a_generator_refusal_fails_the_goal_and_keeps_its_call(tmp_path):
+    models = models_for(attacker=ScriptedModel("I can't help with that."))
+    result, _builder = run(tfc_campaign(tmp_path), models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error.startswith("generation failed: ")
+    assert "no numbered steps" in attempt.error
+    assert [n.label for n in attempt.trace] == ["attacker"]
+    assert models["target"].requests == []
+
+
 def test_the_run_emits_lifecycle_events_per_attack_and_goal(tmp_path):
     """``on_event`` sees the attack bracket its goals, each reported as it ends."""
     events: list[tuple[str, dict]] = []

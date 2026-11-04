@@ -8,7 +8,7 @@ sidebar_position: 9
 
 Composable decorator-program attack chaining multiple obfuscations.
 
-**Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
+**Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
 One request carrying the decorated goal.
 

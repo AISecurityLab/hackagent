@@ -8,13 +8,17 @@ sidebar_position: 7
 
 FC-Attack: auto-generated flowchart images to jailbreak VLMs.
 
-**Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
+**Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
 One multimodal request with the flowchart rendered as an image.
 
 ## Helper models
 
-None. This attack drives no model of its own, so `roles` can be left out.
+Models this attack drives, configured under its `roles`. Each one is a [ModelConfig](../target.md#modelconfig).
+
+| Role | Kind | Needed | What it does |
+|---|---|---|---|
+| `attacker` | chat model | required | Step-description generator: writes the numbered steps for the goal that the flowchart shows. |
 
 ## Parameters
 
@@ -24,12 +28,24 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 |---|---|---|---|
 | `layout` | one of `vertical`, `horizontal`, `tortuous`, `s_shaped` | `vertical` | Shape of the flowchart: vertical, horizontal, tortuous or s_shaped. |
 | `dpi` | integer (>= 72, <= 1200) | `600` | Resolution of the rendered flowchart image. |
-| `num_steps` | integer (>= 2, <= 15) | `6` | How many steps the goal is split into. |
-| `truncate_last_step` | boolean | `true` | Cut the last step off mid-sentence, so the target is invited to complete it. |
+| `num_steps` | integer (>= 1, <= 10) | `5` | How many of the generated steps the flowchart shows, from the first. The paper compares 1, 3, 5 and all (at most 10). |
+| `truncate_last_step` | boolean | `false` | Cut the last step off mid-sentence. Not part of FC-Attack, whose flowcharts keep every step whole. |
 
 ## In a campaign file
 
 ```yaml
 attacks:
 - name: fc
+  roles:
+    attacker:
+      name: llama3.2
+      connection:
+        provider: ollama
+        type: OLLAMA
 ```
+
+:::note[Needs a helper model]
+
+This attack cannot run without `attacker`. A campaign that leaves it out fails to resolve, before anything is attacked.
+
+:::

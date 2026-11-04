@@ -586,17 +586,30 @@ class _AttackRunner:
     async def _generate_and_send(
         self, attack: ResolvedAttack, goal: Goal
     ) -> list[Attempt]:
-        try:
-            async with self.limits.attack:
-                requests = await attack.attack.generate(goal.text)
-        except Exception as exc:
-            logger.warning(
-                "%s | goal %d | generation failed: %s", attack.name, goal.index + 1, exc
-            )
-            return [
-                Attempt(goal.index, 0, goal.text, error=f"generation failed: {exc}")
-            ]
-        return list(
+        # A static attack may call a helper model (FC's step generator) to
+        # build its requests; those calls go on the goal's first attempt, so
+        # each is counted once however many requests it produced.
+        with recording() as generation:
+            try:
+                async with self.limits.attack:
+                    requests = await attack.attack.generate(goal.text)
+            except Exception as exc:
+                logger.warning(
+                    "%s | goal %d | generation failed: %s",
+                    attack.name,
+                    goal.index + 1,
+                    exc,
+                )
+                return [
+                    Attempt(
+                        goal.index,
+                        0,
+                        goal.text,
+                        error=f"generation failed: {exc}",
+                        trace=tuple(generation.nodes),
+                    )
+                ]
+        attempts = list(
             await asyncio.gather(
                 *(
                     self._run_request(attack, goal, index, messages)
@@ -604,6 +617,12 @@ class _AttackRunner:
                 )
             )
         )
+        if generation.nodes and attempts:
+            first = attempts[0]
+            attempts[0] = replace(
+                first, trace=_after(tuple(generation.nodes), first.trace)
+            )
+        return attempts
 
     async def _run_request(
         self,
@@ -886,6 +905,20 @@ def _record_quietly(
 
 def _describe(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+
+
+def _after(
+    before: tuple[TraceNode, ...], nodes: tuple[TraceNode, ...]
+) -> tuple[TraceNode, ...]:
+    """``before`` then ``nodes``, renumbered so ``nodes`` follow it.
+
+    Each was recorded on its own, so both start at path ``(0,)``.
+    """
+    offset = 1 + max((node.path[0] for node in before), default=-1)
+    shifted = tuple(
+        replace(node, path=(node.path[0] + offset, *node.path[1:])) for node in nodes
+    )
+    return (*before, *shifted)
 
 
 def _slices(
