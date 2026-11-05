@@ -34,6 +34,32 @@ TARGET_REPLY = "a reply the judge will read"
 _PAIR_TURN = json.dumps({"improvement": "sharper", "prompt": "an adversarial prompt"})
 
 
+@pytest.mark.parametrize("save_prompts", [False, True])
+@pytest.mark.parametrize("save_responses", [False, True])
+def test_panel_trace_retention_flags_are_independent(save_prompts, save_responses):
+    from hackagent.attacks.techniques.trace import TraceNode
+    from hackagent.orchestrator.campaign.results import trace_payload
+    from hackagent.orchestrator.campaign.spec import OutputSpec
+
+    request = {"prompt": "private prompt", "response": "private reply"}
+    node = TraceNode(
+        path=(),
+        node="call",
+        label="panel",
+        data={"role": "panel", "request": request, "response": {"success": True}},
+    )
+    payload = trace_payload(
+        node, OutputSpec(save_prompts=save_prompts, save_responses=save_responses)
+    )
+    data = payload["data"]
+    retained = data.get("request", {})
+    assert ("prompt" in retained) == save_prompts
+    assert ("response" in retained) == save_responses
+    assert ("response" in data) == save_responses
+    assert request == {"prompt": "private prompt", "response": "private reply"}
+    assert node.data["request"] == request
+
+
 def attacker_role(**overrides):
     return {**model("attacker", "http://127.0.0.1:8003/v1"), **overrides}
 
@@ -541,6 +567,53 @@ def test_retention_settings_apply_to_traces(tmp_path):
     for node in calls:
         assert "request" not in node["data"] and "response" not in node["data"]
         assert node["latency_s"] is not None
+
+
+@pytest.mark.parametrize("save_prompts", [False, True])
+@pytest.mark.parametrize("save_responses", [False, True])
+def test_static_panel_retention_in_files_and_storage(
+    tmp_path, save_prompts, save_responses
+):
+    from tests.fakes import in_memory_store
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={
+            "output": {
+                "directory": str(tmp_path),
+                "save_prompts": save_prompts,
+                "save_responses": save_responses,
+            }
+        },
+    )
+    store = in_memory_store()
+    result, _builder = run(values, models=models_for(), store=store)
+    traces = next(path for path in result.outputs if path.name == "traces.jsonl")
+    file_nodes = [
+        node
+        for line in traces.read_text(encoding="utf-8").splitlines()
+        for node in json.loads(line)["nodes"]
+    ]
+    stored_nodes = [
+        trace.content
+        for record in store.list_results(page_size=50).items
+        for trace in store.list_traces(record.id)
+    ]
+    for nodes in (file_nodes, stored_nodes):
+        panels = [
+            node
+            for node in nodes
+            if node.get("node") == "call" and node["data"]["role"] == "panel"
+        ]
+        assert panels
+        for node in panels:
+            request = node["data"].get("request", {})
+            assert ("prompt" in request) == save_prompts
+            assert ("response" in request) == save_responses
+            if save_responses:
+                assert request["response"] == TARGET_REPLY
+            else:
+                assert TARGET_REPLY not in json.dumps(node)
 
 
 def test_traces_are_written_beside_the_results(tmp_path):

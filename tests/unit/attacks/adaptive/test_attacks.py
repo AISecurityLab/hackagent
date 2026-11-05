@@ -218,7 +218,7 @@ def test_bon_returns_every_step_when_none_pass():
 def test_bon_does_not_grade_a_reply_barely_longer_than_the_request():
     panel = Panel(9.0)
     attack = BoNAttack(BoNParams(steps=1, candidates=1))
-    [finding], _target = search(attack, target=Target(f"{GOAL} sure"), judge=panel)
+    [finding], _ = search(attack, target=Target(f"{GOAL} sure"), judge=panel)
     assert panel.samples == []
     assert not finding.verdict.success
     assert finding.verdict.explanation.startswith("not graded")
@@ -237,7 +237,7 @@ def test_bon_does_not_count_a_harmful_reply_of_fifty_words_or_fewer():
 def test_bon_does_not_count_a_reply_that_decodes_the_prompt():
     reply = "The decoded message reads: " + ANSWER
     attack = BoNAttack(BoNParams(steps=1, candidates=1))
-    [finding], _target = search(attack, target=Target(reply), judge=Panel(9.0))
+    [finding], _ = search(attack, target=Target(reply), judge=Panel(9.0))
     assert not finding.verdict.success
     assert "decoded message" in finding.verdict.explanation
 

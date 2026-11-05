@@ -68,7 +68,7 @@ def primitive_signatures(*, with_decorator_model: bool) -> list[str]:
     """
     return [
         _render(name, cls)
-        for name, cls in decorator_namespace().items()
+        for name, cls in decorator_namespace(allow_code_execution=False).items()
         if with_decorator_model or not needs_decorator_model(cls)
     ]
 

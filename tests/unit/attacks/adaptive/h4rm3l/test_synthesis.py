@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from hackagent.attacks.techniques.adaptive.h4rm3l import (
     H4rm3lAttack,
     H4rm3lParams,
@@ -131,3 +133,69 @@ def test_without_a_panel_synthesis_is_skipped_and_seeds_are_used():
     assert attack.pool.size() == seeded
     assert attack.params.synthesizer.calls == 0
     assert findings
+
+
+@pytest.mark.parametrize(
+    "program",
+    [
+        "TransformFxDecorator(transform_fx='raise RuntimeError()')",
+        "IdentityDecorator().then(TransformFxDecorator(transform_fx='raise RuntimeError()'))",
+        "IdentityDecorator().then(IdentityDecorator().then(TransformFxDecorator(transform_fx='raise RuntimeError()')))",
+    ],
+)
+def test_synthesized_transforms_are_rejected_before_application(program, monkeypatch):
+    from hackagent.attacks.techniques.adaptive.h4rm3l.decorators import (
+        TransformFxDecorator,
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("a synthesized Python transform must never be constructed")
+
+    monkeypatch.setattr(TransformFxDecorator, "__init__", forbidden)
+    target, attack, _findings = prepare_and_search(
+        params(synthesizer=Synthesizer(program), decorator=Synthesizer())
+    )
+    assert program not in attack.pool.entries
+    assert program not in attack._compiled
+    assert target.requests
+
+
+def test_explicit_transform_stays_available_without_synthesis():
+    program = (
+        "TransformFxDecorator(transform_fx="
+        "'def transform(prompt, assistant, random_state):\\n    return prompt')"
+    )
+    target, _attack, findings = prepare_and_search(
+        params(synthesizer=None, decorator=Synthesizer(), program=program)
+    )
+    assert findings
+    assert target.requests == [[{"role": "user", "content": GOAL}]]
+
+
+def test_synthesis_rejects_an_explicit_transform_seed():
+    with pytest.raises(ValueError, match="unknown decorator: TransformFxDecorator"):
+        H4rm3lAttack(
+            params(
+                decorator=Synthesizer(),
+                program="TransformFxDecorator(transform_fx='pass')",
+            )
+        )
+
+
+@pytest.mark.parametrize("syntax_version", [1, 2])
+def test_restricted_compiler_rejects_transforms(syntax_version):
+    from hackagent.attacks.techniques.adaptive.h4rm3l.decorators import compile_program
+
+    transform = "TransformFxDecorator(transform_fx='pass')"
+    program = (
+        f"IdentityDecorator(); {transform}"
+        if syntax_version == 1
+        else f"IdentityDecorator().then({transform})"
+    )
+    with pytest.raises(ValueError, match="unknown decorator: TransformFxDecorator"):
+        compile_program(
+            program,
+            syntax_version,
+            completion=Synthesizer(),
+            allow_code_execution=False,
+        )

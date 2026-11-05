@@ -50,7 +50,7 @@ def test_only_names_the_compiler_accepts_are_offered():
     # The package's ``__all__`` also exports the base classes, the name set
     # and the compiler itself; none of those can appear in a program.
     assert _names(primitive_signatures(with_decorator_model=True)) == set(
-        decorator_namespace()
+        decorator_namespace(allow_code_execution=False)
     )
 
 

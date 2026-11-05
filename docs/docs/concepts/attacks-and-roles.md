@@ -39,6 +39,10 @@ per goal like any static attack. `hackagent examples copy h4rm3l-synth-demo`
 writes out a runnable campaign with the search switched on, next to
 `h4rm3l-demo` which has it off.
 
+Synthesis excludes `TransformFxDecorator`, including inside composed programs,
+because it executes Python source. Trusted, explicitly configured transforms
+remain available only when synthesis is disabled.
+
 ## Roles: the models an attack drives
 
 A role is a model the **attack** uses, as opposed to the target it attacks or

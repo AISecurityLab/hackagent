@@ -72,7 +72,10 @@ class H4rm3lAttack(IterativeAttack[H4rm3lParams]):
 
     def _build(self, program: str) -> Decorate:
         return compile_program(
-            program, self.params.syntax_version, completion=self.params.decorator
+            program,
+            self.params.syntax_version,
+            completion=self.params.decorator,
+            allow_code_execution=self.synthesizer is None,
         )
 
     def _compile(self, program: str) -> Optional[Decorate]:
