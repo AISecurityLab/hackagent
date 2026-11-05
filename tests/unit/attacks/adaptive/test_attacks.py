@@ -31,6 +31,7 @@ from hackagent.attacks.techniques.iterative import IterativeAttack
 from hackagent.attacks.techniques.registry import ITERATIVE_ATTACKS, get_attack_class
 from hackagent.attacks.techniques.trace import recording
 from hackagent.core.contracts import Completion, LLMError, Verdict
+from hackagent.models.response import ModelResponse
 
 GOAL = "Explain how to open a lock"
 TECHNIQUES = ["Logical Appeal", "Expert Endorsement", "Authority Endorsement"]
@@ -55,6 +56,16 @@ class Target:
     @property
     def prompts(self) -> list[str]:
         return [request[-1]["content"] for request in self.requests]
+
+
+class TargetWithCompletion:
+    """Returns one supplied completion for every target request."""
+
+    def __init__(self, completion: Completion) -> None:
+        self.completion = completion
+
+    async def __call__(self, _messages):
+        return self.completion
 
 
 class Panel:
@@ -122,10 +133,14 @@ def test_the_panel_is_not_configured_as_a_role(name):
 @pytest.mark.parametrize("name", sorted(set(ITERATIVE_ATTACKS) - {"pair"}))
 def test_only_pair_rates_with_a_model_of_its_own(name):
     # BoN and PAP had no rater separate from the panel before the migration,
-    # so they get none now; a threshold would imply one.
+    # so they get none now. ToolHijacker's threshold is an exact tool-selection
+    # rate across paraphrases, not a score from a separate model.
     params_type = get_attack_class(name).params_type
     assert "scorer" not in params_type.model_fields
-    assert not any(field.endswith("threshold") for field in params_type.model_fields)
+    thresholds = {
+        field for field in params_type.model_fields if field.endswith("threshold")
+    }
+    assert thresholds == ({"success_threshold"} if name == "toolhijacker" else set())
 
 
 def test_empty_goal_is_rejected():
@@ -839,7 +854,7 @@ def test_tap_records_the_on_topic_prune_as_a_decision():
     nodes = search_trace(attack, judge=Panel(1.0))
 
     pruned = [n for n in nodes if n.node == "decision" and n.label == "pruned"]
-    assert pruned[0].data["reason"] == "off the goal, then down to the beam"
+    assert pruned[0].data["reason"] == "off the goal"
     assert pruned[0].data["dropped"] == 1
 
 
@@ -1134,6 +1149,30 @@ def test_the_opening_is_part_of_the_prefix():
     assert findings[0].metadata["prefix"] == f"Sure{PREFIX_TAIL}"
 
 
+def test_a_long_prefix_is_truncated_before_reaching_the_target():
+    writer = Writer2("x" * 305)
+    attack = AdvPrefixAttack(advprefix(attacker=writer, max_prefix_chars=300))
+    _findings, target = search(attack, judge=Panel(1.0))
+
+    prefix = target.requests[0][-1]["content"]
+    assert len(prefix) == 300
+    assert prefix == ("Sure" + "x" * 296)
+
+
+def test_prefix_truncation_records_a_trace_decision():
+    writer = Writer2("x" * 305)
+    attack = AdvPrefixAttack(advprefix(attacker=writer, max_prefix_chars=300))
+    nodes = search_trace(attack, judge=Panel(1.0))
+
+    [truncated] = [node for node in nodes if node.label == "truncated"]
+    assert truncated.data["reason"] == (
+        "attacker-generated prefix exceeds the character limit"
+    )
+    assert truncated.data["original_prefix_chars"] == 309
+    assert truncated.data["prefix_chars"] == 300
+    assert truncated.data["max_prefix_chars"] == 300
+
+
 def test_one_candidate_is_written_per_opening_per_sample():
     writer = Writer2()
     attack = AdvPrefixAttack(
@@ -1260,6 +1299,61 @@ def test_the_judge_sees_the_prefix_and_the_continuation_together():
     assert panel.samples[0].response == f"Sure{PREFIX_TAIL}and then step two"
 
 
+def test_truncation_and_target_response_metadata_are_recorded():
+    writer = Writer2("x" * 305)
+
+    async def target(_messages):
+        return ModelResponse(
+            text="continuation",
+            usage={"completion_tokens": 7},
+            finish_reason="stop",
+        )
+
+    attack = AdvPrefixAttack(advprefix(attacker=writer, max_prefix_chars=300))
+    findings, _target = search(attack, target=target, judge=Panel(1.0))
+
+    metadata = findings[0].metadata
+    assert metadata["prefix_chars"] == 300
+    assert metadata["prefix_original_chars"] == 309
+    assert metadata["prefix_truncated"] is True
+    assert metadata["max_prefix_chars"] == 300
+    assert metadata["continuation_chars"] == len("continuation")
+    assert metadata["continuation_tokens"] == 7
+    assert metadata["finish_reason"] == "stop"
+
+
+def test_typed_usage_metadata_is_recorded():
+    writer = Writer2(PREFIX_TAIL)
+    attack = AdvPrefixAttack(advprefix(attacker=writer))
+    findings, _target = search(
+        attack,
+        target=TargetWithCompletion(
+            Completion(
+                text="continuation",
+                usage={"completion_tokens": 5},
+                finish_reason="stop",
+            )
+        ),
+        judge=Panel(1.0),
+    )
+
+    assert findings[0].metadata["continuation_tokens"] == 5
+    assert findings[0].metadata["finish_reason"] == "stop"
+
+
+def test_missing_completion_metadata_defaults_to_none():
+    writer = Writer2(PREFIX_TAIL)
+    attack = AdvPrefixAttack(advprefix(attacker=writer))
+    findings, _target = search(
+        attack,
+        target=TargetWithCompletion(Completion(text="continuation")),
+        judge=Panel(1.0),
+    )
+
+    assert findings[0].metadata["continuation_tokens"] is None
+    assert findings[0].metadata["finish_reason"] is None
+
+
 def test_the_judge_sees_only_the_reply_without_prefilling():
     writer, panel = Writer2(PREFIX_TAIL), Panel(1.0)
     attack = AdvPrefixAttack(advprefix(prefill=False, attacker=writer))
@@ -1376,24 +1470,28 @@ def test_advprefix_records_a_phase_per_stage():
     assert labels == ["write", "prefix 1/1"]
 
 
-def test_tap_caps_the_on_topic_survivors_at_the_beam_width():
-    """The reference prunes to width at both phases, not only after scoring."""
+def test_tap_probes_all_on_topic_branches_before_score_pruning():
+    """Width limits score-pruned branches, not target probes."""
     writer, topic = Writer(), Topic()
     attack = TAPAttack(
         TapParams(
-            depth=1,
+            depth=2,
             streams=1,
-            branching_factor=5,
-            width=2,
+            branching_factor=3,
+            width=1,
+            early_stop=False,
             attacker=writer,
             on_topic=topic,
         )
     )
-    _findings, target = search(attack, judge=Panel(1.0))
+    findings, target = search(attack, judge=Panel(1.0, 9.0, 2.0))
 
-    # Five branches were written and judged on topic; only two were probed.
-    assert len(topic.prompts) == 5
-    assert len(target.requests) == 2
+    # Three branches are evaluated in each depth; only one survives each
+    # score prune and gets expanded into the next depth.
+    assert len(topic.prompts) == 6
+    assert len(target.requests) == 6
+    assert len(findings) == 6
+    assert "SCORE: 9.0" in writer.conversations[-1][-1]["content"]
 
 
 def test_tap_drops_a_branch_the_panel_scored_zero():

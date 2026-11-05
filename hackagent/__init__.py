@@ -9,6 +9,7 @@ not install a logging handler and does not import interface toolkits.
 
 from hackagent.client import HackAgent
 from hackagent.core.contracts import AgentType
+from hackagent.core.credentials import CredentialError, resolve_api_key
 from hackagent.core.errors import ApiError, HackAgentError
 from hackagent.core.settings import (
     DEFAULT_REMOTE_BASE_URL,
@@ -22,12 +23,14 @@ from hackagent.core.settings import (
 __all__ = (
     "AgentType",
     "ApiError",
+    "CredentialError",
     "DEFAULT_REMOTE_BASE_URL",
     "HackAgent",
     "HackAgentError",
     "Settings",
     "Source",
     "read_config_file",
+    "resolve_api_key",
     "resolve_ollama_base_url",
     "resolve_remote_base_url",
 )

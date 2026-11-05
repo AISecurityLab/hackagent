@@ -36,6 +36,6 @@ evaluation:
       connection:
         provider: openai
         type: LITELLM
-        api_key_env: OPENAI_API_KEY
+        api_key: "${OPENAI_API_KEY}"
       scoring:
         type: harmbench

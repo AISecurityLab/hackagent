@@ -19,10 +19,7 @@ A model gave no usable reply.
 def build_model(config: ModelConfig, *, retries: int = 0) -> Model
 ```
 
-Create the model client described by `config`.
-
-No request is sent. An `api_key_env` that is not set fails here, so
-configuration errors surface before a run starts.
+Build a client from one connection configuration, without network I/O.
 
 #### as\_completion
 

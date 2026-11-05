@@ -163,3 +163,63 @@ def test_a_choice_stands_for_the_value_its_schema_expects() -> None:
     assert field.choices == ("1", "2")
     assert field.choice_value("2") == 2
     assert field.choice_value("not a choice") == "not a choice"
+
+
+def test_draft_import_rejects_literal_keys_without_echoing_them():
+    import pytest
+    from hackagent.core.credentials import CredentialError
+
+    with pytest.raises(CredentialError) as error:
+        CampaignDraft.from_yaml("target:\n  connection:\n    api_key: never-echo-this")
+    assert "never-echo-this" not in str(error.value)
+
+
+def test_draft_edits_cannot_validate_or_save_a_literal_key():
+    import pytest
+    from hackagent.core.credentials import CredentialError
+
+    draft = CampaignDraft()
+    path = ("target", "connection", "api_key")
+    draft.set(path, "never-save-this")
+    spec, issues = draft.validate()
+    assert spec is None
+    assert issues[0].loc == path
+    assert "never-save-this" not in str(issues)
+    with pytest.raises(CredentialError):
+        draft.to_yaml()
+
+
+def test_draft_keeps_references_after_resolving_a_runtime_spec(monkeypatch):
+    monkeypatch.setenv("MODEL_SECRET", "never-write-this")
+    draft = CampaignDraft()
+    draft.set(("target", "connection", "api_key"), "${MODEL_SECRET}")
+    draft = CampaignDraft.from_yaml(draft.to_yaml())
+    spec, issues = draft.validate()
+    assert not issues
+    assert spec.target.connection.api_key == "never-write-this"
+    text = draft.to_yaml()
+    assert "${MODEL_SECRET}" in text
+    assert "never-write-this" not in text
+
+
+def test_builder_blocks_secret_writes_and_external_editor(tmp_path):
+    from unittest.mock import Mock, patch
+    from hackagent.interfaces.tui.views.campaign.builder import CampaignBuilder
+
+    builder = CampaignBuilder(Mock())
+    builder.draft.set(("target", "connection", "api_key"), "never-persist-this")
+    builder.notify = Mock()
+    assert builder._is_dirty()
+    path = tmp_path / "campaign.yaml"
+    path.write_text("original document")
+    builder._write(path)
+    assert path.read_text() == "original document"
+    assert builder.notify.call_args.kwargs["title"] == "Save failed"
+    with (
+        patch("tempfile.NamedTemporaryFile") as temporary,
+        patch("subprocess.run") as editor,
+    ):
+        builder.action_edit_yaml()
+    temporary.assert_not_called()
+    editor.assert_not_called()
+    assert "never-persist-this" not in str(builder.notify.call_args_list)

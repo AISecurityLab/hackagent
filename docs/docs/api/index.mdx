@@ -79,7 +79,7 @@ const { results } = await response.json();
 
 ## Authentication
 
-Send the API key as a bearer token on every request: `Authorization: Bearer <api-key>`. The dashboard shows a new key once, when you create it; store it like a password. The SDK and CLI read it from `HACKAGENT_API_KEY` or from `hackagent config set --api-key`.
+Send the API key as a bearer token on every request: `Authorization: Bearer <api-key>`. The dashboard shows a new key once, when you create it; store it like a password. The SDK and CLI read it from `HACKAGENT_API_KEY`.
 
 A missing, malformed or revoked key gets `401` with `WWW-Authenticate: Bearer`. A few account endpoints only work from a signed-in dashboard session; they answer an API key with `401` and `"API key authentication not allowed on this endpoint"`. The resource sections below mark them **dashboard only**.
 
@@ -236,7 +236,14 @@ curl -sS "https://api.hackagent.dev/result?run=$RUN_ID&evaluation_status=SUCCESS
 
 ## LLM gateway
 
-`POST /v1/chat/completions` is an OpenAI-compatible chat endpoint. HackAgent's default attacker, judge and category classifier use it in remote mode, and you can call it from any OpenAI client by setting the base URL to `https://api.hackagent.dev/v1`.
+`POST /v1/chat/completions` is an OpenAI-compatible chat endpoint. Its `model` picks one of the models HackAgent serves, and `GET /v1/models` lists them:
+
+| `model` | For |
+|---|---|
+| `hackagent-attacker` | Attack roles: the model that writes attack prompts |
+| `hackagent-judge` | Judges, guardrails and goal classifiers |
+
+Any other name gets `400` with `code: UNKNOWN_MODEL` and the list of valid names. A campaign model uses the gateway when its connection endpoint is `https://api.hackagent.dev/v1` and its `name` is one of these models, or when it is a gateway marker (`connection: {provider: hackagent, type: OPENAI}`) named after one. The gateway authenticates with `HACKAGENT_API_KEY`. Model connections are independent of the result-storage backend. The same endpoint can be called from an OpenAI-compatible client:
 
 <Tabs groupId="http-client">
 <TabItem value="curl" label="curl" default>
@@ -245,7 +252,7 @@ curl -sS "https://api.hackagent.dev/result?run=$RUN_ID&evaluation_status=SUCCESS
 curl -sS https://api.hackagent.dev/v1/chat/completions \
   -H "Authorization: Bearer $HACKAGENT_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "Say hello"}], "max_tokens": 50}'
+  -d '{"model": "hackagent-judge", "messages": [{"role": "user", "content": "Say hello"}], "max_tokens": 50}'
 ```
 
 </TabItem>
@@ -260,7 +267,7 @@ client = OpenAI(
     api_key=os.environ["HACKAGENT_API_KEY"],
 )
 reply = client.chat.completions.create(
-    model="default",  # ignored: the server chooses the model
+    model="hackagent-judge",
     messages=[{"role": "user", "content": "Say hello"}],
     max_tokens=50,
 )
@@ -270,7 +277,7 @@ print(reply.choices[0].message.content)
 </TabItem>
 </Tabs>
 
-The server chooses the model and ignores `model` in the request. Streaming is not supported (`"stream": true` gets `501`), and `max_tokens` is capped at 4,096. The response is a standard chat completion with `usage` token counts.
+Each model runs on the provider and upstream model the server configures for it. Streaming is not supported (`"stream": true` gets `501`), and `max_tokens` is capped at 4,096. The response is a standard chat completion with `usage` token counts.
 
 <Modal trigger="How gateway calls use credits" title="Credits">
 
@@ -316,7 +323,7 @@ Validation errors (`400`) name each field instead: `{"endpoint": ["Enter a valid
 
 | Status | Means |
 |---|---|
-| `400` | The body failed validation, or a gateway request had invalid JSON or `max_tokens` |
+| `400` | The body failed validation, or a gateway request had invalid JSON, an unknown `model` (`UNKNOWN_MODEL`) or an invalid `max_tokens` |
 | `401` | Missing or invalid key, or an API key on a dashboard-only endpoint |
 | `402` | Not enough credits for a gateway call (`INSUFFICIENT_CREDITS`) |
 | `403` | `POST /run/run_tests` with an agent or attack outside your organization, or a gateway call from an account without one |

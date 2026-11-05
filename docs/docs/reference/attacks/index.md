@@ -61,7 +61,7 @@ Every technique HackAgent can run.
 
 **Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 **Multi-turn.** Holds one growing conversation with the target, escalating turn by turn.
 
@@ -80,10 +80,12 @@ Every technique HackAgent can run.
 | [PAIR](pair.md) | Adaptive | `attacker` | Prompt Automatic Iterative Refinement with attacker/scorer loops. |
 | [PAP](pap.md) | Adaptive | `attacker` | Persuasive Adversarial Prompts using persuasion-technique taxonomies. |
 | [RAG poisoning](rag.md) | Static | `attacker`, `embedder` | Indirect prompt injection via poisoned documents in a retrieval-augmented (RAG) corpus. |
+| [STAC](stac.md) | Multi-turn | none | Sequential tool attack chaining in a persistent conversation, verified by ordered tool execution and final sandbox state. |
 | [Static Template](static_template.md) | Static | none | Template-based static template jailbreak attack. |
 | [TAP](tap.md) | Adaptive | `attacker` | Tree of Attacks with Pruning search attack. |
 | [tFC-Attack](tfc.md) | Static | none | tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII). |
 | [Tool-output IPI](tool_output_ipi.md) | Adaptive | none | Indirect prompt injection via poisoned tool observations (InjecAgent / OPI). |
+| [ToolHijacker](toolhijacker.md) | Adaptive | none | Poison a tool registry description to steer retrieval and tool selection across task paraphrases. |
 
 :::tip[Where these come from]
 

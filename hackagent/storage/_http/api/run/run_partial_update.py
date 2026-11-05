@@ -8,13 +8,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...types import UNSET, Response, Unset
-from ..models import PatchedRunRequest, Run
+from ..models import PatchedRunUpdateRequest, Run
 
 
 def _get_kwargs(
     id: UUID,
     *,
-    body: PatchedRunRequest | Unset = UNSET,
+    body: PatchedRunUpdateRequest | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -63,21 +63,16 @@ def sync_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedRunRequest | Unset = UNSET,
+    body: PatchedRunUpdateRequest | Unset = UNSET,
 ) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Update ``run_notes``, or merge keys into ``run_config``. Every other
+    field is read-only here.
 
     Args:
         id (UUID):
-        body (PatchedRunRequest | Unset): Serializer for the Run model, used for both input and
-            output.
+        body (PatchedRunUpdateRequest | Unset): What PATCH /run/{id} may change. ``run_config`` is
+            merged into the
+            stored one, key by key (shallow).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -103,21 +98,16 @@ def sync(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedRunRequest | Unset = UNSET,
+    body: PatchedRunUpdateRequest | Unset = UNSET,
 ) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Update ``run_notes``, or merge keys into ``run_config``. Every other
+    field is read-only here.
 
     Args:
         id (UUID):
-        body (PatchedRunRequest | Unset): Serializer for the Run model, used for both input and
-            output.
+        body (PatchedRunUpdateRequest | Unset): What PATCH /run/{id} may change. ``run_config`` is
+            merged into the
+            stored one, key by key (shallow).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,21 +128,16 @@ async def asyncio_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedRunRequest | Unset = UNSET,
+    body: PatchedRunUpdateRequest | Unset = UNSET,
 ) -> Response[Run]:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Update ``run_notes``, or merge keys into ``run_config``. Every other
+    field is read-only here.
 
     Args:
         id (UUID):
-        body (PatchedRunRequest | Unset): Serializer for the Run model, used for both input and
-            output.
+        body (PatchedRunUpdateRequest | Unset): What PATCH /run/{id} may change. ``run_config`` is
+            merged into the
+            stored one, key by key (shallow).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -176,21 +161,16 @@ async def asyncio(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedRunRequest | Unset = UNSET,
+    body: PatchedRunUpdateRequest | Unset = UNSET,
 ) -> Run | None:
-    """ViewSet for managing Run instances.
-    Primarily for listing/retrieving runs.
-    Creation of server-side runs is handled by custom actions.
-    Runs initiated from Attack definitions are created via AttackViewSet.
-
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-    This is a core SDK operation for executing and monitoring security tests.
+    """Update ``run_notes``, or merge keys into ``run_config``. Every other
+    field is read-only here.
 
     Args:
         id (UUID):
-        body (PatchedRunRequest | Unset): Serializer for the Run model, used for both input and
-            output.
+        body (PatchedRunUpdateRequest | Unset): What PATCH /run/{id} may change. ``run_config`` is
+            merged into the
+            stored one, key by key (shallow).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

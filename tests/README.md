@@ -1,0 +1,106 @@
+# Testing Hackagent
+
+The default suite runs offline component tests, deterministic integrations, and
+end-to-end tests. Real model/backend checks require an explicit opt-in. A test's
+`integration` marker describes its scope; it does not imply a service dependency.
+Service markers (`google_adk`, `ollama`, `openai_sdk`, `litellm`) are gated centrally
+in `tests/conftest.py`. `live` tests require `--run-live`, registered at the root so
+it is available with explicit test paths too.
+
+## Required pull request checks
+
+```sh
+uv run pytest tests/unit
+uv run pytest tests/integration/offline tests/integration/tui --fail-on-skip
+uv run pytest tests/e2e --fail-on-skip
+```
+
+The deterministic lanes run on every PR. `--fail-on-skip` makes a missing
+prerequisite a failure rather than a green job with skipped cases. Ordinary pytest
+already fails when no cases are collected. JUnit artifacts record individual
+outcomes. A deferred TUI snapshot remains an expected failure in the unit suite.
+
+The local completion fixture in `tests/support/campaigns.py` replaces only the
+external provider. The real model factory, HTTP clients, retries, campaign runner,
+judges, trackers, SQLite and output serializers execute. It records requests and
+rejects unexpected paths/models. CLI tests launch fresh processes from a temporary
+working directory with isolated configuration, credentials and storage. They
+assert exact exchanges, final state, trace persistence and JSON/JSONL agreement.
+
+Do not mock the runner or Store to write an integration test. Component tests may
+continue to use small fakes. For successful transport tests require no response
+error and a nonempty reply; intentional failures belong in separate cases. Do not
+catch broad exceptions around assertions or fetch Hub datasets from unit tests.
+
+Markup tests invoke production formatters and mount ResultsTab over a real SQLite
+store. Verify literal content, not just absence of rendering exceptions.
+
+## Real service checks
+
+```sh
+uv run pytest tests/integration/models --run-google-adk --fail-on-skip
+uv run pytest tests/live --run-live
+```
+
+The ADK fixture launches a real ADK API server with test-owned agents. Its text
+agent uses Ollama at temperature zero with a token cap; its tool agent scripts
+model decisions while the ADK runner executes real functions and returns the
+function-call/result events. This keeps tool protocol checks independent of a
+small model's tool-selection quality. Provision Ollama's model before invoking
+a required lane. All successful responses must remain error-free and nonempty.
+
+ADK logs are saved to `reports/adk-server-<worker>.log`, appended to failing test
+reports, and uploaded with JUnit results even when the CI lane fails. Missing
+services fail the required lane through `--fail-on-skip`. Hosted auth is a live backend smoke
+check requiring `HACKAGENT_API_KEY` and `HACKAGENT_API_BASE_URL`; it is not a
+campaign e2e test. Do not point tests at production data or accounts.
+
+`--run-integration` remains a compatibility alias enabling service integration
+checks. Use a specific provider flag for focused local runs. The existing live
+suite remains optional; this change does not create new scheduled jobs.
+
+## Campaign boundary coverage
+
+`tests/integration/offline/test_campaign_boundaries.py` covers failed and successful
+preflight, before/after guardrails, unavailable classifiers, shared HTTP concurrency
+limits across parallel attacks, cancellation and late replies, per-attack timeout
+with both error policies, listener cancellation/failure, escalation completion, and
+required-judge abstention. Gates synchronize in-flight replies; SQLite assertions
+check both terminal state and retained work after the requests finish.
+
+`test_attack_exchanges.py` exercises PAIR refinement and optional scorer feedback,
+panel review without duplicate judging, provider/scorer failures, and STAC tool
+continuations and duplicate call IDs. Structured tool calls travel through the
+real transport and require the project's declared MCP test dependency. Verify
+both persistent traces and output files, not only in-memory findings.
+
+CLI e2e checks cover failed preflight and retention switches in addition to the
+successful campaign and dry run. Retention is checked in JSON, trace output,
+record metadata, and the SQLite request column.
+
+Coverage collection now records branches by default. The existing TUI exclusion
+remains explicit in `pyproject.toml`; coverage percentages still describe that
+configured scope, not the entire product. Child CLI coverage also requires
+separate setup even though the CLI's behavior is exercised.
+
+## Next implementation slices
+
+1. Extend the HTTP harness to stateful ADK and remote API protocol fixtures,
+   validating the latter against the API schema and an isolated API deployment.
+2. Extend the covered PAIR/STAC journeys to the remaining attack families and
+   broader provider contracts, including contextual RAG and multimodal fixtures.
+3. Cover claims, heartbeat, credit exhaustion and write/flush failures through real
+   remote transport. Keep remote schema and fixture compatibility visible in CI.
+4. Maintain the compiled-dashboard Playwright smoke with expected record contents,
+   navigation and browser/server diagnostics. Its seed contract has a regression
+   test; the browser itself is not provisioned by these new deterministic lanes.
+5. Add clean wheel/extras installation and release-binary execution outside the
+   checkout, followed by registry-driven attack/judge contracts and focused live
+   compatibility checks.
+6. Establish branch/patch baselines including the TUI and separating generated
+   clients. Configure subprocess coverage before using CLI coverage percentages
+   as a release gate; ordinary pytest coverage does not measure child CLI code.
+
+Favor one contract scenario per registry entry plus representative cross-component
+journeys over an attack × provider × judge Cartesian product. Keep model quality
+benchmarks separate from deterministic application regression checks.

@@ -11,7 +11,6 @@ attack roles, and the judges. :class:`ModelConnection` and
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, Mapping, Optional
 
 from pydantic import (
@@ -24,6 +23,7 @@ from pydantic import (
 )
 
 from hackagent.core.contracts import AgentType
+from hackagent.core.credentials import ApiKey, resolve_api_key
 
 __all__ = [
     "ConnectionSpec",
@@ -68,18 +68,19 @@ class ConnectionSpec(BaseModel):
             "not called over HTTP."
         ),
     )
-    api_key_env: Optional[str] = Field(
+    api_key: Optional[ApiKey] = Field(
         default=None,
+        repr=False,
         description=(
-            "Name of the environment variable that holds the API key, e.g. "
-            "``OPENAI_API_KEY``. The key itself never goes in the campaign file."
+            "API key injected at runtime. In files use an explicit environment "
+            "reference such as ``${HACKAGENT_API_KEY}``; never store the secret."
         ),
     )
     headers: Mapping[str, str] = Field(
         default_factory=dict,
         description=(
             "Extra HTTP headers sent with every request. An API key belongs in "
-            "``api_key_env``, not here: a campaign file is committed and shared."
+            "``api_key``, not here: a campaign file is committed and shared."
         ),
     )
     timeout: PositiveFloat = Field(
@@ -225,40 +226,22 @@ class ModelConnection(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     api_base: Optional[str] = None
-    api_key: Optional[SecretStr] = None
-    api_key_env: Optional[str] = None
+    api_key: Optional[SecretStr] = Field(default=None, exclude=True, repr=False)
     timeout: Optional[PositiveFloat] = 120.0
     extra_headers: Mapping[str, str] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def validate_api_key_source(self) -> "ModelConnection":
-        """Require an unambiguous API-key source."""
-        if self.api_key is not None and self.api_key_env is not None:
-            raise ValueError("Set either api_key or api_key_env, not both.")
-        if self.api_key is not None and not self.api_key.get_secret_value().strip():
-            raise ValueError("api_key cannot be empty.")
-        if self.api_key_env is not None and not self.api_key_env.strip():
-            raise ValueError("api_key_env cannot be empty.")
-        return self
 
     def to_litellm(self) -> Dict[str, Any]:
         """Resolve secrets and return LiteLLM connection arguments."""
         kwargs = self.model_dump(
-            exclude={"api_key", "api_key_env", "extra_headers"},
+            exclude={"api_key", "extra_headers"},
             exclude_none=True,
         )
-        if self.api_key is not None:
-            kwargs["api_key"] = self.api_key.get_secret_value()
-        elif self.api_key_env:
-            try:
-                api_key = os.environ[self.api_key_env]
-            except KeyError as exc:
-                raise ValueError(
-                    f"Environment variable '{self.api_key_env}' is not set."
-                ) from exc
-            if not api_key.strip():
-                raise ValueError(f"Environment variable '{self.api_key_env}' is empty.")
-            kwargs["api_key"] = api_key
+        api_key = resolve_api_key(
+            None if self.api_key is None else self.api_key.get_secret_value(),
+            purpose="Model API key",
+        )
+        # Explicitly prevent LiteLLM from selecting an ambient provider key.
+        kwargs["api_key"] = api_key if api_key is not None else "not-needed"
         if self.extra_headers:
             kwargs["extra_headers"] = dict(self.extra_headers)
         return kwargs

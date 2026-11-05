@@ -17,6 +17,7 @@ def _get_kwargs(
     start_date: datetime.date,
     tz: str | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["by_key"] = by_key
@@ -75,8 +76,9 @@ def sync_detailed(
 ) -> Response[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         by_key (bool | Unset):
@@ -116,8 +118,9 @@ def sync(
 ) -> APITokenLog | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         by_key (bool | Unset):
@@ -152,8 +155,9 @@ async def asyncio_detailed(
 ) -> Response[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         by_key (bool | Unset):
@@ -191,8 +195,9 @@ async def asyncio(
 ) -> APITokenLog | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
-    Web-only endpoint - requires Auth0 authentication.
+    Web-only endpoint - requires login token (Auth0 or Keycloak) authentication.
     Usage logs are intended for web dashboard monitoring.
+    API keys cannot access logs (security: prevent information disclosure).
 
     Args:
         by_key (bool | Unset):

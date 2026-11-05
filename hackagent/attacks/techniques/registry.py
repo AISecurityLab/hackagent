@@ -31,8 +31,10 @@ _ATTACKS: dict[str, str] = {
     "pair": "adaptive.pair:PAIRAttack",
     "tap": "adaptive.tap:TAPAttack",
     "crescendo": "multi_turn.crescendo:CrescendoAttack",
+    "stac": "multi_turn.stac:STACAttack",
     "advprefix": "adaptive.advprefix:AdvPrefixAttack",
     "tool_output_ipi": "indirect.tool_output_ipi:ToolOutputIPIAttack",
+    "toolhijacker": "indirect.toolhijacker:ToolHijackerAttack",
     "rag": "indirect.rag:RagAttack",
     "autodan_turbo": "adaptive.autodan_turbo:AutoDANTurboAttack",
 }

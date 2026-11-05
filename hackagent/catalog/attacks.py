@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Static catalog of attack strategies exposed by ``hackagent eval``.
+"""Static catalog of attack strategies available to ``hackagent campaign run``.
 
 Labels and descriptions live here. Primary category and tags come from
 :mod:`hackagent.catalog.taxonomy` so CLI listing/help cannot drift from the
@@ -32,6 +32,11 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "Crescendo",
         "description": "Multi-turn escalation attack that gradually steers a persistent "
         "conversation toward the goal, with judge-driven backtracking on refusals.",
+    },
+    "stac": {
+        "label": "STAC",
+        "description": "Sequential tool attack chaining in a persistent conversation, "
+        "verified by ordered tool execution and final sandbox state.",
     },
     "flipattack": {
         "label": "FlipAttack",
@@ -81,5 +86,9 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
     "tool_output_ipi": {
         "label": "Tool-output IPI",
         "description": "Indirect prompt injection via poisoned tool observations (InjecAgent / OPI).",
+    },
+    "toolhijacker": {
+        "label": "ToolHijacker",
+        "description": "Poison a tool registry description to steer retrieval and tool selection across task paraphrases.",
     },
 }

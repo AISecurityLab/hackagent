@@ -316,7 +316,7 @@
           "description": "Base URL of the model's API. Leave it unset for an ``OLLAMA`` model and HackAgent reads ``OLLAMA_HOST``, falling back to ``http://localhost:11434`` \u2014 so a campaign runs against whichever Ollama the machine has without being edited. Writing the URL here pins it, which is what you want for a server at a fixed address. Local agents such as ``CLAUDE_CODE`` need none: they are launched, not called over HTTP.",
           "title": "Endpoint"
         },
-        "api_key_env": {
+        "api_key": {
           "anyOf": [
             {
               "type": "string"
@@ -326,14 +326,14 @@
             }
           ],
           "default": null,
-          "description": "Name of the environment variable that holds the API key, e.g. ``OPENAI_API_KEY``. The key itself never goes in the campaign file.",
-          "title": "Api Key Env"
+          "description": "API key injected at runtime. In files use an explicit environment reference such as ``${HACKAGENT_API_KEY}``; never store the secret.",
+          "title": "Api Key"
         },
         "headers": {
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Extra HTTP headers sent with every request. An API key belongs in ``api_key_env``, not here: a campaign file is committed and shared.",
+          "description": "Extra HTTP headers sent with every request. An API key belongs in ``api_key``, not here: a campaign file is committed and shared.",
           "title": "Headers",
           "type": "object"
         },
@@ -1124,7 +1124,7 @@
       "properties": {
         "backend": {
           "default": "local",
-          "description": "``local`` writes to a SQLite file on this machine; ``remote`` sends results to the HackAgent server named below, authenticated with the key in the environment variable that ``api_key_env`` names.",
+          "description": "``local`` writes to a SQLite file on this machine; ``remote`` sends results to the HackAgent server. The backend is always chosen here, never inferred from which API keys happen to be set, and ``remote`` fails before the run starts if its key is missing.",
           "enum": [
             "local",
             "remote"
@@ -1142,10 +1142,10 @@
             }
           ],
           "default": null,
-          "description": "Address of the remote server. Required when ``backend`` is ``remote``.",
+          "description": "Address of the remote server. Defaults to ``HACKAGENT_BASE_URL`` or the hosted service.",
           "title": "Base Url"
         },
-        "api_key_env": {
+        "api_key": {
           "anyOf": [
             {
               "type": "string"
@@ -1155,8 +1155,8 @@
             }
           ],
           "default": null,
-          "description": "Name of the environment variable holding the remote server's API key. Required when ``backend`` is ``remote``.",
-          "title": "Api Key Env"
+          "description": "Runtime API key, defaulting to HACKAGENT_API_KEY. In a file use an explicit reference such as ${HACKAGENT_API_KEY}.",
+          "title": "Api Key"
         }
       },
       "title": "StorageSpec",

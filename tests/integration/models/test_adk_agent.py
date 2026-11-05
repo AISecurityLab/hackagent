@@ -139,13 +139,8 @@ class TestGoogleADKBackendIntegration:
         response = model.complete(_user("What is 2 + 2? Answer briefly."))
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(
-                f"ADK returned error (may be LLM timeout): {response.error.message}"
-            )
-        else:
-            assert response.text is not None
-            logger.info(f"ADK response: {response.text[:100]}")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
 
     def test_complete_with_messages(
         self,
@@ -160,13 +155,8 @@ class TestGoogleADKBackendIntegration:
         response = model.complete([{"role": "user", "content": "Hello! Say hi."}])
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(
-                f"ADK returned error (may be LLM timeout): {response.error.message}"
-            )
-        else:
-            assert response.text is not None
-            logger.info(f"ADK chat response: {response.text[:100]}")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
 
     @pytest.mark.timeout(240)
     def test_multi_turn_conversation(
@@ -181,18 +171,14 @@ class TestGoogleADKBackendIntegration:
 
         response1 = model.complete(_user("Say hello."))
         assert response1 is not None
-        if response1.error is not None:
-            logger.warning(f"ADK turn 1 error: {response1.error.message}")
-        else:
-            logger.info(f"ADK turn 1 response: {(response1.text or '')[:50]}")
+        assert response1.error is None, response1.error
+        assert response1.text and response1.text.strip()
 
         # Second message in same session should have context.
         response2 = model.complete(_user("Say goodbye."))
         assert response2 is not None
-        if response2.error is not None:
-            logger.warning(f"ADK turn 2 error: {response2.error.message}")
-        else:
-            logger.info(f"ADK turn 2 response: {(response2.text or '')[:50]}")
+        assert response2.error is None, response2.error
+        assert response2.text and response2.text.strip()
 
     def test_session_reuse(
         self,
@@ -211,6 +197,8 @@ class TestGoogleADKBackendIntegration:
         for i in range(3):
             response = model.complete(_user(f"Request {i}"))
             assert response is not None
+            assert response.error is None, response.error
+            assert response.text and response.text.strip()
 
         # Session ID should remain the same.
         assert model.session_id == session_id
@@ -365,10 +353,8 @@ class TestGoogleADKConnectIntegration:
         )
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(f"ADK error: {response.error.message}")
-        elif response.text:
-            logger.info(f"ADK response: {response.text[:50]}")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
 
 
 @pytest.mark.integration
@@ -379,41 +365,66 @@ class TestGoogleADKToolUsage:
     def test_adk_agent_with_tool_calls(
         self,
         skip_if_google_adk_unavailable,
-        google_adk_config: Dict[str, Any],
+        google_adk_tool_config: Dict[str, Any],
     ):
         """Test ADK agent that can use tools (e.g., weather lookup)."""
         from hackagent.models.completions.adk import ADKModel
 
-        model = ADKModel(_adk_spec(google_adk_config))
+        model = ADKModel(_adk_spec(google_adk_tool_config))
 
-        response = model.complete(_user("What is the weather in Boston?"))
+        response = model.complete(_user("What is the weather in New York?"))
 
         assert response is not None
-        assert response.text is not None
-        logger.info(f"ADK tool response: {response.text[:100]}")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
+        assert "sunny" in response.text
+        events = response.metadata["adk_events_list"]
+        parts = [p for e in events for p in (e.get("content") or {}).get("parts", [])]
+        calls = [p["functionCall"] for p in parts if "functionCall" in p]
+        returns = [p["functionResponse"] for p in parts if "functionResponse" in p]
+        assert [c["name"] for c in calls] == ["get_weather"]
+        assert calls[0]["args"] == {"city": "New York"}
+        assert returns[0]["response"]["report"] == "sunny"
 
     @pytest.mark.timeout(300)
     def test_adk_agent_complex_query(
         self,
         skip_if_google_adk_unavailable,
-        google_adk_config: Dict[str, Any],
+        google_adk_tool_config: Dict[str, Any],
     ):
         """Test ADK agent with complex multi-step query."""
         from hackagent.models.completions.adk import ADKModel
 
-        model = ADKModel(_adk_spec(google_adk_config))
+        model = ADKModel(_adk_spec(google_adk_tool_config))
 
         response = model.complete(
             _user(
-                "First tell me the weather in New York, then tell me about "
-                "activities suitable for that weather."
+                "First tell me the weather in New York, then tell me the "
+                "current time in New York."
             )
         )
 
         assert response is not None
-        if response.error is not None:
-            logger.warning(f"ADK complex query error: {response.error.message}")
-        elif response.text:
-            logger.info(f"ADK complex response: {response.text[:100]}")
-        else:
-            logger.warning("ADK complex query returned empty response")
+        assert response.error is None, response.error
+        assert response.text and response.text.strip()
+
+        assert "sunny" in response.text and "12:00" in response.text
+        parts = [
+            p
+            for e in response.metadata["adk_events_list"]
+            for p in (e.get("content") or {}).get("parts", [])
+        ]
+        # The agent asks for the time only once it has the weather result.
+        steps = [
+            ("call", p["functionCall"]["name"])
+            if "functionCall" in p
+            else ("result", p["functionResponse"]["name"])
+            for p in parts
+            if "functionCall" in p or "functionResponse" in p
+        ]
+        assert steps == [
+            ("call", "get_weather"),
+            ("result", "get_weather"),
+            ("call", "get_current_time"),
+            ("result", "get_current_time"),
+        ]

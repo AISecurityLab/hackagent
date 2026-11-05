@@ -36,7 +36,7 @@ def _isolated_results_tab() -> ResultsTab:
     store = LocalBackend(db_path=db_path)
     session = HackAgent(
         Settings.resolve(
-            api_key="", db_path=db_path, env={}, config_path="/nonexistent"
+            backend="local", db_path=db_path, env={}, config_path="/nonexistent"
         ),
         backend=store,
     )

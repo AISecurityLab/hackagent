@@ -95,9 +95,8 @@ def test_every_openai_spelling_selects_the_openai_transport(agent_type):
     ("configured", "expected"),
     [
         ("explicit-key", "explicit-key"),
-        ("EMBEDDING_KEY", "environment-key"),
+        ("EMBEDDING_KEY", "EMBEDDING_KEY"),
         ("${EMBEDDING_KEY}", "environment-key"),
-        (None, "openai-key"),
     ],
 )
 def test_openai_keys(configured, expected):
@@ -120,9 +119,9 @@ def test_openai_keys(configured, expected):
 
 def test_no_storage_key_fallback_and_unset_env_reference():
     with patch.dict("os.environ", {"HACKAGENT_API_KEY": "storage-token"}, clear=True):
-        kwargs = embedding_request_kwargs({"identifier": "text-embedding-3-small"})
-        assert "api_key" not in kwargs
-        with pytest.raises(ValueError, match="is unset"):
+        with pytest.raises(ValueError, match="required"):
+            embedding_request_kwargs({"identifier": "text-embedding-3-small"})
+        with pytest.raises(ValueError, match="missing or empty"):
             embedding_request_kwargs(
                 {"identifier": "model", "api_key": "${MISSING_KEY}"}
             )
@@ -144,6 +143,7 @@ def test_litellm_provider_prefix_preserved():
     kwargs = embedding_request_kwargs(
         {
             "identifier": "cohere/embed-english-v3.0",
+            "api_key": "cohere-test-key",
             "agent_type": "LITELLM",
         }
     )

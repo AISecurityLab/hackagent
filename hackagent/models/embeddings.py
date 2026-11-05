@@ -4,12 +4,13 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any, Dict, Optional
 from urllib.parse import urlsplit
 
+from hackagent.core.credentials import resolve_api_key
 from hackagent.core.contracts import AgentType
 from hackagent.core.settings import resolve_ollama_base_url
+from hackagent.models.completions.litellm import uses_alternative_auth
 
 if TYPE_CHECKING:
     import numpy as np
@@ -93,26 +94,22 @@ def embedding_request_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:
     else:
         raise ValueError(f"Unsupported embedding agent_type: {agent_type}")
 
-    raw_key = config.get("api_key")
-    if raw_key:
-        key = str(raw_key)
-        if key.startswith("${") and key.endswith("}"):
-            env_name = key[2:-1]
-            key = os.environ.get(env_name, "")
-            if not key:
-                raise ValueError(
-                    f"Embedding API key environment variable {env_name} is unset"
-                )
-        else:
-            key = os.environ.get(key) or key
+    key = resolve_api_key(
+        config.get("api_key"),
+        purpose="Embedding API key",
+    )
+    if key is not None:
         kwargs["api_key"] = key
     elif ollama:
-        # Ollama's compatible API needs a client key, but has no default auth.
         kwargs["api_key"] = "ollama"
-    elif agent_type == "OPENAI" and os.environ.get("OPENAI_API_KEY"):
-        kwargs["api_key"] = os.environ["OPENAI_API_KEY"]
-    if config.get("timeout") is not None:
-        kwargs["timeout"] = config["timeout"]
+    elif agent_type == "OPENAI" and endpoint:
+        kwargs["api_key"] = "not-needed"
+    elif not uses_alternative_auth(model):
+        resolve_api_key(required=True, purpose="Embedding API key")
+
+    timeout = config.get("timeout", config.get("request_timeout"))
+    if timeout is not None:
+        kwargs["timeout"] = float(timeout)
     return kwargs
 
 

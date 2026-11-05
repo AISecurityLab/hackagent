@@ -176,18 +176,14 @@ class TAPAttack(IterativeAttack[TapParams]):
             for branch, on_topic in zip(branches, answers)
             if on_topic is not False
         ]
-        # The reference caps this prune at the beam width too, so a wide
-        # fan-out costs at most ``width`` target calls per round rather
-        # than one per surviving branch.
-        survivors = kept[: self.params.width]
-        if len(survivors) < len(branches):
+        if len(kept) < len(branches):
             decision(
                 "pruned",
-                "off the goal, then down to the beam",
-                dropped=len(branches) - len(survivors),
-                kept=len(survivors),
+                "off the goal",
+                dropped=len(branches) - len(kept),
+                kept=len(kept),
             )
-        return survivors
+        return kept
 
     async def _ask_on_topic(self, goal: str, prompt: str) -> Optional[bool]:
         assert self.on_topic is not None

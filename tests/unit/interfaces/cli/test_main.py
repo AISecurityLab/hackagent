@@ -22,7 +22,7 @@ class TestMainCLI:
             "Common Usage:",
             "hackagent init",
             "hackagent agent list",
-            "hackagent attack advprefix",
+            "hackagent campaign run",
             "Environment Variables:",
             "HACKAGENT_API_KEY",
         ]

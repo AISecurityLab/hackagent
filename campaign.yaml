@@ -65,8 +65,8 @@ target:
     provider: vllm
     type: OPENAI
     endpoint: http://127.0.0.1:8000/v1
-    api_key_env: null         # name of the env var holding the API key
-    headers: {}               # extra HTTP headers; keep keys out, use api_key_env
+    api_key: null             # use a ${VARIABLE} reference when the model needs a key
+    headers: {}               # extra HTTP headers; keep keys out, use api_key
     timeout: 300
   generation:
     max_tokens: 512
@@ -370,8 +370,9 @@ execution:
     save_traces: true
   storage:
     # Results are recorded on this machine unless the campaign names a server.
-    # Choose remote and fill both fields below to send them to one; the key
-    # itself stays in the environment variable api_key_env names.
+    # backend: remote records results in the configured API.
+    # Omitted base_url and api_key use HACKAGENT_BASE_URL and HACKAGENT_API_KEY;
+    # the API URL defaults to https://api.hackagent.dev.
     backend: local          # local | remote
-    base_url: null          # required for remote
-    api_key_env: null       # required for remote; env-var name, not the key
+    base_url: null          # API location, default https://api.hackagent.dev
+    api_key: null           # reads HACKAGENT_API_KEY for remote storage

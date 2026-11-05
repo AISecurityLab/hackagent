@@ -34,6 +34,17 @@ KNOWN_LITELLM_PROVIDER_PREFIXES = (
 )
 
 
+def uses_alternative_auth(model: str) -> bool:
+    """Providers that use local access or cloud identity instead of an API key."""
+    return model.split("/", 1)[0] in {
+        "ollama",
+        "ollama_chat",
+        "bedrock",
+        "bedrock_converse",
+        "vertex_ai",
+    }
+
+
 def resolve_litellm_model(
     raw_model: str, *, provider_prefix: Optional[str] = None
 ) -> str:
@@ -99,6 +110,8 @@ class LiteLLMModel(Model):
                 f"Cannot override model connection fields: {sorted(invalid)}"
             )
         kwargs = self.connection.to_litellm()
+        if self.connection.api_key is None and uses_alternative_auth(self.model):
+            kwargs.pop("api_key", None)
         kwargs.update(self.generation.to_kwargs())
         kwargs.update(overrides)
         kwargs["model"] = self.model

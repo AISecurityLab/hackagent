@@ -14,6 +14,7 @@ before a run starts; ``schema`` prints the campaign format as JSON Schema. Both 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -31,6 +32,26 @@ def campaign() -> None:
     """🎯 Run declarative campaign files (campaign.yaml)."""
 
 
+@campaign.command("list")
+def list_attacks() -> None:
+    """List available attack techniques, their category and tags."""
+    from hackagent.client import catalog_entries
+
+    table = Table(title="Campaign attacks")
+    table.add_column("Name", no_wrap=True)
+    table.add_column("Category")
+    table.add_column("Tags")
+    table.add_column("Description")
+    for entry in catalog_entries():
+        table.add_row(
+            entry["attack_type"],
+            entry["category"],
+            ", ".join(entry["tags"]),
+            entry["description"],
+        )
+    console.print(table)
+
+
 def _runtime_settings():
     """Return settings resolved by the root CLI, when invoked through it.
 
@@ -43,6 +64,22 @@ def _runtime_settings():
     root = ctx.find_root()
     config = (root.obj or {}).get("config") if isinstance(root.obj, dict) else None
     return getattr(config, "settings", None)
+
+
+def event_printer(as_json: bool):
+    """The run-progress callback shared by ``campaign run`` and ``run``."""
+
+    def on_event(event: str, **payload: Any) -> None:
+        if as_json:
+            click.echo(json.dumps({"event": event, **payload}))
+        elif event == "attack_started":
+            console.print(f"[cyan]▶ {payload.get('attack')}[/cyan] started")
+        elif event == "attack_finished":
+            error = payload.get("error")
+            mark = "[red]✗[/red]" if error else "[green]✓[/green]"
+            console.print(f"{mark} {payload.get('attack')} finished")
+
+    return on_event
 
 
 def _endpoint_options(func):
@@ -153,13 +190,18 @@ def run(
         setup_package_logging,
         suppress_noisy_libraries,
     )
+    from hackagent.core.settings import Settings
     from hackagent.orchestrator.campaign import (
+        GATEWAY_KEY_ENV,
         EndpointOverrides,
         ServerReadiness,
+        bind_gateway,
         run_campaign,
         summary,
         wait_for_servers,
     )
+    from hackagent.orchestrator.campaign.gateway import uses_gateway
+    from hackagent.orchestrator.execution import execute_spec
 
     overrides = EndpointOverrides(
         ollama=ollama_endpoint,
@@ -174,6 +216,31 @@ def run(
         concurrency=concurrency,
         output_directory=output_directory,
     )
+
+    settings = _runtime_settings() or Settings.resolve()
+    storage = spec.execution.storage
+    # Remote storage names its server and key: the run is tracked there, and
+    # execute_spec binds the gateway to it for execution only, so the
+    # campaign is recorded with its gateway markers. A dry run never
+    # touches remote storage.
+    tracked = storage.backend == "remote" and not spec.execution.dry_run
+    if not tracked:
+        if storage.backend == "remote":
+            gateway_url = storage.base_url or settings.base_url
+            # Nothing is sent in a dry run; any key lets the models build.
+            gateway_key = storage.api_key or settings.api_key
+        else:
+            gateway_url, gateway_key = settings.base_url, settings.api_key
+        spec = bind_gateway(spec, gateway_url)
+        if uses_gateway(spec) and not gateway_key:
+            raise click.ClickException(
+                "This campaign uses the HackAgent gateway; set an API key with: "
+                "hackagent config set --api-key"
+            )
+        if gateway_key:
+            # The selected key, never one already in the environment: the
+            # gateway models were just bound to the selected server.
+            os.environ[GATEWAY_KEY_ENV] = gateway_key
 
     setup_package_logging(default_level_str="INFO")
     suppress_noisy_libraries("httpx", "httpcore", "LiteLLM")
@@ -194,28 +261,25 @@ def run(
         except (ValueError, RuntimeError) as exc:
             raise click.ClickException(str(exc)) from exc
 
-    def on_event(event: str, **payload: Any) -> None:
-        if as_json:
-            click.echo(json.dumps({"event": event, **payload}))
-        elif event == "attack_started":
-            console.print(f"[cyan]▶ {payload.get('attack')}[/cyan] started")
-        elif event == "attack_finished":
-            error = payload.get("error")
-            mark = "[red]✗[/red]" if error else "[green]✓[/green]"
-            console.print(f"{mark} {payload.get('attack')} finished")
+    on_event = event_printer(as_json)
 
-    result = run_campaign(
-        spec,
-        on_event=on_event,
-        settings=_runtime_settings(),
-    )
+    if tracked:
+        outcome = execute_spec(spec, on_event=on_event, settings=settings)
+        if outcome.result is None:
+            display_error(outcome.note or f"Campaign {outcome.status.lower()}.")
+            raise SystemExit(1)
+        result = outcome.result
+        completed = outcome.status == "COMPLETED"
+    else:
+        result = run_campaign(spec, on_event=on_event, settings=settings)
+        completed = True
     report = summary(result)
     report["output_directory"] = spec.execution.output.directory
     if as_json:
         click.echo(json.dumps(report))
     else:
         _render_summary(report)
-    raise SystemExit(0 if report["succeeded"] else 1)
+    raise SystemExit(0 if report["succeeded"] and completed else 1)
 
 
 @campaign.command()
@@ -231,7 +295,7 @@ def validate(file: str) -> None:
 
     try:
         spec = load_campaign(Path(file))
-        resolved = resolve_campaign(spec)
+        resolved = resolve_campaign(spec, settings=_runtime_settings())
     except Exception as exc:
         display_error(f"Invalid campaign: {exc}")
         raise SystemExit(1) from exc

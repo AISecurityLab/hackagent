@@ -13,6 +13,7 @@ from ...types import Response
 def _get_kwargs(
     id: UUID,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "delete",
         "url": "/user/{id}".format(
@@ -54,8 +55,8 @@ def sync_detailed(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
-    Web-only endpoint - requires Auth0 authentication.
-    User profile management requires OAuth context and is not for SDK use.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):
@@ -87,8 +88,8 @@ async def asyncio_detailed(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
-    Web-only endpoint - requires Auth0 authentication.
-    User profile management requires OAuth context and is not for SDK use.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):

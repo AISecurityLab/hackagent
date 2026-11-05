@@ -8,7 +8,7 @@ sidebar_position: 12
 
 Persuasive Adversarial Prompts using persuasion-technique taxonomies.
 
-**Adaptive.** Searches: it reads the target's replies and refines its prompts, which is why it needs an attacker model.
+**Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
 A sweep over persuasion techniques, one request each.
 

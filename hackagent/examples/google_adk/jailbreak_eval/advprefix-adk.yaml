@@ -54,6 +54,6 @@ evaluation:
         provider: hackagent
         type: OPENAI
         endpoint: https://api.hackagent.dev/v1
-        api_key_env: HACKAGENT_API_KEY
+        api_key: "${HACKAGENT_API_KEY}"
       scoring:
         type: harmbench

@@ -11,44 +11,52 @@ exchange), and the final run status.
 
 from __future__ import annotations
 
-import os
 from dataclasses import asdict
 from typing import Any, Mapping, Optional
 from uuid import UUID
 
 from hackagent.core.contracts import EvalStatus, RunStatus
-from hackagent.core.settings import Settings
+from hackagent.core.credentials import resolve_api_key
+from hackagent.core.settings import (
+    Settings,
+    resolve_remote_base_url,
+    env_ca_bundle,
+    ssl_verify,
+)
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.results import (
     Attempt,
     trace_payload,
     trace_step_type,
 )
-from hackagent.orchestrator.campaign.spec import OutputSpec, StorageSpec
+from hackagent.orchestrator.campaign.spec import (
+    OutputSpec,
+    StorageSpec,
+    recorded_model,
+)
 from hackagent.storage.store import Store
 from hackagent.tracking.evaluation import eval_columns
 from hackagent.tracking.serialize import sanitize_for_json
 
 
 def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Store:
-    """Open the store the campaign names.
-
-    A campaign says where its results go, and nothing else decides it: the
-    default is this machine's SQLite, and ``remote`` names its own server
-    and the environment variable holding that server's key. ``settings``
-    supplies the database path the CLI or TUI resolved, so a run follows
-    the configuration they were started with.
-    """
+    """Open the explicitly selected backend, independently of credentials."""
     if storage.backend == "remote":
         from hackagent.storage.remote import RemoteBackend
 
-        assert storage.base_url and storage.api_key_env  # enforced by StorageSpec
-        api_key = os.environ.get(storage.api_key_env, "").strip()
-        if not api_key:
-            raise ValueError(
-                f"Environment variable {storage.api_key_env!r} required for remote storage is not set."
-            )
-        return RemoteBackend.connect(storage.base_url, api_key)
+        api_key = resolve_api_key(
+            storage.api_key
+            if storage.api_key is not None
+            else (settings.api_key if settings else None),
+            use_default=True,
+            required=True,
+            purpose="Remote campaign storage API key",
+        )
+        base_url = storage.base_url or (
+            settings.base_url if settings is not None else resolve_remote_base_url()
+        )
+        verify = settings.verify if settings else ssl_verify(env_ca_bundle())
+        return RemoteBackend.connect(base_url, api_key, verify=verify)
 
     from hackagent.storage.local import LocalBackend
 
@@ -57,14 +65,13 @@ def open_store(storage: StorageSpec, settings: Optional[Settings] = None) -> Sto
 
 
 def register_target(store: Store, target: ModelConfig) -> UUID:
-    """Create or update the agent record that runs are attached to."""
-    agent = store.create_or_update_agent(
-        name=target.name,
-        agent_type=target.connection.type.value,
-        endpoint=target.connection.endpoint or "",
-        metadata=target.generation.model_dump(exclude_none=True),
-        overwrite_metadata=True,
-    )
+    """Create or update the agent record that runs are attached to.
+
+    The agent stores the target's whole model config, with any credential
+    written into the campaign file redacted: an API key is stored only as
+    its ``${VARIABLE}`` reference.
+    """
+    agent = store.create_or_update_agent(target.name, recorded_model(target))
     return agent.id
 
 
@@ -110,6 +117,8 @@ class RunTracker:
         identity = {
             "attack_type": self.attack_name,
             "request_index": attempt.request_index,
+            "goal": attempt.goal,
+            "goal_index": attempt.goal_index,
             **attempt.labels,
         }
         record = self.store.create_result(
@@ -149,7 +158,17 @@ class RunTracker:
         if self.output.save_responses and attempt.response is not None:
             details["response"] = attempt.response.text
             details["decoded_response"] = attempt.decoded
+            details["response_body"] = attempt.response.text
         response = attempt.response
+        latency_ms = response.latency_ms if response else None
+        status_code = (
+            response.error.status_code if response and response.error else None
+        )
+        # Older servers and the local dashboard read these from the metadata.
+        if latency_ms is not None:
+            details["latency_ms"] = latency_ms
+        if status_code is not None:
+            details["response_status_code"] = status_code
         self.store.update_result(
             record.id,
             evaluation_status=_evaluation_status(attempt),
@@ -162,10 +181,8 @@ class RunTracker:
                 if key.startswith(("eval_", "explanation_"))
             },
             agent_specific_data=sanitize_for_json(details),
-            latency_ms=response.latency_ms if response else None,
-            response_status_code=response.error.status_code
-            if response and response.error
-            else None,
+            latency_ms=latency_ms,
+            response_status_code=status_code,
         )
 
     def complete(self) -> None:

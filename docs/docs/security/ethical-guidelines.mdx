@@ -16,7 +16,7 @@ A single attack can send many requests. With its defaults, PAIR sends up to 25 p
 
 ## Handle results with care
 
-Results contain whatever the target produced, including harmful text and any data it leaked. By default they stay on your machine in `~/.local/share/hackagent/hackagent.db`; with an API key they also sync to the HackAgent platform, so for a sensitive target run without one. The attacker and judge default to a local Ollama model. If you configure hosted models instead, your goals and the target's replies go to that provider, which matters when either is confidential.
+Results contain whatever the target produced, including harmful text and any data it leaked. Campaigns store results in the local SQLite database by default. `execution.storage.backend: remote` sends them to the configured HackAgent API. Model requests go to the endpoints selected for the target, attack roles, judges and classifiers, independently of result storage. For local processing, configure local endpoints for all of those models.
 
 ## Research and publication
 

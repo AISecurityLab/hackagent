@@ -37,7 +37,14 @@ class _WebUITestCase(unittest.TestCase):
         self.backend = LocalBackend(str(root / "hackagent.db"))
         self.org_id = self.backend.get_context().org_id
         self.agent = self.backend.create_or_update_agent(
-            "demo-agent", "OPENAI_SDK", "http://localhost:1234", {"description": "d"}
+            "demo-agent",
+            {
+                "connection": {
+                    "type": "OPENAI_SDK",
+                    "endpoint": "http://localhost:1234",
+                },
+                "generation": {"description": "d"},
+            },
         )
         self.attack = self.backend.create_attack(
             "tap", self.agent.id, self.org_id, {"goals": ["g"]}
@@ -60,7 +67,7 @@ class _WebUITestCase(unittest.TestCase):
 
         session = HackAgent(
             Settings.resolve(
-                api_key="",
+                backend="local",
                 db_path=":memory:",
                 env={},
                 config_path="/nonexistent",
@@ -140,7 +147,7 @@ class TestRunEndpoints(_WebUITestCase):
         self.assertEqual(summary["not_evaluated"], 0)
         self.assertEqual(summary["attack_type"], "tap")
         self.assertEqual(summary["organization"], str(self.org_id))
-        self.assertTrue(summary["is_client_executed"])
+        self.assertEqual(summary["executor"], "cli")
 
     def test_operational_failures_count_as_errors_not_mitigated(self):
         failed = self.backend.create_result(self.run.id, "g", 2, {}, {})
@@ -200,12 +207,41 @@ class TestResultEndpoints(_WebUITestCase):
 
 class TestWriteRoutesAreRejected(_WebUITestCase):
     def test_launching_an_attack_offline_is_refused_with_guidance(self):
-        response = self.client.post("/api/proxy/run/run_tests", json={})
+        response = self.client.post("/api/proxy/run", json={})
         self.assertEqual(response.status_code, 501)
         self.assertIn("read-only", response.get_json()["detail"])
 
+    def test_launch_routes_return_offline_message(self):
+        expected = (
+            "Launching needs a HackAgent account. Use `hackagent campaign run "
+            "<file>` offline, or connect the dashboard with an API key."
+        )
+        for path in ("/api/proxy/campaign/launch", "/api/proxy/campaign/1/launch"):
+            response = self.client.post(path, json={})
+            self.assertEqual(response.status_code, 501, path)
+            self.assertEqual(response.get_json()["detail"], expected)
+
     def test_creating_an_agent_offline_is_refused(self):
         self.assertEqual(self.client.post("/api/proxy/agent", json={}).status_code, 501)
+
+
+class TestCampaignBuilderOffline(_WebUITestCase):
+    def test_campaign_list_is_empty(self):
+        payload = self.get("/api/proxy/campaign")
+        self.assertEqual(payload["count"], 0)
+        self.assertEqual(payload["results"], [])
+
+    def test_techniques_are_served(self):
+        payload = self.get("/api/proxy/campaign/techniques")
+        self.assertIsInstance(payload, list)
+        self.assertTrue(payload)
+
+    def test_schema_carries_sorted_dataset_presets(self):
+        payload = self.get("/api/proxy/campaign/schema")
+        self.assertIn("schema", payload)
+        names = [p["name"] for p in payload["dataset_presets"]]
+        self.assertTrue(names)
+        self.assertEqual(names, sorted(names))
 
 
 class TestStaticServing(_WebUITestCase):
@@ -237,7 +273,7 @@ class TestStaticServing(_WebUITestCase):
         _static.static_dir = lambda: link
         session = HackAgent(
             Settings.resolve(
-                api_key="",
+                backend="local",
                 db_path=":memory:",
                 env={},
                 config_path="/nonexistent",

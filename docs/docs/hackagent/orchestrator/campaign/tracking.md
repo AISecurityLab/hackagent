@@ -17,13 +17,7 @@ def open_store(storage: StorageSpec,
                settings: Optional[Settings] = None) -> Store
 ```
 
-Open the store the campaign names.
-
-A campaign says where its results go, and nothing else decides it: the
-default is this machine&#x27;s SQLite, and `remote` names its own server
-and the environment variable holding that server&#x27;s key. `settings`
-supplies the database path the CLI or TUI resolved, so a run follows
-the configuration they were started with.
+Open the explicitly selected backend, independently of credentials.
 
 #### register\_target
 

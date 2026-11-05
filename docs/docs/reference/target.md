@@ -35,8 +35,8 @@ authenticate.
 | `provider` | string (at least 1) | **required** | A label for who serves the model (`openai`, `ollama`, `vllm`, `local`…). Informational only: launch tooling reads it, but the request path uses `type`. |
 | `type` | [agent type](#agent-types) | **required** | Which client talks to the model. This is the field that matters: it decides whether HackAgent calls a chat API (`OPENAI`, `OLLAMA`, `LITELLM`…) or drives an agent directly (`CLAUDE_CODE`, `GOOGLE_ADK`, `WEB`…). |
 | `endpoint` | string | unset | Base URL of the model's API. Leave it unset for an `OLLAMA` model and HackAgent reads `OLLAMA_HOST`, falling back to `http://localhost:11434` — so a campaign runs against whichever Ollama the machine has without being edited. Writing the URL here pins it, which is what you want for a server at a fixed address. Local agents such as `CLAUDE_CODE` need none: they are launched, not called over HTTP. |
-| `api_key_env` | string | unset | Name of the environment variable that holds the API key, e.g. `OPENAI_API_KEY`. The key itself never goes in the campaign file. |
-| `headers` | map of string to string | empty | Extra HTTP headers sent with every request. An API key belongs in `api_key_env`, not here: a campaign file is committed and shared. |
+| `api_key` | string | unset | API key injected at runtime. In files use an explicit environment reference such as `${HACKAGENT_API_KEY}`; never store the secret. |
+| `headers` | map of string to string | empty | Extra HTTP headers sent with every request. An API key belongs in `api_key`, not here: a campaign file is committed and shared. |
 | `timeout` | number (> 0) | `120.0` | Seconds to wait for one reply before giving up. |
 
 ## `target.generation` {#generationspec}
@@ -62,7 +62,7 @@ anything left unset uses the provider's own default.
 
 `connection.type` decides how HackAgent talks to the model. It is the field that matters; `provider` is only a label.
 
-**Chat APIs**, reached over HTTP and driven through LiteLLM: `LITELLM`, `OPENAI`, `OLLAMA`, `LANGCHAIN`. These need an `endpoint`, and an `api_key_env` when the provider requires a key. `OLLAMA` is the exception: leave its `endpoint` unset and HackAgent reads `OLLAMA_HOST`, so the campaign follows whichever Ollama the machine runs.
+**Chat APIs**, reached over HTTP and driven through LiteLLM: `LITELLM`, `OPENAI`, `OLLAMA`, `LANGCHAIN`. These need an `endpoint`, and an `api_key` when the provider requires a key. `OLLAMA` is the exception: leave its `endpoint` unset and HackAgent reads `OLLAMA_HOST`, so the campaign follows whichever Ollama the machine runs.
 
 **Agents**, driven directly:
 
@@ -102,7 +102,7 @@ target:
     provider: openai
     type: OPENAI
     endpoint: https://api.openai.com/v1
-    api_key_env: OPENAI_API_KEY
+    api_key: ${OPENAI_API_KEY}
   generation:
     temperature: 0.0
     max_tokens: 512

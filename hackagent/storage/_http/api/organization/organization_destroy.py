@@ -13,6 +13,7 @@ from ...types import Response
 def _get_kwargs(
     id: UUID,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "delete",
         "url": "/organization/{id}".format(
@@ -53,8 +54,8 @@ def sync_detailed(
 ) -> Response[Any]:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):
@@ -85,8 +86,8 @@ async def asyncio_detailed(
 ) -> Response[Any]:
     """Provides access to Organization details for the authenticated user.
 
-    Web-only endpoint - requires Auth0 authentication.
-    Organization management and billing operations require browser context.
+    List/retrieve endpoints are web-only (reject API keys).
+    `/me` endpoint accepts both API keys and login token (Auth0 or Keycloak) authentication.
 
     Args:
         id (UUID):

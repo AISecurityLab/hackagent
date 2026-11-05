@@ -61,7 +61,7 @@ def sync_detailed(
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
@@ -94,7 +94,7 @@ def sync(
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
@@ -122,7 +122,7 @@ async def asyncio_detailed(
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
@@ -153,7 +153,7 @@ async def asyncio(
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:

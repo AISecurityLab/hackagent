@@ -72,7 +72,7 @@ def sync_detailed(
     agents, including associating them with the correct organization and owner.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
@@ -82,7 +82,7 @@ def sync_detailed(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes (list): API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
@@ -151,7 +151,7 @@ def sync(
     agents, including associating them with the correct organization and owner.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
@@ -161,7 +161,7 @@ def sync(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes (list): API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
@@ -225,7 +225,7 @@ async def asyncio_detailed(
     agents, including associating them with the correct organization and owner.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
@@ -235,7 +235,7 @@ async def asyncio_detailed(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes (list): API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
@@ -302,7 +302,7 @@ async def asyncio(
     agents, including associating them with the correct organization and owner.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
+    Login token (Auth0 or Keycloak) authentication is supported for web dashboard use.
 
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
@@ -312,7 +312,7 @@ async def asyncio(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
+        authentication_classes (list): API Key and login token (Auth0 or Keycloak) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
