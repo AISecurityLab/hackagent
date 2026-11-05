@@ -514,6 +514,118 @@ class TestLocalBackendResult(unittest.TestCase):
         self.assertEqual(sample["first_jailbreak_attempt"], 2)
         self.assertEqual(sample["first_jailbreak_elapsed_s"], 3)
 
+    def test_tokens_are_unknown_when_one_call_has_no_usage(self):
+        for index, usage in enumerate(
+            ({"prompt_tokens": 10, "completion_tokens": 2}, {})
+        ):
+            result = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+            self.backend.create_trace(
+                result.id,
+                0,
+                "OTHER",
+                {"node": "call", "label": "target", "data": {"usage": usage}},
+            )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertIsNone(cost["target_tokens"])
+        self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
+
+    def test_tokens_require_target_coverage_for_every_attempt(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        second = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_trace(
+            first.id,
+            0,
+            "OTHER",
+            {
+                "node": "call",
+                "label": "target",
+                "data": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}},
+            },
+        )
+        self.backend.create_trace(
+            second.id, 0, "OTHER", {"node": "call", "label": "panel"}
+        )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertIsNone(cost["target_tokens"])
+        self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
+
+    def test_legacy_and_shared_batch_usage_remain_measurable(self):
+        for shared in (False, True):
+            with self.subTest(shared=shared):
+                goal_index = int(shared)
+                first = self.backend.create_result(
+                    self.run.id, "goal", goal_index, {}, {}
+                )
+                second = self.backend.create_result(
+                    self.run.id, "goal", goal_index, {}, {}
+                )
+                for index, result in enumerate((first, second)):
+                    usage = {"prompt_tokens": 0, "completion_tokens": 0}
+                    content = (
+                        {
+                            "node": "call",
+                            "label": "target",
+                            "scope": "goal",
+                            "data": {"usage": usage},
+                        }
+                        if shared
+                        else {"response": {"usage": usage}}
+                    )
+                    self.backend.create_trace(
+                        first.id if shared else result.id,
+                        index,
+                        "OTHER" if shared else "interaction",
+                        content,
+                    )
+                cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+                sample = next(
+                    s for s in cost["goal_samples"] if s["goal_index"] == goal_index
+                )
+                self.assertEqual(sample["target_tokens"], 0)
+                self.assertEqual(cost["target_tokens"], {"prompt": 0, "completion": 0})
+
+    def test_run_tokens_are_unknown_when_another_goal_is_untraced(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "other goal", 1, {}, {})
+        self.backend.create_trace(
+            first.id,
+            0,
+            "interaction",
+            {"response": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}}},
+        )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertIsNone(cost["target_tokens"])
+
+    def test_run_tokens_sum_legacy_and_current_goals_without_double_counting(self):
+        for index in (0, 1):
+            result = self.backend.create_result(self.run.id, "goal", index, {}, {})
+            usage = {"prompt_tokens": 10, "completion_tokens": 2}
+            self.backend.create_trace(
+                result.id, 0, "interaction", {"response": {"usage": usage}}
+            )
+            if index:
+                self.backend.create_trace(
+                    result.id,
+                    1,
+                    "OTHER",
+                    {"node": "call", "label": "target", "data": {"usage": usage}},
+                )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertEqual(cost["target_tokens"], {"prompt": 20, "completion": 4})
+        self.assertEqual([s["target_tokens"] for s in cost["goal_samples"]], [12, 12])
+
+    def test_missing_completion_usage_is_not_assumed_to_be_zero(self):
+        result = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_trace(
+            result.id,
+            0,
+            "interaction",
+            {"response": {"usage": {"prompt_tokens": 10}}},
+        )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertIsNone(cost["target_tokens"])
+        self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
+
     def test_first_success_keeps_missing_timing_null_and_zero_measurable(self):
         for index, status, timing in (
             (0, "SUCCESSFUL_JAILBREAK", None),

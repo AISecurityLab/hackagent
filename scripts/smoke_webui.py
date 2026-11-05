@@ -68,8 +68,8 @@ def seed(db_path: Path) -> None:
             {"connection": {"type": "OLLAMA", "endpoint": "http://localhost:11434"}},
         )
         attack = backend.create_attack("tap", agent.id, org, {"goals": ["g0", "g1"]})
-        campaign = backend.create_campaign_run(
-            agent.id, "smoke-campaign", {"version": 1}
+        campaign = backend.start_campaign(
+            agent.id, {"version": 1, "campaign": {"name": "smoke-campaign"}}
         )
         backend.update_campaign_run(campaign.id, status="COMPLETED")
         run = backend.create_run(

@@ -727,6 +727,59 @@ def crescendo_models(refused: bool):
     )
 
 
+@pytest.mark.parametrize("fallback", [False, True])
+@pytest.mark.parametrize("save_prompts", [False, True])
+@pytest.mark.parametrize("save_responses", [False, True])
+def test_refusal_trace_retention_in_files_and_storage(
+    tmp_path, fallback, save_prompts, save_responses
+):
+    from tests.fakes import in_memory_store
+
+    values = crescendo_campaign(tmp_path, max_backtracks=0)
+    values["execution"]["output"].update(
+        save_prompts=save_prompts, save_responses=save_responses
+    )
+    models = crescendo_models(refused=False)
+    if fallback:
+        del values["attacks"][0]["roles"]["refusal"]
+        replies = iter(
+            [
+                json.dumps({"reasoning": "warming up", "question": "a question"}),
+                json.dumps({"score_value": False, "rationale": "scripted"}),
+            ]
+        )
+        models["attacker"] = ScriptedModel(lambda _messages: next(replies))
+    store = in_memory_store()
+    result, _ = run(values, models=models, store=store)
+    path = next(p for p in result.outputs if p.name == "traces.jsonl")
+    file_nodes = [
+        node
+        for line in path.read_text().splitlines()
+        for node in json.loads(line)["nodes"]
+    ]
+    stored_nodes = [
+        trace.content
+        for record in store.list_results(page_size=50).items
+        for trace in store.list_traces(record.id)
+    ]
+    for nodes in (file_nodes, stored_nodes):
+        evaluators = [
+            node
+            for node in nodes
+            if node.get("node") == "call"
+            and node["data"]["role"] == ("attacker" if fallback else "refusal")
+        ]
+        assert evaluators
+        refusal = evaluators[-1]["data"]
+        request = refusal.get("request", {})
+        assert ("prompt" in request) == save_prompts
+        assert ("response" in request) == save_responses
+        if save_responses:
+            assert request["response"] == "I'm sorry, I cannot help with that."
+        else:
+            assert "I'm sorry, I cannot help with that." not in json.dumps(refusal)
+
+
 def test_a_backtracked_crescendo_turn_is_stored_unjudged(tmp_path):
     from tests.fakes import in_memory_store
 

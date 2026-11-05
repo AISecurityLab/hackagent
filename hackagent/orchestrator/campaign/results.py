@@ -172,7 +172,9 @@ def trace_payload(node: TraceNode, output: OutputSpec) -> dict[str, Any]:
         payload["label"] = node.label
     data = dict(node.data)
     if node.node == "call":
-        if data.get("role") == "panel" and isinstance(data.get("request"), dict):
+        if isinstance(data.get("request"), dict) and (
+            data.get("role") == "panel" or "response" in data["request"]
+        ):
             request = dict(data["request"])
             if not output.save_prompts:
                 request.pop("prompt", None)

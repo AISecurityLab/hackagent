@@ -1103,6 +1103,7 @@ class LocalBackend:
         Goal samples include the first successful conversation ordinal and, when
         every successful reply carries a goal clock, the earliest response time.
         Persistence timestamps cannot recover the latter for batched searches.
+        Token totals are unknown when any target call or attempt lacks usage.
         """
         ids = [str(run_id) for run_id in run_ids]
         if not ids:
@@ -1125,11 +1126,7 @@ class LocalBackend:
                 f"""SELECT r.run_id AS run_id,
                        CASE WHEN t.step_type = 'interaction' THEN '' ELSE
                          json_extract(t.content_json, '$.label') END AS label,
-                       COUNT(*) AS n,
-                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
-                                    json_extract(t.content_json, '$.response.usage.prompt_tokens'))) AS prompt,
-                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.completion_tokens'),
-                                    json_extract(t.content_json, '$.response.usage.completion_tokens'))) AS completion
+                       COUNT(*) AS n
                     FROM traces t JOIN results r ON r.id = t.result_id
                     WHERE r.run_id IN ({marks})
                       AND (t.step_type = 'interaction'
@@ -1158,6 +1155,13 @@ class LocalBackend:
                          AND json_extract(t.content_json, '$.node') = 'call'
                          AND COALESCE(json_extract(t.content_json, '$.label'), '') != ''
                        )) AS traced_attempts,
+                       SUM(EXISTS(SELECT 1 FROM traces t WHERE t.result_id = results.id
+                         AND json_extract(t.content_json, '$.node') = 'call'
+                         AND json_extract(t.content_json, '$.label') = 'target'
+                       )) AS target_traced_attempts,
+                       SUM(EXISTS(SELECT 1 FROM traces t WHERE t.result_id = results.id
+                         AND t.step_type = 'interaction'
+                       )) AS interaction_attempts,
                        MIN(created_at) AS started, MAX(updated_at) AS finished
                     FROM ordered AS results
                     GROUP BY run_id, goal_index""",
@@ -1171,13 +1175,20 @@ class LocalBackend:
                        SUM(CASE WHEN json_extract(t.content_json, '$.scope') = 'goal'
                          THEN 1 ELSE 0 END) AS goal_scoped_n,
                        SUM(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
+                                    json_extract(t.content_json, '$.response.usage.prompt_tokens'))) AS prompt,
+                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.completion_tokens'),
+                                    json_extract(t.content_json, '$.response.usage.completion_tokens'))) AS completion,
+                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
                                     json_extract(t.content_json, '$.response.usage.prompt_tokens'), 0)
                          + COALESCE(json_extract(t.content_json, '$.data.usage.completion_tokens'),
                                     json_extract(t.content_json, '$.response.usage.completion_tokens'), 0)) AS tokens,
-                       COUNT(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
-                                      json_extract(t.content_json, '$.response.usage.prompt_tokens'),
-                                      json_extract(t.content_json, '$.data.usage.completion_tokens'),
-                                      json_extract(t.content_json, '$.response.usage.completion_tokens'))) AS usage_samples
+                       COUNT(CASE WHEN COALESCE(
+                         json_extract(t.content_json, '$.data.usage.prompt_tokens'),
+                         json_extract(t.content_json, '$.response.usage.prompt_tokens')) IS NOT NULL
+                         AND COALESCE(
+                         json_extract(t.content_json, '$.data.usage.completion_tokens'),
+                         json_extract(t.content_json, '$.response.usage.completion_tokens')) IS NOT NULL
+                         THEN 1 END) AS usage_samples
                     FROM traces t JOIN results r ON r.id = t.result_id
                     WHERE r.run_id IN ({marks}) AND r.goal_index IS NOT NULL
                       AND (t.step_type = 'interaction'
@@ -1221,17 +1232,6 @@ class LocalBackend:
                 }
             elif interactions:
                 cost["calls"]["target"] = interactions["n"]
-            # Token usage is recorded for target calls only.
-            source = nodes.get("target")
-            if source is None or source["prompt"] is None:
-                source = interactions
-            if source is not None and (
-                source["prompt"] is not None or source["completion"] is not None
-            ):
-                cost["target_tokens"] = {
-                    "prompt": int(source["prompt"] or 0),
-                    "completion": int(source["completion"] or 0),
-                }
         samples: Dict[str, List[float]] = {}
         for row in latencies:
             samples.setdefault(row["run_id"], []).append(float(row["ms"]))
@@ -1251,6 +1251,8 @@ class LocalBackend:
             ] = row
         for cost in by_run.values():
             cost["goal_samples"] = []
+        token_totals = {run_id: {"prompt": 0, "completion": 0} for run_id in by_run}
+        incomplete_usage: set[str] = set()
         for row in goal_totals:
             labels = goal_labels.get((row["run_id"], row["goal_index"]), {})
             nodes = {label: item for label, item in labels.items() if label}
@@ -1258,6 +1260,19 @@ class LocalBackend:
             usage = target
             if usage is None or not usage["usage_samples"]:
                 usage = labels.get("")
+            usage_complete = usage is not None and usage["usage_samples"] == usage["n"]
+            if usage is not None:
+                usage_complete = usage_complete and (
+                    row["interaction_attempts"] == row["attempts"]
+                    if usage["label"] == ""
+                    else row["target_traced_attempts"] == row["attempts"]
+                    or usage["goal_scoped_n"] >= row["attempts"]
+                )
+            if not usage_complete:
+                incomplete_usage.add(row["run_id"])
+            else:
+                token_totals[row["run_id"]]["prompt"] += int(usage["prompt"])
+                token_totals[row["run_id"]]["completion"] += int(usage["completion"])
             started, finished = _to_dt(row["started"]), _to_dt(row["finished"])
             # A batched phase can attach all its goal-scoped calls to one result.
             calls_complete = row["traced_attempts"] == row["attempts"] or (
@@ -1274,12 +1289,13 @@ class LocalBackend:
                     "calls": sum(item["n"] for item in nodes.values())
                     if nodes and calls_complete
                     else None,
-                    "target_tokens": usage["tokens"]
-                    if usage is not None and usage["usage_samples"] == usage["n"]
-                    else None,
+                    "target_tokens": usage["tokens"] if usage_complete else None,
                     "elapsed_s": max((finished - started).total_seconds(), 0.0),
                 }
             )
+        for run_id, cost in by_run.items():
+            if run_id not in incomplete_usage:
+                cost["target_tokens"] = token_totals[run_id]
         return by_run
 
     # ── Attack builder drafts ─────────────────────────────────────────────────

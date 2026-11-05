@@ -33,7 +33,7 @@ from hackagent.core.contracts import Verdict
 
 from ...contract import Completion, Judge, Messages, Target
 from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
-from ...trace import decision, phase
+from ...trace import decision, evaluation_request, phase
 from . import prompts
 from .config import CrescendoParams
 
@@ -157,12 +157,16 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
         undetermined, which does not trigger a backtrack.
         """
         try:
-            answer = await self.refusal_judge(
-                [
-                    {"role": "system", "content": prompts.REFUSAL_JUDGE_PROMPT},
-                    {"role": "user", "content": prompts.refusal_request(goal, reply)},
-                ]
-            )
+            with evaluation_request(goal, reply):
+                answer = await self.refusal_judge(
+                    [
+                        {"role": "system", "content": prompts.REFUSAL_JUDGE_PROMPT},
+                        {
+                            "role": "user",
+                            "content": prompts.refusal_request(goal, reply),
+                        },
+                    ]
+                )
         except Exception:
             return False, "the refusal judge could not be reached"
         parsed = prompts.parse_refusal(answer)
