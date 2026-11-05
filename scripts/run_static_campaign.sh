@@ -37,6 +37,7 @@ attacker_endpoint="http://127.0.0.1:$attacker_port/v1"
 model_config="$("$python" - "$campaign" <<'PY'
 import importlib.util
 import sys
+from hackagent.core.contracts.enums import AgentType
 from hackagent.orchestrator.campaign import load_campaign
 
 if importlib.util.find_spec("vllm") is None:
@@ -48,7 +49,8 @@ if len(roles) > 1:
     raise SystemExit("This launcher supports one distinct role model/endpoint; use external servers for additional role models")
 role = next(iter(roles.values()), None)
 models = [target, *judges, *([role] if role else [])]
-if any(model.connection.provider != "vllm" or model.connection.type.value != "OPENAI_SDK" for model in models):
+# OPENAI_SDK is an alias of OPENAI, so its .value is "OPENAI": compare members.
+if any(model.connection.provider != "vllm" or model.connection.type is not AgentType.OPENAI for model in models):
     raise SystemExit("This launcher requires vLLM/OpenAI-compatible model connections")
 other_judges = {judge.name for judge in judges if judge.name != target.name}
 if len(other_judges) != 1:
