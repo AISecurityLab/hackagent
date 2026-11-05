@@ -8,7 +8,8 @@
 under ``/api/proxy``:
 
 * **remote mode** — the remote storage backend is selected, so calls are
-  forwarded to the configured API with the key attached server-side (``_proxy``);
+  forwarded to the configured API with the key attached server-side (``_proxy``),
+  and the campaigns the dashboard launches run in this process (``_remote_launcher``);
 * **offline mode** — the local backend is selected (the default), so calls
   are answered from the local SQLite store (``_local_api``); campaigns are
   saved there and launched on this machine, in this process (``_launcher``).
@@ -126,12 +127,16 @@ def create_app(client) -> Flask:
     app = Flask(__name__, static_folder=None)
 
     if client.settings.mode is Mode.REMOTE:
+        from hackagent.interfaces.web._remote_launcher import RemoteLauncher
         from hackagent.interfaces.web._proxy import create_proxy
 
         target = client.settings.base_url
         app.register_blueprint(
             create_proxy(
-                target, client.settings.api_key, verify=client.settings.verify
+                target,
+                client.settings.api_key,
+                verify=client.settings.verify,
+                on_launched=RemoteLauncher(client.settings),
             ),
             url_prefix=API_PREFIX,
         )

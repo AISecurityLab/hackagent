@@ -8,16 +8,19 @@ process and not in the browser, so the tests that matter here are the ones
 about which headers cross which boundary.
 """
 
+import json
 import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from uuid import UUID, uuid4
 
 import httpx
 
 from hackagent import HackAgent, Settings
 from hackagent.interfaces.web import _static, create_app
+from hackagent.interfaces.web._remote_launcher import RemoteLauncher
 
 
 def _session(api_key: str = "", base_url: str = "https://api.example.test"):
@@ -146,6 +149,107 @@ class TestRemoteProxy(unittest.TestCase):
     def test_config_json_never_contains_the_api_key(self):
         body = self.client.get("/config.json").data
         self.assertNotIn(b"secret-key", body)
+
+
+class TestLaunchesRunHere(unittest.TestCase):
+    """The dashboard leaves where a run executes to the deployment: launched
+    through ``hackagent web``, it runs on this machine."""
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        bundle = Path(self._tmp.name) / "static"
+        bundle.mkdir()
+        (bundle / "index.html").write_text("<html>index</html>")
+        self._real_static_dir = _static.static_dir
+        _static.static_dir = lambda: bundle
+
+        self.started: list[UUID] = []
+        started = patch.object(
+            RemoteLauncher,
+            "__call__",
+            lambda _self, run_id: self.started.append(run_id),
+        )
+        started.start()
+        self.addCleanup(started.stop)
+        self.client = create_app(_session("secret-key")).test_client()
+
+    def tearDown(self) -> None:
+        _static.static_dir = self._real_static_dir
+        self._tmp.cleanup()
+
+    def _forward(self, send, status_code=201, executor="local"):
+        run_id = uuid4()
+        recorded = {}
+        reply = json.dumps({"id": str(run_id), "executor": executor}).encode()
+
+        def _request(_self, method, url, **kwargs):
+            recorded.update(kwargs, url=url)
+            return _StubResponse(status_code=status_code, content=reply)
+
+        with patch.object(httpx.Client, "request", _request):
+            response = send()
+        return run_id, recorded, response
+
+    def test_a_launch_runs_locally_and_starts_here(self):
+        run_id, recorded, response = self._forward(
+            lambda: self.client.post(
+                "/api/proxy/campaign/abc/launch", json={"executor": "cloud"}
+            )
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(json.loads(recorded["content"]), {"executor": "local"})
+        self.assertEqual(recorded["headers"]["Content-Type"], "application/json")
+        self.assertEqual(self.started, [run_id])
+
+    def test_an_ad_hoc_launch_runs_locally_and_starts_here(self):
+        run_id, recorded, _ = self._forward(
+            lambda: self.client.post(
+                "/api/proxy/campaign/launch", json={"name": "adhoc", "spec": {}}
+            )
+        )
+        self.assertEqual(
+            json.loads(recorded["content"]),
+            {"name": "adhoc", "spec": {}, "executor": "local"},
+        )
+        self.assertEqual(self.started, [run_id])
+
+    def test_a_refused_launch_starts_nothing(self):
+        self._forward(
+            lambda: self.client.post("/api/proxy/campaign/abc/launch", json={}),
+            status_code=400,
+        )
+        self.assertEqual(self.started, [])
+
+    def test_a_launch_the_api_queued_elsewhere_is_not_started_here(self):
+        self._forward(
+            lambda: self.client.post("/api/proxy/campaign/abc/launch", json={}),
+            executor="cloud",
+        )
+        self.assertEqual(self.started, [])
+
+    def test_a_body_that_is_not_an_object_is_forwarded_as_it_is(self):
+        _, recorded, _ = self._forward(
+            lambda: self.client.post(
+                "/api/proxy/campaign/abc/launch",
+                data="[1]",
+                content_type="application/json",
+            )
+        )
+        self.assertEqual(recorded["content"], b"[1]")
+
+    def test_the_preflight_checks_a_local_run(self):
+        _, recorded, _ = self._forward(
+            lambda: self.client.get("/api/proxy/campaign/abc/preflight?executor=cloud"),
+            status_code=200,
+        )
+        self.assertEqual(recorded["params"], {"executor": "local"})
+
+    def test_other_writes_are_forwarded_unchanged(self):
+        _, recorded, _ = self._forward(
+            lambda: self.client.post("/api/proxy/campaign", json={"name": "c"})
+        )
+        self.assertEqual(json.loads(recorded["content"]), {"name": "c"})
+        self.assertEqual(self.started, [])
 
 
 class TestCreateAppValidation(unittest.TestCase):
