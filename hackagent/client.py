@@ -522,6 +522,45 @@ class HackAgent:
 
         return self.backend.get_campaign_run(_as_uuid(campaign_run_id))
 
+    def campaign_outcomes(self, campaign_ids: List[Any]) -> Dict[str, Dict[str, int]]:
+        """Local campaign summaries, excluding full result payloads."""
+        aggregate = getattr(self.backend, "campaign_outcomes", None)
+        if not callable(aggregate):
+            raise NotImplementedError("Campaign summaries require local storage.")
+        return aggregate([_as_uuid(ident) for ident in campaign_ids])
+
+    def campaign_results(
+        self,
+        run_ids: List[Any],
+        *,
+        goal_index: Optional[int] = None,
+        full: bool = False,
+    ) -> List[Any]:
+        read = getattr(self.backend, "campaign_results", None)
+        if not callable(read):
+            raise NotImplementedError("Campaign investigation requires local storage.")
+        return read(
+            [_as_uuid(ident) for ident in run_ids], goal_index=goal_index, full=full
+        )
+
+    def campaign_attempts(
+        self,
+        run_ids: List[Any],
+        goal_index: int,
+        *,
+        page: int,
+        page_size: int,
+    ) -> Dict[str, Any]:
+        read = getattr(self.backend, "campaign_attempts", None)
+        if not callable(read):
+            raise NotImplementedError("Campaign investigation requires local storage.")
+        return read(
+            [_as_uuid(ident) for ident in run_ids],
+            goal_index,
+            page=page,
+            page_size=page_size,
+        )
+
     def run(self, run_id: Any) -> Any:
         return self.backend.get_run(_as_uuid(run_id))
 
@@ -544,9 +583,37 @@ class HackAgent:
     def traces(self, result_id: Any) -> List[Any]:
         return self.backend.list_traces(_as_uuid(result_id))
 
+    def run_costs(self, run_ids: List[Any]) -> Optional[Dict[str, Dict[str, Any]]]:
+        """Calls, target tokens, latency and elapsed time per run.
+
+        ``None`` when the backend cannot aggregate them (the remote API).
+        """
+        aggregate = getattr(self.backend, "run_costs", None)
+        if not callable(aggregate):
+            return None
+        return aggregate([_as_uuid(run_id) for run_id in run_ids])
+
     def delete_run(self, run_id: Any) -> None:
         """Delete one run. This is a write; reads never call it."""
         self.backend.delete_run(_as_uuid(run_id))
+
+    def delete_campaign_run(self, campaign_run_id: Any) -> None:
+        """Delete a completed local campaign execution and its recorded child data."""
+        delete = getattr(self.backend, "delete_campaign_run", None)
+        if not callable(delete):
+            raise NotImplementedError(
+                "Campaign execution deletion requires local storage."
+            )
+        delete(_as_uuid(campaign_run_id))
+
+    def delete_campaign_runs(self, campaign_run_ids: List[Any]) -> None:
+        """Atomically delete selected local executions and their recorded child data."""
+        delete = getattr(self.backend, "delete_campaign_runs", None)
+        if not callable(delete):
+            raise NotImplementedError(
+                "Campaign execution deletion requires local storage."
+            )
+        delete([_as_uuid(ident) for ident in campaign_run_ids])
 
     # -- discovery -------------------------------------------------------------
 

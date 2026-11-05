@@ -425,10 +425,189 @@ class TestLocalBackendResult(unittest.TestCase):
         self.assertEqual(rec.evaluation_status, "NOT_EVALUATED")
         self.assertIsNone(rec.evaluation_notes)
 
+    def test_cost_samples_aggregate_real_goals_without_double_counting_traces(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        second = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        untraced = self.backend.create_result(self.run.id, "other", 1, {}, {})
+        for result in (first, second):
+            self.backend.create_trace(
+                result.id,
+                0,
+                "interaction",
+                {"response": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}}},
+            )
+            self.backend.create_trace(
+                result.id,
+                1,
+                "OTHER",
+                {
+                    "node": "call",
+                    "label": "target",
+                    "data": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}},
+                },
+            )
+            self.backend.create_trace(
+                result.id, 2, "OTHER", {"node": "call", "label": "attacker"}
+            )
+            self.backend.create_trace(
+                result.id, 3, "OTHER", {"node": "call", "label": "panel"}
+            )
+        self.backend.create_trace(untraced.id, 0, "interaction", {})
+        self.backend._conn.execute(
+            "UPDATE results SET created_at = ?, updated_at = ? WHERE id IN (?, ?)",
+            (
+                "2026-01-01T00:00:00+00:00",
+                "2026-01-01T00:00:10+00:00",
+                str(first.id),
+                str(second.id),
+            ),
+        )
+        self.backend._conn.commit()
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        samples = {sample["goal_index"]: sample for sample in cost["goal_samples"]}
+        self.assertEqual(
+            samples[0],
+            {
+                "goal_index": 0,
+                "attempts": 2,
+                "calls": 6,
+                "target_tokens": 24,
+                "elapsed_s": 10.0,
+                "first_jailbreak_attempt": None,
+                "first_jailbreak_elapsed_s": None,
+            },
+        )
+        self.assertEqual(samples[1]["attempts"], 1)
+        self.assertIsNone(samples[1]["calls"])
+        self.assertIsNone(samples[1]["target_tokens"])
+        self.assertEqual(cost["calls"], {"target": 2, "attacker": 2, "judge": 2})
+        self.assertEqual(self.backend.run_costs([]), {})
+
+    def test_first_success_uses_conversation_order_and_earliest_response_clock(self):
+        results = [
+            self.backend.create_result(self.run.id, "goal", 0, {}, {}) for _ in range(4)
+        ]
+        results.sort(key=lambda result: str(result.id))
+        for index, result in enumerate(results):
+            self.backend.update_result(
+                result.id,
+                evaluation_status="SUCCESSFUL_JAILBREAK"
+                if index in (1, 2)
+                else "FAILED_JAILBREAK",
+                agent_specific_data={
+                    "attack_metadata": {"goal_target_elapsed_s": [0, 9, 3, 20][index]}
+                },
+            )
+            self.backend._conn.execute(
+                "UPDATE results SET created_at = ?, updated_at = ? WHERE id = ?",
+                (
+                    "2026-01-01T00:00:00+00:00",
+                    "2026-01-01T00:00:30+00:00",
+                    str(result.id),
+                ),
+            )
+        self.backend._conn.commit()
+        sample = self.backend.run_costs([self.run.id])[str(self.run.id)][
+            "goal_samples"
+        ][0]
+        self.assertEqual(sample["attempts"], 4)
+        self.assertEqual(sample["first_jailbreak_attempt"], 2)
+        self.assertEqual(sample["first_jailbreak_elapsed_s"], 3)
+
+    def test_first_success_keeps_missing_timing_null_and_zero_measurable(self):
+        for index, status, timing in (
+            (0, "SUCCESSFUL_JAILBREAK", None),
+            (1, "SUCCESSFUL_JAILBREAK", 0),
+            (2, "FAILED_JAILBREAK", 5),
+            (3, "ERROR_AGENT_RESPONSE", 5),
+            (4, "NOT_EVALUATED", 5),
+        ):
+            result = self.backend.create_result(self.run.id, "goal", index, {}, {})
+            self.backend.update_result(
+                result.id,
+                evaluation_status=status,
+                agent_specific_data={
+                    "attack_metadata": {"goal_target_elapsed_s": timing}
+                },
+            )
+        samples = {
+            sample["goal_index"]: sample
+            for sample in self.backend.run_costs([self.run.id])[str(self.run.id)][
+                "goal_samples"
+            ]
+        }
+        self.assertEqual(samples[0]["first_jailbreak_attempt"], 1)
+        self.assertIsNone(samples[0]["first_jailbreak_elapsed_s"])
+        self.assertEqual(samples[1]["first_jailbreak_elapsed_s"], 0)
+        for index in (2, 3, 4):
+            self.assertIsNone(samples[index]["first_jailbreak_attempt"])
+            self.assertIsNone(samples[index]["first_jailbreak_elapsed_s"])
+        later = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.update_result(
+            later.id,
+            evaluation_status="SUCCESSFUL_JAILBREAK",
+            agent_specific_data={"attack_metadata": {"goal_target_elapsed_s": 10}},
+        )
+        sample = self.backend.run_costs([self.run.id])[str(self.run.id)][
+            "goal_samples"
+        ][0]
+        self.assertIsNone(sample["first_jailbreak_elapsed_s"])
+
+    def test_cost_samples_accept_shared_goal_scoped_batch_traces(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        for sequence, label in enumerate(
+            ("attacker", "target", "panel", "target", "panel")
+        ):
+            self.backend.create_trace(
+                first.id,
+                sequence,
+                "OTHER",
+                {"node": "call", "scope": "goal", "label": label},
+            )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertEqual(cost["goal_samples"][0]["calls"], 5)
+        self.assertEqual(cost["goal_samples"][0]["attempts"], 2)
+
+    def test_cost_samples_reject_incomplete_goal_scoped_batch_traces(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        for sequence, label in enumerate(("attacker", "target", "panel")):
+            self.backend.create_trace(
+                first.id,
+                sequence,
+                "OTHER",
+                {"node": "call", "scope": "goal", "label": label},
+            )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertIsNone(cost["goal_samples"][0]["calls"])
+
+    def test_cost_samples_do_not_infer_coverage_from_unscoped_calls(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        for sequence in range(2):
+            self.backend.create_trace(
+                first.id, sequence, "OTHER", {"node": "call", "label": "target"}
+            )
+        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.assertIsNone(cost["goal_samples"][0]["calls"])
+
     def test_create_result_unique_ids(self):
         r1 = self.backend.create_result(self.run.id, "g1", 0, {}, {})
         r2 = self.backend.create_result(self.run.id, "g2", 1, {}, {})
         self.assertNotEqual(r1.id, r2.id)
+
+    def test_request_payload_survives_evaluation_metadata_updates(self):
+        payload = {"messages": [{"role": "user", "content": "Recorded prompt"}]}
+        result = self.backend.create_result(self.run.id, "goal", 0, payload, {})
+        self.assertEqual(result.metadata["request_payload"], payload)
+        updated = self.backend.update_result(
+            result.id, agent_specific_data={"response": "Recorded reply"}
+        )
+        self.assertEqual(updated.metadata["request_payload"], payload)
+        fetched = self.backend.get_result(result.id)
+        self.assertEqual(fetched.metadata["request_payload"], payload)
+        self.assertEqual(fetched.metadata["response"], "Recorded reply")
 
     def test_update_result_evaluation_status(self):
         rec = self.backend.create_result(self.run.id, "goal", 0, {}, {})

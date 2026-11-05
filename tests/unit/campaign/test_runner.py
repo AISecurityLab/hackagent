@@ -108,6 +108,42 @@ def test_a_static_attack_without_judges_traces_only_the_target(tmp_path):
     assert [n.label for n in attempt.trace] == ["target"]
 
 
+@pytest.mark.parametrize("iterative", [False, True])
+def test_goal_response_clock_excludes_final_judging_and_survives_batch_storage(
+    tmp_path, monkeypatch, iterative
+):
+    from hackagent.orchestrator.campaign import runner
+
+    clock = [0.0]
+    monkeypatch.setattr(runner, "monotonic", lambda: clock[0])
+
+    def target(messages):
+        clock[0] += 5
+        return TARGET_REPLY
+
+    def judge(messages):
+        clock[0] += 100
+        return "yes"
+
+    values = (
+        iterative_campaign(tmp_path)
+        if iterative
+        else campaign(
+            attacks=[{"name": "baseline"}],
+            execution={"output": {"directory": str(tmp_path)}},
+        )
+    )
+    result, _builder = run(
+        values, models=models_for(target=ScriptedModel(target), judge=judge)
+    )
+    attempts = attempts_of(result)
+    assert attempts[0].metadata["goal_target_elapsed_s"] == 5
+    assert all(
+        attempt.metadata["goal_target_elapsed_s"] < clock[0] for attempt in attempts
+    )
+    assert all(attempt.response.latency_ms == 5000 for attempt in attempts)
+
+
 def test_a_static_target_failure_keeps_its_traced_call(tmp_path):
     def broken(messages):
         raise RuntimeError("connection reset")

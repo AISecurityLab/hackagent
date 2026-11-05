@@ -519,6 +519,11 @@ def _is_reference(value: Any) -> bool:
     return isinstance(value, str) and value.startswith("${") and value.endswith("}")
 
 
+def redacted(value: Any) -> Any:
+    """Any recorded configuration with the credentials it spells out replaced."""
+    return _redacted(value)
+
+
 def _redacted_url(text: str) -> str:
     try:
         parts = urlsplit(text)
@@ -569,4 +574,5 @@ __all__ = [
     "StorageSpec",
     "campaign_json_schema",
     "recorded_model",
+    "redacted",
 ]

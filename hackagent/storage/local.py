@@ -128,6 +128,8 @@ CREATE INDEX IF NOT EXISTS idx_attacks_agent   ON attacks(agent_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_runs_agent ON campaign_runs(agent_id);
 CREATE INDEX IF NOT EXISTS idx_runs_attack     ON runs(attack_id);
 CREATE INDEX IF NOT EXISTS idx_results_run     ON results(run_id);
+CREATE INDEX IF NOT EXISTS idx_results_run_goal_order
+    ON results(run_id, goal_index, created_at, id);
 CREATE INDEX IF NOT EXISTS idx_traces_result   ON traces(result_id);
 """
 
@@ -138,6 +140,14 @@ def _now_str() -> str:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _quantile(ordered: List[float], q: float) -> float:
+    """Linear-interpolated quantile of an already sorted, non-empty list."""
+    position = (len(ordered) - 1) * q
+    low = int(position)
+    high = min(low + 1, len(ordered) - 1)
+    return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
 
 
 def _to_dt(s: Optional[str]) -> datetime:
@@ -161,6 +171,9 @@ class LocalBackend:
         self._db_path = Path(db_path or _DEFAULT_DB_PATH).expanduser()
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+        self._conn.create_function(
+            "result_bucket", 2, result_bucket, deterministic=True
+        )
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.execute("PRAGMA journal_mode = PERSIST")
@@ -613,6 +626,201 @@ class LocalBackend:
             updated_at=_to_dt(row["updated_at"]),
         )
 
+    def campaign_results(
+        self,
+        run_ids: List[UUID],
+        *,
+        goal_index: Optional[int] = None,
+        full: bool = False,
+    ) -> List[ResultRecord]:
+        """Read only summary fields unless a selected goal needs full conversations."""
+        ids = [str(ident) for ident in run_ids]
+        if not ids:
+            return []
+        if full and goal_index is None:
+            raise ValueError("Full campaign results require a selected goal.")
+        marks = ",".join("?" for _ in ids)
+        fields = (
+            "*"
+            if full
+            else """id, run_id, goal, goal_index,
+            evaluation_status, evaluation_notes, created_at, updated_at,
+            '{}' AS request_payload_json, '{}' AS metrics_json,
+            json_object('category', json_extract(metadata_json, '$.category'),
+                        'subcategory', json_extract(metadata_json, '$.subcategory'))
+                AS metadata_json"""
+        )
+        where = f"run_id IN ({marks})"
+        args: List[Any] = list(ids)
+        if goal_index is not None:
+            where += " AND goal_index=?"
+            args.append(goal_index)
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT {fields} FROM results WHERE {where} ORDER BY created_at DESC",
+                args,
+            ).fetchall()
+        return [self._row_to_result(row) for row in rows]
+
+    def campaign_attempts(
+        self,
+        run_ids: List[UUID],
+        goal_index: int,
+        *,
+        page: int,
+        page_size: int,
+    ) -> Dict[str, Any]:
+        """Page lightweight attempt rows after filtering a goal in SQLite."""
+        ids = [str(ident) for ident in run_ids]
+        if not ids:
+            return {"items": [], "total": 0, "first_success": None}
+        marks = ",".join("?" for _ in ids)
+        query = f"""WITH ordered AS (
+            SELECT id, run_id, evaluation_status, evaluation_notes, created_at,
+                ROW_NUMBER() OVER (ORDER BY created_at, id) AS ordinal
+            FROM results WHERE run_id IN ({marks}) AND goal_index=?
+        ) """
+        args = [*ids, goal_index]
+        with self._lock:
+            total = self._conn.execute(
+                f"SELECT COUNT(*) FROM results WHERE run_id IN ({marks}) AND goal_index=?",
+                args,
+            ).fetchone()[0]
+            first = self._conn.execute(
+                query
+                + """SELECT id, ordinal FROM ordered
+                    WHERE result_bucket(evaluation_status, evaluation_notes)='jailbreak'
+                    ORDER BY ordinal LIMIT 1""",
+                args,
+            ).fetchone()
+            rows = self._conn.execute(
+                query + "SELECT * FROM ordered ORDER BY ordinal LIMIT ? OFFSET ?",
+                [*args, page_size, (page - 1) * page_size],
+            ).fetchall()
+        return {
+            "items": [
+                {
+                    "id": row["id"],
+                    "run_id": row["run_id"],
+                    "ordinal": row["ordinal"],
+                    "bucket": result_bucket(
+                        row["evaluation_status"], row["evaluation_notes"]
+                    ),
+                    "notes": row["evaluation_notes"],
+                    "created_at": _to_dt(row["created_at"]).isoformat(),
+                }
+                for row in rows
+            ],
+            "total": total,
+            "first_success": {
+                "id": first["id"],
+                "page": (first["ordinal"] - 1) // page_size + 1,
+            }
+            if first
+            else None,
+        }
+
+    def campaign_outcomes(self, campaign_ids: List[UUID]) -> Dict[str, Dict[str, int]]:
+        """Summary counts without materializing result payloads or metadata."""
+        ids = [str(ident) for ident in campaign_ids]
+        if not ids:
+            return {}
+        marks = ",".join("?" for _ in ids)
+        with self._lock:
+            runs = self._conn.execute(
+                f"""SELECT n.campaign_run_id, COUNT(*) AS attack_runs,
+                           MIN(n.status = 'COMPLETED' AND c.status = 'COMPLETED') AS completed
+                    FROM runs n JOIN campaign_runs c ON c.id = n.campaign_run_id
+                    WHERE n.campaign_run_id IN ({marks})
+                    GROUP BY n.campaign_run_id""",
+                ids,
+            ).fetchall()
+            goals = self._conn.execute(
+                f"""WITH per_goal AS (
+                    SELECT n.campaign_run_id, r.goal_index, COUNT(*) AS attempts,
+                        MAX(result_bucket(r.evaluation_status, r.evaluation_notes)
+                            = 'jailbreak') AS jailbroken,
+                        MIN(result_bucket(r.evaluation_status, r.evaluation_notes)
+                            = 'mitigated') AS mitigated
+                    FROM results r JOIN runs n ON n.id = r.run_id
+                    WHERE n.campaign_run_id IN ({marks})
+                    GROUP BY n.campaign_run_id, r.goal_index
+                )
+                SELECT campaign_run_id, COUNT(*) AS recorded_goals,
+                       SUM(attempts) AS attempts, SUM(jailbroken) AS jailbroken,
+                       SUM(CASE WHEN jailbroken = 0 THEN mitigated ELSE 0 END) AS mitigated
+                FROM per_goal GROUP BY campaign_run_id""",
+                ids,
+            ).fetchall()
+        counts = {
+            sid: {
+                "attack_runs": 0,
+                "recorded_goals": 0,
+                "attempts": 0,
+                "jailbroken": 0,
+                "mitigated": 0,
+                "unresolved": 0,
+            }
+            for sid in ids
+        }
+        completed = {}
+        for row in runs:
+            counts[row["campaign_run_id"]]["attack_runs"] = row["attack_runs"]
+            completed[row["campaign_run_id"]] = bool(row["completed"])
+        for row in goals:
+            item = counts[row["campaign_run_id"]]
+            for key in ("recorded_goals", "attempts", "jailbroken", "mitigated"):
+                item[key] = row[key]
+            if not completed.get(row["campaign_run_id"], True):
+                item["mitigated"] = 0
+        for item in counts.values():
+            item["unresolved"] = (
+                item["recorded_goals"] - item["jailbroken"] - item["mitigated"]
+            )
+        return counts
+
+    def delete_campaign_run(self, campaign_run_id: UUID) -> None:
+        self.delete_campaign_runs([campaign_run_id])
+
+    def delete_campaign_runs(self, campaign_run_ids: List[UUID]) -> None:
+        ids = list(dict.fromkeys(str(ident) for ident in campaign_run_ids))
+        if not ids:
+            raise ValueError("Select at least one campaign execution.")
+        placeholders = ",".join("?" for _ in ids)
+        terminal = {"COMPLETED", "FAILED", "CANCELLED"}
+        with self._lock, self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            campaigns = self._conn.execute(
+                f"SELECT status FROM campaign_runs WHERE id IN ({placeholders})", ids
+            ).fetchall()
+            if len(campaigns) != len(ids):
+                raise RuntimeError(
+                    "LocalBackend: Selected campaign execution not found"
+                )
+            runs = self._conn.execute(
+                f"SELECT status FROM runs WHERE campaign_run_id IN ({placeholders})",
+                ids,
+            ).fetchall()
+            if any(row["status"] not in terminal for row in [*campaigns, *runs]):
+                raise ValueError("An active campaign execution cannot be deleted.")
+            self._conn.execute(
+                "DELETE FROM traces WHERE result_id IN "
+                "(SELECT id FROM results WHERE run_id IN "
+                f"(SELECT id FROM runs WHERE campaign_run_id IN ({placeholders})))",
+                ids,
+            )
+            self._conn.execute(
+                "DELETE FROM results WHERE run_id IN "
+                f"(SELECT id FROM runs WHERE campaign_run_id IN ({placeholders}))",
+                ids,
+            )
+            self._conn.execute(
+                f"DELETE FROM runs WHERE campaign_run_id IN ({placeholders})", ids
+            )
+            self._conn.execute(
+                f"DELETE FROM campaign_runs WHERE id IN ({placeholders})", ids
+            )
+
     def delete_run(self, run_id: UUID) -> None:
         sid = str(run_id)
         with self._lock:
@@ -682,6 +890,8 @@ class LocalBackend:
         result_id = uuid.uuid4()
         now = _now_str()
         metadata = {**request_payload, **agent_specific_data}
+        if request_payload:
+            metadata["request_payload"] = request_payload
         with self._lock:
             self._conn.execute(
                 """INSERT INTO results
@@ -813,6 +1023,10 @@ class LocalBackend:
         raise RuntimeError(f"LocalBackend: Result {result_id} not found")
 
     def _row_to_result(self, row) -> ResultRecord:
+        metadata = json.loads(row["metadata_json"] or "{}")
+        payload = json.loads(row["request_payload_json"] or "{}")
+        if payload:
+            metadata["request_payload"] = payload
         return ResultRecord(
             id=UUID(row["id"]),
             run_id=UUID(row["run_id"]),
@@ -821,7 +1035,7 @@ class LocalBackend:
             evaluation_status=row["evaluation_status"],
             evaluation_notes=row["evaluation_notes"],
             evaluation_metrics=json.loads(row["metrics_json"] or "{}"),
-            metadata=json.loads(row["metadata_json"] or "{}"),
+            metadata=metadata,
             created_at=_to_dt(row["created_at"]),
             updated_at=_to_dt(row["updated_at"]),
         )
@@ -876,6 +1090,197 @@ class LocalBackend:
             )
             for r in rows
         ]
+
+    def run_costs(self, run_ids: List[UUID]) -> Dict[str, Dict[str, Any]]:
+        """What each run spent, aggregated from its stored results and traces.
+
+        ``call`` trace nodes are labelled with the role that made them
+        (``target``, ``panel``, ``attacker`` or a helper such as ``on_topic``).
+        Runs that record no call nodes only have their target interactions,
+        so their judge and attacker calls are reported as ``None``: not traced,
+        rather than zero.
+
+        Goal samples include the first successful conversation ordinal and, when
+        every successful reply carries a goal clock, the earliest response time.
+        Persistence timestamps cannot recover the latter for batched searches.
+        """
+        ids = [str(run_id) for run_id in run_ids]
+        if not ids:
+            return {}
+        marks = ",".join("?" for _ in ids)
+        with self._lock:
+            totals = self._conn.execute(
+                f"""SELECT run_id, COUNT(*) AS attempts,
+                       COUNT(DISTINCT goal_index) AS goals,
+                       MIN(created_at) AS started, MAX(updated_at) AS finished
+                    FROM results WHERE run_id IN ({marks}) GROUP BY run_id""",
+                ids,
+            ).fetchall()
+            latencies = self._conn.execute(
+                f"""SELECT run_id, json_extract(metadata_json, '$.latency_ms') AS ms
+                    FROM results WHERE run_id IN ({marks}) AND ms IS NOT NULL""",
+                ids,
+            ).fetchall()
+            calls = self._conn.execute(
+                f"""SELECT r.run_id AS run_id,
+                       CASE WHEN t.step_type = 'interaction' THEN '' ELSE
+                         json_extract(t.content_json, '$.label') END AS label,
+                       COUNT(*) AS n,
+                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
+                                    json_extract(t.content_json, '$.response.usage.prompt_tokens'))) AS prompt,
+                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.completion_tokens'),
+                                    json_extract(t.content_json, '$.response.usage.completion_tokens'))) AS completion
+                    FROM traces t JOIN results r ON r.id = t.result_id
+                    WHERE r.run_id IN ({marks})
+                      AND (t.step_type = 'interaction'
+                           OR json_extract(t.content_json, '$.node') = 'call')
+                    GROUP BY 1, 2""",
+                ids,
+            ).fetchall()
+            goal_totals = self._conn.execute(
+                f"""WITH ordered AS (
+                       SELECT *, ROW_NUMBER() OVER (
+                         PARTITION BY run_id, goal_index ORDER BY created_at, id
+                       ) AS ordinal,
+                       result_bucket(evaluation_status, evaluation_notes) AS bucket
+                       FROM results WHERE run_id IN ({marks}) AND goal_index IS NOT NULL
+                    )
+                    SELECT run_id, goal_index, COUNT(*) AS attempts,
+                       MIN(CASE WHEN bucket = 'jailbreak' THEN ordinal END) AS first_jailbreak_attempt,
+                       SUM(bucket = 'jailbreak') AS successes,
+                       COUNT(CASE WHEN bucket = 'jailbreak' THEN
+                         json_extract(metadata_json, '$.attack_metadata.goal_target_elapsed_s')
+                       END) AS timed_successes,
+                       MIN(CASE WHEN bucket = 'jailbreak' THEN
+                         json_extract(metadata_json, '$.attack_metadata.goal_target_elapsed_s')
+                       END) AS first_jailbreak_elapsed_s,
+                       SUM(EXISTS(SELECT 1 FROM traces t WHERE t.result_id = results.id
+                         AND json_extract(t.content_json, '$.node') = 'call'
+                         AND COALESCE(json_extract(t.content_json, '$.label'), '') != ''
+                       )) AS traced_attempts,
+                       MIN(created_at) AS started, MAX(updated_at) AS finished
+                    FROM ordered AS results
+                    GROUP BY run_id, goal_index""",
+                ids,
+            ).fetchall()
+            goal_calls = self._conn.execute(
+                f"""SELECT r.run_id, r.goal_index,
+                       CASE WHEN t.step_type = 'interaction' THEN '' ELSE
+                         json_extract(t.content_json, '$.label') END AS label,
+                       COUNT(*) AS n,
+                       SUM(CASE WHEN json_extract(t.content_json, '$.scope') = 'goal'
+                         THEN 1 ELSE 0 END) AS goal_scoped_n,
+                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
+                                    json_extract(t.content_json, '$.response.usage.prompt_tokens'), 0)
+                         + COALESCE(json_extract(t.content_json, '$.data.usage.completion_tokens'),
+                                    json_extract(t.content_json, '$.response.usage.completion_tokens'), 0)) AS tokens,
+                       COUNT(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
+                                      json_extract(t.content_json, '$.response.usage.prompt_tokens'),
+                                      json_extract(t.content_json, '$.data.usage.completion_tokens'),
+                                      json_extract(t.content_json, '$.response.usage.completion_tokens'))) AS usage_samples
+                    FROM traces t JOIN results r ON r.id = t.result_id
+                    WHERE r.run_id IN ({marks}) AND r.goal_index IS NOT NULL
+                      AND (t.step_type = 'interaction'
+                           OR json_extract(t.content_json, '$.node') = 'call')
+                    GROUP BY 1, 2, 3""",
+                ids,
+            ).fetchall()
+
+        by_run: Dict[str, Dict[str, Any]] = {}
+        for row in totals:
+            started, finished = _to_dt(row["started"]), _to_dt(row["finished"])
+            by_run[row["run_id"]] = {
+                "attempts": row["attempts"],
+                "goals": row["goals"],
+                "elapsed_s": max((finished - started).total_seconds(), 0.0),
+                "calls": {"target": 0, "attacker": None, "judge": None},
+                "calls_traced": False,
+                "target_tokens": None,
+                "target_latency_ms": None,
+            }
+        labelled: Dict[str, Dict[str, Any]] = {}
+        for row in calls:
+            labelled.setdefault(row["run_id"], {})[row["label"] or ""] = row
+        for run_id, labels in labelled.items():
+            cost = by_run.get(run_id)
+            if cost is None:
+                continue
+            nodes = {label: row for label, row in labels.items() if label}
+            interactions = labels.get("")
+            if nodes:
+                cost["calls_traced"] = True
+                target = nodes.get("target")
+                cost["calls"] = {
+                    "target": target["n"] if target else 0,
+                    "attacker": sum(
+                        row["n"]
+                        for label, row in nodes.items()
+                        if label not in ("target", "panel")
+                    ),
+                    "judge": nodes["panel"]["n"] if "panel" in nodes else 0,
+                }
+            elif interactions:
+                cost["calls"]["target"] = interactions["n"]
+            # Token usage is recorded for target calls only.
+            source = nodes.get("target")
+            if source is None or source["prompt"] is None:
+                source = interactions
+            if source is not None and (
+                source["prompt"] is not None or source["completion"] is not None
+            ):
+                cost["target_tokens"] = {
+                    "prompt": int(source["prompt"] or 0),
+                    "completion": int(source["completion"] or 0),
+                }
+        samples: Dict[str, List[float]] = {}
+        for row in latencies:
+            samples.setdefault(row["run_id"], []).append(float(row["ms"]))
+        for run_id, values in samples.items():
+            if run_id not in by_run:
+                continue
+            values.sort()
+            by_run[run_id]["target_latency_ms"] = {
+                "median": _quantile(values, 0.5),
+                "p90": _quantile(values, 0.9),
+                "samples": len(values),
+            }
+        goal_labels: Dict[Any, Dict[str, Any]] = {}
+        for row in goal_calls:
+            goal_labels.setdefault((row["run_id"], row["goal_index"]), {})[
+                row["label"] or ""
+            ] = row
+        for cost in by_run.values():
+            cost["goal_samples"] = []
+        for row in goal_totals:
+            labels = goal_labels.get((row["run_id"], row["goal_index"]), {})
+            nodes = {label: item for label, item in labels.items() if label}
+            target = nodes.get("target") if nodes else labels.get("")
+            usage = target
+            if usage is None or not usage["usage_samples"]:
+                usage = labels.get("")
+            started, finished = _to_dt(row["started"]), _to_dt(row["finished"])
+            # A batched phase can attach all its goal-scoped calls to one result.
+            calls_complete = row["traced_attempts"] == row["attempts"] or (
+                target is not None and target["goal_scoped_n"] >= row["attempts"]
+            )
+            by_run[row["run_id"]]["goal_samples"].append(
+                {
+                    "goal_index": row["goal_index"],
+                    "first_jailbreak_attempt": row["first_jailbreak_attempt"],
+                    "first_jailbreak_elapsed_s": row["first_jailbreak_elapsed_s"]
+                    if row["successes"] and row["timed_successes"] == row["successes"]
+                    else None,
+                    "attempts": row["attempts"],
+                    "calls": sum(item["n"] for item in nodes.values())
+                    if nodes and calls_complete
+                    else None,
+                    "target_tokens": usage["tokens"]
+                    if usage is not None and usage["usage_samples"] == usage["n"]
+                    else None,
+                    "elapsed_s": max((finished - started).total_seconds(), 0.0),
+                }
+            )
+        return by_run
 
     # ── Attack builder drafts ─────────────────────────────────────────────────
 

@@ -92,7 +92,8 @@ def user_profile(org_id: UUID) -> Dict[str, Any]:
         "organization_name": LOCAL_ORG_NAME,
         "keycloak_user_id": None,
         "auth0_user_id": None,
-        "analytics_consent": None,
+        # Offline profiles cannot save consent; never prompt or enable tracking.
+        "analytics_consent": "declined",
     }
 
 
@@ -161,7 +162,11 @@ def result(record: Any, traces: Optional[List[Any]] = None) -> Dict[str, Any]:
         "evaluation_status": record.evaluation_status,
         "evaluation_notes": record.evaluation_notes,
         "evaluation_metrics": record.evaluation_metrics,
-        "agent_specific_data": metadata,
+        "agent_specific_data": {
+            **metadata,
+            "goal": record.goal,
+            "goal_index": record.goal_index,
+        },
         "timestamp": _iso(record.created_at),
         "traces": [trace(t) for t in (traces or [])],
     }

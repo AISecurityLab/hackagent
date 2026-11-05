@@ -586,6 +586,7 @@ class _AttackRunner:
     async def _generate_and_send(
         self, attack: ResolvedAttack, goal: Goal
     ) -> list[Attempt]:
+        goal_started = monotonic()
         # A static attack may call a helper model (FC's step generator) to
         # build its requests; those calls go on the goal's first attempt, so
         # each is counted once however many requests it produced.
@@ -612,7 +613,7 @@ class _AttackRunner:
         attempts = list(
             await asyncio.gather(
                 *(
-                    self._run_request(attack, goal, index, messages)
+                    self._run_request(attack, goal, index, messages, goal_started)
                     for index, messages in enumerate(requests)
                 )
             )
@@ -630,6 +631,7 @@ class _AttackRunner:
         goal: Goal,
         request_index: int,
         messages: list[dict[str, Any]],
+        goal_started: Optional[float] = None,
     ) -> Attempt:
         """Send one request a static attack generated, and judge the reply.
 
@@ -637,7 +639,9 @@ class _AttackRunner:
         an iterative attack, including on the paths that stop early.
         """
         with recording() as trace:
-            attempt = await self._send_and_judge(attack, goal, request_index, messages)
+            attempt = await self._send_and_judge(
+                attack, goal, request_index, messages, goal_started
+            )
         return replace(attempt, trace=tuple(trace.nodes))
 
     async def _send_and_judge(
@@ -646,12 +650,18 @@ class _AttackRunner:
         goal: Goal,
         request_index: int,
         messages: list[dict[str, Any]],
+        goal_started: Optional[float] = None,
     ) -> Attempt:
         attempt = Attempt(
             goal.index, request_index, goal.text, messages=tuple(messages)
         )
         try:
             response = await self._send(messages)
+            if goal_started is not None:
+                attempt = replace(
+                    attempt,
+                    metadata={"goal_target_elapsed_s": monotonic() - goal_started},
+                )
         except Exception as exc:
             # A provider error arrives as a response; a transport failure
             # arrives as an exception, and is this request's alone.
@@ -699,11 +709,19 @@ class _AttackRunner:
 
     async def _search(self, attack: ResolvedAttack, goal: Goal) -> list[Attempt]:
         """Run an iterative attack for ``goal`` and judge every exchange it kept."""
+        goal_started = monotonic()
+        response_times: dict[int, float] = {}
+
+        async def timed_target(messages: Messages, **overrides: Any) -> ModelResponse:
+            response = await self._send(messages, **overrides)
+            response_times[id(response)] = monotonic() - goal_started
+            return response
+
         with recording() as trace:
             try:
                 async with self.limits.attack:
                     findings = await attack.attack.run(
-                        goal.text, self._send, self._ask_panel
+                        goal.text, timed_target, self._ask_panel
                     )
             except Exception as exc:
                 logger.warning(
@@ -730,7 +748,7 @@ class _AttackRunner:
                 )
             ]
         return [
-            self._attempt_for(attack, goal, index, finding, slice_)
+            self._attempt_for(attack, goal, index, finding, slice_, response_times)
             for index, (finding, slice_) in enumerate(
                 zip(findings, _slices(nodes, findings))
             )
@@ -743,6 +761,7 @@ class _AttackRunner:
         index: int,
         finding: Finding,
         trace: tuple[TraceNode, ...],
+        response_times: Optional[dict[int, float]] = None,
     ) -> Attempt:
         """One attempt per judged exchange, carrying the search that made it."""
         # The finding's reply is one that _send returned.
@@ -757,6 +776,14 @@ class _AttackRunner:
             metadata=dict(finding.metadata),
             trace=trace,
         )
+        if response_times is not None and id(response) in response_times:
+            attempt = replace(
+                attempt,
+                metadata={
+                    **attempt.metadata,
+                    "goal_target_elapsed_s": response_times[id(response)],
+                },
+            )
         try:
             return replace(attempt, decoded=attack.attack.decode(response.text))
         except Exception as exc:

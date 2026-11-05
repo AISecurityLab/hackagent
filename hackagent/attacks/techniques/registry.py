@@ -48,6 +48,12 @@ ITERATIVE_ATTACKS = ATTACKS - STATIC_ATTACKS
 AttackType = Union[type[StaticAttack], type[IterativeAttack]]
 
 
+def attack_family(name: str) -> Optional[str]:
+    """Return the family ``name`` belongs to (``static``, ``adaptive``, …), or None."""
+    path = _ATTACKS.get(name)
+    return path.split(".", 1)[0] if path else None
+
+
 def get_attack_class(name: str) -> AttackType:
     """Return the attack class registered under ``name``."""
     try:

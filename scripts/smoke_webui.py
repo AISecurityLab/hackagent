@@ -67,7 +67,13 @@ def seed(db_path: Path) -> None:
             "smoke-agent", "ollama", "http://localhost:11434", {"description": "smoke"}
         )
         attack = backend.create_attack("tap", agent.id, org, {"goals": ["g0", "g1"]})
-        run = backend.create_run(attack.id, agent.id, {"limit": 4})
+        campaign = backend.create_campaign_run(
+            agent.id, "smoke-campaign", {"version": 1}
+        )
+        backend.update_campaign_run(campaign.id, status="COMPLETED")
+        run = backend.create_run(
+            attack.id, agent.id, {"limit": 4}, campaign_run_id=campaign.id
+        )
         backend.update_run(run.id, status="COMPLETED")
 
         # A spread of outcomes, so the summary counts are exercised rather than
@@ -80,7 +86,11 @@ def seed(db_path: Path) -> None:
         ]
         for index, (status, notes) in enumerate(outcomes):
             result = backend.create_result(
-                run.id, f"smoke goal {index}", index, {"prompt": f"p{index}"}, {}
+                run.id,
+                f"smoke goal {index}",
+                index,
+                {"messages": [{"role": "user", "content": f"prompt {index}"}]},
+                {"response": f"reply {index}"},
             )
             backend.update_result(
                 result.id,
@@ -129,6 +139,9 @@ def drive(base: str) -> list[str]:
             try:
                 page.goto(base + path, wait_until="networkidle", timeout=30_000)
                 page.wait_for_timeout(1_200)
+                consent = page.get_by_role("button", name="Not now", exact=True)
+                if consent.is_visible():
+                    consent.click()
                 rendered = page.inner_text("body").strip()
             except Exception as exc:  # noqa: BLE001 - reported, not raised
                 failures.append(f"{path}: {type(exc).__name__}: {exc}")
@@ -139,6 +152,30 @@ def drive(base: str) -> list[str]:
 
             status = "ok" if len(failures) == before else "FAILED"
             print(f"  {path:<20} {status}")
+
+        try:
+            page.goto(base + "/stats", wait_until="networkidle")
+            page.get_by_role("link", name="smoke-campaign", exact=True).click()
+            page.get_by_role("region", name="Campaign outcomes").wait_for()
+            navigator = page.get_by_role("complementary", name="Goal navigator")
+            navigator.wait_for()
+            navigator.get_by_role("button", name="smoke goal 0", exact=False).click()
+            page.get_by_role("heading", name="smoke goal 0", exact=True).wait_for()
+            page.get_by_role("region", name="Attack conversation").wait_for()
+            navigator.get_by_role("button", name="smoke goal 1", exact=False).click()
+            page.get_by_role("heading", name="smoke goal 1", exact=True).wait_for()
+            navigator.get_by_role("button", name="smoke goal 0", exact=False).wait_for()
+            page.get_by_role("tab", name="TAP", exact=False).wait_for()
+            page.get_by_role("button", name="Attack settings", exact=True).click()
+            page.get_by_role("dialog").get_by_text('"limit": 4', exact=False).wait_for()
+            page.get_by_role("button", name="Close", exact=True).click()
+            page.get_by_role("region", name="Campaign audit").wait_for()
+            page.get_by_text(
+                "No audit recorded for this execution.", exact=True
+            ).wait_for()
+            print("  campaign investigation ok")
+        except Exception as exc:  # noqa: BLE001 - reported, not raised
+            failures.append(f"campaign investigation: {type(exc).__name__}: {exc}")
 
         browser.close()
 
