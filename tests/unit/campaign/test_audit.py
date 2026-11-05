@@ -494,8 +494,43 @@ def test_a_panel_behind_its_best_judge_says_so_with_the_gap():
     )
 
     assert "the panel is behind by 0.750" in text
-    # Three disagreements, all one way, is still not enough to call.
-    assert "too few to call" in text
+    prose = " ".join(text.split())
+    assert "no significant accuracy difference" in prose
+    assert "not a test of J" in prose
+
+
+def test_mcnemar_significance_is_not_presented_as_j_significance():
+    labels = [True] * 10 + [False] * 90
+    columns = {"negative": [False] * 100, "positive": [True] * 100}
+    ensemble = compare_rules(columns, columns["positive"], labels)
+    report = AuditReport(
+        samples=100,
+        contextual_samples=0,
+        judges=(JudgeReport(judge=PANEL, metrics=ensemble.configured.metrics),),
+        ensemble=ensemble,
+    )
+    text = " ".join(format_report(report).split())
+
+    assert ensemble.configured.metrics.youden_j == ensemble.best_single.metrics.youden_j
+    assert ensemble.disagreement.p_value < 0.05
+    assert "the two are level" in text
+    assert "significant accuracy difference" in text
+    assert "not a test of J" in text
+
+
+def test_threshold_recommendation_is_rendered_without_rounding():
+    from hackagent.evaluation.audit import best_threshold
+
+    boundary = 20 / 3
+    report = ensemble_report("11000000", a="11000000", b="11000000")
+    report = report.model_copy(
+        update={
+            "threshold": best_threshold([boundary, 0.0], [True, False], current=7.0)
+        }
+    )
+    text = format_report(report)
+
+    assert f"{boundary!r} would score 1.000" in text
 
 
 def test_judges_that_cover_each_other_are_not_reported_as_a_cost():

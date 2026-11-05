@@ -128,13 +128,11 @@ One way of combining judges, and how it scored.
 class Disagreement(_Report)
 ```
 
-Where the panel and the best lone judge parted company.
+Accuracy disagreements between the panel and the best lone judge.
 
-Only the two discordant counts carry information about which is better.
-Samples they both got right, or both got wrong, say nothing either way,
-and on a panel whose judges mostly agree they are nearly all of the
-samples: a difference in J resting on twenty disagreements is a
-difference resting on twenty samples, however many were judged.
+Counts are pooled across classes. McNemar&#x27;s test on these counts tests
+ordinary accuracy, not balanced accuracy or Youden&#x27;s J. On imbalanced
+samples its result can be significant even when both judges have equal J.
 
 #### p\_value
 
@@ -146,11 +144,11 @@ def p_value() -> float
 
 How often chance alone would split the disagreements this unevenly.
 
-McNemar&#x27;s exact test. If the panel and the judge were equally good,
+McNemar&#x27;s exact test of equal ordinary accuracy, not equal J.
+If the panel and the judge had equal accuracy,
 each sample they disagree on would fall either way on a coin toss,
 so the question is whether this many landed on one side. Large means
-the difference between them has not been shown, whatever the gap in
-J looks like; 1.0 when they never disagreed.
+an accuracy difference has not been shown; 1.0 when they never disagreed.
 
 ## EnsembleReport Objects
 
@@ -178,11 +176,9 @@ def worth_it() -> Optional[bool]
 
 Does the panel beat the best judge on it? `None` without J.
 
-This is the gap as measured, and a gap is not a finding. Read it
-with `disagreement.p_value`, which says whether a gap this size
-would have turned up anyway: panels usually sit close enough to
-their best judge that a calibration set of a few hundred cannot
-tell them apart.
+This is descriptive, not a significance test of the J difference.
+`disagreement.p_value` tests ordinary accuracy only and must not
+be used to qualify this comparison of J.
 
 ## FlipMetrics Objects
 
@@ -281,8 +277,11 @@ https://doi.org/10.1093/oxfordjournals.aje.a112510
 #### best\_threshold
 
 ```python
-def best_threshold(scores: Sequence[float], labels: Sequence[bool], *,
-                   current: float) -> Optional[ThresholdSweep]
+def best_threshold(scores: Sequence[float],
+                   labels: Sequence[bool],
+                   *,
+                   current: float,
+                   available: Optional[Sequence[bool]] = None) -> Optional[ThresholdSweep]
 ```
 
 Find the cut on a panel&#x27;s score that separates the labels best.
@@ -293,7 +292,9 @@ were harmful. Ties go to the cut nearest the one in use, so a threshold
 that is already as good as any other is never reported as improvable.
 
 `None` when the labels are all one class, which leaves nothing to
-separate.
+separate. `available` marks samples with a panel verdict; unavailable
+samples remain non-detections at every threshold. Threshold values are
+retained exactly so applying a recommendation reproduces its predictions.
 
 #### expected\_independent\_j
 
@@ -364,13 +365,15 @@ def compare_rules(votes: Mapping[str, Sequence[bool]],
                   labels: Sequence[bool],
                   *,
                   aggregation: str = "",
-                  abstentions: int = 0) -> Optional[EnsembleReport]
+                  abstentions: int = 0,
+                  judge_abstentions: int = 0) -> Optional[EnsembleReport]
 ```
 
 Ask whether this panel is worth more than the best judge on it.
 
 `None` for a panel of one, which is not a panel and has nothing to be
-compared against.
+compared against. `judge_abstentions` counts individual abstentions;
+any such abstention suppresses the fixed-vote independence diagnostic.
 
 #### flip\_metrics
 
@@ -413,4 +416,3 @@ One pass of the panel over a list of samples, split by judge.
 #### panel\_scores
 
 The panel&#x27;s combined score per sample, which is what its threshold cuts.
-

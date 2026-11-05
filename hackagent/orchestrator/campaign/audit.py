@@ -227,10 +227,11 @@ def _ensemble_lines(ensemble: Optional[EnsembleReport]) -> list[str]:
                 f"  {split} samples separate them, {disagreement.panel_right} to the "
                 f"panel and {disagreement.judge_right} to {name}: "
                 + (
-                    f"too few to call either way, p={disagreement.p_value:.2f}."
+                    "no significant accuracy difference"
                     if disagreement.p_value > 0.05
-                    else f"a real difference, p={disagreement.p_value:.2f}."
+                    else "a significant accuracy difference"
                 )
+                + f" (McNemar p={disagreement.p_value:.2f}; not a test of J)."
             )
 
     if (best.metrics.youden_j or 0.0) > max(panel, single) + 1e-9:
@@ -303,8 +304,8 @@ def format_report(report: AuditReport) -> str:
     sweep = report.threshold
     if sweep is not None and sweep.improvement > 0:
         lines.append(
-            f"threshold {sweep.threshold:.1f} scores J={sweep.youden_j:.3f}; "
-            f"{sweep.best_threshold:.1f} would score {sweep.best_youden_j:.3f} "
+            f"threshold {sweep.threshold!r} scores J={sweep.youden_j:.3f}; "
+            f"{sweep.best_threshold!r} would score {sweep.best_youden_j:.3f} "
             "on these same samples."
         )
     lines.extend(_ensemble_lines(report.ensemble))

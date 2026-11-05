@@ -455,6 +455,50 @@ def test_a_panel_that_counts_votes_is_not_swept():
     assert report.threshold is None
 
 
+def test_threshold_boundary_round_trips_without_changing_predictions():
+    scores = [20 / 3, 0.0]
+    labels = [True, False]
+    sweep = best_threshold(scores, labels, current=7.0)
+
+    assert sweep.best_threshold == scores[0]
+    restored = type(sweep).model_validate_json(sweep.model_dump_json())
+    metrics = binary_metrics(
+        [score >= restored.best_threshold for score in scores], labels
+    )
+    assert metrics.youden_j == sweep.best_youden_j == 1.0
+
+
+@pytest.mark.parametrize("aggregation", ["mean", "max"])
+def test_unjudged_samples_remain_nondetections_in_threshold_sweep(aggregation):
+    judge = ScriptedJudge("j", {"safe": True}, abstains=("harmful",))
+    panel = Panel([judge], aggregation=aggregation)
+    samples = labelled(("harmful", True), ("safe", False))
+    report = audit(panel, samples)
+
+    panel.threshold = report.threshold.best_threshold
+    measured = audit(panel, samples)
+    assert report.threshold.best_youden_j == measured.report_for(PANEL).metrics.youden_j
+    assert report.threshold.youden_j == -1.0
+
+
+def test_a_current_threshold_above_all_scores_is_not_made_worse():
+    sweep = best_threshold([0.0, 5.0], [True, False], current=7.0)
+    assert sweep.best_threshold == 7.0
+    assert sweep.improvement == 0.0
+
+
+def test_threshold_sweep_rejects_mismatched_availability():
+    with pytest.raises(ValueError, match="availability"):
+        best_threshold([1.0, 0.0], [True, False], current=7.0, available=[True])
+
+
+def test_threshold_zero_does_not_turn_an_abstention_into_a_detection():
+    sweep = best_threshold(
+        [0.0, 10.0], [True, False], current=0.0, available=[False, True]
+    )
+    assert sweep.youden_j == sweep.best_youden_j == -1.0
+
+
 # --- is the panel worth its judges? -----------------------------------------
 
 
@@ -554,6 +598,31 @@ def test_disagreement_counts_only_where_they_differ():
 
 def test_a_panel_of_one_is_not_a_panel():
     assert compare_rules(votes(a="10"), (True, False), [True, False]) is None
+
+
+def test_zero_j_ranks_above_negative_j():
+    columns = votes(no_signal="0000", negative="0010")
+    labels = [True, True, False, False]
+    ranked = sweep_rules(columns, labels)
+    report = compare_rules(columns, (False,) * 4, labels)
+
+    assert ranked[0].metrics.youden_j == 0.0
+    assert report.best_single.judges == ("no_signal",)
+    assert report.best_rule.metrics.youden_j == 0.0
+
+
+@pytest.mark.parametrize("aggregation", ["majority", "any"])
+def test_independence_diagnostic_is_omitted_when_a_judge_abstains(aggregation):
+    sharp = ScriptedJudge("sharp", {"harmful": True})
+    silent = ScriptedJudge("silent", {}, abstains=("harmful", "safe"))
+    report = audit(
+        Panel([sharp, silent], aggregation=aggregation),
+        labelled(("harmful", True), ("safe", False)),
+    )
+
+    assert report.ensemble.configured.metrics.youden_j == 1.0
+    assert report.ensemble.independent_j is None
+    assert report.ensemble.correlation_penalty is None
 
 
 def test_the_independence_estimate_matches_the_textbook_case():

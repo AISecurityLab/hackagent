@@ -263,13 +263,11 @@ class RuleReport(_Report):
 
 
 class Disagreement(_Report):
-    """Where the panel and the best lone judge parted company.
+    """Accuracy disagreements between the panel and the best lone judge.
 
-    Only the two discordant counts carry information about which is better.
-    Samples they both got right, or both got wrong, say nothing either way,
-    and on a panel whose judges mostly agree they are nearly all of the
-    samples: a difference in J resting on twenty disagreements is a
-    difference resting on twenty samples, however many were judged.
+    Counts are pooled across classes. McNemar's test on these counts tests
+    ordinary accuracy, not balanced accuracy or Youden's J. On imbalanced
+    samples its result can be significant even when both judges have equal J.
     """
 
     panel_right: int = Field(
@@ -285,11 +283,11 @@ class Disagreement(_Report):
     def p_value(self) -> float:
         """How often chance alone would split the disagreements this unevenly.
 
-        McNemar's exact test. If the panel and the judge were equally good,
+        McNemar's exact test of equal ordinary accuracy, not equal J.
+        If the panel and the judge had equal accuracy,
         each sample they disagree on would fall either way on a coin toss,
         so the question is whether this many landed on one side. Large means
-        the difference between them has not been shown, whatever the gap in
-        J looks like; 1.0 when they never disagreed.
+        an accuracy difference has not been shown; 1.0 when they never disagreed.
         """
         discordant = self.panel_right + self.judge_right
         if not discordant:
@@ -328,7 +326,8 @@ class EnsembleReport(_Report):
         description=(
             "The J this vote would have reached if its judges never erred "
             "together. Only for ``majority`` and ``any``, which are counts of "
-            "votes; ``mean`` and ``max`` are not."
+            "votes; ``mean`` and ``max`` are not. Omitted if any judge abstained, "
+            "since the panel's participating vote count then varies."
         ),
     )
     correlation_penalty: Optional[float] = Field(
@@ -346,11 +345,9 @@ class EnsembleReport(_Report):
     def worth_it(self) -> Optional[bool]:
         """Does the panel beat the best judge on it? ``None`` without J.
 
-        This is the gap as measured, and a gap is not a finding. Read it
-        with ``disagreement.p_value``, which says whether a gap this size
-        would have turned up anyway: panels usually sit close enough to
-        their best judge that a calibration set of a few hundred cannot
-        tell them apart.
+        This is descriptive, not a significance test of the J difference.
+        ``disagreement.p_value`` tests ordinary accuracy only and must not
+        be used to qualify this comparison of J.
         """
         panel = self.configured.metrics.youden_j
         single = self.best_single.metrics.youden_j
@@ -539,7 +536,11 @@ def correct_rate(
 
 
 def best_threshold(
-    scores: Sequence[float], labels: Sequence[bool], *, current: float
+    scores: Sequence[float],
+    labels: Sequence[bool],
+    *,
+    current: float,
+    available: Optional[Sequence[bool]] = None,
 ) -> Optional[ThresholdSweep]:
     """Find the cut on a panel's score that separates the labels best.
 
@@ -549,24 +550,34 @@ def best_threshold(
     that is already as good as any other is never reported as improvable.
 
     ``None`` when the labels are all one class, which leaves nothing to
-    separate.
+    separate. ``available`` marks samples with a panel verdict; unavailable
+    samples remain non-detections at every threshold. Threshold values are
+    retained exactly so applying a recommendation reproduces its predictions.
     """
     if len(scores) != len(labels):
         raise ValueError("scores and labels must have the same length")
+    if available is not None and len(available) != len(scores):
+        raise ValueError("availability and scores must have the same length")
     if not labels or len(set(labels)) < 2:
         return None
 
     def youden(threshold: float) -> float:
-        metrics = binary_metrics([score >= threshold for score in scores], labels)
+        metrics = binary_metrics(
+            [
+                score >= threshold and (available is None or available[index])
+                for index, score in enumerate(scores)
+            ],
+            labels,
+        )
         return metrics.youden_j or 0.0
 
-    candidates = sorted(set(scores))
+    candidates = sorted({*scores, current})
     best = max(candidates, key=lambda cut: (youden(cut), -abs(cut - current)))
     at_best, at_current = youden(best), youden(current)
     return ThresholdSweep(
-        threshold=round(current, 4),
+        threshold=current,
         youden_j=round(at_current, 4),
-        best_threshold=round(best, 4),
+        best_threshold=best,
         best_youden_j=round(at_best, 4),
         improvement=round(at_best - at_current, 4),
     )
@@ -650,7 +661,13 @@ def sweep_rules(
             )
     return tuple(
         sorted(
-            reports, key=lambda report: report.metrics.youden_j or -1.0, reverse=True
+            reports,
+            key=lambda report: (
+                report.metrics.youden_j
+                if report.metrics.youden_j is not None
+                else -math.inf
+            ),
+            reverse=True,
         )
     )
 
@@ -705,11 +722,13 @@ def compare_rules(
     *,
     aggregation: str = "",
     abstentions: int = 0,
+    judge_abstentions: int = 0,
 ) -> Optional[EnsembleReport]:
     """Ask whether this panel is worth more than the best judge on it.
 
     ``None`` for a panel of one, which is not a panel and has nothing to be
-    compared against.
+    compared against. ``judge_abstentions`` counts individual abstentions;
+    any such abstention suppresses the fixed-vote independence diagnostic.
     """
     names = tuple(votes)
     if len(names) < 2:
@@ -739,7 +758,12 @@ def compare_rules(
         (by_judge[name].recall, by_judge[name].false_positive_rate) for name in names
     ]
     independent = None
-    if needed is not None and all(alarm is not None for _, alarm in rates):
+    if (
+        needed is not None
+        and not judge_abstentions
+        and not abstentions
+        and all(alarm is not None for _, alarm in rates)
+    ):
         independent = round(expected_independent_j(rates, needed), 4)
 
     panel_j = configured.metrics.youden_j
@@ -873,7 +897,12 @@ async def audit_panel(
     # not a single cut on the combined score: sweeping one would describe a
     # panel that does not exist.
     sweep = (
-        best_threshold(baseline.panel_scores, labels, current=panel.threshold)
+        best_threshold(
+            baseline.panel_scores,
+            labels,
+            current=panel.threshold,
+            available=baseline.panel_available,
+        )
         if getattr(panel, "aggregation", "") in ("mean", "max")
         else None
     )
@@ -893,6 +922,7 @@ async def audit_panel(
             labels,
             aggregation=getattr(panel, "aggregation", ""),
             abstentions=baseline.abstentions[PANEL],
+            judge_abstentions=sum(baseline.abstentions[name] for name in judge_votes),
         ),
     )
 
@@ -907,6 +937,7 @@ class _Predictions(BaseModel):
     abstentions: Mapping[str, int]
     #: The panel's combined score per sample, which is what its threshold cuts.
     panel_scores: tuple[float, ...] = ()
+    panel_available: tuple[bool, ...] = ()
 
 
 async def _judge_all(
@@ -936,6 +967,7 @@ async def _judge_all(
         predictions=predictions,
         abstentions=abstentions,
         panel_scores=tuple(verdict.score for verdict in verdicts),
+        panel_available=tuple(not _vote_for(verdict, PANEL)[1] for verdict in verdicts),
     )
 
 
