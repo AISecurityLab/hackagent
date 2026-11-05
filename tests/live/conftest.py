@@ -3,7 +3,8 @@
 
 """Fixtures for the tests that actually send requests.
 
-Everything here talks to a real model. The rest of the suite proves the code
+These fixtures talk to a real model; the auth smoke checks a real backend.
+The rest of the suite proves the code
 is internally consistent; these prove it works — the distinction that let a
 shipped example which could never reach its target pass 2,382 green tests.
 
@@ -28,24 +29,6 @@ CHAT_MODEL = os.environ.get("HACKAGENT_LIVE_MODEL", "llama3.2:3b")
 EMBED_MODEL = os.environ.get("HACKAGENT_LIVE_EMBEDDER", "embeddinggemma")
 #: Some attacks send images, so their target has to be able to see.
 VISION_MODEL = os.environ.get("HACKAGENT_LIVE_VISION", "gemma3:4b")
-
-
-def pytest_addoption(parser: Any) -> None:
-    parser.addoption(
-        "--run-live",
-        action="store_true",
-        default=False,
-        help="Run the tests that send real requests to a local Ollama.",
-    )
-
-
-def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
-    if config.getoption("--run-live"):
-        return
-    skip = pytest.mark.skip(reason="needs --run-live and a local Ollama")
-    for item in items:
-        if "live" in item.keywords:
-            item.add_marker(skip)
 
 
 def _ollama_is_up(endpoint: str) -> bool:

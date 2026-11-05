@@ -148,6 +148,7 @@ include = [
 ]
 
 [tool.coverage.run]
+branch = true
 data_file = "reports/.coverage"
 source = ["hackagent"]
 omit = [
@@ -180,7 +181,7 @@ markers = [
     "openai_sdk: marks tests that require OpenAI/OpenRouter API key",
     "google_adk: marks tests that require a live Google ADK server (use --run-google-adk to enable)",
     "litellm: marks tests that require a LiteLLM-compatible backend",
-    "e2e: marks end-to-end tests that require external services",
+    "e2e: deterministic end-to-end tests using controlled local services",
     "hackagent_backend: marks tests that require the HackAgent backend API",
     "slow: marks slow-running tests (excluded from CI, run nightly)",
 ]

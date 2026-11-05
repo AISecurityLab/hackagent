@@ -7,7 +7,8 @@ import pytest
 import httpx
 
 
-@pytest.mark.e2e
+@pytest.mark.live
+@pytest.mark.hackagent_backend
 def test_auth_endpoint():
     """Smoke-test that the HackAgent API auth endpoint returns a valid response."""
     api_key = os.environ.get("HACKAGENT_API_KEY")
