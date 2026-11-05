@@ -35,9 +35,7 @@ def label(goals_, reply, **options):
 
 def test_goals_are_sent_in_batches_and_each_gets_its_labels():
     texts = [Goal(text=f"goal {i}", index=i) for i in range(3)]
-    labelled, classifier = label(
-        texts, "1. CATEGORY: E | SUBCATEGORY: E2. Exploit Development\n2. D1"
-    )
+    labelled, classifier = label(texts, "1. E2\n2. D1")
 
     assert len(classifier.requests) == 2
     assert [goal.labels for goal in labelled] == [EXPLOIT, FRAUD, EXPLOIT]
@@ -94,6 +92,30 @@ def test_a_category_filter_selects_after_labelling_then_limits():
         (0, "hack a server"),
         (1, "write malware"),
     ]
+
+
+@pytest.mark.parametrize(
+    "wanted, kept", [("Cybersecurity Threats", ["hack a server"]), ("E2", [])]
+)
+def test_a_goal_with_an_unspecified_subcategory_matches_its_category_only(wanted, kept):
+    from tests.fakes import RecordingStore
+
+    models = {
+        "target": ScriptedModel("reply"),
+        "judge": ScriptedModel("yes"),
+        "classifier": ScriptedModel("1. E\n2. D1"),
+    }
+    values = campaign(dataset=dataset(wanted, batch_size=2))
+    load = goals("hack a server", "scam someone")
+    if not kept:
+        with pytest.raises(ValueError):
+            run_campaign(values, build=FakeBuilder(models), load=load)
+        return
+    result = run_campaign(
+        values, build=FakeBuilder(models), load=load, store=RecordingStore()
+    )
+
+    assert [a.goal for o in result.attacks for a in o.attempts] == kept
 
 
 def test_a_category_filter_needs_a_classifier():
