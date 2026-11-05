@@ -8,13 +8,17 @@ sidebar_position: 17
 
 tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII).
 
-**Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
+**Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
 One text request with the flowchart serialized as code.
 
 ## Helper models
 
-None. This attack drives no model of its own, so `roles` can be left out.
+Models this attack drives, configured under its `roles`. Each one is a [ModelConfig](../target.md#modelconfig).
+
+| Role | Kind | Needed | What it does |
+|---|---|---|---|
+| `attacker` | chat model | required | Step-description generator: writes the numbered steps for the goal that the flowchart shows. |
 
 ## Parameters
 
@@ -24,12 +28,24 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 |---|---|---|---|
 | `layout` | one of `vertical`, `horizontal`, `tortuous`, `s_shaped` | `vertical` | Shape of the flowchart: vertical, horizontal, tortuous or s_shaped. |
 | `text_format` | one of `dot`, `mermaid`, `tikz`, `plantuml`, `ascii` | `dot` | Text language the flowchart is written in: dot, mermaid, tikz, plantuml or ascii. |
-| `num_steps` | integer (>= 2, <= 15) | `6` | How many steps the goal is split into. |
-| `truncate_last_step` | boolean | `true` | Cut the last step off mid-sentence, so the target is invited to complete it. |
+| `num_steps` | integer (>= 1, <= 10) | `5` | How many of the generated steps the flowchart shows, from the first. The paper compares 1, 3, 5 and all (at most 10). |
+| `truncate_last_step` | boolean | `false` | Cut the last step off mid-sentence. Not part of FC-Attack, whose flowcharts keep every step whole. |
 
 ## In a campaign file
 
 ```yaml
 attacks:
 - name: tfc
+  roles:
+    attacker:
+      name: llama3.2
+      connection:
+        provider: ollama
+        type: OLLAMA
 ```
+
+:::note[Needs a helper model]
+
+This attack cannot run without `attacker`. A campaign that leaves it out fails to resolve, before anything is attacked.
+
+:::

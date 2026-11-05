@@ -12,6 +12,11 @@ Prefilling attack: opens the model's answer with an adversarial prefix and keeps
 
 Prefill the answer's opening and measure which opening works.
 
+`max_prefix_chars` bounds the assembled prefix before target evaluation;
+it does not limit the writer's generation or reproduce token-based stopping.
+In prefill mode the panel judges the prefix plus the target continuation,
+not a separate continuation-only success rate.
+
 ## Helper models
 
 Models this attack drives, configured under its `roles`. Each one is a [ModelConfig](../target.md#modelconfig).

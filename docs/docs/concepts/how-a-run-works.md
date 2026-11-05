@@ -96,7 +96,7 @@ attack.
 | The selected storage backend | Every attempt, with its prompt, reply and verdict. The default is local SQLite; `execution.storage.backend: remote` records it in the configured API. Read the selected store with the CLI or terminal app. |
 | `./logs/runs/<run id>/campaign.yaml` | The exact campaign that ran, every default written out, so the run can be repeated. |
 | `./logs/runs/<run id>/results.json` | The same attempts as a file, for diffing or sharing. |
-| `./logs/runs/<run id>/traces.jsonl` | For adaptive attacks, the search itself: every call, decision and branch. |
+| `./logs/runs/<run id>/traces.jsonl` | Every model call per attempt, and for adaptive attacks the search itself: every decision and branch. |
 | `./logs/runs/<run id>/audit.json` | When the judge audit is on, how the panel measured up. |
 
 The output folder and formats are set under

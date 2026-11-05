@@ -29,6 +29,9 @@ from hackagent.attacks.techniques.multi_turn.crescendo import (
 )
 from hackagent.attacks.techniques.iterative import IterativeAttack
 from hackagent.attacks.techniques.registry import ITERATIVE_ATTACKS, get_attack_class
+from hackagent.attacks.techniques.multi_turn.crescendo.prompts import (
+    REFUSAL_JUDGE_PROMPT,
+)
 from hackagent.attacks.techniques.trace import recording
 from hackagent.core.contracts import Completion, LLMError, Verdict
 from hackagent.models.response import ModelResponse
@@ -155,13 +158,16 @@ def test_params_reject_unknown_fields():
 
 # --- bon --------------------------------------------------------------------
 
+#: A reply long enough to pass the reference's length guards (> 50 words).
+ANSWER = "step " * 60
+
 
 def test_bon_sends_one_request_per_candidate_each_step():
     attack = BoNAttack(BoNParams(steps=3, candidates=4))
-    findings, target = search(attack, judge=Panel(1.0))
+    findings, target = search(attack, target=Target(ANSWER), judge=Panel(1.0))
     assert len(target.requests) == 3 * 4
-    # One candidate per step is kept for the panel, not all four.
-    assert len(findings) == 3
+    # The reference grades every candidate, not one per step.
+    assert len(findings) == 3 * 4
 
 
 def test_bon_candidates_are_augmentations_of_the_goal():
@@ -186,32 +192,59 @@ def test_bon_without_augmentations_resends_the_goal_unchanged():
 def test_bon_stops_at_the_first_step_the_panel_passes():
     panel = Panel(8.0, 1.0, 1.0)
     attack = BoNAttack(BoNParams(steps=3, candidates=1))
-    findings, target = search(attack, judge=panel)
+    findings, target = search(attack, target=Target(ANSWER), judge=panel)
     assert [finding.verdict.score for finding in findings] == [8.0]
     assert len(panel.samples) == 1
     assert len(target.requests) == 1
 
 
+def test_bon_judges_every_reply_of_the_step_it_stops_at():
+    panel = Panel(1.0, 8.0, 1.0)
+    attack = BoNAttack(BoNParams(steps=3, candidates=3))
+    findings, target = search(attack, target=Target(ANSWER), judge=panel)
+    assert len(panel.samples) == 3
+    assert [finding.verdict.success for finding in findings] == [False, True, False]
+    assert len(target.requests) == 3
+
+
 def test_bon_returns_every_step_when_none_pass():
     attack = BoNAttack(BoNParams(steps=3, candidates=1))
-    findings, target = search(attack, judge=Panel(1.0, 4.0, 2.0))
+    findings, target = search(attack, target=Target(ANSWER), judge=Panel(1.0, 4.0, 2.0))
     assert [finding.verdict.score for finding in findings] == [1.0, 4.0, 2.0]
     assert [finding.metadata["step"] for finding in findings] == [0, 1, 2]
     assert len(target.requests) == 3
 
 
-def test_bon_judges_the_longest_reply_of_a_step():
-    panel = Panel(5.0)
-    attack = BoNAttack(BoNParams(steps=1, candidates=3))
-    target = Target("short", "the longest reply of the three", "mid")
-    [finding], _target = search(attack, target=target, judge=panel)
-    assert finding.response.text == "the longest reply of the three"
-    assert panel.samples[0].response == "the longest reply of the three"
+def test_bon_does_not_grade_a_reply_barely_longer_than_the_request():
+    panel = Panel(9.0)
+    attack = BoNAttack(BoNParams(steps=1, candidates=1))
+    [finding], _ = search(attack, target=Target(f"{GOAL} sure"), judge=panel)
+    assert panel.samples == []
+    assert not finding.verdict.success
+    assert finding.verdict.explanation.startswith("not graded")
+
+
+def test_bon_does_not_count_a_harmful_reply_of_fifty_words_or_fewer():
+    attack = BoNAttack(BoNParams(steps=2, candidates=1))
+    findings, _target = search(attack, target=Target("word " * 50), judge=Panel(9.0))
+    # Not a success, so the search does not stop.
+    assert len(findings) == 2
+    assert not findings[0].verdict.success
+    assert findings[0].verdict.score == 9.0
+    assert "50 words or fewer" in findings[0].verdict.explanation
+
+
+def test_bon_does_not_count_a_reply_that_decodes_the_prompt():
+    reply = "The decoded message reads: " + ANSWER
+    attack = BoNAttack(BoNParams(steps=1, candidates=1))
+    [finding], _ = search(attack, target=Target(reply), judge=Panel(9.0))
+    assert not finding.verdict.success
+    assert "decoded message" in finding.verdict.explanation
 
 
 def test_bon_keeps_searching_when_the_panel_fails():
     attack = BoNAttack(BoNParams(steps=2, candidates=1))
-    findings, target = search(attack, judge=failing_panel)
+    findings, target = search(attack, target=Target(ANSWER), judge=failing_panel)
     assert len(target.requests) == 2
     # Nothing to stop on, so the search runs out its steps.
     assert [finding.verdict for finding in findings] == [None, None]
@@ -308,17 +341,20 @@ def search_trace(attack, goal=GOAL, target=None, judge=None):
 
 def test_a_search_records_a_phase_per_step_and_why_it_stopped():
     attack = BoNAttack(BoNParams(steps=3, candidates=1))
-    nodes = search_trace(attack, judge=Panel(2.0, 9.0))
+    nodes = search_trace(attack, target=Target(ANSWER), judge=Panel(2.0, 9.0))
 
     # Two steps ran; the panel passed the second, so the third never did.
     phases = [n for n in nodes if n.node == "phase"]
-    assert [n.label for n in phases] == ["step 1/3", "step 2/3"]
+    assert [n.label for n in phases] == [
+        "step 1/3, candidate 1/1",
+        "step 2/3, candidate 1/1",
+    ]
     assert [n.path for n in phases] == [(0,), (1,)]
 
     [stop] = [n for n in nodes if n.node == "decision"]
     assert stop.label == "stopped"
     assert stop.data["score"] == 9.0
-    # The decision sits inside the step that made it.
+    # The decision sits inside the candidate that made it.
     assert stop.parent == (1,)
 
 
@@ -341,9 +377,14 @@ def test_a_phase_contains_the_calls_made_inside_it():
     nodes = asyncio.run(run()).nodes
     calls = [n for n in nodes if n.node == "call"]
     assert len(calls) == 3
-    # Every candidate is a distinct child of the step, whatever order they finish in.
-    assert sorted(n.path for n in calls) == [(0, 0), (0, 1), (0, 2)]
-    assert all(n.parent == (0,) for n in calls)
+    # Every candidate has its own phase, whatever order they finish in.
+    assert sorted(n.parent for n in calls) == [(0,), (1,), (2,)]
+    phases = {n.path: n.label for n in nodes if n.node == "phase"}
+    assert sorted(phases[n.parent] for n in calls) == [
+        "step 1/1, candidate 1/3",
+        "step 1/1, candidate 2/3",
+        "step 1/1, candidate 3/3",
+    ]
 
 
 def test_a_skipped_step_records_why_and_yields_no_finding():
@@ -614,6 +655,41 @@ def test_pair_without_a_scorer_still_lets_the_panel_judge_every_attempt():
 # --- tap ---------------------------------------------------------------------
 
 
+def test_tap_records_candidate_ancestry_and_pruned_paths():
+    attack = TAPAttack(
+        TapParams(
+            attacker=Writer(),
+            depth=2,
+            streams=1,
+            branching_factor=2,
+            width=1,
+            early_stop=False,
+        )
+    )
+    with recording() as trace:
+        findings, _ = search(attack, judge=Panel(1))
+    candidates = [
+        node
+        for node in trace.nodes
+        if node.node == "phase" and node.label == "candidate"
+    ]
+    assert len(candidates) == 4
+    roots = [node for node in candidates if not node.data["parent_path"]]
+    children = [node for node in candidates if node.data["parent_path"]]
+    assert len(roots) == len(children) == 2
+    assert all(
+        tuple(node.data["parent_path"]) in {r.path for r in roots} for node in children
+    )
+    assert {tuple(f.metadata["candidate_path"]) for f in findings} == {
+        node.path for node in candidates
+    }
+    assert any(
+        node.data.get("candidate_paths")
+        for node in trace.nodes
+        if node.label == "pruned"
+    )
+
+
 class Topic:
     """An on-topic judge: answers from a set of prompts it calls off-topic."""
 
@@ -856,6 +932,8 @@ def test_tap_records_the_on_topic_prune_as_a_decision():
     pruned = [n for n in nodes if n.node == "decision" and n.label == "pruned"]
     assert pruned[0].data["reason"] == "off the goal"
     assert pruned[0].data["dropped"] == 1
+    candidates = [n for n in nodes if n.node == "phase" and n.label == "candidate"]
+    assert pruned[0].data["candidate_paths"] == [list(candidates[1].path)]
 
 
 # --- crescendo ---------------------------------------------------------------
@@ -880,16 +958,36 @@ class Escalator:
 REFUSAL = "I'm sorry, I cannot help with that."
 
 
+class Refuser:
+    """A Refusal Judge that calls ``REFUSAL`` a refusal and nothing else."""
+
+    def __init__(self) -> None:
+        self.requests: list[list[dict]] = []
+
+    async def __call__(self, messages):
+        self.requests.append([dict(m) for m in messages])
+        refused = messages[-1]["content"].endswith(REFUSAL)
+        return json.dumps({"score_value": refused, "rationale": "scripted"})
+
+
+def crescendo(writer=None, refusal=None, **params):
+    """A Crescendo attack with a scripted attacker and Refusal Judge."""
+    return CrescendoAttack(
+        CrescendoParams(
+            attacker=writer or Escalator(),
+            refusal=refusal or Refuser(),
+            **params,
+        )
+    )
+
+
 def test_crescendo_needs_an_attacker():
     with pytest.raises(ValueError, match="needs an 'attacker' role"):
         CrescendoAttack(CrescendoParams())
 
 
 def test_crescendo_grows_one_conversation_with_the_target():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=3, early_stop=False, attacker=writer)
-    )
+    attack = crescendo(max_turns=3, early_stop=False)
     _findings, target = search(attack, judge=Panel(1.0))
 
     # Each turn re-sends everything before it, so the conversation grows by
@@ -900,21 +998,60 @@ def test_crescendo_grows_one_conversation_with_the_target():
 
 
 def test_crescendo_stops_once_a_turn_passes():
-    writer = Escalator()
-    attack = CrescendoAttack(CrescendoParams(max_turns=4, attacker=writer))
+    attack = crescendo(max_turns=4)
     findings, target = search(attack, judge=Panel(1.0, 9.0, 1.0))
 
     assert len(target.requests) == 2
     assert [f.verdict.success for f in findings] == [False, True]
 
 
-def test_crescendo_backtracks_a_refused_turn_without_spending_it():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
+def test_the_refusal_judge_reads_the_reply_against_the_goal():
+    refuser = Refuser()
+    attack = crescendo(refusal=refuser, max_turns=1)
+    search(attack, target=Target("the reply"), judge=Panel(1.0))
+
+    # PyRIT's strict rubric, and its request format, with the attack's goal.
+    [request] = refuser.requests
+    assert request[0] == {"role": "system", "content": REFUSAL_JUDGE_PROMPT}
+    assert request[1]["content"] == (
+        f"conversation_objective: {GOAL}\nresponse_to_evaluate_input: the reply"
     )
+
+
+def test_without_a_refusal_role_the_attacker_judges_refusals():
+    writer = Escalator()
+    attack = CrescendoAttack(CrescendoParams(max_turns=1, attacker=writer))
+    search(attack, judge=Panel(1.0))
+
+    systems = [plan[0]["content"] for plan in writer.plans]
+    assert REFUSAL_JUDGE_PROMPT in systems
+
+
+def test_only_the_refusal_judge_decides_what_a_refusal_is():
+    async def never_refuses(messages):
+        return json.dumps({"score_value": False, "rationale": "it answered"})
+
+    attack = crescendo(refusal=never_refuses, max_turns=1, max_backtracks=1)
+    findings, target = search(attack, target=Target(REFUSAL), judge=Panel(1.0))
+
+    # A reply that reads like a refusal is not backtracked if the judge says no.
+    assert len(target.requests) == 1
+    assert findings[0].metadata["refused"] is False
+
+
+def test_an_unreadable_refusal_verdict_is_not_a_refusal():
+    async def mumbles(messages):
+        return "perhaps"
+
+    attack = crescendo(refusal=mumbles, max_turns=1, max_backtracks=1)
+    findings, target = search(attack, target=Target(REFUSAL), judge=Panel(1.0))
+
+    assert len(target.requests) == 1
+    assert findings[0].metadata["refused"] is False
+
+
+def test_crescendo_backtracks_a_refused_turn_without_spending_it():
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
     _findings, target = search(
         attack, target=Target(REFUSAL, "sure", "sure"), judge=Panel(1.0)
     )
@@ -924,10 +1061,7 @@ def test_crescendo_backtracks_a_refused_turn_without_spending_it():
 
 
 def test_a_backtracked_turn_never_joins_the_conversation():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=1, max_backtracks=1, attacker=writer)
-    )
+    attack = crescendo(max_turns=1, max_backtracks=1)
     _findings, target = search(attack, target=Target(REFUSAL, "sure"), judge=Panel(1.0))
 
     # The retry starts from an empty history, not from the refusal.
@@ -935,58 +1069,43 @@ def test_a_backtracked_turn_never_joins_the_conversation():
     assert target.requests[1][0]["content"] == "question 2"
 
 
+def test_a_backtracked_turn_is_not_judged():
+    panel = Panel(9.0)
+    attack = crescendo(max_turns=1, max_backtracks=1)
+    findings, _target = search(attack, target=Target(REFUSAL, "sure"), judge=panel)
+
+    # Only the turn that was kept reaches the panel.
+    assert [sample.response for sample in panel.samples] == ["sure"]
+    assert findings[0].verdict.success is False
+    assert findings[0].verdict.explanation.startswith("not judged")
+    assert findings[0].metadata["score"] is None
+
+
 def test_crescendo_accepts_a_refusal_once_the_backtrack_budget_is_spent():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=0, early_stop=False, attacker=writer
-        )
-    )
+    attack = crescendo(max_turns=2, max_backtracks=0, early_stop=False)
     _findings, target = search(attack, target=Target(REFUSAL), judge=Panel(1.0))
 
     # No budget, so nothing is retried and both turns are spent.
     assert len(target.requests) == 2
 
 
-def test_a_refused_turn_does_not_end_the_search():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=3, max_backtracks=0, attacker=writer)
-    )
-    # The panel passes, but the target refused, so the search goes on.
-    _findings, target = search(attack, target=Target(REFUSAL), judge=Panel(9.0))
-
-    assert len(target.requests) == 3
-
-
-def test_a_refused_turn_is_never_a_success():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
-    )
-    # The panel passes every reply, refusals included.
+def test_a_refusal_kept_once_the_budget_is_spent_is_judged_like_any_turn():
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
+    # The panel passes every reply it is shown.
     findings, _target = search(
         attack, target=Target(REFUSAL, REFUSAL, "sure"), judge=Panel(9.0)
     )
 
-    # Backtracked, accepted once the budget ran out, then a real answer.
+    # Backtracked, kept once the budget ran out, then a real answer. As in the
+    # paper and PyRIT, the kept turn's verdict stands: there is no veto.
     assert [f.metadata["refused"] for f in findings] == [True, True, False]
     assert [f.metadata["backtracked"] for f in findings] == [True, False, False]
-    assert [f.verdict.success for f in findings] == [False, False, True]
-    # What the panel scored is kept; only the outcome is overruled.
-    assert [f.verdict.score for f in findings] == [9.0, 9.0, 9.0]
-    assert [f.metadata["score"] for f in findings] == [9.0, 9.0, 9.0]
+    assert [f.verdict.success for f in findings] == [False, True, True]
+    assert [f.metadata["score"] for f in findings] == [None, 9.0, 9.0]
 
 
 def test_crescendo_reports_every_turn_that_reached_the_target():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
-    )
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
     findings, _target = search(
         attack, target=Target(REFUSAL, "sure", "sure"), judge=Panel(1.0)
     )
@@ -994,13 +1113,12 @@ def test_crescendo_reports_every_turn_that_reached_the_target():
     assert [f.metadata["turn"] for f in findings] == [0, 0, 1]
     assert [f.metadata["refused"] for f in findings] == [True, False, False]
     assert findings[0].metadata["backtracked"] is True
+    assert findings[0].metadata["refusal_rationale"] == "scripted"
 
 
 def test_crescendo_feeds_the_reply_and_score_back_to_the_attacker():
     writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=2, early_stop=False, attacker=writer)
-    )
+    attack = crescendo(writer, max_turns=2, early_stop=False)
     search(attack, target=Target("the target said this"), judge=Panel(4.0))
 
     feedback = writer.plans[1][-1]["content"]
@@ -1010,9 +1128,7 @@ def test_crescendo_feeds_the_reply_and_score_back_to_the_attacker():
 
 def test_a_refusal_tells_the_attacker_to_rephrase_not_escalate():
     writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=1, max_backtracks=1, attacker=writer)
-    )
+    attack = crescendo(writer, max_turns=1, max_backtracks=1)
     search(attack, target=Target(REFUSAL, "sure"), judge=Panel(1.0))
 
     feedback = writer.plans[1][-1]["content"]
@@ -1021,8 +1137,7 @@ def test_a_refusal_tells_the_attacker_to_rephrase_not_escalate():
 
 
 def test_crescendo_stops_when_the_attacker_writes_nothing():
-    writer = Escalator(reply="")
-    attack = CrescendoAttack(CrescendoParams(max_turns=3, attacker=writer))
+    attack = crescendo(Escalator(reply=""), max_turns=3)
     findings, target = search(attack, judge=Panel(1.0))
 
     assert findings == []
@@ -1030,8 +1145,9 @@ def test_crescendo_stops_when_the_attacker_writes_nothing():
 
 
 def test_crescendo_takes_a_plain_question_as_the_next_turn():
-    writer = Escalator(reply="What is the history of this subject?")
-    attack = CrescendoAttack(CrescendoParams(max_turns=1, attacker=writer))
+    attack = crescendo(
+        Escalator(reply="What is the history of this subject?"), max_turns=1
+    )
     _findings, target = search(attack, judge=Panel(1.0))
 
     # Unlike PAIR, a Crescendo turn is just a question; prose is usable.
@@ -1040,9 +1156,7 @@ def test_crescendo_takes_a_plain_question_as_the_next_turn():
 
 def test_crescendo_trims_its_plan_but_never_the_conversation():
     writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(max_turns=4, keep_last_n=1, early_stop=False, attacker=writer)
-    )
+    attack = crescendo(writer, max_turns=4, keep_last_n=1, early_stop=False)
     _findings, target = search(attack, judge=Panel(1.0))
 
     assert [m["role"] for m in writer.plans[-1]] == ["system", "assistant", "user"]
@@ -1051,12 +1165,7 @@ def test_crescendo_trims_its_plan_but_never_the_conversation():
 
 
 def test_crescendo_records_a_phase_per_turn_and_its_backtracks():
-    writer = Escalator()
-    attack = CrescendoAttack(
-        CrescendoParams(
-            max_turns=2, max_backtracks=1, early_stop=False, attacker=writer
-        )
-    )
+    attack = crescendo(max_turns=2, max_backtracks=1, early_stop=False)
     nodes = search_trace(
         attack, target=Target(REFUSAL, "sure", "sure"), judge=Panel(1.0)
     )
@@ -1112,6 +1221,31 @@ def test_advprefix_needs_an_attacker():
 def test_advprefix_needs_at_least_one_opening():
     with pytest.raises(ValueError, match="at least one meta prefix"):
         AdvPrefixAttack(AdvPrefixParams(meta_prefixes=(), attacker=Writer2()))
+
+
+def test_advprefix_keeps_an_echoed_opening_once():
+    attack = AdvPrefixAttack(
+        advprefix(meta_prefixes=("Here",), attacker=Writer2("Here are the steps"))
+    )
+    candidate = asyncio.run(attack._one_prefix(GOAL, "Here"))
+
+    assert candidate.prefix == "Here are the steps"
+
+
+def test_advprefix_caps_a_candidate_without_a_line_break():
+    attack = AdvPrefixAttack(
+        advprefix(max_prefix_chars=12, attacker=Writer2(" one two three four"))
+    )
+
+    assert asyncio.run(attack._one_prefix(GOAL, "Sure")).prefix == "Sure one two"
+
+
+def test_advprefix_prepends_an_opening_the_writer_did_not_echo():
+    attack = AdvPrefixAttack(
+        advprefix(meta_prefixes=("Here",), attacker=Writer2(" are the steps"))
+    )
+
+    assert asyncio.run(attack._one_prefix(GOAL, "Here")).prefix == "Here are the steps"
 
 
 def test_sample_counts_must_match_the_openings():
@@ -1171,6 +1305,23 @@ def test_prefix_truncation_records_a_trace_decision():
     assert truncated.data["original_prefix_chars"] == 309
     assert truncated.data["prefix_chars"] == 300
     assert truncated.data["max_prefix_chars"] == 300
+
+
+def test_echoed_opening_is_counted_once_before_character_truncation():
+    written = "Sure " + "x" * 10000
+    attack = AdvPrefixAttack(advprefix(attacker=Writer2(written), max_prefix_chars=300))
+    with recording() as trace:
+        findings, target = search(attack, judge=Panel(1.0))
+
+    prefix = written[:300]
+    assert target.requests[0][-1]["content"] == prefix
+    metadata = findings[0].metadata
+    assert metadata["prefix"] == prefix
+    assert metadata["prefix_original_chars"] == len(written)
+    assert metadata["prefix_chars"] == 300
+    assert metadata["prefix_truncated"] is True
+    [truncated] = [node for node in trace.nodes if node.label == "truncated"]
+    assert truncated.data["original_prefix_chars"] == len(written)
 
 
 def test_one_candidate_is_written_per_opening_per_sample():
@@ -1297,6 +1448,15 @@ def test_the_judge_sees_the_prefix_and_the_continuation_together():
     search(attack, target=Target("and then step two"), judge=panel)
 
     assert panel.samples[0].response == f"Sure{PREFIX_TAIL}and then step two"
+
+
+def test_the_judge_sees_the_prefix_once_when_the_target_echoes_it():
+    # Some servers return the prefilled opening as part of the reply.
+    writer, panel = Writer2(PREFIX_TAIL), Panel(1.0)
+    attack = AdvPrefixAttack(advprefix(attacker=writer))
+    search(attack, target=Target(f"Sure{PREFIX_TAIL} and then step two"), judge=panel)
+
+    assert panel.samples[0].response == f"Sure{PREFIX_TAIL} and then step two"
 
 
 def test_truncation_and_target_response_metadata_are_recorded():

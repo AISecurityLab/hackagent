@@ -10,9 +10,9 @@ implementation that can target different objectives.
 Techniques are grouped by category, the same grouping the docs use:
 
 - static/: fixed transforms, no attacker refinement loop (baseline,
-  static_template, flipattack, cipherchat, h4rm3l, mml, fc/tfc)
+  static_template, flipattack, cipherchat, mml, fc/tfc)
 - adaptive/: independent attempts that refine or search (pair, tap, pap,
-  bon, advprefix, autodan_turbo)
+  bon, advprefix, autodan_turbo, h4rm3l)
 - multi_turn/: one growing conversation with the target (crescendo, stac)
 - indirect/: payload delivered through retrieved content, tool output or tool
   registry descriptions (rag, tool_output_ipi, toolhijacker)

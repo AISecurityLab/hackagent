@@ -30,7 +30,7 @@ Tests whether the LLM can be manipulated into bypassing its safety filters throu
 ### Attack Techniques
 
 **Primary**
-- **[h4rm3l](../../reference/attacks/h4rm3l.md)**: Composable decorator-chain jailbreak for fast high-yield probing
+- **[h4rm3l](../../reference/attacks/h4rm3l.md)**: Composable decorator-chain jailbreak, synthesised when a synthesizer is given
 - **[TAP](../../reference/attacks/tap.md)**: Tree-search jailbreak with pruning for efficient discovery
 - **[PAIR](../../reference/attacks/pair.md)**: Iterative attacker-guided refinement for adaptive bypass
 

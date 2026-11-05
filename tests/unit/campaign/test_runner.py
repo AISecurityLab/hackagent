@@ -34,6 +34,32 @@ TARGET_REPLY = "a reply the judge will read"
 _PAIR_TURN = json.dumps({"improvement": "sharper", "prompt": "an adversarial prompt"})
 
 
+@pytest.mark.parametrize("save_prompts", [False, True])
+@pytest.mark.parametrize("save_responses", [False, True])
+def test_panel_trace_retention_flags_are_independent(save_prompts, save_responses):
+    from hackagent.attacks.techniques.trace import TraceNode
+    from hackagent.orchestrator.campaign.results import trace_payload
+    from hackagent.orchestrator.campaign.spec import OutputSpec
+
+    request = {"prompt": "private prompt", "response": "private reply"}
+    node = TraceNode(
+        path=(),
+        node="call",
+        label="panel",
+        data={"role": "panel", "request": request, "response": {"success": True}},
+    )
+    payload = trace_payload(
+        node, OutputSpec(save_prompts=save_prompts, save_responses=save_responses)
+    )
+    data = payload["data"]
+    retained = data.get("request", {})
+    assert ("prompt" in retained) == save_prompts
+    assert ("response" in retained) == save_responses
+    assert ("response" in data) == save_responses
+    assert request == {"prompt": "private prompt", "response": "private reply"}
+    assert node.data["request"] == request
+
+
 def attacker_role(**overrides):
     return {**model("attacker", "http://127.0.0.1:8003/v1"), **overrides}
 
@@ -86,7 +112,108 @@ def test_a_static_attack_judges_every_request_it_generates(tmp_path):
     [attempt] = attempts_of(result)
     assert attempt.response.text == TARGET_REPLY
     assert attempt.verdict is not None and attempt.verdict.success is True
-    assert attempt.trace == ()
+    # The target call and the panel evaluation are traced like an iterative
+    # attack's, so the run's costs can be counted the same way.
+    assert [n.node for n in attempt.trace] == ["call", "call"]
+    assert [n.label for n in attempt.trace] == ["target", "panel"]
+    target, panel = attempt.trace
+    assert target.data["response"] == TARGET_REPLY
+    assert target.latency_s is not None and panel.latency_s is not None
+    assert panel.data["response"]["success"] is True
+
+
+def test_a_static_attack_without_judges_traces_only_the_target(tmp_path):
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        evaluation={"judges": []},
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    result, _builder = run(values, models=models_for())
+    [attempt] = attempts_of(result)
+    assert attempt.error is None and attempt.verdict is None
+    assert [n.label for n in attempt.trace] == ["target"]
+
+
+def test_a_static_target_failure_keeps_its_traced_call(tmp_path):
+    def broken(messages):
+        raise RuntimeError("connection reset")
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    models["target"] = ScriptedModel(broken)
+    result, _builder = run(values, models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error.startswith("target call failed: ")
+    [call] = attempt.trace
+    assert call.label == "target" and call.error.endswith("connection reset")
+    assert models["judge"].requests == []
+
+
+def test_a_static_provider_error_is_traced_and_not_judged(tmp_path):
+    from .fakes import failure
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    models["target"] = ScriptedModel(lambda messages: failure("rate limited"))
+    result, _builder = run(values, models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error.startswith("target error")
+    [call] = attempt.trace
+    assert call.label == "target" and call.error == "rate limited"
+
+
+def test_a_static_judge_failure_keeps_the_traced_calls(tmp_path):
+    def broken(messages):
+        raise RuntimeError("judge offline")
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    models["judge"] = ScriptedModel(broken)
+    result, _builder = run(values, models=models)
+    [attempt] = attempts_of(result)
+    if attempt.error is not None:
+        assert attempt.error.startswith("judging failed: ")
+    # Whatever the panel made of a failing judge, the target call is kept
+    # and the evaluation that was attempted is on the trace.
+    assert [n.label for n in attempt.trace] == ["target", "panel"]
+
+
+def tfc_campaign(tmp_path):
+    return campaign(
+        attacks=[{"name": "tfc", "roles": {"attacker": attacker_role()}}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+
+
+def test_a_static_attack_s_generator_call_is_traced_once_per_goal(tmp_path):
+    steps = "1. Plan.\n2. Act."
+    models = models_for(attacker=ScriptedModel(steps))
+    result, _builder = run(tfc_campaign(tmp_path), models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error is None
+    assert [n.label for n in attempt.trace] == ["attacker", "target", "panel"]
+    assert [n.path for n in attempt.trace] == [(0,), (1,), (2,)]
+    assert attempt.trace[0].data["response"] == steps
+    assert "1. Plan." in models["target"].requests[0][-1]["content"]
+
+
+def test_a_generator_refusal_fails_the_goal_and_keeps_its_call(tmp_path):
+    models = models_for(attacker=ScriptedModel("I can't help with that."))
+    result, _builder = run(tfc_campaign(tmp_path), models=models)
+    [attempt] = attempts_of(result)
+    assert attempt.error.startswith("generation failed: ")
+    assert "no numbered steps" in attempt.error
+    assert [n.label for n in attempt.trace] == ["attacker"]
+    assert models["target"].requests == []
 
 
 def test_the_run_emits_lifecycle_events_per_attack_and_goal(tmp_path):
@@ -125,8 +252,15 @@ def test_the_run_emits_lifecycle_events_per_attack_and_goal(tmp_path):
 
 
 def iterative_campaign(tmp_path, **attack):
-    """A campaign of one BoN attack, with output under ``tmp_path``."""
-    spec = {"name": "bon", "parameters": {"steps": 1, "candidates": 2}, **attack}
+    """A campaign of one BoN attack, with output under ``tmp_path``.
+
+    BoN's length guards are off: the scripted replies are short, and these
+    tests are about the runner, not about which replies BoN counts.
+    """
+    parameters = {"steps": 1, "candidates": 2, **attack.pop("parameters", {})}
+    parameters.setdefault("min_reply_words", 0)
+    parameters.setdefault("min_extra_words", 0)
+    spec = {"name": "bon", "parameters": parameters, **attack}
     return campaign(attacks=[spec], execution={"output": {"directory": str(tmp_path)}})
 
 
@@ -135,11 +269,10 @@ def test_an_iterative_attack_submits_one_exchange_per_goal(tmp_path):
     models = models_for(judge="yes")
     result, _builder = run(values, models=models, texts=("goal one", "goal two"))
 
-    assert len(attempts_of(result)) == 2
-    # One step, so one exchange per goal; its two candidates both reach the
-    # target but only the step's best is kept for the panel.
+    # One step with two candidates per goal; the panel rates each reply.
+    assert len(attempts_of(result)) == 4
     assert len(models["target"].requests) == 4
-    assert len(models["judge"].requests) == 2
+    assert len(models["judge"].requests) == 4
 
 
 def test_the_panel_rates_every_exchange_the_attack_kept(tmp_path):
@@ -148,11 +281,11 @@ def test_the_panel_rates_every_exchange_the_attack_kept(tmp_path):
     result, _builder = run(values, models=models)
 
     attempts = attempts_of(result)
-    # Nothing passes, so all three steps run and each is judged on its own.
+    # Nothing passes, so all three steps run and every reply is judged.
     assert len(models["target"].requests) == 6
-    assert len(models["judge"].requests) == 3
-    assert [attempt.request_index for attempt in attempts] == [0, 1, 2]
-    assert [attempt.metadata["step"] for attempt in attempts] == [0, 1, 2]
+    assert len(models["judge"].requests) == 6
+    assert [attempt.request_index for attempt in attempts] == [0, 1, 2, 3, 4, 5]
+    assert [attempt.metadata["step"] for attempt in attempts] == [0, 0, 1, 1, 2, 2]
     assert all(attempt.verdict is not None for attempt in attempts)
 
 
@@ -204,6 +337,59 @@ def test_pair_reports_one_attempt_per_stream_and_round(tmp_path):
         assert roles == ["attacker", "target", "panel"]
 
 
+def test_h4rm3l_without_a_synthesizer_costs_one_call_per_goal(tmp_path):
+    """It is adaptive, but only searches when a synthesizer is configured.
+
+    Without one it is the decorator program and nothing else, which is what
+    every h4rm3l example campaign relies on: one request, one verdict, no
+    role model built and no synthesis round before the goals.
+    """
+    values = campaign(
+        attacks=[{"name": "h4rm3l", "parameters": {"program": "Base64Decorator()"}}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    models = models_for()
+    result, builder = run(values, models=models, texts=("goal one", "goal two"))
+
+    attempts = attempts_of(result)
+    assert len(attempts) == 2
+    assert len(models["target"].requests) == 2
+    assert len(models["judge"].requests) == 2
+    assert all(a.verdict is not None and a.verdict.success for a in attempts)
+    assert {name for name, _ in builder.built} == {"target", "judge"}
+    assert all(a.metadata["program"] == "Base64Decorator()" for a in attempts)
+
+
+def test_h4rm3l_with_a_synthesizer_searches_before_the_goals(tmp_path):
+    """The synthesizer's programs are scored once, then used on every goal."""
+    values = campaign(
+        attacks=[
+            {
+                "name": "h4rm3l",
+                "parameters": {
+                    "iterations": 1,
+                    "proposals": 1,
+                    "scoring_goals": 1,
+                    "programs_per_goal": 1,
+                    "seed": 0,
+                },
+                "roles": {"synthesizer": {**attacker_role(), "name": "synthesizer"}},
+            }
+        ],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    proposal = "AIMDecorator().then(Base64Decorator())"
+    models = models_for(synthesizer=ScriptedModel(proposal))
+    result, _builder = run(values, models=models, texts=("goal one", "goal two"))
+
+    assert models["synthesizer"].requests, "the synthesizer was never asked"
+    attempts = attempts_of(result)
+    assert len(attempts) == 2
+    # Scoring the proposal costs one call before the goals are attacked.
+    assert len(models["target"].requests) == 3
+    assert all(a.metadata["program"] == proposal for a in attempts)
+
+
 def test_each_attempt_carries_the_phase_that_produced_it(tmp_path):
     values = iterative_campaign(tmp_path, parameters={"steps": 2, "candidates": 1})
     result, _builder = run(values, models=models_for(judge="no"))
@@ -212,14 +398,14 @@ def test_each_attempt_carries_the_phase_that_produced_it(tmp_path):
     # Each step's phase, its target call and its verdict go to its own attempt.
     for attempt, step in ((first, 0), (second, 1)):
         assert [n.node for n in attempt.trace] == ["phase", "call", "call"]
-        assert attempt.trace[0].label == f"step {step + 1}/2"
+        assert attempt.trace[0].label == f"step {step + 1}/2, candidate 1/1"
         assert [n.data["role"] for n in attempt.trace[1:]] == ["target", "panel"]
     # Nothing is stored twice.
     assert {n.path for n in first.trace}.isdisjoint({n.path for n in second.trace})
 
 
 def test_what_the_attack_judged_is_what_the_run_reports(tmp_path):
-    values = iterative_campaign(tmp_path)
+    values = iterative_campaign(tmp_path, parameters={"candidates": 1})
     models = models_for(judge="no")
     result, _builder = run(values, models=models)
 
@@ -288,20 +474,23 @@ def test_the_trace_holds_every_call_and_why_the_search_stopped(tmp_path):
     models = models_for(judge="yes")
     result, _builder = run(values, models=models)
 
-    [attempt] = attempts_of(result)
-    calls = [n for n in attempt.trace if n.node == "call"]
-    # The panel passed the first step, so the second one never ran.
-    assert [n.data["role"] for n in calls] == ["target", "target", "panel"]
-    [stop] = [n for n in attempt.trace if n.node == "decision"]
-    assert stop.label == "stopped"
-    assert all(n.latency_s is not None for n in calls)
+    attempts = attempts_of(result)
+    # The panel passed the first step, so the second one never ran; each of
+    # its two candidates keeps its own target call, panel call and decision.
+    assert [attempt.metadata["step"] for attempt in attempts] == [0, 0]
+    for attempt in attempts:
+        calls = [n for n in attempt.trace if n.node == "call"]
+        assert [n.data["role"] for n in calls] == ["target", "panel"]
+        [stop] = [n for n in attempt.trace if n.node == "decision"]
+        assert stop.label == "stopped"
+        assert all(n.latency_s is not None for n in calls)
 
 
 def test_each_traced_target_call_keeps_its_request_and_reply(tmp_path):
     values = iterative_campaign(tmp_path)
     result, _builder = run(values, models=models_for())
 
-    nodes = attempts_of(result)[0].trace
+    nodes = [n for attempt in attempts_of(result) for n in attempt.trace]
     targets = [n for n in nodes if n.node == "call" and n.data["role"] == "target"]
     assert len(targets) == 2
     for node in targets:
@@ -380,8 +569,55 @@ def test_retention_settings_apply_to_traces(tmp_path):
         assert node["latency_s"] is not None
 
 
+@pytest.mark.parametrize("save_prompts", [False, True])
+@pytest.mark.parametrize("save_responses", [False, True])
+def test_static_panel_retention_in_files_and_storage(
+    tmp_path, save_prompts, save_responses
+):
+    from tests.fakes import in_memory_store
+
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={
+            "output": {
+                "directory": str(tmp_path),
+                "save_prompts": save_prompts,
+                "save_responses": save_responses,
+            }
+        },
+    )
+    store = in_memory_store()
+    result, _builder = run(values, models=models_for(), store=store)
+    traces = next(path for path in result.outputs if path.name == "traces.jsonl")
+    file_nodes = [
+        node
+        for line in traces.read_text(encoding="utf-8").splitlines()
+        for node in json.loads(line)["nodes"]
+    ]
+    stored_nodes = [
+        trace.content
+        for record in store.list_results(page_size=50).items
+        for trace in store.list_traces(record.id)
+    ]
+    for nodes in (file_nodes, stored_nodes):
+        panels = [
+            node
+            for node in nodes
+            if node.get("node") == "call" and node["data"]["role"] == "panel"
+        ]
+        assert panels
+        for node in panels:
+            request = node["data"].get("request", {})
+            assert ("prompt" in request) == save_prompts
+            assert ("response" in request) == save_responses
+            if save_responses:
+                assert request["response"] == TARGET_REPLY
+            else:
+                assert TARGET_REPLY not in json.dumps(node)
+
+
 def test_traces_are_written_beside_the_results(tmp_path):
-    values = iterative_campaign(tmp_path)
+    values = iterative_campaign(tmp_path, parameters={"candidates": 1})
     values["execution"]["output"]["formats"] = ["json", "jsonl"]
     result, _builder = run(values, models=models_for(judge="no"))
 
@@ -399,11 +635,11 @@ def test_traces_are_written_beside_the_results(tmp_path):
         "scope": "goal",
         "path": [0],
         "node": "phase",
-        "label": "step 1/1",
-        "data": {"step": 0},
+        "label": "step 1/1, candidate 1/1",
+        "data": {"step": 0, "candidate": 0},
     }
     calls = [n for n in row["nodes"] if n["node"] == "call"]
-    assert [n["data"]["role"] for n in calls].count("target") == 2
+    assert [n["data"]["role"] for n in calls].count("target") == 1
 
 
 def test_traces_are_not_written_when_they_are_turned_off(tmp_path):
@@ -428,7 +664,7 @@ def test_the_campaign_that_ran_is_written_beside_the_results(tmp_path):
 def test_every_trace_step_is_stored_with_its_result(tmp_path):
     from tests.fakes import in_memory_store
 
-    values = iterative_campaign(tmp_path)
+    values = iterative_campaign(tmp_path, parameters={"candidates": 1})
     store = in_memory_store()
     result, _builder = run(values, models=models_for(judge="no"), store=store)
 
@@ -528,32 +764,64 @@ def test_a_target_error_records_its_status_code(tmp_path):
     assert isinstance(record.metadata["latency_ms"], int)
 
 
-def test_a_refused_crescendo_turn_is_stored_as_a_failure(tmp_path):
-    from tests.fakes import in_memory_store
-
-    question = json.dumps({"reasoning": "warming up", "question": "a question"})
-    values = campaign(
+def crescendo_campaign(tmp_path, **parameters):
+    return campaign(
         attacks=[
             {
                 "name": "crescendo",
-                "parameters": {"max_turns": 1, "max_backtracks": 0},
-                "roles": {"attacker": attacker_role()},
+                "parameters": {"max_turns": 1, **parameters},
+                "roles": {
+                    "attacker": attacker_role(),
+                    "refusal": model("refusal", "http://127.0.0.1:8004/v1"),
+                },
             }
         ],
         execution={"output": {"directory": str(tmp_path)}},
     )
-    store = in_memory_store()
-    # The panel passes the reply, but the target turned the turn down.
-    models = models_for(
+
+
+def crescendo_models(refused: bool):
+    question = json.dumps({"reasoning": "warming up", "question": "a question"})
+    verdict = json.dumps({"score_value": refused, "rationale": "scripted"})
+    return models_for(
         target_reply="I'm sorry, I cannot help with that.",
         judge="yes",
         attacker=ScriptedModel(question),
+        refusal=ScriptedModel(verdict),
     )
-    run(values, models=models, store=store)
 
+
+def test_a_backtracked_crescendo_turn_is_stored_unjudged(tmp_path):
+    from tests.fakes import in_memory_store
+
+    store = in_memory_store()
+    models = crescendo_models(refused=True)
+    run(crescendo_campaign(tmp_path, max_backtracks=1), models=models, store=store)
+
+    records = store.list_results(page_size=50).items
+    first = next(r for r in records if r.metadata["attack_metadata"]["backtracked"])
+    assert first.evaluation_status == "FAILED_JAILBREAK"
+    assert first.metadata["attack_metadata"]["refused"] is True
+    # Two replies reached the target; only the kept one reached the panel.
+    assert len(models["target"].requests) == 2
+    assert len(models["judge"].requests) == 1
+    assert len(models["refusal"].requests) == 2
+
+
+def test_a_refused_turn_kept_after_the_backtracks_is_judged(tmp_path):
+    from tests.fakes import in_memory_store
+
+    store = in_memory_store()
+    run(
+        crescendo_campaign(tmp_path, max_backtracks=0),
+        models=crescendo_models(True),
+        store=store,
+    )
+
+    # The panel passed it, and as in the reference that verdict stands.
     [record] = store.list_results(page_size=50).items
-    assert record.evaluation_status == "FAILED_JAILBREAK"
     assert record.metadata["attack_metadata"]["refused"] is True
+    assert record.evaluation_status == "SUCCESSFUL_JAILBREAK"
 
 
 # --- reporting ----------------------------------------------------------------
@@ -569,8 +837,8 @@ def test_the_summary_counts_iterative_successes(tmp_path):
     assert report["attacks"][0] == {
         "name": "bon",
         "run_id": report["attacks"][0]["run_id"],
-        "attempts": 2,
-        "successes": 2,
+        "attempts": 4,
+        "successes": 4,
         "error": None,
     }
 

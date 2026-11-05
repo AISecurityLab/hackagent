@@ -1,6 +1,6 @@
 ---
 sidebar_label: base
-title: hackagent.attacks.techniques.static.h4rm3l.decorators.base
+title: hackagent.attacks.techniques.adaptive.h4rm3l.decorators.base
 ---
 
 Base classes and callable types for h4rm3l decorators.

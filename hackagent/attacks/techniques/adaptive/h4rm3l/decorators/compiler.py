@@ -9,7 +9,7 @@ import ast
 from collections.abc import Callable
 from functools import partial
 
-from ...base import Completion
+from ....contract import Completion
 from .base import DecorationResult, PromptDecorator
 from .llm import (
     PAPDecorator,
@@ -127,6 +127,21 @@ _DECORATOR_NAMESPACE = {
 }
 
 
+def decorator_namespace(
+    *, allow_code_execution: bool = True
+) -> dict[str, type[PromptDecorator]]:
+    """The primitives a program may name, by the name it names them with.
+
+    This is what the compiler accepts, which is narrower than the package's
+    ``__all__``: that also exports the base classes and the compiler itself.
+    Anything offering a catalogue of primitives should read it from here.
+    """
+    namespace = dict(_DECORATOR_NAMESPACE)
+    if not allow_code_execution:
+        namespace.pop("TransformFxDecorator")
+    return namespace
+
+
 def _missing_completion(name: str) -> Callable[..., PromptDecorator]:
     def constructor(*_args: object, **_kwargs: object) -> PromptDecorator:
         raise ValueError(
@@ -136,9 +151,13 @@ def _missing_completion(name: str) -> Callable[..., PromptDecorator]:
     return constructor
 
 
-def _compiler_namespace(completion: Completion | None) -> dict[str, object]:
-    namespace = dict(_DECORATOR_NAMESPACE)
+def _compiler_namespace(
+    completion: Completion | None, *, allow_code_execution: bool
+) -> dict[str, object]:
+    namespace = decorator_namespace(allow_code_execution=allow_code_execution)
     for name in LLM_ASSISTED_DECORATOR_NAMES - {"TranslateBackDecorator"}:
+        if name not in namespace:
+            continue
         namespace[name] = (
             _missing_completion(name)
             if completion is None
@@ -224,6 +243,7 @@ def compile_program(
     syntax_version: int = 2,
     *,
     completion: Completion | None = None,
+    allow_code_execution: bool = True,
 ) -> Callable[[str], DecorationResult]:
     """Compile a decorator program string into a callable.
 
@@ -231,6 +251,8 @@ def compile_program(
         program: The program string (either v1 or v2 syntax).
         syntax_version: ``1`` for semicolon-separated, ``2`` for ``.then()``.
         completion: The model LLM-assisted decorators rewrite prompts with.
+        allow_code_execution: Permit trusted Python transforms. Must be false
+            for model-generated programs.
 
     Returns:
         A function ``(prompt) -> str | Awaitable[str]`` applying the chain.
@@ -241,7 +263,9 @@ def compile_program(
             without a ``completion``.
         SyntaxError: If the program string cannot be parsed.
     """
-    namespace = _compiler_namespace(completion)
+    namespace = _compiler_namespace(
+        completion, allow_code_execution=allow_code_execution
+    )
     if syntax_version == 1:
         return _compile_v1(program, namespace).decorate
     if syntax_version == 2:

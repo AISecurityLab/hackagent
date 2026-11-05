@@ -158,7 +158,7 @@ def test_a_campaign_records_each_goal_s_labels(tmp_path):
         (a for o in result.attacks for a in o.attempts), key=lambda a: a.goal_index
     )
     assert [dict(a.labels) for a in attempts] == [EXPLOIT, FRAUD]
-    [path] = [p for p in result.outputs if p.suffix == ".jsonl"]
+    [path] = [p for p in result.outputs if p.name == "results.jsonl"]
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert {(row["category"], row["subcategory"]) for row in rows} == {
         (EXPLOIT["category"], EXPLOIT["subcategory"]),

@@ -52,6 +52,7 @@ class Branch:
     prompt: str = ""
     verdict: Optional[Verdict] = None
     path: Path = ()
+    parent_path: Path = ()
     response: Any = None
 
     @property
@@ -59,7 +60,10 @@ class Branch:
         return 0.0 if self.verdict is None else self.verdict.score
 
     def child(self) -> "Branch":
-        return Branch(conversation=[dict(turn) for turn in self.conversation])
+        return Branch(
+            conversation=[dict(turn) for turn in self.conversation],
+            parent_path=self.path,
+        )
 
 
 @dataclass
@@ -148,17 +152,22 @@ class TAPAttack(IterativeAttack[TapParams]):
     async def _refine(self, parent: Branch) -> Optional[Branch]:
         """One refinement of one branch, retried while the attacker rambles."""
         branch = parent.child()
-        for _ in range(self.params.max_attempts):
-            try:
-                reply = await self.attacker(branch.conversation)
-            except Exception:
-                continue
-            proposal = _parse(reply)
-            if proposal is None:
-                continue
-            branch.prompt, assistant_turn = proposal
-            branch.conversation.append({"role": "assistant", "content": assistant_turn})
-            return branch
+        with phase("candidate", parent_path=list(parent.path)) as path:
+            branch.path = path
+            for _ in range(self.params.max_attempts):
+                try:
+                    reply = await self.attacker(branch.conversation)
+                except Exception:
+                    continue
+                proposal = _parse(reply)
+                if proposal is None:
+                    continue
+                branch.prompt, assistant_turn = proposal
+                branch.conversation.append(
+                    {"role": "assistant", "content": assistant_turn}
+                )
+                return branch
+            decision("skipped", "the attacker proposed no usable prompt")
         return None
 
     async def _keep_on_topic(self, goal: str, branches: list[Branch]) -> list[Branch]:
@@ -182,6 +191,7 @@ class TAPAttack(IterativeAttack[TapParams]):
                 "off the goal",
                 dropped=len(branches) - len(kept),
                 kept=len(kept),
+                candidate_paths=[list(b.path) for b in branches if b not in kept],
             )
         return kept
 
@@ -223,12 +233,19 @@ class TAPAttack(IterativeAttack[TapParams]):
         judge: Optional[Judge],
     ) -> tuple[Branch, Optional[Finding]]:
         """One branch's turn: send, judge, and feed the result back."""
-        with phase(f"branch {index + 1}/{total}", branch=index) as path:
-            branch.path = path
+        with phase(
+            f"branch {index + 1}/{total}",
+            branch=index,
+            candidate_path=list(branch.path),
+        ) as path:
             messages = [{"role": "user", "content": branch.prompt}]
             reply = await target(messages)
             if not reply.ok or not reply.text:
-                decision("skipped", "the target gave no usable reply")
+                decision(
+                    "skipped",
+                    "the target gave no usable reply",
+                    candidate_paths=[list(branch.path)],
+                )
                 self._feed_back(goal, branch, "[no reply]")
                 return branch, None
 
@@ -239,7 +256,11 @@ class TAPAttack(IterativeAttack[TapParams]):
                 messages=messages,
                 response=reply,
                 verdict=branch.verdict,
-                metadata={"score": branch.verdict.score if branch.verdict else None},
+                metadata={
+                    "score": branch.verdict.score if branch.verdict else None,
+                    "candidate_path": list(branch.path),
+                    "parent_path": list(branch.parent_path),
+                },
                 path=path,
             )
 
@@ -264,6 +285,7 @@ class TAPAttack(IterativeAttack[TapParams]):
                 dropped=len(branches) - len(survivors),
                 kept=len(survivors),
                 best=round(survivors[0].score, 3),
+                candidate_paths=[list(b.path) for b in branches if b not in survivors],
             )
         return survivors
 

@@ -27,8 +27,8 @@ EMBED_MODEL: dict[str, Any] = {
 KINDS = {
     "static": (
         "Static",
-        "Builds its prompts up front and sends them. It drives no model of its "
-        "own, so it is cheap and repeatable.",
+        "Builds its prompts up front and sends them, without reading the "
+        "target's replies, so it is cheap and repeatable.",
     ),
     "adaptive": (
         "Adaptive",

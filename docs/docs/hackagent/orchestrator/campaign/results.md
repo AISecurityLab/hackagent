@@ -154,9 +154,10 @@ Write a run&#x27;s files into `<directory>/<run_id>/`.
 
 `campaign.yaml` is the campaign that ran, so the run can be reproduced
 even when it was never saved as a file. `results.json` and/or
-`results.jsonl` hold one row per attempt. Search traces of iterative
-attacks go to `traces.jsonl`, one line per attempt, so the result rows
-stay readable, and a judge audit goes to `audit.json`.
+`results.jsonl` hold one row per attempt. Traces (an iterative attack&#x27;s
+search, a static attack&#x27;s target and panel calls) go to `traces.jsonl`,
+one line per attempt, so the result rows stay readable, and a judge audit
+goes to `audit.json`.
 
 #### summary
 

@@ -14,5 +14,6 @@ class CrescendoParams(AttackParams)
 How far the conversation escalates, and how often it may rephrase.
 
 `attacker` is a role: the model that proposes each next question, so
-Crescendo cannot run without it.
+Crescendo cannot run without it. `refusal` is the optional Refusal
+Judge; without it the attacker model judges refusals, as in PyRIT.
 
