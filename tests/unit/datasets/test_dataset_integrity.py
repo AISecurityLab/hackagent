@@ -306,58 +306,39 @@ class TestDatasetPresetInformation(unittest.TestCase):
 class TestDatasetFunctionality(unittest.TestCase):
     """Test actual dataset loading functionality."""
 
-    def test_preset_based_loading(self):
-        """Test loading goals using preset name."""
-        # This is a basic smoke test - doesn't require actual data download
-        # If the dataset isn't available locally, it should raise appropriate error
-        try:
-            # Try to load with limit to minimize data transfer
-            goals = load_goals(preset="advbench", limit=1)
+    def setUp(self):
+        from unittest.mock import patch
+        from datasets import Dataset
 
-            # If successful, verify basic properties
-            self.assertIsInstance(goals, list)
-            if len(goals) > 0:
-                self.assertIsInstance(goals[0], str)
-        except Exception as e:
-            # If it fails, it should be a dataset-not-found or network error
-            # not a configuration error
-            error_msg = str(e).lower()
-            valid_errors = [
-                "dataset",
-                "not found",
-                "connection",
-                "network",
-                "timeout",
-                "authentication",
-            ]
-            self.assertTrue(
-                any(valid_error in error_msg for valid_error in valid_errors),
-                f"Unexpected error type: {e}",
-            )
+        self.records = Dataset.from_list([{"goal": f"Goal {i}"} for i in range(12)])
+        loader = patch("datasets.load_dataset", return_value=self.records)
+        self.load_dataset = loader.start()
+        self.addCleanup(loader.stop)
+
+    def test_preset_based_loading(self):
+        self.assertEqual(load_goals(preset="advbench", limit=1), ["Goal 0"])
+        self.load_dataset.assert_called_once_with(
+            path="walledai/AdvBench", split="train", trust_remote_code=False
+        )
 
     def test_limit_parameter_works(self):
-        """Test that limit parameter is properly passed through."""
-        # This test verifies the parameter chain works
-        # Actual limiting is tested in provider-specific tests
-        try:
-            goals = load_goals(preset="advbench", limit=5)
-            if isinstance(goals, list) and len(goals) > 0:
-                self.assertLessEqual(len(goals), 5)
-        except Exception:
-            # Dataset might not be available, that's okay for this test
-            pass
+        self.assertEqual(
+            load_goals(preset="advbench", limit=5), [f"Goal {i}" for i in range(5)]
+        )
 
     def test_shuffle_parameter_accepted(self):
-        """Test that shuffle and seed parameters are accepted."""
-        try:
-            # Should not raise error about unknown parameters
-            goals = load_goals(preset="advbench", limit=2, shuffle=True, seed=42)
-            self.assertIsInstance(goals, list)
-        except Exception as e:
-            # Should not fail due to parameter issues
-            error_msg = str(e).lower()
-            self.assertNotIn("unexpected", error_msg)
-            self.assertNotIn("unknown parameter", error_msg)
+        expected = [row["goal"] for row in self.records.shuffle(seed=42)][:2]
+        self.assertEqual(
+            load_goals(preset="advbench", limit=2, shuffle=True, seed=42), expected
+        )
+        self.assertEqual(
+            load_goals(preset="advbench", limit=2, shuffle=True, seed=42), expected
+        )
+
+    def test_dataset_failure_is_reported(self):
+        self.load_dataset.side_effect = ConnectionError("dataset unavailable")
+        with self.assertRaisesRegex(ConnectionError, "dataset unavailable"):
+            load_goals(preset="advbench", limit=1)
 
 
 class TestDatasetDocumentation(unittest.TestCase):

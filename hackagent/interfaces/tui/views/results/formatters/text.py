@@ -7,26 +7,10 @@ from typing import Any
 
 
 def _escape(value: Any) -> str:
-    """Escape a value for safe Rich markup rendering.
+    """Preserve user text literally when embedded in Rich markup."""
+    from rich.markup import escape
 
-    Args:
-        value: Any value to escape
-
-    Returns:
-        String with Rich markup characters escaped
-
-    Note:
-        We escape ALL square brackets, not just tag-like patterns,
-        because Rich's markup parser can get confused by unescaped
-        brackets in certain contexts (e.g., JSON arrays inside colored text).
-    """
-    if value is None:
-        return ""
-    # Escape ALL square brackets to prevent any markup interpretation issues
-    # Rich's escape() only escapes tag-like patterns, but single brackets
-    # can still cause issues in nested color contexts
-    text = str(value)
-    return text.replace("[", "\\[").replace("]", "\\]")
+    return escape(str(value)) if value is not None else ""
 
 
 def _format_message_content(content: str, max_length: int = 300) -> str:

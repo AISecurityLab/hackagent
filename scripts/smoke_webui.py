@@ -64,7 +64,8 @@ def seed(db_path: Path) -> None:
     try:
         org = backend.get_context().org_id
         agent = backend.create_or_update_agent(
-            "smoke-agent", "ollama", "http://localhost:11434", {"description": "smoke"}
+            "smoke-agent",
+            {"connection": {"type": "OLLAMA", "endpoint": "http://localhost:11434"}},
         )
         attack = backend.create_attack("tap", agent.id, org, {"goals": ["g0", "g1"]})
         campaign = backend.create_campaign_run(

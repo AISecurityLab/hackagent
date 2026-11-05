@@ -34,6 +34,32 @@ TARGET_REPLY = "a reply the judge will read"
 _PAIR_TURN = json.dumps({"improvement": "sharper", "prompt": "an adversarial prompt"})
 
 
+@pytest.mark.parametrize("save_prompts", [False, True])
+@pytest.mark.parametrize("save_responses", [False, True])
+def test_panel_trace_retention_flags_are_independent(save_prompts, save_responses):
+    from hackagent.attacks.techniques.trace import TraceNode
+    from hackagent.orchestrator.campaign.results import trace_payload
+    from hackagent.orchestrator.campaign.spec import OutputSpec
+
+    request = {"prompt": "private prompt", "response": "private reply"}
+    node = TraceNode(
+        path=(),
+        node="call",
+        label="panel",
+        data={"role": "panel", "request": request, "response": {"success": True}},
+    )
+    payload = trace_payload(
+        node, OutputSpec(save_prompts=save_prompts, save_responses=save_responses)
+    )
+    data = payload["data"]
+    retained = data.get("request", {})
+    assert ("prompt" in retained) == save_prompts
+    assert ("response" in retained) == save_responses
+    assert ("response" in data) == save_responses
+    assert request == {"prompt": "private prompt", "response": "private reply"}
+    assert node.data["request"] == request
+
+
 def attacker_role(**overrides):
     return {**model("attacker", "http://127.0.0.1:8003/v1"), **overrides}
 

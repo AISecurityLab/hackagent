@@ -4,9 +4,9 @@
 """The HackAgent LLM gateway as a symbolic model connection.
 
 A stored campaign refers to the gateway as ``connection: {provider: hackagent,
-type: OPENAI}`` with no endpoint and no key. Whoever executes the run binds it
-to its own base URL and to the key in ``HACKAGENT_GATEWAY_KEY`` with
-:func:`bind_gateway`.
+type: OPENAI}`` with no endpoint and no key, named after one of the models it
+serves (:data:`GATEWAY_MODELS`). Whoever executes the run binds it to its own
+base URL and to the key in ``HACKAGENT_GATEWAY_KEY`` with :func:`bind_gateway`.
 """
 
 from __future__ import annotations
@@ -20,6 +20,11 @@ from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 GATEWAY_PROVIDER = "hackagent"
 GATEWAY_KEY_ENV = "HACKAGENT_GATEWAY_KEY"
+#: The models the gateway serves, by the name a request's ``model`` gives:
+#: one for attack roles, one for judges, guardrails and goal classifiers.
+GATEWAY_ATTACKER = "hackagent-attacker"
+GATEWAY_JUDGE = "hackagent-judge"
+GATEWAY_MODELS = (GATEWAY_ATTACKER, GATEWAY_JUDGE)
 
 M = TypeVar("M", bound=ModelConfig)
 
@@ -36,6 +41,11 @@ def _bind(config: M, endpoint: str) -> M:
         raise ValueError(
             "The HackAgent gateway is an OPENAI model; "
             f"got type {config.connection.type.value}."
+        )
+    if config.name not in GATEWAY_MODELS:
+        raise ValueError(
+            f"A HackAgent gateway model is named {' or '.join(GATEWAY_MODELS)}; "
+            f"got {config.name!r}."
         )
     connection = config.connection.model_copy(
         update={"endpoint": endpoint, "api_key": env_reference(GATEWAY_KEY_ENV)}
@@ -75,7 +85,8 @@ def bind_gateway(spec: CampaignSpec, base_url: str) -> CampaignSpec:
 
     The key is read from ``HACKAGENT_GATEWAY_KEY`` when each model is built.
 
-    Raises ``ValueError`` for a gateway model whose type is not ``OPENAI``.
+    Raises ``ValueError`` for a gateway model whose type is not ``OPENAI``, or
+    whose name is not one of :data:`GATEWAY_MODELS`.
     """
     endpoint = f"{base_url.rstrip('/')}/v1"
     attacks = tuple(

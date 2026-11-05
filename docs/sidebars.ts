@@ -25,12 +25,6 @@ const sidebars: SidebarsConfig = {
       ],
     },
     {
-      type: 'doc',
-      id: 'guides/choosing-an-attacker',
-      className: 'sidebar-icon sidebar-icon-sword',
-      label: 'Choosing an attacker',
-    },
-    {
       type: 'category',
       label: 'Concepts',
       className: 'sidebar-icon sidebar-icon-book',
@@ -38,6 +32,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'concepts/how-a-run-works',
         'concepts/attacks-and-roles',
+        'concepts/choosing-an-attacker',
         'concepts/judges',
         'concepts/code-map',
       ],
