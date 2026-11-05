@@ -90,7 +90,7 @@ def read_reply(text: str, count: int) -> dict[int, dict[str, str]]:
 
 def place(answer: str) -> Optional[dict[str, str]]:
     """Resolve one code, tolerating surrounding Markdown and a trailing period."""
-    code = answer.strip().strip("*`").rstrip(".").strip().upper()
+    code = answer.strip().rstrip(".").strip("*`").rstrip(".").strip().upper()
     if _CODE.fullmatch(code) is None:
         return None
     if code in taxonomy.subcategories():
