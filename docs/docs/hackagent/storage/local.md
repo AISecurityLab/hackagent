@@ -43,6 +43,22 @@ def flush() -> None
 
 No-op: local writes are synchronous (mirrors RemoteBackend.flush).
 
+#### link\_campaign\_run
+
+```python
+def link_campaign_run(campaign_run_id: UUID, campaign_id: UUID) -> None
+```
+
+Record which saved campaign a campaign run was launched from.
+
+#### delete\_campaign
+
+```python
+def delete_campaign(campaign_id: UUID) -> None
+```
+
+Delete a saved campaign; the runs launched from it are kept.
+
 #### count\_result\_buckets
 
 ```python

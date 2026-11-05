@@ -7,7 +7,8 @@
 Serves the bundled single-page app (the same one hosted at app.hackagent.dev)
 from this process. With the ``remote`` storage backend its API calls are proxied
 to the hosted API, with the key attached server-side; with ``local`` (the
-default) they are answered read-only from the local SQLite store.
+default) they are answered from the local SQLite store, and campaigns launched
+from the dashboard run on this machine, in this process.
 """
 
 import os
@@ -146,7 +147,7 @@ def web(ctx, host, port, db_path, force_local, no_browser):
     With ``--backend remote``, the dashboard shows your hosted HackAgent data;
     the key stays in this process and is never exposed to the browser. With
     the default local backend, it shows the runs recorded in your local
-    database (read-only).
+    database, and campaigns you launch from it run on this machine.
 
     \b
     Examples:

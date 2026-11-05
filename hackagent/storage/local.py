@@ -27,6 +27,7 @@ from uuid import UUID
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
+    CampaignRecord,
     CampaignRunRecord,
     OrganizationContext,
     PaginatedResult,
@@ -69,9 +70,20 @@ CREATE TABLE IF NOT EXISTS attacks (
     created_at      TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS campaigns (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    agent_id    TEXT NOT NULL REFERENCES agents(id),
+    spec_json   TEXT NOT NULL DEFAULT '{}',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS campaign_runs (
     id                   TEXT PRIMARY KEY,
     agent_id             TEXT NOT NULL REFERENCES agents(id),
+    campaign_id          TEXT REFERENCES campaigns(id) ON DELETE SET NULL,
     name                 TEXT NOT NULL,
     campaign_config_json TEXT NOT NULL DEFAULT '{}',
     audit_json           TEXT,
@@ -185,6 +197,15 @@ class LocalBackend:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_runs_campaign ON runs(campaign_run_id)"
         )
+        columns = {
+            row[1]
+            for row in self._conn.execute("PRAGMA table_info(campaign_runs)").fetchall()
+        }
+        if "campaign_id" not in columns:
+            self._conn.execute(
+                "ALTER TABLE campaign_runs ADD COLUMN campaign_id TEXT "
+                "REFERENCES campaigns(id) ON DELETE SET NULL"
+            )
 
     def close(self) -> None:
         """Close the underlying SQLite connection.
@@ -469,8 +490,18 @@ class LocalBackend:
             )
         return self._row_to_campaign_run(row)
 
+    def link_campaign_run(self, campaign_run_id: UUID, campaign_id: UUID) -> None:
+        """Record which saved campaign a campaign run was launched from."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE campaign_runs SET campaign_id=? WHERE id=?",
+                (str(campaign_id), str(campaign_run_id)),
+            )
+            self._conn.commit()
+
     @staticmethod
     def _row_to_campaign_run(row: sqlite3.Row) -> CampaignRunRecord:
+        campaign_id = row["campaign_id"]
         return CampaignRunRecord(
             id=UUID(row["id"]),
             agent_id=UUID(row["agent_id"]),
@@ -479,6 +510,103 @@ class LocalBackend:
             audit=json.loads(row["audit_json"]) if row["audit_json"] else None,
             status=row["status"],
             run_notes=row["run_notes"],
+            created_at=_to_dt(row["created_at"]),
+            updated_at=_to_dt(row["updated_at"]),
+            campaign_id=UUID(campaign_id) if campaign_id else None,
+        )
+
+    # ── Saved campaign ────────────────────────────────────────────────────────
+
+    def create_campaign(
+        self, name: str, description: str, agent_id: UUID, spec: Dict[str, Any]
+    ) -> CampaignRecord:
+        campaign_id = uuid.uuid4()
+        now = _now_str()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO campaigns "
+                "(id, name, description, agent_id, spec_json, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (
+                    str(campaign_id),
+                    name,
+                    description,
+                    str(agent_id),
+                    json.dumps(spec),
+                    now,
+                    now,
+                ),
+            )
+            self._conn.commit()
+        return self.get_campaign(campaign_id)
+
+    def update_campaign(
+        self,
+        campaign_id: UUID,
+        name: str,
+        description: str,
+        agent_id: UUID,
+        spec: Dict[str, Any],
+    ) -> CampaignRecord:
+        with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE campaigns SET name=?, description=?, agent_id=?, spec_json=?, "
+                "updated_at=? WHERE id=?",
+                (
+                    name,
+                    description,
+                    str(agent_id),
+                    json.dumps(spec),
+                    _now_str(),
+                    str(campaign_id),
+                ),
+            )
+            self._conn.commit()
+        if cursor.rowcount == 0:
+            raise RuntimeError(f"LocalBackend: Campaign {campaign_id} not found")
+        return self.get_campaign(campaign_id)
+
+    def get_campaign(self, campaign_id: UUID) -> CampaignRecord:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM campaigns WHERE id=? LIMIT 1", (str(campaign_id),)
+            ).fetchone()
+        if row is None:
+            raise RuntimeError(f"LocalBackend: Campaign {campaign_id} not found")
+        return self._row_to_campaign(row)
+
+    def list_campaigns(
+        self, page: int = 1, page_size: int = 100
+    ) -> PaginatedResult[CampaignRecord]:
+        offset = (page - 1) * page_size
+        with self._lock:
+            total = self._conn.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
+            rows = self._conn.execute(
+                "SELECT * FROM campaigns ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+                (page_size, offset),
+            ).fetchall()
+        return PaginatedResult(
+            items=[self._row_to_campaign(row) for row in rows], total=total
+        )
+
+    def delete_campaign(self, campaign_id: UUID) -> None:
+        """Delete a saved campaign; the runs launched from it are kept."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM campaigns WHERE id=?", (str(campaign_id),)
+            )
+            self._conn.commit()
+        if cursor.rowcount == 0:
+            raise RuntimeError(f"LocalBackend: Campaign {campaign_id} not found")
+
+    @staticmethod
+    def _row_to_campaign(row: sqlite3.Row) -> CampaignRecord:
+        return CampaignRecord(
+            id=UUID(row["id"]),
+            name=row["name"],
+            description=row["description"],
+            agent_id=UUID(row["agent_id"]),
+            spec=json.loads(row["spec_json"] or "{}"),
             created_at=_to_dt(row["created_at"]),
             updated_at=_to_dt(row["updated_at"]),
         )

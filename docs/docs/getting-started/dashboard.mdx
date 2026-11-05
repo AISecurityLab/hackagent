@@ -14,7 +14,7 @@ with no Node runtime, Docker or database server involved.
 
 The recording shows the runs of the [example run](./example-run.mdx) against a small support bot.
 
-- **Local mode** (the default local backend): reads the runs recorded in your SQLite database. Read-only, apart from deleting a run.
+- **Local mode** (the default local backend): reads the runs recorded in your SQLite database, and saves and launches campaigns on this machine.
 - **Remote mode** (`--backend remote`, with `HACKAGENT_API_KEY` set): shows your hosted HackAgent data.
 
 Your API key never reaches the browser. It stays in the CLI process, which
@@ -87,15 +87,23 @@ the page requires no login. Bind it only on a trusted network, and prefer an SSH
 tunnel (`ssh -L 7860:127.0.0.1:7860 host`) for remote access.
 :::
 
-## Local mode is read-only
+## Launching campaigns in local mode
 
-Local mode renders agents, attacks, runs, results and traces, but does not
-launch attacks. Run a campaign from the CLI, then refresh the dashboard:
+In local mode, **Attacks** builds a campaign against one of your agents, saves
+it to the local database and launches it on this machine: the `hackagent web`
+process runs it, and the run page follows its attacks and results as they land.
+Cancel stops it at its next step. Only *This machine* is offered, since cloud
+runs need a HackAgent account.
+
+A campaign targets an agent the database already knows. Agents are registered
+by running a campaign against them, for example from the CLI:
 
 ```bash
 hackagent campaign run campaign.yaml
 hackagent web
 ```
+
+A launched run lives as long as `hackagent web`: stopping the server ends it.
 
 ## Troubleshooting
 
@@ -107,7 +115,7 @@ which dashboard bundle is in use — the first things to include in a bug report
 | "No web UI bundle found …" | Nothing supplied a dashboard: `pip install 'hackagent[web]'`, or use a release binary |
 | "Port 7860 is already in use by another process" | An unrelated process holds the port — a previous HackAgent dashboard is reclaimed automatically, anything else never is. Use `--port` |
 | Every panel is empty (local mode) | No runs recorded in that database yet, or they went to another one. Check `hackagent results list` |
-| Creating or launching returns "read-only" | Expected in local mode — see above |
+| Creating an agent returns 501 (local mode) | Agents are registered by running a campaign against them — see above |
 | 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `HACKAGENT_API_KEY` and `hackagent config show` |
 
 ## See also

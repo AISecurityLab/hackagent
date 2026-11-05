@@ -12,7 +12,8 @@ under `/api/proxy`:
 * **remote mode** — the remote storage backend is selected, so calls are
   forwarded to the configured API with the key attached server-side (`_proxy`);
 * **offline mode** — the local backend is selected (the default), so calls
-  are answered from the local SQLite store (`_local_api`), read-only.
+  are answered from the local SQLite store (`_local_api`); campaigns are
+  saved there and launched on this machine, in this process (`_launcher`).
 
 Either way the browser only ever talks to `127.0.0.1`, and the SPA itself is
 identical to the hosted one — there is no second dashboard to keep in sync.

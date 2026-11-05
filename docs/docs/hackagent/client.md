@@ -82,6 +82,17 @@ Command lists and TUI forms are generated from this. It covers both
 halves of the migration — what the legacy pipeline still runs and what
 the campaign runner has taken over — because `hack` runs either.
 
+#### technique\_catalog
+
+```python
+def technique_catalog() -> List[Dict[str, Any]]
+```
+
+Every technique with its parameter schema and auxiliary-model roles.
+
+Consumers build attack forms from this instead of hardcoding them. The
+result is a fresh copy, so callers may mutate it freely.
+
 #### grouped\_catalog
 
 ```python
@@ -164,6 +175,19 @@ def delete_run(run_id: Any) -> None
 ```
 
 Delete one run. This is a write; reads never call it.
+
+#### save\_campaign
+
+```python
+def save_campaign(*,
+                  name: str,
+                  description: str,
+                  agent_id: Any,
+                  spec: Dict[str, Any],
+                  campaign_id: Any = None) -> Any
+```
+
+Create a saved campaign, or replace the one `campaign_id` names.
 
 #### check\_connection
 

@@ -138,6 +138,7 @@ _PRIVATE = ("hackagent/storage/_http", "hackagent/attacks/_lib/legacy_seams")
 #: its private helpers under public names.
 _RENAMED = {
     "interfaces/web/__init__": "interfaces/web/index",
+    "interfaces/web/_launcher": "interfaces/web/launcher",
     "interfaces/web/_local_api": "interfaces/web/local_api",
     "interfaces/web/_proxy": "interfaces/web/proxy",
     "interfaces/web/_serializers": "interfaces/web/serializers",
