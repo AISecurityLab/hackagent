@@ -26,7 +26,7 @@ from tests.unit.campaign.fakes import FakeBuilder, ScriptedModel, campaign, goal
 BASE_URL = "https://exec.example/api"
 GATEWAY_KEY = "gateway-key-for-test"
 GW = {
-    "name": "hackagent-attacker",
+    "name": "hackagent/attacker-v1",
     "connection": {"provider": "hackagent", "type": "OPENAI"},
 }
 
@@ -907,7 +907,7 @@ def test_a_gateway_marker_the_gateway_does_not_serve_ends_the_run_failed(tmp_pat
     )
 
     assert outcome.status == "FAILED"
-    assert "hackagent-attacker or hackagent-judge" in outcome.note
+    assert "hackagent/attacker-v1 or hackagent/judge-v1" in outcome.note
     assert store.finished == [(store.run_id, "FAILED", outcome.note)]
     assert store._closed
 

@@ -240,8 +240,8 @@ curl -sS "https://api.hackagent.dev/result?run=$RUN_ID&evaluation_status=SUCCESS
 
 | `model` | For |
 |---|---|
-| `hackagent-attacker` | Attack roles: the model that writes attack prompts |
-| `hackagent-judge` | Judges, guardrails and goal classifiers |
+| `hackagent/attacker-v1` | Attack roles: the model that writes attack prompts |
+| `hackagent/judge-v1` | Judges, guardrails and goal classifiers |
 
 Any other name gets `400` with `code: UNKNOWN_MODEL` and the list of valid names. A campaign model uses the gateway when its connection endpoint is `https://api.hackagent.dev/v1` and its `name` is one of these models, or when it is a gateway marker (`connection: {provider: hackagent, type: OPENAI}`) named after one. The gateway authenticates with `HACKAGENT_API_KEY`. Model connections are independent of the result-storage backend. The same endpoint can be called from an OpenAI-compatible client:
 
@@ -252,7 +252,7 @@ Any other name gets `400` with `code: UNKNOWN_MODEL` and the list of valid names
 curl -sS https://api.hackagent.dev/v1/chat/completions \
   -H "Authorization: Bearer $HACKAGENT_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model": "hackagent-judge", "messages": [{"role": "user", "content": "Say hello"}], "max_tokens": 50}'
+  -d '{"model": "hackagent/judge-v1", "messages": [{"role": "user", "content": "Say hello"}], "max_tokens": 50}'
 ```
 
 </TabItem>
@@ -267,7 +267,7 @@ client = OpenAI(
     api_key=os.environ["HACKAGENT_API_KEY"],
 )
 reply = client.chat.completions.create(
-    model="hackagent-judge",
+    model="hackagent/judge-v1",
     messages=[{"role": "user", "content": "Say hello"}],
     max_tokens=50,
 )
