@@ -177,10 +177,11 @@ class TestLaunchesRunHere(unittest.TestCase):
         _static.static_dir = self._real_static_dir
         self._tmp.cleanup()
 
-    def _forward(self, send, status_code=201, executor="local"):
+    def _forward(self, send, status_code=201, executor="local", reply=None):
         run_id = uuid4()
         recorded = {}
-        reply = json.dumps({"id": str(run_id), "executor": executor}).encode()
+        if reply is None:
+            reply = json.dumps({"id": str(run_id), "executor": executor}).encode()
 
         def _request(_self, method, url, **kwargs):
             recorded.update(kwargs, url=url)
@@ -236,6 +237,26 @@ class TestLaunchesRunHere(unittest.TestCase):
             )
         )
         self.assertEqual(recorded["content"], b"[1]")
+
+    def test_a_body_that_is_not_json_is_forwarded_as_it_is(self):
+        _, recorded, _ = self._forward(
+            lambda: self.client.post(
+                "/api/proxy/campaign/abc/launch",
+                data="not json",
+                content_type="text/plain",
+            )
+        )
+        self.assertEqual(recorded["content"], b"not json")
+        self.assertEqual(recorded["headers"]["Content-Type"], "text/plain")
+
+    def test_a_reply_that_is_not_a_run_starts_nothing(self):
+        for reply in (b"not json", b"[]", b'{"executor": "local"}'):
+            with self.subTest(reply=reply):
+                self._forward(
+                    lambda: self.client.post("/api/proxy/campaign/abc/launch", json={}),
+                    reply=reply,
+                )
+                self.assertEqual(self.started, [])
 
     def test_the_preflight_checks_a_local_run(self):
         _, recorded, _ = self._forward(
