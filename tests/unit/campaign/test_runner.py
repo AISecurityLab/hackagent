@@ -134,6 +134,119 @@ def test_a_static_attack_without_judges_traces_only_the_target(tmp_path):
     assert [n.label for n in attempt.trace] == ["target"]
 
 
+@pytest.mark.parametrize("iterative", [False, True])
+def test_goal_response_clock_excludes_final_judging_and_survives_batch_storage(
+    tmp_path, monkeypatch, iterative
+):
+    from hackagent.orchestrator.campaign import runner
+
+    clock = [0.0]
+    monkeypatch.setattr(runner, "monotonic", lambda: clock[0])
+
+    def target(messages):
+        clock[0] += 5
+        return TARGET_REPLY
+
+    def judge(messages):
+        clock[0] += 100
+        return "yes"
+
+    values = (
+        iterative_campaign(tmp_path)
+        if iterative
+        else campaign(
+            attacks=[{"name": "baseline"}],
+            execution={"output": {"directory": str(tmp_path)}},
+        )
+    )
+    result, _builder = run(
+        values, models=models_for(target=ScriptedModel(target), judge=judge)
+    )
+    attempts = attempts_of(result)
+    assert attempts[0].metadata["goal_target_elapsed_s"] == 5
+    assert attempts[0].metadata["goal_active_target_elapsed_s"] == 5
+    assert all(
+        attempt.metadata["goal_target_elapsed_s"] < clock[0] for attempt in attempts
+    )
+    assert all(attempt.response.latency_ms == 5000 for attempt in attempts)
+
+
+@pytest.mark.parametrize("iterative", [False, True])
+def test_active_goal_clock_excludes_local_slot_waits(tmp_path, monkeypatch, iterative):
+    from hackagent.orchestrator.campaign import runner
+
+    clock = [0.0]
+    monkeypatch.setattr(runner, "monotonic", lambda: clock[0])
+
+    class QueuedSemaphore(asyncio.Semaphore):
+        async def acquire(self):
+            clock[0] += 10
+            return await super().acquire()
+
+    monkeypatch.setattr(
+        runner._Limits,
+        "from_counts",
+        lambda **counts: runner._Limits(
+            QueuedSemaphore(counts["attack"]),
+            QueuedSemaphore(counts["target"]),
+            QueuedSemaphore(counts["judge"]),
+        ),
+    )
+
+    def target(messages):
+        clock[0] += 5
+        return TARGET_REPLY
+
+    def judge(messages):
+        clock[0] += 100
+        return "yes"
+
+    values = (
+        iterative_campaign(tmp_path)
+        if iterative
+        else campaign(
+            attacks=[{"name": "baseline"}],
+            execution={"output": {"directory": str(tmp_path)}},
+        )
+    )
+    result, _ = run(
+        values, models=models_for(target=ScriptedModel(target), judge=judge)
+    )
+    first = attempts_of(result)[0]
+    assert first.metadata["goal_target_elapsed_s"] == 25
+    assert first.metadata["goal_active_target_elapsed_s"] == 5
+    assert first.response.latency_ms == 5000
+
+
+def test_active_clock_keeps_intervening_judging_but_not_its_slot_wait(monkeypatch):
+    from hackagent.orchestrator.campaign import runner
+
+    clock = [0.0]
+    monkeypatch.setattr(runner, "monotonic", lambda: clock[0])
+
+    class QueuedSemaphore(asyncio.Semaphore):
+        async def acquire(self):
+            clock[0] += 10
+            return await super().acquire()
+
+    async def check():
+        token = runner._goal_timing.set(runner._GoalTiming(0))
+        try:
+            async with runner._slot(QueuedSemaphore(1)):
+                clock[0] += 5  # First target response.
+            async with runner._slot(QueuedSemaphore(1)):
+                clock[0] += 7  # Judging needed to choose the next request.
+            async with runner._slot(QueuedSemaphore(1)):
+                clock[0] += 3  # Successful target response.
+            assert runner._active_goal_elapsed() == 15
+            assert clock[0] == 45
+        finally:
+            runner._goal_timing.reset(token)
+        assert runner._active_goal_elapsed() is None
+
+    asyncio.run(check())
+
+
 def test_a_static_target_failure_keeps_its_traced_call(tmp_path):
     def broken(messages):
         raise RuntimeError("connection reset")
@@ -789,6 +902,59 @@ def crescendo_models(refused: bool):
         attacker=ScriptedModel(question),
         refusal=ScriptedModel(verdict),
     )
+
+
+@pytest.mark.parametrize("fallback", [False, True])
+@pytest.mark.parametrize("save_prompts", [False, True])
+@pytest.mark.parametrize("save_responses", [False, True])
+def test_refusal_trace_retention_in_files_and_storage(
+    tmp_path, fallback, save_prompts, save_responses
+):
+    from tests.fakes import in_memory_store
+
+    values = crescendo_campaign(tmp_path, max_backtracks=0)
+    values["execution"]["output"].update(
+        save_prompts=save_prompts, save_responses=save_responses
+    )
+    models = crescendo_models(refused=False)
+    if fallback:
+        del values["attacks"][0]["roles"]["refusal"]
+        replies = iter(
+            [
+                json.dumps({"reasoning": "warming up", "question": "a question"}),
+                json.dumps({"score_value": False, "rationale": "scripted"}),
+            ]
+        )
+        models["attacker"] = ScriptedModel(lambda _messages: next(replies))
+    store = in_memory_store()
+    result, _ = run(values, models=models, store=store)
+    path = next(p for p in result.outputs if p.name == "traces.jsonl")
+    file_nodes = [
+        node
+        for line in path.read_text().splitlines()
+        for node in json.loads(line)["nodes"]
+    ]
+    stored_nodes = [
+        trace.content
+        for record in store.list_results(page_size=50).items
+        for trace in store.list_traces(record.id)
+    ]
+    for nodes in (file_nodes, stored_nodes):
+        evaluators = [
+            node
+            for node in nodes
+            if node.get("node") == "call"
+            and node["data"]["role"] == ("attacker" if fallback else "refusal")
+        ]
+        assert evaluators
+        refusal = evaluators[-1]["data"]
+        request = refusal.get("request", {})
+        assert ("prompt" in request) == save_prompts
+        assert ("response" in request) == save_responses
+        if save_responses:
+            assert request["response"] == "I'm sorry, I cannot help with that."
+        else:
+            assert "I'm sorry, I cannot help with that." not in json.dumps(refusal)
 
 
 def test_a_backtracked_crescendo_turn_is_stored_unjudged(tmp_path):

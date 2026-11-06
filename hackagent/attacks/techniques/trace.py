@@ -206,12 +206,29 @@ def record_judge_call(sample: Sample, verdict: Verdict, latency_s: float) -> Non
     )
 
 
+_evaluation_request: ContextVar[Optional[dict[str, str]]] = ContextVar(
+    "hackagent_evaluation_request", default=None
+)
+
+
+@contextmanager
+def evaluation_request(prompt: str, response: str) -> Iterator[None]:
+    """Keep evaluator inputs separable for independent retention filtering."""
+    token = _evaluation_request.set({"prompt": prompt, "response": response})
+    try:
+        yield
+    finally:
+        _evaluation_request.reset(token)
+
+
 def traced_completion(name: str, completion: Completion) -> Completion:
     """``completion``, recording each call as a ``call`` node."""
 
     async def complete(messages: Messages) -> str:
         started = monotonic()
-        request = [dict(message) for message in messages]
+        request: object = _evaluation_request.get()
+        if request is None:
+            request = [dict(message) for message in messages]
         try:
             reply = await completion(messages)
         except Exception as exc:
@@ -237,6 +254,7 @@ __all__ = [
     "artifact",
     "current_path",
     "decision",
+    "evaluation_request",
     "phase",
     "record_call",
     "record_judge_call",
