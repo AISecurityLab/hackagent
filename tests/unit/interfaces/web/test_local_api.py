@@ -348,9 +348,8 @@ def _slow_run(spec, *, store, on_event, **_kwargs):
 
 class TestLaunchingOnThisMachine(_CampaignTestCase):
     def launch(self, campaign_id, executor="local"):
-        return self.client.post(
-            f"/api/proxy/campaign/{campaign_id}/launch", json={"executor": executor}
-        )
+        body = {} if executor is None else {"executor": executor}
+        return self.client.post(f"/api/proxy/campaign/{campaign_id}/launch", json=body)
 
     def wait_until_final(self, run_id):
         for _ in range(200):
@@ -366,7 +365,8 @@ class TestLaunchingOnThisMachine(_CampaignTestCase):
     )
     def test_launch_runs_here_and_serves_the_parent_run(self, run, _resolve):
         saved = self.saved()
-        response = self.launch(saved["id"])
+        # The dashboard leaves where to the deployment: offline, this machine.
+        response = self.launch(saved["id"], executor=None)
         self.assertEqual(response.status_code, 201)
         parent = response.get_json()
         self.assertEqual(parent["executor"], "local")
@@ -440,10 +440,11 @@ class TestLaunchingOnThisMachine(_CampaignTestCase):
 
     def test_local_preflight_passes_for_a_valid_campaign(self):
         saved = self.saved()
-        preflight = self.get(
-            f"/api/proxy/campaign/{saved['id']}/preflight?executor=local"
-        )
-        self.assertEqual(preflight, {"ok": True, "problems": []})
+        for query in ("?executor=local", ""):
+            preflight = self.get(f"/api/proxy/campaign/{saved['id']}/preflight{query}")
+            self.assertEqual(
+                preflight, {"executor": "local", "ok": True, "problems": []}
+            )
 
     @mock.patch(
         "hackagent.interfaces.web._launcher.resolve_campaign",

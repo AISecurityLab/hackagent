@@ -486,7 +486,8 @@ def create_local_api(client) -> Blueprint:
         )
 
     def _launch(campaign: Any, executor: Any):
-        if executor != "local":
+        # Left out, the deployment decides; offline, that is this machine.
+        if executor not in (None, "local"):
             return jsonify({"problems": [_CLOUD_UNAVAILABLE]}), 400
         try:
             record = launcher.launch(campaign)
@@ -551,16 +552,19 @@ def create_local_api(client) -> Blueprint:
         campaign = _campaign_or_none(campaign_id)
         if campaign is None:
             return _not_found("Campaign")
-        if request.args.get("executor") != "local":
-            return jsonify({"ok": False, "problems": [_CLOUD_UNAVAILABLE]})
+        executor = request.args.get("executor", "local")
+        if executor != "local":
+            return jsonify(
+                {"executor": executor, "ok": False, "problems": [_CLOUD_UNAVAILABLE]}
+            )
         try:
             load_stored_campaign(
                 launch_spec(campaign, client.agent(campaign.agent_id), Path("."))
             )
         except Exception as exc:
             problem = {"code": "LAUNCH_REFUSED", "message": str(exc), "details": {}}
-            return jsonify({"ok": False, "problems": [problem]})
-        return jsonify({"ok": True, "problems": []})
+            return jsonify({"executor": executor, "ok": False, "problems": [problem]})
+        return jsonify({"executor": executor, "ok": True, "problems": []})
 
     @bp.post("/campaign/<campaign_id>/launch")
     def campaign_launch(campaign_id: str):
