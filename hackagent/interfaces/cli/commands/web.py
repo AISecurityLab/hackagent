@@ -184,7 +184,7 @@ def web(ctx, host, port, db_path, force_local, no_browser):
     session = HackAgent(settings)
 
     try:
-        app = create_app(session)
+        app = create_app(session, hosts=[host])
     except MissingBundleError as exc:
         session.close()
         console.print(f"[bold red]❌ {exc}[/bold red]")

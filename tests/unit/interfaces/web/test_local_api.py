@@ -76,6 +76,7 @@ class _WebUITestCase(unittest.TestCase):
             ),
             backend=self.backend,
         )
+        self.session = session
         self.client = create_app(session).test_client()
 
     def tearDown(self) -> None:

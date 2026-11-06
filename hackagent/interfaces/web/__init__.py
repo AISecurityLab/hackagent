@@ -16,6 +16,12 @@ under ``/api/proxy``:
 
 Either way the browser only ever talks to ``127.0.0.1``, and the SPA itself is
 identical to the hosted one — there is no second dashboard to keep in sync.
+
+Only requests addressed to this machine by name are served, and a
+browser may only write from the dashboard's own origin: otherwise any web page
+could rebind its name to ``127.0.0.1``, or post to it, and use this process —
+its data, the API key it attaches, and the campaigns it launches with the
+shell's model keys.
 """
 
 from __future__ import annotations
@@ -23,9 +29,10 @@ from __future__ import annotations
 import logging
 import mimetypes
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
+from urllib.parse import urlsplit
 
-from flask import Flask, Response, jsonify, send_from_directory
+from flask import Flask, Response, abort, jsonify, request, send_from_directory
 
 from hackagent.core.settings import Mode
 from hackagent.interfaces.web._static import (
@@ -40,6 +47,12 @@ logger = logging.getLogger("hackagent.interfaces.web")
 #: Mounted under this prefix because the SPA's generated client hardcodes it as
 #: its basePath (``src/lib/apiClient.ts``).
 API_PREFIX = "/api/proxy"
+
+#: The names a request may address this process by, besides the ``--host`` it
+#: listens on.
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 class MissingBundleError(RuntimeError):
@@ -103,15 +116,17 @@ def runtime_config(api_url: str = API_PREFIX) -> Dict[str, Any]:
     }
 
 
-def create_app(client) -> Flask:
+def create_app(client, hosts: Iterable[str] = ()) -> Flask:
     """Build the Flask app serving the web UI.
 
     Args:
         client: a :class:`hackagent.client.HackAgent` session. A configured
             ``remote`` storage backend selects remote proxy mode (its
             settings carry the validated API key). Otherwise calls are answered
-            from the session's local store. ``delete_run`` is the one local
-            write; other writes stay unavailable.
+            from the session's local store, where campaigns are saved and
+            launched.
+        hosts: names this process is reached by besides the loopback ones,
+            e.g. the ``--host`` it listens on.
 
     Raises:
         MissingBundleError: this build ships no web UI bundle.
@@ -125,6 +140,26 @@ def create_app(client) -> Flask:
         raise MissingBundleError()
 
     app = Flask(__name__, static_folder=None)
+    trusted = {
+        name.lower()
+        for name in (*LOOPBACK_HOSTS, *hosts)
+        if name not in ("0.0.0.0", "::")
+    }
+
+    @app.before_request
+    def only_this_machine() -> None:
+        """Refuse a request for another name (400): a page that rebinds its
+        name to 127.0.0.1 sends it. Then refuse a browser's write from another
+        origin (403, CSRF). A client with no ``Origin`` (the CLI, curl) is no
+        browser page and is let through."""
+        host = request.headers.get("Host", "")
+        if (urlsplit(f"//{host}").hostname or "").lower() not in trusted:
+            abort(400)
+        origin = request.headers.get("Origin")
+        if request.method in _SAFE_METHODS or origin is None:
+            return
+        if urlsplit(origin).netloc.lower() != host.lower():
+            abort(403)
 
     if client.settings.mode is Mode.REMOTE:
         from hackagent.interfaces.web._remote_launcher import RemoteLauncher

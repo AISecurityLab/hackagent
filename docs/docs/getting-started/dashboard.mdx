@@ -128,6 +128,11 @@ Every option is in the [CLI reference](../reference/cli.md#hackagent-web).
 the port can act with your API key: the proxy attaches it to every request and
 the page requires no login. Bind it only on a trusted network, and prefer an SSH
 tunnel (`ssh -L 7860:127.0.0.1:7860 host`) for remote access.
+
+The dashboard answers only requests addressed to `127.0.0.1`, `localhost` or the
+`--host` name it was started with, and takes changes only from its own pages.
+With `--host 0.0.0.0`, open it through one of those names (the SSH tunnel does):
+a request for any other name gets 400.
 :::
 
 ## Launching in remote mode
