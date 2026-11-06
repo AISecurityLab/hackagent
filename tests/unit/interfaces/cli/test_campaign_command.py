@@ -184,7 +184,7 @@ def test_campaign_run_binds_gateway(monkeypatch, ambient):
         monkeypatch.setenv("HACKAGENT_GATEWAY_KEY", ambient)
     monkeypatch.setenv("HACKAGENT_API_KEY", "dashboard-key")
     gateway = {
-        "name": "hackagent-attacker",
+        "name": "hackagent/attacker-v1",
         "connection": {"provider": "hackagent", "type": "OPENAI"},
     }
     spec = CampaignSpec.model_validate(
@@ -227,7 +227,7 @@ def test_campaign_run_binds_gateway(monkeypatch, ambient):
 def test_campaign_run_gateway_without_api_key_fails(monkeypatch):
     monkeypatch.delenv("HACKAGENT_GATEWAY_KEY", raising=False)
     gateway = {
-        "name": "hackagent-attacker",
+        "name": "hackagent/attacker-v1",
         "connection": {"provider": "hackagent", "type": "OPENAI"},
     }
     spec = CampaignSpec.model_validate(MIN | {"target": gateway})
