@@ -1101,7 +1101,8 @@ class LocalBackend:
         rather than zero.
 
         Goal samples include the first successful conversation ordinal and, when
-        every successful reply carries a goal clock, the earliest response time.
+        every successful reply carries an active goal clock, the earliest response time.
+        Local scheduling waits are excluded; legacy wall clocks are not substituted.
         Persistence timestamps cannot recover the latter for batched searches.
         Token totals are unknown when any target call or attempt lacks usage.
         """
@@ -1146,10 +1147,10 @@ class LocalBackend:
                        MIN(CASE WHEN bucket = 'jailbreak' THEN ordinal END) AS first_jailbreak_attempt,
                        SUM(bucket = 'jailbreak') AS successes,
                        COUNT(CASE WHEN bucket = 'jailbreak' THEN
-                         json_extract(metadata_json, '$.attack_metadata.goal_target_elapsed_s')
+                         json_extract(metadata_json, '$.attack_metadata.goal_active_target_elapsed_s')
                        END) AS timed_successes,
                        MIN(CASE WHEN bucket = 'jailbreak' THEN
-                         json_extract(metadata_json, '$.attack_metadata.goal_target_elapsed_s')
+                         json_extract(metadata_json, '$.attack_metadata.goal_active_target_elapsed_s')
                        END) AS first_jailbreak_elapsed_s,
                        SUM(EXISTS(SELECT 1 FROM traces t WHERE t.result_id = results.id
                          AND json_extract(t.content_json, '$.node') = 'call'

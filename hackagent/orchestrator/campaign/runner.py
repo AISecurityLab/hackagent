@@ -36,6 +36,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Iterable, Mapping
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from pathlib import Path
 from time import monotonic
@@ -92,6 +94,40 @@ from hackagent.storage.store import Store
 logger = get_logger(__name__)
 
 T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class _GoalTiming:
+    started: float
+    queued: float = 0.0
+
+
+_goal_timing: ContextVar[Optional[_GoalTiming]] = ContextVar(
+    "goal_timing", default=None
+)
+
+
+@asynccontextmanager
+async def _slot(semaphore: asyncio.Semaphore):
+    started = monotonic()
+    async with semaphore:
+        timing = _goal_timing.get()
+        if timing is not None:
+            # Immutable context values keep concurrent request branches independent.
+            _goal_timing.set(
+                replace(timing, queued=timing.queued + monotonic() - started)
+            )
+        yield
+
+
+def _active_goal_elapsed() -> Optional[float]:
+    timing = _goal_timing.get()
+    return (
+        max(monotonic() - timing.started - timing.queued, 0.0)
+        if timing is not None
+        else None
+    )
+
 
 #: Receives ``(event_name, **payload)``. An audited run first emits
 #: ``audit_finished`` (``audit``), then ``attack_started`` (``attack``,
@@ -554,10 +590,14 @@ class _AttackRunner:
         run_id: str,
     ) -> None:
         started = monotonic()
-        if isinstance(attack.attack, IterativeAttack):
-            attempts = await self._search(attack, goal)
-        else:
-            attempts = await self._generate_and_send(attack, goal)
+        token = _goal_timing.set(_GoalTiming(started))
+        try:
+            if isinstance(attack.attack, IterativeAttack):
+                attempts = await self._search(attack, goal)
+            else:
+                attempts = await self._generate_and_send(attack, goal)
+        finally:
+            _goal_timing.reset(token)
         if goal.labels:
             attempts = [replace(attempt, labels=goal.labels) for attempt in attempts]
         for attempt in attempts:
@@ -592,7 +632,7 @@ class _AttackRunner:
         # each is counted once however many requests it produced.
         with recording() as generation:
             try:
-                async with self.limits.attack:
+                async with _slot(self.limits.attack):
                     requests = await attack.attack.generate(goal.text)
             except Exception as exc:
                 logger.warning(
@@ -660,7 +700,10 @@ class _AttackRunner:
             if goal_started is not None:
                 attempt = replace(
                     attempt,
-                    metadata={"goal_target_elapsed_s": monotonic() - goal_started},
+                    metadata={
+                        "goal_target_elapsed_s": monotonic() - goal_started,
+                        "goal_active_target_elapsed_s": _active_goal_elapsed(),
+                    },
                 )
         except Exception as exc:
             # A provider error arrives as a response; a transport failure
@@ -711,15 +754,19 @@ class _AttackRunner:
         """Run an iterative attack for ``goal`` and judge every exchange it kept."""
         goal_started = monotonic()
         response_times: dict[int, float] = {}
+        active_response_times: dict[int, float] = {}
 
         async def timed_target(messages: Messages, **overrides: Any) -> ModelResponse:
             response = await self._send(messages, **overrides)
             response_times[id(response)] = monotonic() - goal_started
+            active_elapsed = _active_goal_elapsed()
+            if active_elapsed is not None:
+                active_response_times[id(response)] = active_elapsed
             return response
 
         with recording() as trace:
             try:
-                async with self.limits.attack:
+                async with _slot(self.limits.attack):
                     findings = await attack.attack.run(
                         goal.text, timed_target, self._ask_panel
                     )
@@ -748,7 +795,15 @@ class _AttackRunner:
                 )
             ]
         return [
-            self._attempt_for(attack, goal, index, finding, slice_, response_times)
+            self._attempt_for(
+                attack,
+                goal,
+                index,
+                finding,
+                slice_,
+                response_times,
+                active_response_times,
+            )
             for index, (finding, slice_) in enumerate(
                 zip(findings, _slices(nodes, findings))
             )
@@ -762,6 +817,7 @@ class _AttackRunner:
         finding: Finding,
         trace: tuple[TraceNode, ...],
         response_times: Optional[dict[int, float]] = None,
+        active_response_times: Optional[dict[int, float]] = None,
     ) -> Attempt:
         """One attempt per judged exchange, carrying the search that made it."""
         # The finding's reply is one that _send returned.
@@ -782,6 +838,14 @@ class _AttackRunner:
                 metadata={
                     **attempt.metadata,
                     "goal_target_elapsed_s": response_times[id(response)],
+                },
+            )
+        if active_response_times is not None and id(response) in active_response_times:
+            attempt = replace(
+                attempt,
+                metadata={
+                    **attempt.metadata,
+                    "goal_active_target_elapsed_s": active_response_times[id(response)],
                 },
             )
         try:
@@ -846,7 +910,7 @@ class _AttackRunner:
         The clock starts once the call holds its slot, so the latency is the
         target's and not the time spent queueing behind other requests.
         """
-        async with self.limits.target:
+        async with _slot(self.limits.target):
             started = monotonic()
             response = await self.resolved.target.acomplete(messages, **overrides)
             elapsed = monotonic() - started
@@ -856,7 +920,7 @@ class _AttackRunner:
         panel = self.resolved.panel
         if panel is None:
             return None
-        async with self.limits.judge:
+        async with _slot(self.limits.judge):
             verdict = await panel.aevaluate(sample)
         if self.require_all_judges and any(vote.abstained for vote in verdict.votes):
             return verdict.model_copy(

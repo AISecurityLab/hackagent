@@ -164,10 +164,87 @@ def test_goal_response_clock_excludes_final_judging_and_survives_batch_storage(
     )
     attempts = attempts_of(result)
     assert attempts[0].metadata["goal_target_elapsed_s"] == 5
+    assert attempts[0].metadata["goal_active_target_elapsed_s"] == 5
     assert all(
         attempt.metadata["goal_target_elapsed_s"] < clock[0] for attempt in attempts
     )
     assert all(attempt.response.latency_ms == 5000 for attempt in attempts)
+
+
+@pytest.mark.parametrize("iterative", [False, True])
+def test_active_goal_clock_excludes_local_slot_waits(tmp_path, monkeypatch, iterative):
+    from hackagent.orchestrator.campaign import runner
+
+    clock = [0.0]
+    monkeypatch.setattr(runner, "monotonic", lambda: clock[0])
+
+    class QueuedSemaphore(asyncio.Semaphore):
+        async def acquire(self):
+            clock[0] += 10
+            return await super().acquire()
+
+    monkeypatch.setattr(
+        runner._Limits,
+        "from_counts",
+        lambda **counts: runner._Limits(
+            QueuedSemaphore(counts["attack"]),
+            QueuedSemaphore(counts["target"]),
+            QueuedSemaphore(counts["judge"]),
+        ),
+    )
+
+    def target(messages):
+        clock[0] += 5
+        return TARGET_REPLY
+
+    def judge(messages):
+        clock[0] += 100
+        return "yes"
+
+    values = (
+        iterative_campaign(tmp_path)
+        if iterative
+        else campaign(
+            attacks=[{"name": "baseline"}],
+            execution={"output": {"directory": str(tmp_path)}},
+        )
+    )
+    result, _ = run(
+        values, models=models_for(target=ScriptedModel(target), judge=judge)
+    )
+    first = attempts_of(result)[0]
+    assert first.metadata["goal_target_elapsed_s"] == 25
+    assert first.metadata["goal_active_target_elapsed_s"] == 5
+    assert first.response.latency_ms == 5000
+
+
+def test_active_clock_keeps_intervening_judging_but_not_its_slot_wait(monkeypatch):
+    from hackagent.orchestrator.campaign import runner
+
+    clock = [0.0]
+    monkeypatch.setattr(runner, "monotonic", lambda: clock[0])
+
+    class QueuedSemaphore(asyncio.Semaphore):
+        async def acquire(self):
+            clock[0] += 10
+            return await super().acquire()
+
+    async def check():
+        token = runner._goal_timing.set(runner._GoalTiming(0))
+        try:
+            async with runner._slot(QueuedSemaphore(1)):
+                clock[0] += 5  # First target response.
+            async with runner._slot(QueuedSemaphore(1)):
+                clock[0] += 7  # Judging needed to choose the next request.
+            async with runner._slot(QueuedSemaphore(1)):
+                clock[0] += 3  # Successful target response.
+            assert runner._active_goal_elapsed() == 15
+            assert clock[0] == 45
+        finally:
+            runner._goal_timing.reset(token)
+        assert runner._active_goal_elapsed() is None
+
+    asyncio.run(check())
 
 
 def test_a_static_target_failure_keeps_its_traced_call(tmp_path):

@@ -553,11 +553,35 @@ class TestCampaignHistory(_WebUITestCase):
             ],
         )
 
-    def test_running_technique_never_claims_mitigation(self):
+    def test_running_attack_reports_evaluated_goal_without_waiting_for_other_goals(
+        self,
+    ):
+        self.backend.update_campaign_run(self.campaign.id, status="RUNNING")
         self.backend.update_run(self.child.id, status="RUNNING")
-        technique = self.get(self.base)["technique_outcomes"][0]
-        self.assertEqual(technique["mitigated"], 0)
-        self.assertEqual(technique["unresolved"], 1)
+        pending = self.backend.create_result(self.child.id, "Pending goal", 1, {}, {})
+        failed = self.backend.create_result(self.child.id, "Errored goal", 2, {}, {})
+        self.backend.update_result(failed.id, evaluation_status="ERROR_AGENT_RESPONSE")
+        payload = self.get(self.base)
+        technique = payload["technique_outcomes"][0]
+        self.assertEqual(technique["mitigated"], 1)
+        self.assertEqual(technique["unresolved"], 2)
+        self.assertEqual(payload["runs"][0]["outcomes"]["mitigated"], 1)
+        goals = self.get(self.base + "/goals")["results"]
+        self.assertEqual(goals[0]["verdict"], "unresolved")
+        self.assertEqual(goals[0]["attack_outcomes"][0]["verdict"], "mitigated")
+        self.assertEqual(goals[1]["attack_outcomes"][0]["verdict"], "unresolved")
+        self.assertEqual(goals[2]["attack_outcomes"][0]["verdict"], "error")
+        scoped = self.get(self.base + f"?run_id={self.child.id}")
+        self.assertEqual(scoped["mitigated"], 1)
+        self.assertEqual(scoped["unresolved"], 2)
+        scoped_goals = self.get(
+            self.base + f"/goals?run_id={self.child.id}&verdict=mitigated"
+        )
+        self.assertEqual(scoped_goals["count"], 1)
+        self.assertEqual(scoped_goals["results"][0]["index"], 0)
+        self.backend.update_result(pending.id, evaluation_status="SUCCESSFUL_JAILBREAK")
+        updated = self.get(self.base + "/goals")["results"][1]
+        self.assertEqual(updated["attack_outcomes"][0]["verdict"], "jailbroken")
 
     def test_scoped_detail_and_categories_use_only_selected_execution(self):
         self.backend.update_result(
@@ -689,7 +713,9 @@ class TestCampaignHistory(_WebUITestCase):
         self.backend.update_result(
             repeat.id,
             evaluation_status="SUCCESSFUL_JAILBREAK",
-            agent_specific_data={"attack_metadata": {"goal_target_elapsed_s": 12.5}},
+            agent_specific_data={
+                "attack_metadata": {"goal_active_target_elapsed_s": 12.5}
+            },
         )
         payload = self.get(self.base + "/costs")
         sample = next(

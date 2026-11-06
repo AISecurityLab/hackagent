@@ -495,7 +495,9 @@ class TestLocalBackendResult(unittest.TestCase):
                 if index in (1, 2)
                 else "FAILED_JAILBREAK",
                 agent_specific_data={
-                    "attack_metadata": {"goal_target_elapsed_s": [0, 9, 3, 20][index]}
+                    "attack_metadata": {
+                        "goal_active_target_elapsed_s": [0, 9, 3, 20][index]
+                    }
                 },
             )
             self.backend._conn.execute(
@@ -639,7 +641,7 @@ class TestLocalBackendResult(unittest.TestCase):
                 result.id,
                 evaluation_status=status,
                 agent_specific_data={
-                    "attack_metadata": {"goal_target_elapsed_s": timing}
+                    "attack_metadata": {"goal_active_target_elapsed_s": timing}
                 },
             )
         samples = {
@@ -658,11 +660,26 @@ class TestLocalBackendResult(unittest.TestCase):
         self.backend.update_result(
             later.id,
             evaluation_status="SUCCESSFUL_JAILBREAK",
-            agent_specific_data={"attack_metadata": {"goal_target_elapsed_s": 10}},
+            agent_specific_data={
+                "attack_metadata": {"goal_active_target_elapsed_s": 10}
+            },
         )
         sample = self.backend.run_costs([self.run.id])[str(self.run.id)][
             "goal_samples"
         ][0]
+        self.assertIsNone(sample["first_jailbreak_elapsed_s"])
+
+    def test_first_success_does_not_substitute_legacy_queue_inclusive_clock(self):
+        result = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.update_result(
+            result.id,
+            evaluation_status="SUCCESSFUL_JAILBREAK",
+            agent_specific_data={"attack_metadata": {"goal_target_elapsed_s": 1063}},
+        )
+        sample = self.backend.run_costs([self.run.id])[str(self.run.id)][
+            "goal_samples"
+        ][0]
+        self.assertEqual(sample["first_jailbreak_attempt"], 1)
         self.assertIsNone(sample["first_jailbreak_elapsed_s"])
 
     def test_cost_samples_accept_shared_goal_scoped_batch_traces(self):

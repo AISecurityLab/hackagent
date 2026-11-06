@@ -170,18 +170,20 @@ def create_history_api(client: Any) -> Blueprint:
         results = records(selected)
         category_goals = _goals(
             results,
-            campaign.status == "COMPLETED"
-            and all(run.status == "COMPLETED" for run in selected),
+            bool(request.args.get("run_id"))
+            or (
+                campaign.status == "COMPLETED"
+                and all(run.status == "COMPLETED" for run in selected)
+            ),
         )
         payload = summary(campaign, selected, results, names(), category_goals)
         by_run: dict[UUID, list[ResultRecord]] = {run.id: [] for run in selected}
         for result in results:
             by_run[result.run_id].append(result)
         goals_by_run = {
-            run.id: _goals(
-                by_run[run.id],
-                campaign.status == "COMPLETED" and run.status == "COMPLETED",
-            )
+            # The runner records attempts after the attack finishes that goal,
+            # not after the attack has finished every goal in the dataset.
+            run.id: _goals(by_run[run.id], True)
             for run in selected
         }
         categories = category_summaries(category_goals)
@@ -195,13 +197,7 @@ def create_history_api(client: Any) -> Blueprint:
         for technique, group in sorted(technique_runs.items()):
             attempts = [result for run in group for result in by_run[run.id]]
             goals = (
-                goals_by_run[group[0].id]
-                if len(group) == 1
-                else _goals(
-                    attempts,
-                    campaign.status == "COMPLETED"
-                    and all(run.status == "COMPLETED" for run in group),
-                )
+                goals_by_run[group[0].id] if len(group) == 1 else _goals(attempts, True)
             )
             technique_outcomes.append(
                 {
@@ -299,8 +295,9 @@ def create_history_api(client: Any) -> Blueprint:
         runs = scoped(children(campaign.id))
         if request.args.get("run_id") and not runs:
             return _not_found("Attack run")
-        completed = campaign.status == "COMPLETED" and all(
-            run.status == "COMPLETED" for run in runs
+        completed = bool(request.args.get("run_id")) or (
+            campaign.status == "COMPLETED"
+            and all(run.status == "COMPLETED" for run in runs)
         )
         index = None
         if "goal_index" in request.args:
@@ -318,13 +315,7 @@ def create_history_api(client: Any) -> Blueprint:
         for result in results:
             by_run[result.run_id].append(result)
         per_run = {
-            str(run.id): {
-                goal["index"]: goal
-                for goal in _goals(
-                    by_run[run.id],
-                    campaign.status == "COMPLETED" and run.status == "COMPLETED",
-                )
-            }
+            str(run.id): {goal["index"]: goal for goal in _goals(by_run[run.id], True)}
             for run in runs
         }
         for goal in items:
