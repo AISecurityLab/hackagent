@@ -26,7 +26,6 @@ attacks:
   - name: static_template
   - name: flipattack
   - name: cipherchat
-  - name: h4rm3l
   - name: mml
   - name: fc
     roles:
@@ -45,6 +44,8 @@ attacks:
   - name: advprefix
     roles: {attacker: *role}
   - name: stac
+  - name: h4rm3l
+    roles: {synthesizer: *role}
   - name: tool_output_ipi
   - name: toolhijacker
   - name: rag

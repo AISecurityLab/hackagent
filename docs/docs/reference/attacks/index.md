@@ -75,7 +75,7 @@ Every technique HackAgent can run.
 | [Crescendo](crescendo.md) | Multi-turn | `attacker` | Multi-turn escalation attack that gradually steers a persistent conversation toward the goal, with judge-driven backtracking on refusals. |
 | [FC-Attack](fc.md) | Static | `attacker` | FC-Attack: auto-generated flowchart images to jailbreak VLMs. |
 | [FlipAttack](flipattack.md) | Static | none | Prompt obfuscation via character/word flipping modes. |
-| [h4rm3l](h4rm3l.md) | Static | none | Composable decorator-program attack chaining multiple obfuscations. |
+| [h4rm3l](h4rm3l.md) | Adaptive | none | Composable decorator-program attack chaining multiple obfuscations, with an optional search for the program that works best. |
 | [MML](mml.md) | Static | none | Multi-Modal Linkage attack encoding harmful prompts into images for VLMs. |
 | [PAIR](pair.md) | Adaptive | `attacker` | Prompt Automatic Iterative Refinement with attacker/scorer loops. |
 | [PAP](pap.md) | Adaptive | `attacker` | Persuasive Adversarial Prompts using persuasion-technique taxonomies. |

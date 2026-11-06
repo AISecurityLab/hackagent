@@ -202,7 +202,7 @@ def _remote_values():
         "api_key": "${HACKAGENT_API_KEY}",
     }
     gateway = {
-        "name": "hackagent-attacker",
+        "name": "hackagent/attacker-v1",
         "connection": {"provider": "hackagent", "type": "OPENAI"},
     }
     values["attacks"] = [{"name": "pair", "roles": {"attacker": gateway}}]

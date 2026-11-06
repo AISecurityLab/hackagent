@@ -22,8 +22,8 @@ GATEWAY_PROVIDER = "hackagent"
 GATEWAY_KEY_ENV = "HACKAGENT_GATEWAY_KEY"
 #: The models the gateway serves, by the name a request's ``model`` gives:
 #: one for attack roles, one for judges, guardrails and goal classifiers.
-GATEWAY_ATTACKER = "hackagent-attacker"
-GATEWAY_JUDGE = "hackagent-judge"
+GATEWAY_ATTACKER = "hackagent/attacker-v1"
+GATEWAY_JUDGE = "hackagent/judge-v1"
 GATEWAY_MODELS = (GATEWAY_ATTACKER, GATEWAY_JUDGE)
 
 M = TypeVar("M", bound=ModelConfig)
