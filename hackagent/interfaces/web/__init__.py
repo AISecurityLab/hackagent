@@ -143,9 +143,13 @@ def create_app(client) -> Flask:
         app.config["HACKAGENT_MODE"] = "remote"
         app.config["HACKAGENT_TARGET"] = target
     else:
+        from hackagent.interfaces.web._history import create_history_api
         from hackagent.interfaces.web._local_api import create_local_api
 
         app.register_blueprint(create_local_api(client), url_prefix=API_PREFIX)
+        app.register_blueprint(
+            create_history_api(client), url_prefix=f"{API_PREFIX}/local/history"
+        )
         app.config["HACKAGENT_MODE"] = "local"
         app.config["HACKAGENT_TARGET"] = None
 

@@ -8,7 +8,7 @@ sidebar_position: 15
 
 Template-based static template jailbreak attack.
 
-**Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
+**Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
 One request per selected template.
 

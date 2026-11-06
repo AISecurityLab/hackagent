@@ -19,9 +19,8 @@
 # The webapp checkout is never modified: the sources are copied to a scratch
 # directory and the export is configured there. That matters because the webapp
 # is built for a Node deployment — it ships server route handlers for its API
-# proxy and its runtime config, and `output: 'export'` rejects those. The CLI
-# serves both of those itself (hackagent/interfaces/web/_proxy.py and
-# /config.json), so the routes are simply left out of this build.
+# proxy, runtime config and health check, and `output: 'export'` rejects those.
+# The CLI serves those itself, so the routes are left out of this build.
 #
 # Usage:
 #   scripts/build_webui.sh [WEBAPP_DIR]
@@ -41,11 +40,12 @@ WEBAPP_REPO="${HACKAGENT_WEBAPP_REPO:-https://github.com/AISecurityLab/hackagent
 # community packaging landed cannot produce a static export at all.
 WEBAPP_REF="${HACKAGENT_WEBAPP_REF:-v0.2.0}"
 
-# Server-only sources that a static export cannot contain. The CLI answers both
-# of these paths from Python instead.
+# Server-only sources that a static export cannot contain. The CLI answers
+# these paths from Python instead.
 EXCLUDED_ROUTES=(
   "src/app/api"
   "src/app/config.json"
+  "src/app/healthz"
 )
 
 log()  { printf '\033[36m▸\033[0m %s\n' "$*"; }
@@ -131,9 +131,15 @@ log "Building the static export"
 
 # ── Install the bundle ───────────────────────────────────────────────────────
 log "Installing bundle into ${DEST}"
+if [[ -f "${DEST}/.gitignore" ]]; then
+  cp "${DEST}/.gitignore" "${SCRATCH}/static.gitignore"
+fi
 rm -rf "${DEST}"
 mkdir -p "${DEST}"
 tar -C "${BUILD}/out" -cf - . | tar -C "${DEST}" -xf -
+if [[ -f "${SCRATCH}/static.gitignore" ]]; then
+  cp "${SCRATCH}/static.gitignore" "${DEST}/.gitignore"
+fi
 
 WEBAPP_VERSION="$(node -p "require('${BUILD}/package.json').version" 2>/dev/null || echo unknown)"
 printf '%s\n' "${WEBAPP_VERSION}" > "${DEST}/VERSION"

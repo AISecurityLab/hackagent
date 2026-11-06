@@ -1,6 +1,6 @@
 ---
 sidebar_label: llm
-title: hackagent.attacks.techniques.static.h4rm3l.decorators.llm
+title: hackagent.attacks.techniques.adaptive.h4rm3l.decorators.llm
 ---
 
 LLM-assisted h4rm3l prompt decorators.

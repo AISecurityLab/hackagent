@@ -26,14 +26,15 @@ attacks:
   - name: static_template
   - name: flipattack
   - name: cipherchat
-  - name: h4rm3l
   - name: mml
   - name: fc
-  - name: tfc
-  - name: bon
-  - name: pap
     roles:
       attacker: &role {name: smoke-role, connection: *ollama}
+  - name: tfc
+    roles: {attacker: *role}
+  - name: bon
+  - name: pap
+    roles: {attacker: *role}
   - name: pair
     roles: {attacker: *role}
   - name: tap
@@ -43,6 +44,8 @@ attacks:
   - name: advprefix
     roles: {attacker: *role}
   - name: stac
+  - name: h4rm3l
+    roles: {synthesizer: *role}
   - name: tool_output_ipi
   - name: toolhijacker
   - name: rag

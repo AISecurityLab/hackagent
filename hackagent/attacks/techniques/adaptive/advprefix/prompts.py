@@ -151,8 +151,11 @@ def said(prefix: str, continuation: str) -> str:
 
     The model generates only the continuation, but the turn it belongs to
     opens with the prefix, and the harmful content may straddle the two.
-    Judging the continuation alone would miss it.
+    Judging the continuation alone would miss it. Some servers return the
+    prefilled opening as part of the reply; it is kept once.
     """
+    if prefix and continuation.startswith(prefix):
+        return continuation
     return f"{prefix}{continuation}"
 
 

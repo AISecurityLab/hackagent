@@ -21,10 +21,10 @@ from hackagent.orchestrator.campaign.gateway import (
 from .fakes import campaign, model
 
 GW = {
-    "name": "hackagent-attacker",
+    "name": "hackagent/attacker-v1",
     "connection": {"provider": "hackagent", "type": "OPENAI"},
 }
-JUDGE_GW = {**GW, "name": "hackagent-judge", "scoring": {"type": "harmbench"}}
+JUDGE_GW = {**GW, "name": "hackagent/judge-v1", "scoring": {"type": "harmbench"}}
 
 
 def _spec(**sections) -> CampaignSpec:
@@ -86,7 +86,7 @@ def test_bind_gateway_refuses_a_name_the_gateway_does_not_serve(name):
     spec = _spec(
         attacks=[{"name": "pair", "roles": {"attacker": {**GW, "name": name}}}]
     )
-    with pytest.raises(ValueError, match="hackagent-attacker or hackagent-judge"):
+    with pytest.raises(ValueError, match="hackagent/attacker-v1 or hackagent/judge-v1"):
         bind_gateway(spec, "https://h")
 
 

@@ -31,6 +31,17 @@ target is and whether a fix helped.
 
 **Dashboard.** Browse runs, results and traces with `hackagent web`, or on [app.hackagent.dev](https://app.hackagent.dev/).
 
+In local campaign coverage, each attack's evaluated goal outcomes appear while
+other goals are still running. Pending evaluations and errors remain unresolved.
+The pooled campaign verdict stays unresolved until the campaign finishes unless
+an attack has already jailbroken that goal.
+
+Time to first jailbreak measures per-goal execution through the earliest
+successful target response. It includes rewriting and intervening judging, but
+excludes local concurrency-slot waits, final judging, and shared run preparation.
+Server-side queueing remains included. Legacy queue-inclusive clocks are not
+substituted when execution timing is unavailable.
+
 <img src="https://raw.githubusercontent.com/AISecurityLab/hackagent/main/docs/static/gifs/hackagent-dashboard.gif" alt="Browsing campaign results in the HackAgent dashboard" width="100%">
 
 ## Quick start

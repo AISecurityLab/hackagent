@@ -49,7 +49,7 @@ evaluation:
   judges:
     # HackAgent's hosted judge. Swap it for a local Ollama model to keep the
     # whole run on your machine.
-    - name: hackagent-judge
+    - name: hackagent/judge-v1
       connection:
         provider: hackagent
         type: OPENAI

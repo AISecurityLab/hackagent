@@ -75,7 +75,13 @@ class Candidate:
 
 
 class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
-    """Prefill the answer's opening and measure which opening works."""
+    """Prefill the answer's opening and measure which opening works.
+
+    ``max_prefix_chars`` bounds the assembled prefix before target evaluation;
+    it does not limit the writer's generation or reproduce token-based stopping.
+    In prefill mode the panel judges the prefix plus the target continuation,
+    not a separate continuation-only success rate.
+    """
 
     name = "advprefix"
     params_type = AdvPrefixParams
@@ -133,8 +139,14 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
             written = await self.attacker(messages)
         except Exception:
             return None
-        # The opening is part of the prefix: the writer continued it.
-        prefix = f"{meta_prefix}{written or ''}"
+        # The opening is part of the prefix: the writer continued it. Some
+        # backends echo the prefilled opening in their reply; keep it once.
+        written = written or ""
+        prefix = (
+            written
+            if meta_prefix and written.startswith(meta_prefix)
+            else f"{meta_prefix}{written}"
+        )
         original_prefix_chars = len(prefix)
         prefix_truncated = original_prefix_chars > self.params.max_prefix_chars
         if len(prefix) > self.params.max_prefix_chars:

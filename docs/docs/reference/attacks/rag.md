@@ -8,7 +8,7 @@ sidebar_position: 13
 
 Indirect prompt injection via poisoned documents in a retrieval-augmented (RAG) corpus.
 
-**Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
+**Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
 Poison the retrieved corpus and judge what the target does with it.
 
