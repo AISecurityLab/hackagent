@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for scripts/extract_changelog_section.py."""
+"""Tests for deploy/release/extract_changelog_section.py."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SCRIPT_PATH = REPO_ROOT / "scripts" / "extract_changelog_section.py"
+SCRIPT_PATH = REPO_ROOT / "deploy" / "release" / "extract_changelog_section.py"
 
 
 def _load_module():

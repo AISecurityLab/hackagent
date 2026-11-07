@@ -11,8 +11,7 @@ models the campaign needs. They operate on the plain dict a
 :class:`CampaignSpec` dumps to, so a caller can edit connections in place and
 re-validate.
 
-The CLI ``campaign`` command and ``scripts/run_campaign.py`` both build on
-these; neither logic lives in the other.
+The CLI ``campaign`` command builds on these.
 """
 
 from __future__ import annotations

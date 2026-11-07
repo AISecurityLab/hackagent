@@ -4,7 +4,7 @@
 """How a build locates its web UI bundle.
 
 Two routes exist — bundled in the package tree (release binaries, and a source
-checkout after scripts/build_webui.sh) and the installed ``hackagent-webui``
+checkout after deploy/web/build_webui.sh) and the installed ``hackagent-webui``
 distribution (``pip install 'hackagent[web]'``) — and which one wins matters:
 a release binary must serve the assets it shipped with, not whatever version
 happens to be in the environment.

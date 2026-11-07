@@ -62,7 +62,7 @@ class MissingBundleError(RuntimeError):
         super().__init__(
             f"No web UI bundle found at {static_dir()}. Install it with "
             "`pip install 'hackagent[web]'`, build one from a hackagent-webapp "
-            "checkout with `scripts/build_webui.sh`, or use a release binary, "
+            "checkout with `deploy/web/build_webui.sh`, or use a release binary, "
             "which ships the bundle."
         )
 

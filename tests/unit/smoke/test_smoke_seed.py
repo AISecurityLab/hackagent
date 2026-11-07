@@ -4,7 +4,7 @@
 """The dashboard smoke fixture must seed the current storage contract."""
 
 from hackagent.storage.local import LocalBackend
-from scripts.smoke_webui import seed
+from tests.smoke.smoke_webui import seed
 
 
 def test_browser_smoke_seed_persists_results_and_traces(tmp_path):

@@ -16,7 +16,7 @@ from hackagent.attacks.techniques.registry import ATTACKS
 from hackagent.core.settings import Settings
 from hackagent.orchestrator.campaign import load_campaign, resolve_campaign
 
-PACKAGING = Path(__file__).resolve().parents[3] / "packaging"
+PACKAGING = Path(__file__).resolve().parents[3] / "deploy" / "packaging"
 SMOKE_CAMPAIGN = PACKAGING / "smoke-campaign.yaml"
 
 

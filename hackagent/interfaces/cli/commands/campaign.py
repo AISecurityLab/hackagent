@@ -7,8 +7,7 @@
 overrides, waits for local servers, and executes it; ``validate`` resolves it
 (goals, models, judges) without attacking, so configuration errors surface
 before a run starts; ``schema`` prints the campaign format as JSON Schema. Both build on
-:mod:`hackagent.orchestrator.campaign.overrides`, shared with
-``scripts/run_campaign.py``.
+:mod:`hackagent.orchestrator.campaign.overrides`.
 """
 
 from __future__ import annotations

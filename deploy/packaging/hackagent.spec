@@ -5,7 +5,7 @@
 
 Build with::
 
-    uv run pyinstaller packaging/hackagent.spec
+    uv run pyinstaller deploy/packaging/hackagent.spec
 
 Produces a ``dist/hackagent/`` directory (onedir) containing a ``hackagent``
 launcher. Onedir is used instead of onefile because onefile unpacks the whole
@@ -21,7 +21,8 @@ from PyInstaller.utils.hooks import (
     copy_metadata,
 )
 
-PROJECT_ROOT = Path(SPECPATH).resolve().parent
+# This spec lives in deploy/packaging/, two levels below the repository root.
+PROJECT_ROOT = Path(SPECPATH).resolve().parents[1]
 BUILD_DIR = Path(workpath).resolve()
 
 # ``importlib.metadata.version("hackagent")`` is used for ``--version`` and the
@@ -57,7 +58,7 @@ _runtime_hook.write_text(
 )
 
 a = Analysis(
-    [str(PROJECT_ROOT / "packaging" / "entrypoint.py")],
+    [str(PROJECT_ROOT / "deploy" / "packaging" / "entrypoint.py")],
     pathex=[str(PROJECT_ROOT)],
     binaries=[],
     datas=datas,

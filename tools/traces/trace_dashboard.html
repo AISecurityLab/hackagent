@@ -132,11 +132,13 @@ const clip = (text, max) => (text.length > max ? text.slice(0, max - 1) + "…" 
 // ---------------------------------------------------------------- tree model
 
 const pathKey = (scope, path) => `${scope}:${path.join(".")}`;
+// A run-level entry has no goal index: its trace is shared by every goal.
+const goalTag = goal => goal.goal_index == null ? "run" : `#${goal.goal_index}`;
 const last = (path) => path[path.length - 1];
 
 function buildTree(goal) {
   const byId = new Map();
-  const root = { id: "root", node: "goal", label: `goal ${goal.goal_index}`, path: [], scope: "goal", data: {}, children: [], depth: 0 };
+  const root = { id: "root", node: "goal", label: goal.goal_index == null ? "run" : `goal ${goal.goal_index}`, path: [], scope: "goal", data: {}, children: [], depth: 0 };
   const scopeRoots = new Map();
 
   const create = (raw) => {
@@ -252,7 +254,7 @@ function renderGoals() {
       el("i", { class: child.node === "decision" ? "dec" : child.agg.hot ? "hot" : "", title: child.label }));
     list.append(
       el("div", { class: "goal" + (goal === state.goal ? " active" : ""), onclick: () => selectGoal(goal) },
-        el("div", { class: "title" }, el("span", { class: "dot" + (tree.agg.hot ? " hot" : "") }), `#${goal.goal_index} `, goal.goal || "(goal text unavailable)"),
+        el("div", { class: "title" }, el("span", { class: "dot" + (tree.agg.hot ? " hot" : "") }), `${goalTag(goal)} `, goal.goal || "(goal text unavailable)"),
         el("div", { class: "strip" }, strip),
         el("div", { class: "meta" }, el("span", {}, `${tree.agg.calls} calls · ${goal.attempts.length} attempts`), el("span", {}, fmtTime(tree.agg.latency)))));
   }
@@ -277,7 +279,7 @@ function renderBar() {
     el("span", { style: `--c:${roleColor(role)}` }, `${role} ×${stat.calls} · ${fmtTime(stat.latency)}`));
   legend.push(el("span", { style: "--c:#f59e0b" }, "decision"), el("span", { style: "--c:#64748b" }, "phase"));
   $("#bar").replaceChildren(
-    el("div", { class: "goaltext" }, state.goal.goal || `goal ${state.goal.goal_index}`),
+    el("div", { class: "goaltext" }, state.goal.goal || `goal ${goalTag(state.goal)}`),
     el("button", { onclick: () => { state.collapsed = new Set(); redraw(); } }, "Expand all"),
     el("button", { onclick: () => { state.collapsed = new Set(allIds(tree).filter((id) => id !== "root")); redraw(); } }, "Collapse all"),
     el("label", {}, el("input", { type: "checkbox", checked: state.hideCalls ? "" : null, onchange: (event) => { state.hideCalls = event.target.checked; redraw(); } }), " hide model calls"),
