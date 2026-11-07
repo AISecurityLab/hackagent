@@ -18,7 +18,7 @@ repos:
         entry: uv run lint-imports
         language: system
         pass_filenames: false
-        files: ^(hackagent/.*\.py|lint/.*\.py|pyproject\.toml)$
+        files: ^(hackagent/.*\.py|tools/lint/.*\.py|pyproject\.toml)$
 
       - id: pytest
         name: pytest (unit only)

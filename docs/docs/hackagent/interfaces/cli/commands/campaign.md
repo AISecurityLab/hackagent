@@ -9,8 +9,7 @@ Run declarative campaign files (`campaign.yaml`) from the CLI.
 overrides, waits for local servers, and executes it; `validate` resolves it
 (goals, models, judges) without attacking, so configuration errors surface
 before a run starts; `schema` prints the campaign format as JSON Schema. Both build on
-:mod:`hackagent.orchestrator.campaign.overrides`, shared with
-`scripts/run_campaign.py`.
+:mod:`hackagent.orchestrator.campaign.overrides`.
 
 #### campaign
 
@@ -20,6 +19,23 @@ def campaign() -> None
 ```
 
 🎯 Run declarative campaign files (campaign.yaml).
+
+#### list\_attacks
+
+```python
+@campaign.command("list")
+def list_attacks() -> None
+```
+
+List available attack techniques, their category and tags.
+
+#### event\_printer
+
+```python
+def event_printer(as_json: bool)
+```
+
+The run-progress callback shared by `campaign run` and `run`.
 
 #### run
 

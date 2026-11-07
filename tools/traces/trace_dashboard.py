@@ -4,10 +4,14 @@ Reads a run folder's ``traces.jsonl`` (and, next to it, the result rows
 ``results.jsonl`` or ``results.json`` for goals and verdicts) and writes one
 HTML file with no external assets, so it opens offline from any machine::
 
-    python -m scripts.trace_dashboard logs/runs/<run_id>
-    python -m scripts.trace_dashboard logs/runs   # every run in the folder
+    python -m tools.traces.trace_dashboard logs/runs/<run_id>
+    python -m tools.traces.trace_dashboard logs/runs   # every run in the folder
 
 Older runs written as flat ``<run_id>.traces.jsonl`` files are read too.
+
+An attack's run-level trace (``goal_index`` null, ``scope: run``) is work shared
+by every goal, such as a strategy library built before the goals are attacked.
+It is listed first under its attack, as its own entry.
 """
 
 from __future__ import annotations
@@ -22,6 +26,8 @@ TEMPLATE = Path(__file__).with_name("trace_dashboard.html")
 PLACEHOLDER = "__TRACE_DATA__"
 TRACES = "traces.jsonl"
 LEGACY_SUFFIX = ".traces.jsonl"
+#: What a run-level entry shows in place of a goal.
+RUN_LEVEL = "Run-level search, shared by every goal"
 
 
 def run_id_of(traces: Path) -> str:
@@ -78,9 +84,15 @@ def verdict_node(nodes: list[dict[str, Any]]) -> dict[str, Any] | None:
     return (targets or calls or [None])[0]
 
 
+def _goal_order(item: tuple[tuple[str, int | None], Any]) -> tuple[str, bool, int]:
+    """By attack, its run-level entry (no goal index) before its goals."""
+    (attack, goal_index), _ = item
+    return attack, goal_index is not None, goal_index or 0
+
+
 def load_run(traces: Path) -> dict[str, Any]:
     run_id = run_id_of(traces)
-    goals: dict[tuple[str, int], dict[str, Any]] = defaultdict(
+    goals: dict[tuple[str, int | None], dict[str, Any]] = defaultdict(
         lambda: {"goal": None, "nodes": {}, "attempts": {}}
     )
     campaign = ""
@@ -107,12 +119,12 @@ def load_run(traces: Path) -> dict[str, Any]:
             )
 
     attacks: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for (attack, goal_index), entry in sorted(goals.items()):
+    for (attack, goal_index), entry in sorted(goals.items(), key=_goal_order):
         ordered = sorted(entry["nodes"].items(), key=lambda item: item[0])
         attacks[attack].append(
             {
                 "goal_index": goal_index,
-                "goal": entry["goal"],
+                "goal": entry["goal"] if goal_index is not None else RUN_LEVEL,
                 "nodes": [node for _, node in ordered],
                 "attempts": [entry["attempts"][i] for i in sorted(entry["attempts"])],
             }

@@ -4,7 +4,7 @@
 # binary that is missing one still starts and only fails when a campaign names
 # it. Validating builds every model and constructs every attack, and sends
 # nothing, so this needs no model server. It names every registered attack;
-# tests/unit/packaging/test_smoke_campaign.py keeps it that way.
+# tests/unit/deploy/test_smoke_campaign.py keeps it that way.
 version: 1
 
 campaign:

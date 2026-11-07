@@ -35,6 +35,21 @@ catch broad exceptions around assertions or fetch Hub datasets from unit tests.
 Markup tests invoke production formatters and mount ResultsTab over a real SQLite
 store. Verify literal content, not just absence of rendering exceptions.
 
+## Dashboard smoke check
+
+```sh
+uv sync --group dev --extra web
+uv pip install --prerelease allow --upgrade "hackagent-webui<1.0"
+uv run --no-sync playwright install chromium
+uv run --no-sync pytest tests/smoke --fail-on-skip
+```
+
+`tests/smoke` starts `hackagent web` on a seeded database and drives every page in
+a real browser, failing on any failed API call. It needs a dashboard bundle and a
+Playwright Chromium, and skips naming the missing one otherwise. The PR job uses
+the newest `hackagent-webui` pre-release (hackagent-webapp's stage branch); a bundle
+built with `deploy/web/build_webui.sh` works too.
+
 ## Real service checks
 
 ```sh

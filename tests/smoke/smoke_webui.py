@@ -14,12 +14,17 @@ never implemented, shows up here as a failed request instead of passing a test
 written against the same assumption as the code.
 
 Usage:
-    python scripts/smoke_webui.py            # local (offline) mode
-    python scripts/smoke_webui.py --keep     # leave the server up to poke at
+    uv run python -m tests.smoke.smoke_webui          # local (offline) mode
+    uv run python -m tests.smoke.smoke_webui --keep   # leave the server up to poke at
+    uv run pytest tests/smoke                         # the same, as a test
 
-Requires a dashboard bundle (``pip install 'hackagent[web]'`` or
-``scripts/build_webui.sh``) and a Playwright browser
-(``python -m playwright install chromium``).
+Requires a dashboard bundle (``uv sync --extra web``, which installs
+``hackagent-webui``, or ``deploy/web/build_webui.sh``) and a Playwright
+browser (``uv run playwright install chromium``). The pytest wrapper skips,
+naming what is missing, when either is absent; CI's dashboard smoke job
+provides both and fails on a skip. The campaign pages exercised here are the
+dashboard's current ones: CI checks them against the newest
+``hackagent-webui`` pre-release, built from hackagent-webapp's stage branch.
 """
 
 from __future__ import annotations
@@ -158,22 +163,29 @@ def drive(base: str) -> list[str]:
             page.goto(base + "/stats", wait_until="networkidle")
             page.get_by_role("link", name="smoke-campaign", exact=True).click()
             page.get_by_role("region", name="Campaign outcomes").wait_for()
-            navigator = page.get_by_role("complementary", name="Goal navigator")
-            navigator.wait_for()
-            navigator.get_by_role("button", name="smoke goal 0", exact=False).click()
-            page.get_by_role("heading", name="smoke goal 0", exact=True).wait_for()
-            page.get_by_role("region", name="Attack conversation").wait_for()
-            navigator.get_by_role("button", name="smoke goal 1", exact=False).click()
-            page.get_by_role("heading", name="smoke goal 1", exact=True).wait_for()
-            navigator.get_by_role("button", name="smoke goal 0", exact=False).wait_for()
-            page.get_by_role("tab", name="TAP", exact=False).wait_for()
-            page.get_by_role("button", name="Attack settings", exact=True).click()
-            page.get_by_role("dialog").get_by_text('"limit": 4', exact=False).wait_for()
-            page.get_by_role("button", name="Close", exact=True).click()
-            page.get_by_role("region", name="Campaign audit").wait_for()
-            page.get_by_text(
+            coverage = page.get_by_role("region", name="Goal by attack outcomes")
+            coverage.get_by_role("button", name="Detail: Categories").click()
+            page.get_by_role("radio", name="Goals", exact=True).click()
+            page.keyboard.press("Escape")
+            # Each goal's TAP marker opens that goal's conversation in an overlay.
+            for index, verdict in ((0, "jailbroken"), (1, "mitigated")):
+                goal = f"smoke goal {index}"
+                row = coverage.get_by_role("row", name=goal, exact=False)
+                row.get_by_role("link", name=f"TAP: {verdict}", exact=False).click()
+                overlay = page.get_by_role("dialog", name=goal, exact=True)
+                overlay.get_by_role("heading", name="TAP", exact=True).wait_for()
+                conversation = overlay.get_by_role("region", name="Attack conversation")
+                conversation.get_by_text(f"reply {index}", exact=True).wait_for()
+                overlay.get_by_role("button", name="Close", exact=True).click()
+                overlay.wait_for(state="hidden")
+            page.get_by_role("region", name="Success progression").wait_for()
+            page.get_by_role("region", name="Attack efficiency").wait_for()
+            page.get_by_role("region", name="Campaign audit").get_by_text(
                 "No audit recorded for this execution.", exact=True
             ).wait_for()
+            page.get_by_role("group").filter(
+                has_text="Campaign configuration (YAML)"
+            ).get_by_text("smoke-campaign", exact=False).wait_for(state="attached")
             print("  campaign investigation ok")
         except Exception as exc:  # noqa: BLE001 - reported, not raised
             failures.append(f"campaign investigation: {type(exc).__name__}: {exc}")
@@ -183,14 +195,14 @@ def drive(base: str) -> list[str]:
     return failures
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--keep",
         action="store_true",
         help="leave the server running afterwards so you can open it yourself",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     from hackagent.interfaces.web import _static
 
@@ -199,7 +211,7 @@ def main() -> int:
         print(
             "No dashboard bundle found. Install one with "
             "`pip install 'hackagent[web]'` or build one with "
-            "`scripts/build_webui.sh`.",
+            "`deploy/web/build_webui.sh`.",
             file=sys.stderr,
         )
         return 1

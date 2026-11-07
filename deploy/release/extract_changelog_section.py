@@ -9,8 +9,8 @@ Git tags such as ``v0.13.0`` map to an H2 heading like ``## v0.13.0 (date)``,
 H2 (the following version), exclusive.
 
 Usage:
-    python scripts/extract_changelog_section.py v0.13.0
-    python scripts/extract_changelog_section.py v0.13.0 --output notes.md
+    python deploy/release/extract_changelog_section.py v0.13.0
+    python deploy/release/extract_changelog_section.py v0.13.0 --output notes.md
 """
 
 from __future__ import annotations

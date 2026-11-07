@@ -47,7 +47,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          python scripts/extract_changelog_section.py "$RELEASE_TAG" \
+          python deploy/release/extract_changelog_section.py "$RELEASE_TAG" \
             --changelog CHANGELOG.md \
             --output "${RUNNER_TEMP}/release-notes.md"
 
@@ -156,7 +156,7 @@ jobs:
       - name: Build binary
         env:
           HACKAGENT_BUILD_VERSION: ${{ inputs.tag || github.ref_name }}
-        run: uv run --no-sync pyinstaller --noconfirm packaging/hackagent.spec
+        run: uv run --no-sync pyinstaller --noconfirm deploy/packaging/hackagent.spec
 
       - name: Smoke test binary (Unix)
         if: runner.os != 'Windows'
@@ -164,7 +164,7 @@ jobs:
           ./dist/hackagent/hackagent --version
           ./dist/hackagent/hackagent version
           # Builds every model and attack, and sends nothing.
-          ./dist/hackagent/hackagent campaign validate packaging/smoke-campaign.yaml
+          ./dist/hackagent/hackagent campaign validate deploy/packaging/smoke-campaign.yaml
           # The dashboard must be inside the archive, not rebuilt at runtime.
           ./dist/hackagent/hackagent web --no-browser --port 7871 &
           pid=$!
@@ -191,7 +191,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "hackagent --version exited $LASTEXITCODE" }
           & .\dist\hackagent\hackagent.exe version
           if ($LASTEXITCODE -ne 0) { throw "hackagent version exited $LASTEXITCODE" }
-          & .\dist\hackagent\hackagent.exe campaign validate packaging\smoke-campaign.yaml
+          & .\dist\hackagent\hackagent.exe campaign validate deploy\packaging\smoke-campaign.yaml
           if ($LASTEXITCODE -ne 0) { throw "hackagent campaign validate exited $LASTEXITCODE" }
 
       - name: Smoke test TUI launch (Unix)
