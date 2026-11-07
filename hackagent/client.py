@@ -615,6 +615,35 @@ class HackAgent:
             )
         delete([_as_uuid(ident) for ident in campaign_run_ids])
 
+    # -- saved campaigns (local store) -------------------------------------------
+
+    def campaigns(self, *, page: int = 1, page_size: int = 100) -> Any:
+        return self.backend.list_campaigns(page=page, page_size=page_size)
+
+    def campaign(self, campaign_id: Any) -> Any:
+        return self.backend.get_campaign(_as_uuid(campaign_id))
+
+    def save_campaign(
+        self,
+        *,
+        name: str,
+        description: str,
+        agent_id: Any,
+        spec: Dict[str, Any],
+        campaign_id: Any = None,
+    ) -> Any:
+        """Create a saved campaign, or replace the one ``campaign_id`` names."""
+        if campaign_id is None:
+            return self.backend.create_campaign(
+                name, description, _as_uuid(agent_id), spec
+            )
+        return self.backend.update_campaign(
+            _as_uuid(campaign_id), name, description, _as_uuid(agent_id), spec
+        )
+
+    def delete_campaign(self, campaign_id: Any) -> None:
+        self.backend.delete_campaign(_as_uuid(campaign_id))
+
     # -- discovery -------------------------------------------------------------
 
     def catalog(self) -> List[Dict[str, Any]]:

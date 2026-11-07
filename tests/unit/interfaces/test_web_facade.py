@@ -89,8 +89,8 @@ class TestWebReadsThroughFacade(unittest.TestCase):
         listing = self.client.get("/api/proxy/run")
         self.assertEqual(listing.get_json()["count"], 0)
 
-    def test_unknown_run_delete_does_not_invent_a_second_write(self):
+    def test_unknown_run_delete_writes_nothing(self):
         missing = self.client.delete(f"/api/proxy/run/{self.agent.id}")
         self.assertEqual(missing.status_code, 404)
-        self.assertIn("delete_run", self.store.call_names())
+        self.assertNotIn("delete_run", self.store.call_names())
         self.assertIn(self.run.id, self.store.runs)

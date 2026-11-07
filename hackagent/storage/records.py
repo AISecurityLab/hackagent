@@ -100,6 +100,28 @@ class CampaignRunRecord(BaseModel):
     run_notes: Optional[str]
     created_at: datetime
     updated_at: datetime
+    #: The saved campaign it was launched from, when the dashboard launched it.
+    campaign_id: Optional[UUID] = None
+    #: The dashboard launched it, in the ``hackagent web`` process. Kept when
+    #: the saved campaign is deleted and ``campaign_id`` cleared.
+    launched: bool = False
+
+
+class CampaignRecord(BaseModel):
+    """A campaign saved from the dashboard: a spec without target and execution.
+
+    The target comes from the agent's config when the campaign is launched.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    name: str
+    description: str
+    agent_id: UUID
+    spec: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
 
 
 class RunRecord(BaseModel):
