@@ -319,6 +319,13 @@ class TestSavedCampaigns(_CampaignTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("spec", response.get_json())
 
+    def test_campaign_metadata_that_is_not_an_object_is_refused(self):
+        for metadata in (42, "invalid"):
+            with self.subTest(metadata=metadata):
+                response = self.save(spec={**_SPEC, "campaign": metadata})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("spec", response.get_json())
+
     def test_agents_carry_their_model_config(self):
         agent = self.get(f"/api/proxy/agent/{self.target.id}")
         self.assertEqual(agent["config"]["connection"]["type"], "OPENAI")
@@ -458,6 +465,84 @@ class TestLaunchingOnThisMachine(_CampaignTestCase):
         self.assertEqual(
             (problem["code"], problem["message"]),
             ("LAUNCH_REFUSED", "judge unreachable"),
+        )
+
+
+class TestTopLevelRuns(_CampaignTestCase):
+    """``parent__isnull=true`` lists every run without a parent: campaign runs
+    and attack runs started on their own, filtered before they are counted."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.campaign_run = self.backend.start_campaign(
+            self.target.id, {"campaign": {"name": "cli"}}
+        )
+        self.backend.update_campaign_run(self.campaign_run.id, status="COMPLETED")
+
+    def top_level(self, query=""):
+        return self.get(f"/api/proxy/run?parent__isnull=true{query}")
+
+    def test_standalone_runs_are_listed_with_campaign_runs(self):
+        listing = self.top_level()
+        self.assertEqual(listing["count"], 2)
+        self.assertEqual(
+            {r["id"] for r in listing["results"]},
+            {str(self.run.id), str(self.campaign_run.id)},
+        )
+
+    def test_filters_apply_before_counting(self):
+        by_agent = self.top_level(f"&agent={self.target.id}")
+        self.assertEqual(
+            [r["id"] for r in by_agent["results"]], [str(self.campaign_run.id)]
+        )
+        by_status = self.top_level("&status=RUNNING")
+        self.assertEqual((by_status["count"], by_status["results"]), (0, []))
+        by_attack = self.top_level(f"&attack={self.attack.id}")
+        self.assertEqual([r["id"] for r in by_attack["results"]], [str(self.run.id)])
+
+    def test_a_campaign_filter_lists_only_its_campaign_runs(self):
+        saved = self.saved()
+        self.backend.link_campaign_run(self.campaign_run.id, saved["id"])
+        listing = self.get(f"/api/proxy/run?campaign={saved['id']}")
+        self.assertEqual(
+            [r["id"] for r in listing["results"]], [str(self.campaign_run.id)]
+        )
+
+    def test_deleting_a_campaign_run_deletes_its_attack_runs(self):
+        child = self.backend.create_run(
+            self.attack.id,
+            self.target.id,
+            {},
+            campaign_run_id=self.campaign_run.id,
+        )
+        self.backend.update_run(child.id, status="COMPLETED")
+        path = f"/api/proxy/run/{self.campaign_run.id}"
+        self.assertEqual(self.client.delete(path).status_code, 204)
+        self.assertEqual(self.client.get(path).status_code, 404)
+        self.assertEqual(self.client.get(f"/api/proxy/run/{child.id}").status_code, 404)
+
+    def test_an_active_campaign_run_is_not_deleted(self):
+        running = self.backend.start_campaign(
+            self.target.id, {"campaign": {"name": "running"}}
+        )
+        response = self.client.delete(f"/api/proxy/run/{running.id}")
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            self.client.get(f"/api/proxy/run/{running.id}").status_code, 200
+        )
+
+    def test_deleting_an_unknown_run_is_404(self):
+        response = self.client.delete(f"/api/proxy/run/{self.agent.id}")
+        self.assertEqual(response.status_code, 404)
+
+    def test_a_launched_run_stays_local_when_its_campaign_is_deleted(self):
+        saved = self.saved()
+        self.backend.link_campaign_run(self.campaign_run.id, saved["id"])
+        self.client.delete(f"/api/proxy/campaign/{saved['id']}")
+        parent = self.get(f"/api/proxy/run/{self.campaign_run.id}")
+        self.assertEqual(
+            (parent["executor"], parent["claimed_by"], parent["campaign"]),
+            ("local", "hackagent web", None),
         )
 
 

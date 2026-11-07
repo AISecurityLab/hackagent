@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS campaign_runs (
     id                   TEXT PRIMARY KEY,
     agent_id             TEXT NOT NULL REFERENCES agents(id),
     campaign_id          TEXT REFERENCES campaigns(id) ON DELETE SET NULL,
+    launched             INTEGER NOT NULL DEFAULT 0,
     name                 TEXT NOT NULL,
     campaign_config_json TEXT NOT NULL DEFAULT '{}',
     audit_json           TEXT,
@@ -218,6 +219,15 @@ class LocalBackend:
             self._conn.execute(
                 "ALTER TABLE campaign_runs ADD COLUMN campaign_id TEXT "
                 "REFERENCES campaigns(id) ON DELETE SET NULL"
+            )
+        if "launched" not in columns:
+            self._conn.execute(
+                "ALTER TABLE campaign_runs ADD COLUMN launched INTEGER NOT NULL "
+                "DEFAULT 0"
+            )
+            # Until now only a dashboard launch linked a run to a campaign.
+            self._conn.execute(
+                "UPDATE campaign_runs SET launched=1 WHERE campaign_id IS NOT NULL"
             )
 
     def close(self) -> None:
@@ -504,10 +514,11 @@ class LocalBackend:
         return self._row_to_campaign_run(row)
 
     def link_campaign_run(self, campaign_run_id: UUID, campaign_id: UUID) -> None:
-        """Record which saved campaign a campaign run was launched from."""
+        """Record that the dashboard launched a campaign run, and from which
+        saved campaign. The launch stays recorded if the campaign is deleted."""
         with self._lock:
             self._conn.execute(
-                "UPDATE campaign_runs SET campaign_id=? WHERE id=?",
+                "UPDATE campaign_runs SET campaign_id=?, launched=1 WHERE id=?",
                 (str(campaign_id), str(campaign_run_id)),
             )
             self._conn.commit()
@@ -526,6 +537,7 @@ class LocalBackend:
             created_at=_to_dt(row["created_at"]),
             updated_at=_to_dt(row["updated_at"]),
             campaign_id=UUID(campaign_id) if campaign_id else None,
+            launched=bool(row["launched"]),
         )
 
     # ── Saved campaign ────────────────────────────────────────────────────────

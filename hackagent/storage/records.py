@@ -102,6 +102,9 @@ class CampaignRunRecord(BaseModel):
     updated_at: datetime
     #: The saved campaign it was launched from, when the dashboard launched it.
     campaign_id: Optional[UUID] = None
+    #: The dashboard launched it, in the ``hackagent web`` process. Kept when
+    #: the saved campaign is deleted and ``campaign_id`` cleared.
+    launched: bool = False
 
 
 class CampaignRecord(BaseModel):

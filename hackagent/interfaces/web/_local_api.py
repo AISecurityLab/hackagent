@@ -122,7 +122,7 @@ def create_local_api(client) -> Blueprint:
     def _launched_parents() -> set[str]:
         """Campaign runs the dashboard launched, whose attack runs ran here."""
         listing = client.campaign_runs(page=1, page_size=_SCAN_PAGE_SIZE)
-        return {str(c.id) for c in listing.items if c.campaign_id is not None}
+        return {str(c.id) for c in listing.items if c.launched}
 
     def _executor(record: Any, launched: set[str]) -> str:
         parent = getattr(record, "campaign_run_id", None)
@@ -245,39 +245,92 @@ def create_local_api(client) -> Blueprint:
         return _not_found("Attack")
 
     # ── Runs ─────────────────────────────────────────────────────────────────
-    def _parent_list(page: int, page_size: int):
-        """Campaign runs as parent runs, newest first, with their results counted."""
-        parents = client.campaign_runs(page=1, page_size=_SCAN_PAGE_SIZE).items
+    def _run_item(record: Any, names, types, launched, org_id) -> Dict[str, Any]:
+        results = client.results(run_id=record.id, page=1, page_size=_SCAN_PAGE_SIZE)
+        return ser.run_summary(
+            record,
+            results.items,
+            agent_name=names.get(str(record.agent_id)),
+            attack_type=types.get(str(record.attack_id)),
+            org_id=org_id,
+            executor=_executor(record, launched),
+        )
+
+    def _top_level_list(page: int, page_size: int):
+        """Runs without a parent, newest first: campaign runs, with their attack
+        runs' results counted, and attack runs started on their own."""
+        agent_filter = request.args.get("agent")
+        attack_filter = request.args.get("attack")
+        status_filter = request.args.get("status")
         campaign_filter = request.args.get("campaign")
-        if campaign_filter:
-            parents = [c for c in parents if str(c.campaign_id) == campaign_filter]
+
+        def matches(record: Any) -> bool:
+            return (not agent_filter or str(record.agent_id) == agent_filter) and (
+                not status_filter or record.status == status_filter
+            )
+
+        runs = _all_runs()
+        # A campaign run has no single attack, so an attack filter leaves none.
+        parents = (
+            []
+            if attack_filter
+            else [
+                c
+                for c in client.campaign_runs(page=1, page_size=_SCAN_PAGE_SIZE).items
+                if matches(c)
+                and (not campaign_filter or str(c.campaign_id) == campaign_filter)
+            ]
+        )
+        # A saved campaign's runs are all campaign runs.
+        standalone = (
+            []
+            if campaign_filter
+            else [
+                r
+                for r in runs
+                if r.campaign_run_id is None
+                and matches(r)
+                and (not attack_filter or str(r.attack_id) == attack_filter)
+            ]
+        )
+        top = sorted(
+            [(c, True) for c in parents] + [(r, False) for r in standalone],
+            key=lambda entry: entry[0].created_at,
+            reverse=True,
+        )
+
         children: Dict[str, List[Any]] = {}
-        for record in _all_runs():
+        for record in runs:
             if record.campaign_run_id is not None:
                 children.setdefault(str(record.campaign_run_id), []).append(record)
+        names, types = _agent_names(), _attack_types()
+        launched, org_id = _launched_parents(), _org_id()
         items = []
-        for parent in _slice(parents, page, page_size):
+        for record, is_parent in _slice(top, page, page_size):
+            if not is_parent:
+                items.append(_run_item(record, names, types, launched, org_id))
+                continue
             results = [
                 result
-                for child in children.get(str(parent.id), [])
+                for child in children.get(str(record.id), [])
                 for result in client.results(
                     run_id=child.id, page=1, page_size=_SCAN_PAGE_SIZE
                 ).items
             ]
             items.append(
                 {
-                    **_campaign_run_payload(parent),
+                    **_campaign_run_payload(record),
                     **ser.result_counts(results),
                     "attack_type": None,
                 }
             )
-        return jsonify(ser.paginate(items, len(parents), page, page_size))
+        return jsonify(ser.paginate(items, len(top), page, page_size))
 
     @bp.get("/run")
     def run_list():
         page, page_size = _page_args()
         if request.args.get("parent__isnull") == "true" or request.args.get("campaign"):
-            return _parent_list(page, page_size)
+            return _top_level_list(page, page_size)
         runs = _all_runs()
 
         agent_filter = request.args.get("agent")
@@ -293,27 +346,13 @@ def create_local_api(client) -> Blueprint:
         if status_filter:
             runs = [r for r in runs if r.status == status_filter]
 
-        total = len(runs)
-        org_id = _org_id()
-        names = _agent_names()
-        types = _attack_types()
-        launched = _launched_parents()
-        items = []
-        for record in _slice(runs, page, page_size):
-            results = client.results(
-                run_id=record.id, page=1, page_size=_SCAN_PAGE_SIZE
-            ).items
-            items.append(
-                ser.run_summary(
-                    record,
-                    results,
-                    agent_name=names.get(str(record.agent_id)),
-                    attack_type=types.get(str(record.attack_id)),
-                    org_id=org_id,
-                    executor=_executor(record, launched),
-                )
-            )
-        return jsonify(ser.paginate(items, total, page, page_size))
+        names, types = _agent_names(), _attack_types()
+        launched, org_id = _launched_parents(), _org_id()
+        items = [
+            _run_item(record, names, types, launched, org_id)
+            for record in _slice(runs, page, page_size)
+        ]
+        return jsonify(ser.paginate(items, len(runs), page, page_size))
 
     @bp.get("/run/<run_id>")
     def run_detail(run_id: str):
@@ -364,9 +403,17 @@ def create_local_api(client) -> Blueprint:
         if parsed is None:
             return _not_found("Run")
         try:
-            client.delete_run(parsed)
+            client.run(parsed)
         except RuntimeError:
-            return _not_found("Run")
+            # Not an attack run: a campaign run goes with its attack runs.
+            try:
+                client.delete_campaign_run(parsed)
+            except RuntimeError:
+                return _not_found("Run")
+            except ValueError as exc:
+                return jsonify({"detail": str(exc)}), 409
+            return "", 204
+        client.delete_run(parsed)
         return "", 204
 
     @bp.get("/run/<run_id>/result")
@@ -459,9 +506,11 @@ def create_local_api(client) -> Blueprint:
                 key: "set by the server" for key in _SERVER_KEYS if key in spec
             }
         elif agent is not None:
-            # Validated as it will launch: the agent as target, the name filled in.
-            meta = {"name": str(body.get("name") or "campaign")}
-            meta.update(spec.get("campaign") or {})
+            # Validated as it will launch: the agent as target, the name filled
+            # in. Metadata that is not an object is left for validation to report.
+            meta = spec.get("campaign") or {}
+            if isinstance(meta, dict):
+                meta = {"name": str(body.get("name") or "campaign"), **meta}
             try:
                 load_stored_campaign(
                     {**spec, "campaign": meta, "target": agent.metadata}

@@ -204,7 +204,7 @@ def campaign_run(
     other was started by ``hackagent campaign run`` (executor ``cli``).
     """
     final = record.status in _FINAL_STATUSES
-    launched = record.campaign_id is not None
+    launched = record.launched
     return {
         "id": str(record.id),
         "agent": str(record.agent_id),

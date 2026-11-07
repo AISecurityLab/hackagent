@@ -78,6 +78,43 @@ class TestLocalBackendInit(unittest.TestCase):
             finally:
                 backend.close()
 
+    def test_existing_database_records_which_campaign_runs_the_dashboard_launched(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "test.db")
+            backend = LocalBackend(db_path=path)
+            agent = backend.create_or_update_agent("a", {})
+            campaign = backend.create_campaign("c", "", agent.id, {})
+            launched = backend.start_campaign(agent.id, {})
+            backend.link_campaign_run(launched.id, campaign.id)
+            cli = backend.start_campaign(agent.id, {})
+            # A database from before the column: only a launch set campaign_id.
+            backend._conn.execute("ALTER TABLE campaign_runs DROP COLUMN launched")
+            backend._conn.commit()
+            backend.close()
+
+            backend = LocalBackend(db_path=path)
+            try:
+                self.assertTrue(backend.get_campaign_run(launched.id).launched)
+                self.assertFalse(backend.get_campaign_run(cli.id).launched)
+            finally:
+                backend.close()
+
+    def test_a_launch_stays_recorded_when_its_campaign_is_deleted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            backend = _make_backend(tmp)
+            try:
+                agent = backend.create_or_update_agent("a", {})
+                campaign = backend.create_campaign("c", "", agent.id, {})
+                record = backend.start_campaign(agent.id, {})
+                backend.link_campaign_run(record.id, campaign.id)
+                backend.delete_campaign(campaign.id)
+                kept = backend.get_campaign_run(record.id)
+                self.assertEqual((kept.campaign_id, kept.launched), (None, True))
+            finally:
+                backend.close()
+
     def test_multiple_instances_same_db(self):
         """Two instances pointing at the same path share data."""
         with tempfile.TemporaryDirectory() as tmp:
