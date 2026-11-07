@@ -92,7 +92,8 @@ def user_profile(org_id: UUID) -> Dict[str, Any]:
         "organization_name": LOCAL_ORG_NAME,
         "keycloak_user_id": None,
         "auth0_user_id": None,
-        "analytics_consent": None,
+        # Offline profiles cannot save consent; never prompt or enable tracking.
+        "analytics_consent": "declined",
     }
 
 
@@ -104,6 +105,8 @@ def agent(record: Any) -> Dict[str, Any]:
         "agent_type": record.agent_type,
         "description": (record.metadata or {}).get("description"),
         "metadata": record.metadata,
+        # The local store keeps the agent's model config as its metadata.
+        "config": record.metadata,
         "organization": str(record.organization),
         "organization_detail": organization_minimal(record.organization),
         "owner": record.owner,
@@ -161,9 +164,75 @@ def result(record: Any, traces: Optional[List[Any]] = None) -> Dict[str, Any]:
         "evaluation_status": record.evaluation_status,
         "evaluation_notes": record.evaluation_notes,
         "evaluation_metrics": record.evaluation_metrics,
-        "agent_specific_data": metadata,
+        "agent_specific_data": {
+            **metadata,
+            "goal": record.goal,
+            "goal_index": record.goal_index,
+        },
         "timestamp": _iso(record.created_at),
         "traces": [trace(t) for t in (traces or [])],
+    }
+
+
+def campaign(record: Any, org_id: Optional[UUID] = None) -> Dict[str, Any]:
+    return {
+        "id": str(record.id),
+        "name": record.name,
+        "description": record.description,
+        "agent": str(record.agent_id),
+        "spec": record.spec,
+        "origin": "dashboard",
+        "organization": _str(org_id),
+        "owner": LOCAL_USER_ID,
+        "created_at": _iso(record.created_at),
+        "updated_at": _iso(record.updated_at),
+    }
+
+
+_FINAL_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
+
+
+def campaign_run(
+    record: Any,
+    agent_name: Optional[str] = None,
+    org_id: Optional[UUID] = None,
+    cancel_requested_at: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Serialise a campaign run as the parent run its attack runs belong to.
+
+    One the dashboard launched ran in this process (executor ``local``); any
+    other was started by ``hackagent campaign run`` (executor ``cli``).
+    """
+    final = record.status in _FINAL_STATUSES
+    launched = record.launched
+    return {
+        "id": str(record.id),
+        "agent": str(record.agent_id),
+        "agent_name": agent_name,
+        "attack": None,
+        "owner": LOCAL_USER_ID,
+        "owner_username": LOCAL_USERNAME,
+        "organization": _str(org_id),
+        "organization_name": LOCAL_ORG_NAME,
+        "run_config": {
+            "_record_type": "campaign_run",
+            "campaign_name": record.name,
+            "campaign_id": _str(record.campaign_id),
+            "campaign_config": record.campaign_config,
+        },
+        "timestamp": _iso(record.created_at),
+        "status": record.status,
+        "run_notes": record.run_notes,
+        "executor": "local" if launched else "cli",
+        "campaign": _str(record.campaign_id),
+        "parent": None,
+        # It starts as soon as it is recorded: nothing waits to pick it up.
+        "claimed_at": _iso(record.created_at),
+        "claimed_by": "hackagent web" if launched else None,
+        "heartbeat_at": None if final else _iso(record.updated_at),
+        "cancel_requested_at": _iso(cancel_requested_at),
+        "finished_at": _iso(record.updated_at) if final else None,
+        "results": [],
     }
 
 
@@ -172,10 +241,13 @@ def run(
     agent_name: Optional[str] = None,
     results: Optional[List[Dict[str, Any]]] = None,
     org_id: Optional[UUID] = None,
+    executor: str = "cli",
 ) -> Dict[str, Any]:
+    parent = _str(getattr(record, "campaign_run_id", None))
     return {
         "id": str(record.id),
-        "campaign_run_id": _str(getattr(record, "campaign_run_id", None)),
+        "campaign_run_id": parent,
+        "parent": parent,
         "agent": str(record.agent_id),
         "agent_name": agent_name,
         "attack": _str(record.attack_id),
@@ -187,8 +259,8 @@ def run(
         "timestamp": _iso(record.created_at),
         "status": record.status,
         "run_notes": record.run_notes,
-        # Every local run was executed by this client, by definition.
-        "executor": "cli",
+        # Run by this client: from the CLI, or from the dashboard's launcher.
+        "executor": executor,
         "results": results or [],
     }
 
@@ -199,22 +271,24 @@ def run_summary(
     agent_name: Optional[str] = None,
     attack_type: Optional[str] = None,
     org_id: Optional[UUID] = None,
+    executor: str = "cli",
 ) -> Dict[str, Any]:
     """Serialise a run with the per-outcome counts the run list renders."""
+    payload = run(record, agent_name=agent_name, org_id=org_id, executor=executor)
+    payload.pop("results")
+    payload.update({"attack_type": attack_type, **result_counts(results)})
+    return payload
+
+
+def result_counts(results: List[Any]) -> Dict[str, int]:
+    """The per-outcome counts of ``results``, as run summaries carry them."""
     counts = {"jailbreak": 0, "mitigated": 0, "error": 0, "pending": 0}
     for item in results:
         counts[result_bucket(item.evaluation_status, item.evaluation_notes)] += 1
-
-    payload = run(record, agent_name=agent_name, org_id=org_id)
-    payload.pop("results")
-    payload.update(
-        {
-            "attack_type": attack_type,
-            "total_results": len(results),
-            "successful_jailbreaks": counts["jailbreak"],
-            "failed_jailbreaks": counts["mitigated"],
-            "errors": counts["error"],
-            "not_evaluated": counts["pending"],
-        }
-    )
-    return payload
+    return {
+        "total_results": len(results),
+        "successful_jailbreaks": counts["jailbreak"],
+        "failed_jailbreaks": counts["mitigated"],
+        "errors": counts["error"],
+        "not_evaluated": counts["pending"],
+    }

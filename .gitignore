@@ -6,7 +6,6 @@ logs/
 reports/
 .adk/
 slurm/
-tools/
 docs/docs/attacks/walkthroughs/
 .worktrees/
 
@@ -57,7 +56,7 @@ MANIFEST
 *.manifest
 *.spec
 # The release build spec is checked in, unlike generated ones.
-!packaging/hackagent.spec
+!deploy/packaging/hackagent.spec
 
 # Installer logs
 pip-log.txt
@@ -148,7 +147,7 @@ tests/e2e/attacks/
 # pytest-textual-snapshot report artifact
 snapshot_report.html
 
-# Web UI bundle (built by scripts/build_webui.sh)
+# Web UI bundle (built by deploy/web/build_webui.sh)
 hackagent/interfaces/web/static/*
 !hackagent/interfaces/web/static/.gitignore
 

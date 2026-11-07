@@ -282,8 +282,14 @@ def _codes(goal: Goal) -> set[str]:
     try:
         subcategory = taxonomy.resolve_subcategory(goal.labels.get("subcategory", ""))
     except ValueError:
+        pass
+    else:
+        return {subcategory, taxonomy.category_of(subcategory)}
+    # Placed in a category with an unspecified subcategory: only it matches.
+    try:
+        return {taxonomy.resolve_category(goal.labels.get("category", ""))}
+    except ValueError:
         return set()
-    return {subcategory, taxonomy.category_of(subcategory)}
 
 
 def select_goals(goals: Sequence[Goal], selection: DatasetSelection) -> list[Goal]:

@@ -48,6 +48,8 @@ class Candidate:
 
     prefix: str
     meta_prefix: str
+    original_prefix_chars: int = 0
+    prefix_truncated: bool = False
     attempts: list[Finding] = field(default_factory=list)
     #: Negative log-likelihood of the prefix under the target. The paper
     #: ranks on this after the attack success rate; it needs token
@@ -73,7 +75,13 @@ class Candidate:
 
 
 class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
-    """Prefill the answer's opening and measure which opening works."""
+    """Prefill the answer's opening and measure which opening works.
+
+    ``max_prefix_chars`` bounds the assembled prefix before target evaluation;
+    it does not limit the writer's generation or reproduce token-based stopping.
+    In prefill mode the panel judges the prefix plus the target continuation,
+    not a separate continuation-only success rate.
+    """
 
     name = "advprefix"
     params_type = AdvPrefixParams
@@ -131,11 +139,34 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
             written = await self.attacker(messages)
         except Exception:
             return None
-        # The opening is part of the prefix: the writer continued it.
-        prefix = f"{meta_prefix}{written or ''}"
+        # The opening is part of the prefix: the writer continued it. Some
+        # backends echo the prefilled opening in their reply; keep it once.
+        written = written or ""
+        prefix = (
+            written
+            if meta_prefix and written.startswith(meta_prefix)
+            else f"{meta_prefix}{written}"
+        )
+        original_prefix_chars = len(prefix)
+        prefix_truncated = original_prefix_chars > self.params.max_prefix_chars
+        if len(prefix) > self.params.max_prefix_chars:
+            prefix = prefix[: self.params.max_prefix_chars]
+            decision(
+                "truncated",
+                "attacker-generated prefix exceeds the character limit",
+                original_prefix_chars=original_prefix_chars,
+                prefix_chars=len(prefix),
+                max_prefix_chars=self.params.max_prefix_chars,
+                meta_prefix=meta_prefix,
+            )
         if not prefix.strip():
             return None
-        return Candidate(prefix=prefix, meta_prefix=meta_prefix)
+        return Candidate(
+            prefix=prefix,
+            meta_prefix=meta_prefix,
+            original_prefix_chars=original_prefix_chars,
+            prefix_truncated=prefix_truncated,
+        )
 
     # --- 2. sift --------------------------------------------------------------
 
@@ -214,6 +245,7 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
             else reply.text
         )
         verdict = await judge_reply(judge, goal, candidate.prefix, said)
+        continuation = reply.text or ""
         return Finding(
             messages=messages,
             response=reply,
@@ -221,6 +253,19 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
             metadata={
                 "prefix": candidate.prefix,
                 "meta_prefix": candidate.meta_prefix,
+                "prefix_chars": len(candidate.prefix),
+                "prefix_original_chars": candidate.original_prefix_chars,
+                "prefix_truncated": candidate.prefix_truncated,
+                "max_prefix_chars": self.params.max_prefix_chars,
+                "continuation_chars": len(continuation),
+                "continuation_tokens": (
+                    reply.usage.get("completion_tokens")
+                    if isinstance(getattr(reply, "usage", None), dict)
+                    else getattr(
+                        getattr(reply, "usage", None), "completion_tokens", None
+                    )
+                ),
+                "finish_reason": getattr(reply, "finish_reason", None),
                 "prefix_index": index,
                 "prefilled": self.params.prefill,
                 "selected": False,

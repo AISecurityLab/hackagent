@@ -19,6 +19,7 @@ Models this attack drives, configured under its `roles`. Each one is a [ModelCon
 | Role | Kind | Needed | What it does |
 |---|---|---|---|
 | `attacker` | chat model | required | Plans the conversation and writes each next question, a little closer to the goal than the last. |
+| `refusal` | chat model | optional | Optional. The Refusal Judge: decides whether each reply refuses the goal, which triggers a backtrack. Defaults to the attacker model. |
 
 ## Parameters
 
@@ -27,9 +28,9 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `max_turns` | integer (>= 1) | `10` | Turns the conversation may grow to. A backtracked turn is retried, not counted, so the conversation never escalates on a refusal. |
-| `max_backtracks` | integer (>= 0) | `10` | Rephrasings allowed across the whole goal. Once spent, a refused turn is accepted as-is and the conversation moves on. |
+| `max_backtracks` | integer (>= 0) | `10` | Rephrasings allowed across the whole goal. Once spent, a refused turn is accepted as-is, judged like any other, and the conversation moves on. |
 | `keep_last_n` | integer (>= 1) | `6` | Attacker turns kept before its planning log is trimmed. The target's own conversation is never trimmed: that history is the attack. |
-| `early_stop` | boolean | `true` | Stop as soon as a turn the target did not refuse passes the panel. |
+| `early_stop` | boolean | `true` | Stop as soon as a turn passes the panel. |
 | `feedback_max_chars` | integer (>= 1) | `2500` | Longest reply and explanation fed back to the attacker. |
 
 ## In a campaign file

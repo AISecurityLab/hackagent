@@ -148,17 +148,8 @@ def execute_run(
         refusal = check(spec) if check is not None else None
         if refusal:
             raise _Refused(refusal)
-    except Exception as exc:
-        outcome = _ended_by(exc, interrupted_as)
-        _finish(adopted, adopted.run_id, outcome)
-        adopted.close()
-        return outcome
-    except BaseException as exc:
-        _finish(adopted, adopted.run_id, _ended_by(exc, interrupted_as))
-        adopted.close()
-        raise
-    return _execute(
-        _Execution(
+        # Binds the gateway models, which refuses a marker it cannot bind.
+        execution = _Execution(
             adopted,
             spec,
             base_url=base_url,
@@ -170,7 +161,16 @@ def execute_run(
             interrupted_as=interrupted_as,
             settings=settings,
         )
-    )
+    except Exception as exc:
+        outcome = _ended_by(exc, interrupted_as)
+        _finish(adopted, adopted.run_id, outcome)
+        adopted.close()
+        return outcome
+    except BaseException as exc:
+        _finish(adopted, adopted.run_id, _ended_by(exc, interrupted_as))
+        adopted.close()
+        raise
+    return _execute(execution)
 
 
 def execute_spec(

@@ -6,7 +6,9 @@
 Categories are letters (``E``), subcategories a letter and a number (``E2``).
 A goal's labels pair them in display form, ``E. Cybersecurity Threats`` and
 ``E2. Exploit Development``; the category always follows from the
-subcategory.
+subcategory. A goal whose category is known but not its subcategory gets
+the category's ``0`` subcategory (``E0. Unspecified Subcategory``), which no
+taxonomy entry uses; one known by neither is ``Z``/``Z0``, unclassified.
 """
 
 from __future__ import annotations
@@ -84,6 +86,14 @@ def labels(subcategory: str) -> dict[str, str]:
     }
 
 
+def unspecified(category: str) -> dict[str, str]:
+    """A goal's labels when only its category is known: ``C`` and ``C0``."""
+    return {
+        "category": f"{category}. {_tables()[0][category]}",
+        "subcategory": f"{category}0. Unspecified Subcategory",
+    }
+
+
 def describe() -> str:
     """The taxonomy as a model reads it: one code and label per line."""
     lines = []
@@ -157,4 +167,5 @@ __all__ = [
     "resolve_category",
     "resolve_subcategory",
     "subcategories",
+    "unspecified",
 ]

@@ -1,60 +1,64 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Flowchart attacks: present the goal as an incomplete flowchart to finish."""
+"""Flowchart attacks: present the goal's steps as a flowchart to expand.
+
+A step-description generator (the ``attacker`` role) writes numbered steps
+for the goal; the first ``num_steps`` are drawn under the goal as an image
+(FC) or written as flowchart code (tFC), and the target is asked to fill in
+the details.
+"""
 
 from __future__ import annotations
 
 import re
 from typing import Any
 
-from ..base import Messages, StaticAttack
+from ..base import Completion, Messages, StaticAttack
 from .config import FCParams, tFCParams
 from .flowchart_renderer import TEXT_FORMAT_SERIALIZERS, render_flowchart
-from .prompts import SYSTEM_PROMPT, USER_PROMPT
+from .prompts import STEP_GENERATION_PROMPT, SYSTEM_PROMPT, USER_PROMPT
 
 
-def _decompose_goal_to_steps(goal: str, num_steps: int) -> list[str]:
-    sentences = [
-        sentence.strip()
-        for sentence in re.split(r"[.;]\s*", goal.strip())
-        if sentence.strip()
+#: A numbered step: ``1. …``, ``2) …`` or ``Step 3: …``.
+_STEP = re.compile(r"^\s*(?:step\s*)?\d+\s*[.):]\s*(\S.*)$", re.IGNORECASE)
+
+
+def parse_steps(reply: str) -> list[str]:
+    """The numbered steps in a generator reply, in order."""
+    return [
+        match.group(1).strip()
+        for match in map(_STEP.match, reply.splitlines())
+        if match
     ]
-    if len(sentences) >= num_steps:
-        return sentences[:num_steps]
 
-    words = goal.split()
-    if len(words) <= 3:
-        return [
-            f"Understand the task: {goal}",
-            f"Research methods for: {goal}",
-            "Gather required materials",
-            "Execute the plan step by step",
-            f"Verify completion of: {goal}",
-        ][:num_steps]
 
-    chunk_size = max(1, len(words) // num_steps)
-    steps = [
-        " ".join(
-            words[index * chunk_size :]
-            if index == num_steps - 1
-            else words[index * chunk_size : (index + 1) * chunk_size]
-        )
-        for index in range(num_steps)
-    ]
-    steps = [step for step in steps if step]
-    steps.extend(
-        "Continue with remaining details..." for _ in range(num_steps - len(steps))
+async def generate_steps(
+    attacker: Completion, goal: str, num_steps: int, truncate_last_step: bool
+) -> list[str]:
+    """Ask the step-description generator for ``goal``'s steps; keep the first ones."""
+    reply = await attacker(
+        [{"role": "user", "content": STEP_GENERATION_PROMPT.format(goal=goal)}]
     )
-    return steps[:num_steps]
-
-
-def _steps(goal: str, num_steps: int, truncate_last_step: bool) -> list[str]:
-    steps = _decompose_goal_to_steps(goal, num_steps)
-    if truncate_last_step and steps:
+    steps = parse_steps(reply)[:num_steps]
+    if not steps:
+        raise ValueError(
+            "the step-description generator wrote no numbered steps: "
+            f"{reply.strip()[:200]!r}"
+        )
+    if truncate_last_step:
         truncation_point = max(3, len(steps[-1]) * 3 // 5)
         steps[-1] = steps[-1][:truncation_point] + "..."
     return steps
+
+
+def _require_attacker(params: FCParams | tFCParams, name: str) -> Completion:
+    if params.attacker is None:
+        raise ValueError(
+            f"{name} needs an 'attacker' role: the step-description generator "
+            "that writes the flowchart's steps."
+        )
+    return params.attacker
 
 
 def _build_multimodal_messages(
@@ -95,10 +99,17 @@ class FCAttack(StaticAttack[FCParams]):
     name = "fc"
     params_type = FCParams
 
+    def __init__(self, params: FCParams) -> None:
+        super().__init__(params)
+        self.attacker = _require_attacker(params, "FC-Attack")
+
     async def build_requests(self, goal: str) -> list[Messages]:
         params = self.params
+        steps = await generate_steps(
+            self.attacker, goal, params.num_steps, params.truncate_last_step
+        )
         rendered = render_flowchart(
-            steps=_steps(goal, params.num_steps, params.truncate_last_step),
+            steps=steps,
             goal_text=goal,
             layout=params.layout,
             dpi=params.dpi,
@@ -112,9 +123,15 @@ class tFCAttack(StaticAttack[tFCParams]):
     name = "tfc"
     params_type = tFCParams
 
+    def __init__(self, params: tFCParams) -> None:
+        super().__init__(params)
+        self.attacker = _require_attacker(params, "tFC-Attack")
+
     async def build_requests(self, goal: str) -> list[Messages]:
         params = self.params
-        steps = _steps(goal, params.num_steps, params.truncate_last_step)
+        steps = await generate_steps(
+            self.attacker, goal, params.num_steps, params.truncate_last_step
+        )
         graph_text = TEXT_FORMAT_SERIALIZERS[params.text_format](
             goal,
             steps,

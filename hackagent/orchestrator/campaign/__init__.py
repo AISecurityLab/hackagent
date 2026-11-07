@@ -21,7 +21,10 @@ from hackagent.orchestrator.campaign.audit import (
     run_audit,
 )
 from hackagent.orchestrator.campaign.gateway import (
+    GATEWAY_ATTACKER,
+    GATEWAY_JUDGE,
     GATEWAY_KEY_ENV,
+    GATEWAY_MODELS,
     GATEWAY_PROVIDER,
     bind_gateway,
     is_gateway,
@@ -56,7 +59,10 @@ from hackagent.orchestrator.campaign.runner import (
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 __all__ = [
+    "GATEWAY_ATTACKER",
+    "GATEWAY_JUDGE",
     "GATEWAY_KEY_ENV",
+    "GATEWAY_MODELS",
     "GATEWAY_PROVIDER",
     "AuditFailed",
     "Attempt",

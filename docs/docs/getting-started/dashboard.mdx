@@ -14,8 +14,28 @@ with no Node runtime, Docker or database server involved.
 
 The recording shows the runs of the [example run](./example-run.mdx) against a small support bot.
 
-- **Local mode** (the default local backend): reads the runs recorded in your SQLite database. Read-only, apart from deleting a run.
-- **Remote mode** (`--backend remote`, with `HACKAGENT_API_KEY` set): shows your hosted HackAgent data.
+- **Local mode** (the default local backend): reads the runs recorded in your SQLite database, and saves and launches campaigns on this machine.
+- **Remote mode** (`--backend remote`, with `HACKAGENT_API_KEY` set): shows your hosted HackAgent data, and runs the campaigns you launch on this machine.
+
+In local mode, select campaign checkboxes (or select all deletable executions
+on the current page), then **Delete selected** to remove recorded executions.
+You can also use **Delete** in a campaign's header to remove that execution.
+The selection clears when you change pages or refresh. Bulk deletion is atomic:
+if any selected execution is active or missing, none are deleted.
+The confirmation deletes child attack runs,
+results, traces and recorded audit/configuration together. Saved campaign
+definitions and exported log files remain untouched. Active executions cannot
+be deleted; deletion is permanent and is not a way to stop a running campaign.
+
+The campaign list and overview share summary data. Summary counts are aggregated
+in SQLite without loading result prompts, responses or metadata. Full result
+data is loaded for campaign investigations rather than for the history list.
+
+Campaign charts and goal lists read only outcome fields and category labels, not
+full request/response payloads. Attempts are filtered by goal and paginated in
+SQLite; full conversations and search traces are fetched for the selected goal
+and attack. Campaign sections (including costs and judge audit) load together on
+one scrollable page and remain mounted to preserve their state.
 
 Your API key never reaches the browser. It stays in the CLI process, which
 attaches it to each request it proxies; the page itself runs with authentication
@@ -46,17 +66,40 @@ Open a result for everything stored with it: the verdict, the judge's scores, th
 The Config tab shows the attack's parameters and the model in each of its roles.
 
   </Screenshot>
-  <Screenshot src="/img/dashboard/reports.png" alt="Reports: one agent rated high, with two reports" title="Reports">
-
-One entry per agent, with a severity and a risk score for each of its reports.
-
-  </Screenshot>
-  <Screenshot src="/img/dashboard/report.png" alt="Report details: 40% risk score and robustness per risk category" title="Report details">
-
-The eye icon on a report opens it: the risk score, robustness per risk category (100 minus the share of results that were jailbreaks) and a PDF export.
-
-  </Screenshot>
 </ScreenshotGrid>
+
+Runs is the single results workspace. The legacy Reports page and its per-run
+PDF/print view have been removed.
+
+### Export a campaign
+
+In local mode, **Export** is beside **Delete** in campaign details.
+The Runs list offers **Export selected** beside **Delete selected**, using
+the same campaign checkboxes. Completed, failed and cancelled executions can
+be exported; active executions must finish first.
+
+Each campaign downloads a separate, self-contained interactive HTML campaign
+page. Open it offline in a browser, or use **Print / Save as PDF** for a static
+copy of the current view.
+Multiple selected campaigns may require permission for multiple downloads.
+The file uses the same campaign components, compiled styles and light/dark theme
+as Runs. It contains the full campaign's goal coverage, success progression,
+costs, judge audit and recorded configuration. Dashboard filters are not applied:
+it starts unfiltered with all campaign attacks in complementarity.
+Chart tooltips, curve selection, portfolio recomputation, coverage search and
+filters, category/subcategory/goal expansion and section navigation remain
+interactive offline. Goal text and outcomes are embedded; conversations, raw
+prompts/responses and free-form execution notes are excluded. Goal outcome
+markers do not open conversations.
+
+Charts remain vector SVGs, with the same floating inspection tooltips.
+The runtime, stylesheet and snapshot are embedded; no server or network
+connection is required. Missing measurements remain explicitly unrecorded.
+Export uses fresh data and fails visibly if the snapshot changes; no files are
+downloaded when preparing a selection fails.
+Credential-named configuration fields and URL credentials are redacted, but
+target addresses, goal text and tested configuration may still be sensitive. Review the
+report before sharing.
 
 ## Getting the dashboard
 
@@ -85,17 +128,331 @@ Every option is in the [CLI reference](../reference/cli.md#hackagent-web).
 the port can act with your API key: the proxy attaches it to every request and
 the page requires no login. Bind it only on a trusted network, and prefer an SSH
 tunnel (`ssh -L 7860:127.0.0.1:7860 host`) for remote access.
+
+The dashboard answers only requests addressed to `127.0.0.1`, `localhost` or the
+`--host` name it was started with, and takes changes only from its own pages.
+With `--host 0.0.0.0`, open it through one of those names (the SSH tunnel does):
+a request for any other name gets 400.
 :::
 
-## Local mode is read-only
+## Launching in remote mode
 
-Local mode renders agents, attacks, runs, results and traces, but does not
-launch attacks. Run a campaign from the CLI, then refresh the dashboard:
+A campaign launched from the dashboard runs where the dashboard runs. On
+app.hackagent.dev that is HackAgent cloud. Under `hackagent web` it is your
+machine: the CLI process claims each run it launched and executes it, the way
+`hackagent run` does, and the dashboard follows it live. Your machine reaches
+local and internal targets, and the shell that started `hackagent web` provides
+the model keys the campaign reads. A run that needs a variable the shell lacks
+ends failed, naming it.
+
+Stopping `hackagent web` stops its runs too; the server marks them failed once
+they stop reporting.
+
+## Launching campaigns in local mode
+
+In local mode, **Attacks** builds a campaign against one of your agents, saves
+it to the local database and launches it on this machine: the `hackagent web`
+process runs it, and the run page follows its attacks and results as they land.
+Cancel stops it at its next step. There is nothing to choose: without a
+HackAgent account, this machine is the only place a campaign runs.
+
+A campaign targets an agent the database already knows. Agents are registered
+by running a campaign against them, for example from the CLI:
 
 ```bash
 hackagent campaign run campaign.yaml
 hackagent web
 ```
+
+A launched run lives as long as `hackagent web`: stopping the server ends it.
+
+## Campaign runs preview
+
+When using a frontend built from the sibling `hackagent-webapp` checkout,
+**Runs** shows one entry per local campaign execution. Open an entry to
+see campaign-wide statistics above **01 / Goal coverage**, **02 / Success progression**,
+**03 / Cost** and **04 / Judge audit** on one page, without tabs.
+A sticky row of section links below the summary cards jumps to Coverage, Success
+progression, Cost and Judge audit. An underline follows the section being read.
+Jumps preserve your filters and move keyboard focus to the destination; coverage
+headings stay beneath the navigation. On narrow screens the link row scrolls horizontally.
+The goal coverage table is the single workspace for searching and filtering goals,
+comparing attacks and opening focused goal-and-attack conversations.
+**Campaign configuration (YAML)** below Judge audit shows the whole file as executed.
+It redacts credentials, and endpoints are
+the addresses used during that execution. Runs recorded before parameters were stored show only
+the values written in the file.
+
+The **Runs** list opens with trend cards (campaigns, goals tested, goal-weighted ASR,
+recorded attempts and the latest campaign), each with a sparkline across recent campaigns.
+Every campaign row shows a stacked bar of jailbroken, mitigated and unresolved goals.
+
+A campaign opens with a status line and six equal-height cards: ASR (outcome bar), goals
+(classified vs unclassified), attacks (best attack and per-attack ASR sparkline), LLM calls
+(split into target, attacker and judge), target tokens (prompt vs completion) and attack time.
+Goal coverage, success progression, cost and judge audit (calibration and robustness) appear in order
+on the same page. Selections and goal search remain in place while scrolling. Taxonomy
+letter codes remain part of category and subcategory names. Unclassified goals remain explicit.
+
+The primary attack comparison is **Goal coverage**, with attack columns sorted by
+goal-level ASR. The **All goals** summary row shows each execution's overall ASR;
+hover or focus a percentage for successful/recorded goals and unresolved counts.
+**Combined outcome** is the union of jailbroken
+goals, counting each goal once, not the average of attack rates.
+Inspecting cost distributions does not change goal filters, category coverage or campaign totals.
+Table values remain informational, not filters.
+Exact sample sizes accompany every rate:
+100% on one goal is not equivalent to 100% on 66 goals.
+Attack column headings are informational, not controls. There is no separate attack-ranking plot.
+Search sits above a toolbar with four focused dropdowns: **Attacks · Topics · Outcomes · Detail**.
+**Clear all** sits at the far right of the toolbar, disabled when nothing has changed.
+Attacks and Outcomes contain checkboxes; Topics keeps categories and their nested subcategory
+choices together; Detail offers single-choice Categories, Subcategories and Goals.
+Dropdowns stay open while selecting and show selection counts, without per-group clear buttons.
+No selection includes all values.
+Selections use OR within each group and AND between groups. Subcategory choices appear
+only for explicitly selected categories, grouped under their category names. Otherwise
+the dropdown says **Select a category first**. Changing categories removes only
+subcategories no longer available; clearing all categories clears subcategory selections.
+Active secondary filters remain visible as individually removable chips even when closed.
+The attack filter narrows the columns to **Combined outcome** plus the selected executions.
+The Combined outcome column combines only selected attacks, or every campaign attack when
+none are selected. Its heading tooltip explains that any selected successful attack makes
+a goal jailbroken. Summary percentages and goal markers follow that same scope.
+Combined outcome is informational and does not open a conversation.
+When only one attack is selected (or the campaign has one attack), the redundant
+Combined outcome column is hidden at every level of the coverage table.
+Outcome filtering uses the combined verdict of selected attacks: any jailbreak wins,
+all recorded outcomes must be mitigated for Mitigated, all errors give Error, and other
+recorded combinations are Unresolved. Not tested means none of the selected attacks
+has a recorded outcome. With no attack selection, the saved campaign-wide verdict is used.
+Matching goals expand automatically. A separate count shows how many match; **All goals**
+retains every campaign goal regardless of search/topic/outcome filters; its combined percentage
+still follows the selected attacks. Category/subcategory rows summarize matches.
+Remove individual chips to clear search or filters. Detail shows its current level directly
+in the button, without a duplicate chip. One **Clear all** button
+resets every selection, search and granularity to collapsed campaign coverage.
+Filters and goal selection are reflected in the URL, with repeated `category`, `subcategory`
+`attack` and `outcome` parameters for multiple selections, and `granularity` for explicit
+detail level. Existing single-value and `section=goals` links
+open coverage, and deep goal/attempt links open the focused conversation overlay.
+Legacy `section=audit` and `tab=audit` links scroll to the inline Judge audit section.
+ASR is successful distinct recorded goals divided by all distinct recorded goals
+for that execution/category, including unresolved goals. Missing coverage is
+**Not tested**, never 0%; missing coverage shows a dash.
+Exact fractions and unresolved counts appear in goal coverage tooltips.
+Category labels retain their taxonomy prefixes, without coloured letter badges.
+
+**Goal coverage** combines category statistics and individual goal outcomes in one table.
+The **All goals** row remains visible when categories are collapsed.
+Category headers group subcategory rows, and attack columns follow the same ASR ranking.
+Goal counts appear inline in parentheses beside category and subcategory names.
+Attack headings are rotated to keep columns compact. Each category and subcategory
+cell shows its ASR percentage with subtle shading that strengthens as ASR increases;
+untested cells remain unshaded. Hover or focus a percentage for successful/recorded goals
+and unresolved counts, including errors. Untested cells show a dash labelled
+**Not tested**, not 0%.
+Each goal appears once on its own row, with its full text on the left and one outcome
+marker per attack. The first outcome column shows the combined outcome across selected attacks.
+Missing attempts use dashed markers, distinct from mitigated goals.
+Category-only and unclassified partitions remain visible. Select a category to expand
+or collapse its subcategories, or a subcategory to expand or collapse its goals.
+Opening a category shows only subcategory summaries, even if its goals were previously
+expanded. **Detail** sets the whole table's
+expansion level without disabling individual expanders. Categories is the collapsed default;
+Subcategories opens category summaries, and Goals opens both levels. Selecting the same
+level again keeps that level. Mixed individual expansion displays **Detail: Custom**.
+The All goals row has a distinct background; subcategories are indented, and goals
+are indented further. The table fits the available width where possible, with horizontal
+scrolling for narrow screens or many attacks. Expanding goals grows the page without
+an internal vertical scrollbar. A sticky header at the top of the scroll area carries
+attack headings first, with current category and subcategory context below them while scrolling through goals.
+Attack headings stay aligned when scrolling the table horizontally. The goal-text
+column stays pinned during horizontal scrolling.
+Select an outcome marker to open only that goal's attack conversation in a focused
+overlay, without the goal navigator or attack selector. Close it to return to the
+same coverage position. Untested cells show an explicit no-attempts message.
+The overlay title is the goal text, with category and subcategory underneath.
+The selected attack and verdict come next, followed by numbered, outcome-coloured
+attempt tiles aligned to the right of the attack name, and then the conversation.
+The attack header omits the redundant attempt-count label and aggregate verdict.
+The goal's verdict for the selected attack appears beneath the goal title, matching
+the corresponding table cell rather than the campaign-wide combined outcome;
+each individual attempt retains its own outcome.
+Optional technique guidance appears below the navigation.
+The attack name, verdict and attempt badges stay sticky while scrolling the conversation.
+Selecting a badge positions its attempt below the controls, even when badges wrap.
+Single attempts omit redundant navigation; multiple attempts use compact 28px numbered
+tiles with subtle outcome colours and a selected-state ring, without icons.
+The active tile follows the attempt being read as you scroll, accounting for the sticky
+controls. Passive scrolling does not change focus or rewrite the attempt link in the URL.
+untested attacks show **0 attempts**.
+A **Combined outcome** marker is non-clickable; select an individual attack's marker
+to open its conversation. Previously saved conversation links remain supported.
+Modified clicks open the same filtered coverage and conversation in another tab.
+New links use `conversation_attack` separately from the attack filter, so opening
+an individual conversation does not narrow the table's columns.
+Goals appear in goal-number order within each subcategory.
+
+**Success progression** follows goal coverage. Two aligned violin panels compare
+attempts and time to first jailbreak, using only successful goals. Attack labels
+show successful/tested counts; each panel shows measured/successful counts.
+Sparse samples use dots and ranges instead of an artificial density.
+
+For any attack with multiple recorded attempts for at least one goal, including
+static attacks such as StaticTemplate, cumulative step curves show the percentage of all tested
+goals first broken by each recorded attempt. Each goal counts once. The denominator
+stays fixed, curves plateau to each attack's maximum recorded attempt, and endpoints
+equal the reported ASR. This is observed search progression, not repeated-response
+ASR@k or a promise about changing the attempt budget.
+Attempts follow recorded conversation order, not necessarily completion order:
+static and batched requests may run in parallel. Family information is not required.
+Click an attack in the curve legend to highlight its curve and dim the others.
+Click the selected attack again, or **Show all curves equally**, to clear the highlight.
+Legend buttons also work with the keyboard; hovering another curve does not change the selection.
+On desktop the legend sits to the right of the curve plot; it moves below on narrow screens.
+Curve and distribution details appear only in floating tooltips on hover, focus or tap,
+not duplicate boxes below the plots. Inspection does not change the page layout.
+**Show all curves equally** is in the legend. Curve and portfolio selectors use matching
+row and selection styles. Coverage attack headings omit unexplained coloured dots;
+goal outcome markers remain unchanged.
+
+**Combining attacks** follows the curves within Success progression. Its right-hand
+selector starts with all attacks selected, including single-attempt attacks. All recorded
+attempts count. Combined ASR is the fraction of goals tested by at least one selected
+attack that any selected attack broke. Counts show both tested-by-any and tested-by-all
+coverage; untested goals are not failures. "Not yet broken" includes mitigated, unresolved
+and error outcomes. The selection is independent of the goal coverage filters.
+
+The contribution bars show **goals lost if removed** for each selected attack,
+using the current portfolio's fixed denominator for percentage-point contributions.
+These are not additive shares: removing one attack does not lose a goal also broken
+by another. Zero means redundant coverage in this portfolio, not an ineffective attack.
+Missing or inconsistent first-success summaries show an explicit unavailable state.
+
+Attempt numbering follows the recorded conversation. New runs measure time from
+goal-search start to the earliest successful target response, including goal-level
+preparation and queueing but excluding that response's judge evaluation. Parallel
+batches can have a different earliest response than their first stored successful
+attempt. Older runs without this clock show **Not recorded** for timing: results
+can be persisted after the entire search, so persistence timestamps cannot recover it.
+Restart an older backend to load first-success attempt summaries from existing results.
+
+**Cost** shows four aligned horizontal violin plots: LLM calls, target tokens, attempts
+and time per goal. Attack labels and ASR percentages appear once on the left.
+Rows are equally spaced and sorted by descending ASR, not positioned on a numeric ASR axis.
+Each column uses its own symlog cost scale: linear from zero to one, logarithmic above
+one (one second for time). Tick labels retain original units. On narrow screens the comparison scrolls horizontally.
+Wider sections contain more goals with similar costs on the transformed scale.
+A dark marker and explicit **Median:** label show the 50th percentile.
+The label sits directly below the marker, with inward-aligned text near the plot edges.
+Each axis spans its metric's observed minimum to maximum, with both endpoints labelled.
+Sample counts appear in inspection details rather than unexplained graph annotations.
+Densities are estimated in symlog space and stay inside observed ranges.
+Fewer than five measurements or three distinct values use dots and ranges instead.
+Hover, focus or tap shows the median, quartiles, range and measured/total goal counts.
+Distributions use actual per-goal measurements, never inferred samples from averages.
+Missing measurements remain **Not recorded**; partially measured costs show their coverage.
+Goal-scoped batch traces (including AdvPrefix prefix sampling) count across the goal,
+even when the batch's calls are attached to only one of its attempt records.
+Time uses each goal's first-to-last recorded result span, not
+total run duration divided by goals; it is not a measurement of model compute time.
+
+Inspecting a calls distribution also shows recorded mean target, attacker and judge calls
+per goal, without a separate repeated table. Untraced roles remain explicitly marked.
+Tooltips and inspection details separate statistics and coverage into labelled lines,
+with a blank line before the call-role breakdown and one indented line per role.
+These are call volumes, not monetary spending. Only target tokens are recorded.
+Token totals require usage on every recorded target call and coverage of every
+attempt; incomplete totals remain unknown rather than showing a partial subtotal.
+Judge calls count panel evaluations; a panel of
+several judges makes one call per judge for each. Most static attacks use no attacker model, so
+their attacker calls are zero; FC and tFC count one call to their step generator per goal. Runs
+recorded before static attacks traced their calls only have the target replies; their attacker
+and judge calls are shown as **not traced**, not zero.
+
+The focused conversation header shows the selected attack's verdict, or **Not tested**.
+A clickable timeline jumps directly to any attempt.
+Category and subcategory labels come
+from recorded dataset metadata; missing labels are shown as Unknown, never guessed.
+Attacks that have not tested a goal are labeled **Not tested**, not mitigated.
+The **04 / Judge audit** section uses aligned horizontal plots with the same frames,
+gutters and marker-aligned labels as cost plots. Judges share the y-axis; individual
+judges appear first and the panel last. Calibration has three panels:
+**Youden's J**, **Harmful detected** (sensitivity) and **Falsely accused**
+(safe examples incorrectly flagged harmful). J ranges from -1 (reversed), through
+0 (no discrimination), to +1 (perfect separation); the other two use linear 0-100%
+axes. The panel is scored on its combined verdicts, not an average of judge scores.
+Single recorded scores use markers rather than invented distributions.
+Shared name columns remain open and unframed across success, cost, complementarity
+and judge audit plots; rounded frames identify metrics rather than row labels.
+
+Robustness uses one panel per recorded wrapper, with the same judge rows and a
+shared linear percentage scale. Markers show how often that wrapper changed the
+original verdict; ideally 0%. The answer and correct label stay unchanged.
+Black ticks show configured maxima. The overall check uses samples changed by
+any wrapper, counting each sample once, not independent per-wrapper tests.
+Hover, focus or tap a marker for descriptions, confusion counts, hidden correct
+harmful detections and the overall recorded check. There are no expandable judge
+audit blocks or selectors. The plots scroll horizontally on narrow screens.
+Derived metrics use recorded counts, not rounded rates; missing evidence stays
+unmeasured. Neither J nor robustness passing guarantees reliability on every
+campaign response.
+Campaign totals deduplicate goals across attacks; attack-specific totals count each
+goal once per execution, so they must not be added to get the campaign's unique count.
+No chart fabricates a score when evidence is absent.
+
+Each attack is a continuous conversation: scroll through all attempt prompts,
+target responses and outcome explanations without selecting events. Repeated
+conversation history is omitted only when an attempt exactly continues an
+earlier exchange; independent branches keep their own context. A Crescendo turn
+rephrased after a refusal says which attempt it continues from. A prompt, prefilled
+opening or response identical to an earlier attempt appears as a one-line
+"same as attempt N" reference instead of being printed again. Prefill attacks
+such as AdvPrefix show the attacker-written opening once, highlighted, followed
+by only the text the target added. Attempt headers state the Crescendo turn or
+the AdvPrefix opening and sample, and a one-sentence guide explains how those
+attacks work.
+There are no Result/Traces tabs or execution trees.
+Coverage shows full goal text and one outcome per attack.
+Every matching goal is available in the keyboard-focusable, independently scrollable
+table, without pagination or next/previous buttons. The frontend retrieves subsequent
+API batches automatically for lists over 1,000 goals; incomplete loads expose an
+error and retry rather than silently truncating the list.
+Selecting a deep-linked goal expands its category/subcategory path and opens the focused
+conversation overlay. Closing the overlay restores focus to its marker, or search for a
+direct link. One search/filter toolbar controls coverage.
+New TAP recordings include explicit candidate parents and pruning references.
+An optional **Attack branches** view shows these relationships; selecting a node
+jumps to its conversation rather than opening a competing evidence panel.
+No tree is shown when candidate ancestry is unavailable.
+Raw records and diagnostics are under **Technical details**.
+Goal, attack, category, filters and jump targets are reflected in the URL.
+Light mode uses white panels on a neutral canvas; dark mode uses separated slate
+surfaces. Outcome labels and icons accompany colour, and a keyboard-accessible
+list is available as an alternative to the optional branch map.
+
+Goals are grouped by their dataset index across the campaign's attack runs.
+A successful attempt marks a goal as jailbroken. Mitigated requires a completed
+campaign and completed child runs with only mitigated attempts for that goal;
+other outcomes remain unresolved. Counts cover **recorded goals**, not selected
+goals that have not produced any attempts. Refresh explicitly while a run is
+active to load new evidence.
+
+This preview is local-only; existing hosted results and older standalone runs
+remain accessible through **Inspect individual attack runs** within Runs.
+Hosted mode keeps its existing run browser. No example data is added to your database.
+
+To preview changes from source, run these commands from the CLI repository
+(Node.js and npm are required for the build):
+
+```bash
+bash deploy/web/build_webui.sh ../hackagent-webapp
+hackagent web --local --no-browser
+```
+
+Open `http://127.0.0.1:7860/stats`, forwarding port 7860 if using remote VS Code.
+Rebuild after frontend edits and restart the CLI after Python changes.
 
 ## Troubleshooting
 
@@ -107,7 +464,7 @@ which dashboard bundle is in use — the first things to include in a bug report
 | "No web UI bundle found …" | Nothing supplied a dashboard: `pip install 'hackagent[web]'`, or use a release binary |
 | "Port 7860 is already in use by another process" | An unrelated process holds the port — a previous HackAgent dashboard is reclaimed automatically, anything else never is. Use `--port` |
 | Every panel is empty (local mode) | No runs recorded in that database yet, or they went to another one. Check `hackagent results list` |
-| Creating or launching returns "read-only" | Expected in local mode — see above |
+| Creating an agent returns 501 (local mode) | Agents are registered by running a campaign against them — see above |
 | 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `HACKAGENT_API_KEY` and `hackagent config show` |
 
 ## See also

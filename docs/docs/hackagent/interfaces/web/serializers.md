@@ -54,6 +54,21 @@ Serialise a result.
 over it unconditionally); pass `None` for list endpoints, where loading
 every trace would turn one page into hundreds of queries.
 
+#### campaign\_run
+
+```python
+def campaign_run(
+        record: Any,
+        agent_name: Optional[str] = None,
+        org_id: Optional[UUID] = None,
+        cancel_requested_at: Optional[datetime] = None) -> Dict[str, Any]
+```
+
+Serialise a campaign run as the parent run its attack runs belong to.
+
+One the dashboard launched ran in this process (executor `local`); any
+other was started by `hackagent campaign run` (executor `cli`).
+
 #### run\_summary
 
 ```python
@@ -61,8 +76,17 @@ def run_summary(record: Any,
                 results: List[Any],
                 agent_name: Optional[str] = None,
                 attack_type: Optional[str] = None,
-                org_id: Optional[UUID] = None) -> Dict[str, Any]
+                org_id: Optional[UUID] = None,
+                executor: str = "cli") -> Dict[str, Any]
 ```
 
 Serialise a run with the per-outcome counts the run list renders.
+
+#### result\_counts
+
+```python
+def result_counts(results: List[Any]) -> Dict[str, int]
+```
+
+The per-outcome counts of `results`, as run summaries carry them.
 

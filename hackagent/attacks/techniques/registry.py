@@ -22,11 +22,11 @@ _ATTACKS: dict[str, str] = {
     "static_template": "static.static_template:StaticTemplateAttack",
     "flipattack": "static.flipattack:FlipAttack",
     "cipherchat": "static.cipherchat:CipherChatAttack",
-    "h4rm3l": "static.h4rm3l:H4rm3lAttack",
     "mml": "static.mml:MMLAttack",
     "fc": "static.fc:FCAttack",
     "tfc": "static.fc:tFCAttack",
     "bon": "adaptive.bon:BoNAttack",
+    "h4rm3l": "adaptive.h4rm3l:H4rm3lAttack",
     "pap": "adaptive.pap:PAPAttack",
     "pair": "adaptive.pair:PAIRAttack",
     "tap": "adaptive.tap:TAPAttack",
@@ -46,6 +46,12 @@ STATIC_ATTACKS = frozenset(
 ITERATIVE_ATTACKS = ATTACKS - STATIC_ATTACKS
 
 AttackType = Union[type[StaticAttack], type[IterativeAttack]]
+
+
+def attack_family(name: str) -> Optional[str]:
+    """Return the family ``name`` belongs to (``static``, ``adaptive``, …), or None."""
+    path = _ATTACKS.get(name)
+    return path.split(".", 1)[0] if path else None
 
 
 def get_attack_class(name: str) -> AttackType:

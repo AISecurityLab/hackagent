@@ -134,7 +134,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["hackagent"]
 # `artifacts` re-includes paths that .gitignore excludes. The web UI bundle is
-# a build output (scripts/build_webui.sh) but must ship in the wheel, otherwise
+# a build output (deploy/web/build_webui.sh) but must ship in the wheel, otherwise
 # `hackagent web` has nothing to serve.
 artifacts = [
     "hackagent/examples/**",
@@ -148,6 +148,7 @@ include = [
 ]
 
 [tool.coverage.run]
+branch = true
 data_file = "reports/.coverage"
 source = ["hackagent"]
 omit = [
@@ -171,7 +172,7 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/integration", "tests/e2e", "tests/live"]
+testpaths = ["tests/unit", "tests/integration", "tests/e2e", "tests/smoke", "tests/live"]
 addopts = "--timeout=120"
 markers = [
     "live: sends real requests to a local Ollama (use --run-live to enable)",
@@ -180,7 +181,7 @@ markers = [
     "openai_sdk: marks tests that require OpenAI/OpenRouter API key",
     "google_adk: marks tests that require a live Google ADK server (use --run-google-adk to enable)",
     "litellm: marks tests that require a LiteLLM-compatible backend",
-    "e2e: marks end-to-end tests that require external services",
+    "e2e: deterministic end-to-end tests using controlled local services",
     "hackagent_backend: marks tests that require the HackAgent backend API",
     "slow: marks slow-running tests (excluded from CI, run nightly)",
 ]
@@ -218,7 +219,7 @@ select = ["E4", "E7", "E9", "F"]
 root_packages = ["hackagent"]
 include_external_packages = true
 contract_types = [
-    "logging_handlers: lint.import_contracts.LoggingHandlersContract",
+    "logging_handlers: tools.lint.import_contracts.LoggingHandlersContract",
 ]
 
 [[tool.importlinter.contracts]]

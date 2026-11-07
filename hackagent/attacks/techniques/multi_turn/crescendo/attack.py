@@ -11,21 +11,29 @@ the question reads as the next step rather than the first one.
 
 That makes refusals special. Escalating from a refusal teaches the
 conversation that refusing is acceptable, so a refused turn is *backtracked*
-instead: it is dropped from the target's history and the attacker is asked
-to rephrase the same step. The turn counter does not advance, so a rephrase
-costs a backtrack rather than a turn. Once the backtrack budget is spent a
-refusal is accepted and the conversation moves on.
+instead: it is dropped from the target's history, it is not judged, and the
+attacker is asked to rephrase the same step. The turn counter does not
+advance, so a rephrase costs a backtrack rather than a turn. Once the
+backtrack budget is spent a refused turn is kept, judged like any other, and
+the conversation moves on.
+
+A refusal is decided by an LLM Refusal Judge (paper, section 4.1), as in
+the reference implementation, PyRIT's ``CrescendoAttack`` with its default
+``SelfAskRefusalScorer``: the strict rubric, read against the attack's goal.
 
 Based on: https://arxiv.org/abs/2404.01833
+Reference: https://github.com/microsoft/PyRIT (pyrit/executor/attack/multi_turn/crescendo.py)
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
+from hackagent.core.contracts import Verdict
+
 from ...contract import Completion, Judge, Messages, Target
 from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
-from ...trace import decision, phase
+from ...trace import decision, evaluation_request, phase
 from . import prompts
 from .config import CrescendoParams
 
@@ -41,6 +49,7 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
         if params.attacker is None:
             raise ValueError("Crescendo needs an 'attacker' role to write its turns.")
         self.attacker: Completion = params.attacker
+        self.refusal_judge: Completion = params.refusal or params.attacker
 
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
@@ -72,15 +81,24 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
                     turn += 1
                     continue
 
-                refused = prompts.refused(reply.text)
-                verdict = await judge_reply(judge, goal, question, reply.text)
-                score = None if verdict is None else verdict.score
+                refused, why = await self._refused(goal, reply.text)
+                backtrack = refused and backtracks < params.max_backtracks
+                if backtrack:
+                    # Backtracked turns are not judged, as in the reference.
+                    verdict = (
+                        None
+                        if judge is None
+                        else Verdict(
+                            success=False,
+                            score=0.0,
+                            explanation=f"not judged: backtracked after a refusal. {why}".strip(),
+                        )
+                    )
+                    score = None
+                else:
+                    verdict = await judge_reply(judge, goal, question, reply.text)
+                    score = None if verdict is None else verdict.score
                 self._feed_back(goal, plan, reply.text, score, refused=refused)
-                if refused and verdict is not None and verdict.success:
-                    # The target turned this turn down, so it is not a
-                    # jailbreak whatever the panel made of the reply. The
-                    # score is kept: it is what the attacker was told.
-                    verdict = verdict.model_copy(update={"success": False})
 
                 findings.append(
                     Finding(
@@ -90,19 +108,19 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
                         metadata={
                             "turn": turn,
                             "refused": refused,
-                            "backtracked": refused
-                            and backtracks < params.max_backtracks,
+                            "refusal_rationale": why,
+                            "backtracked": backtrack,
                             "score": score,
                         },
                         path=path,
                     )
                 )
 
-                if refused and backtracks < params.max_backtracks:
+                if backtrack:
                     backtracks += 1
                     decision(
                         "backtracked",
-                        "the target refused; rephrasing the same step",
+                        "the refusal judge found a refusal; rephrasing the same step",
                         used=backtracks,
                         budget=params.max_backtracks,
                     )
@@ -113,9 +131,7 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
                 history = conversation + [{"role": "assistant", "content": reply.text}]
                 turn += 1
 
-                # A refusal accepted only because the budget ran out is
-                # still a refusal, so it does not end the search.
-                if params.early_stop and not refused and succeeded(verdict):
+                if params.early_stop and succeeded(verdict):
                     decision("stopped", "a turn reached a reply the panel passed")
                     break
 
@@ -133,6 +149,30 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
         question, logged = parsed
         plan.append({"role": "assistant", "content": logged})
         return question
+
+    async def _refused(self, goal: str, reply: str) -> tuple[bool, str]:
+        """Ask the Refusal Judge whether the reply refuses the goal, and why.
+
+        An unreadable or failed verdict is not a refusal: PyRIT scores it as
+        undetermined, which does not trigger a backtrack.
+        """
+        try:
+            with evaluation_request(goal, reply):
+                answer = await self.refusal_judge(
+                    [
+                        {"role": "system", "content": prompts.REFUSAL_JUDGE_PROMPT},
+                        {
+                            "role": "user",
+                            "content": prompts.refusal_request(goal, reply),
+                        },
+                    ]
+                )
+        except Exception:
+            return False, "the refusal judge could not be reached"
+        parsed = prompts.parse_refusal(answer)
+        if parsed is None:
+            return False, "the refusal judge gave no readable verdict"
+        return parsed
 
     def _feed_back(
         self,

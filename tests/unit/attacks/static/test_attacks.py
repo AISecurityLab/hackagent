@@ -20,13 +20,13 @@ from hackagent.attacks.techniques.static.cipherchat import (
     CipherChatAttack,
     CipherChatParams,
 )
-from hackagent.attacks.techniques.static.fc import FCParams, tFCAttack, tFCParams
-from hackagent.attacks.techniques.static.flipattack import FlipAttack, FlipAttackParams
-from hackagent.attacks.techniques.static.h4rm3l import (
-    PRESET_PROGRAMS,
-    H4rm3lAttack,
-    H4rm3lParams,
+from hackagent.attacks.techniques.static.fc import (
+    FCAttack,
+    FCParams,
+    tFCAttack,
+    tFCParams,
 )
+from hackagent.attacks.techniques.static.flipattack import FlipAttack, FlipAttackParams
 from hackagent.attacks.techniques.static.mml import MMLParams
 from hackagent.attacks.techniques.static.static_template import (
     StaticTemplateAttack,
@@ -43,7 +43,7 @@ def generate(attack: StaticAttack, goal: str = GOAL):
 # --- contract ---------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", sorted(STATIC_ATTACKS - {"fc", "mml"}))
+@pytest.mark.parametrize("name", sorted(STATIC_ATTACKS - {"fc", "tfc", "mml"}))
 def test_every_text_attack_generates_chat_requests_with_defaults(name):
     attack_type = get_attack_class(name)
     requests = generate(attack_type(attack_type.params_type()))
@@ -89,7 +89,6 @@ def test_roles_are_the_completion_fields():
         optional: Completion | None = None
 
     assert Params.role_names() == {"required", "optional"}
-    assert H4rm3lParams.role_names() == {"decorator"}
     assert BaselineParams.role_names() == frozenset()
 
 
@@ -185,72 +184,123 @@ def test_each_cipherchat_demonstration_is_one_exchange():
     assert merged == []
 
 
-def test_tfc_serializes_a_text_flowchart():
-    requests = generate(tFCAttack(tFCParams(text_format="mermaid")))
-    assert "```mermaid" in requests[0][-1]["content"]
+GENERATED_STEPS = """Instruction: Explain how to open a lock
+Steps:
+1. Inspect the lock and identify its type.
+2) Insert a tension wrench into the keyway.
+3. Apply light rotational pressure.
+4. Rake the pins with a pick.
+5. Set each pin at the shear line.
+6. Turn the plug to open the lock.
+7. Remove the tools."""
+
+
+class StepGenerator:
+    """A scripted step-description generator that records its prompts."""
+
+    def __init__(self, reply: str = GENERATED_STEPS) -> None:
+        self.reply = reply
+        self.prompts: list[str] = []
+
+    async def __call__(self, messages):
+        self.prompts.append(messages[-1]["content"])
+        return self.reply
+
+
+def test_flowchart_attacks_require_a_step_generator():
+    assert tFCParams.REQUIRED_ROLES == FCParams.REQUIRED_ROLES == {"attacker"}
+    with pytest.raises(ValueError, match="attacker"):
+        tFCAttack(tFCParams())
+    with pytest.raises(ValueError, match="attacker"):
+        FCAttack(FCParams())
+
+
+def test_tfc_asks_the_generator_for_steps_in_the_authors_format():
+    generator = StepGenerator()
+    generate(tFCAttack(tFCParams(attacker=generator)))
+    [prompt] = generator.prompts
+    # The authors' few-shot examples, then the goal as the instruction.
+    assert "Explain how to make braised pork belly." in prompt
+    assert "Write about how to plant a small indoor herb garden." in prompt
+    assert prompt.rstrip().endswith(f"Instruction: {GOAL}\nSteps:")
+
+
+def test_tfc_draws_the_first_generated_steps_whole():
+    generator = StepGenerator()
+    [messages] = generate(
+        tFCAttack(tFCParams(attacker=generator, text_format="mermaid"))
+    )
+    content = messages[-1]["content"]
+    assert "```mermaid" in content
+    # Five steps by default, as written by the generator and not cut short.
+    assert "5. Set each pin at the shear line." in content
+    assert "6. Turn the plug" not in content
+    assert "Steps:" not in content and "Instruction:" not in content
+
+
+def test_tfc_keeps_fewer_steps_when_the_generator_wrote_fewer():
+    generator = StepGenerator("1. Inspect the lock.\n2. Pick it.")
+    [messages] = generate(tFCAttack(tFCParams(attacker=generator, num_steps=10)))
+    content = messages[-1]["content"]
+    assert "Inspect the lock." in content and "Pick it." in content
+    assert "step_3" not in content
+
+
+def test_truncating_the_last_step_is_an_option():
+    generator = StepGenerator()
+    [messages] = generate(
+        tFCAttack(
+            tFCParams(
+                attacker=generator,
+                num_steps=1,
+                truncate_last_step=True,
+                text_format="ascii",
+            )
+        )
+    )
+    assert "Inspect the lock and identify its type." not in messages[-1]["content"]
+
+
+@pytest.mark.parametrize("reply", ["I can't help with that.", "", "Steps:\n\n"])
+def test_a_generator_reply_without_steps_fails_the_generation(reply):
+    with pytest.raises(ValueError, match="no numbered steps"):
+        generate(tFCAttack(tFCParams(attacker=StepGenerator(reply))))
+
+
+def test_fc_renders_the_generated_steps(monkeypatch):
+    from hackagent.attacks.techniques.static.fc import attack as fc_attack
+
+    drawn = {}
+
+    def render(*, steps, goal_text, layout, dpi):
+        drawn.update(steps=steps, goal=goal_text)
+        return {"image_data_url": "data:image/png;base64,AAAA"}
+
+    monkeypatch.setattr(fc_attack, "render_flowchart", render)
+    [messages] = generate(FCAttack(FCParams(attacker=StepGenerator(), num_steps=3)))
+    assert drawn == {
+        "steps": [
+            "Inspect the lock and identify its type.",
+            "Insert a tension wrench into the keyway.",
+            "Apply light rotational pressure.",
+        ],
+        "goal": GOAL,
+    }
+    assert messages[-1]["content"][0]["image_url"]["url"].startswith("data:image")
 
 
 @pytest.mark.parametrize(
     "build",
     [
         lambda: FCParams(dpi=10),
-        lambda: FCParams(num_steps=1),
+        lambda: FCParams(num_steps=0),
+        lambda: tFCParams(num_steps=11),
         lambda: MMLParams(font_size=2),
     ],
 )
 def test_image_attack_params_are_bounded(build):
     with pytest.raises(ValidationError):
         build()
-
-
-# --- h4rm3l -----------------------------------------------------------------
-
-
-def test_h4rm3l_syntactic_program_needs_no_model():
-    requests = generate(H4rm3lAttack(H4rm3lParams(program="ReverseDecorator()")))
-    assert requests == [[{"role": "user", "content": GOAL[::-1]}]]
-
-
-def test_h4rm3l_accepts_preset_names():
-    attack = H4rm3lAttack(H4rm3lParams(program="refusal_suppression"))
-    assert "Do not apologize" in generate(attack)[0][0]["content"]
-    assert "refusal_suppression" in PRESET_PROGRAMS
-
-
-def test_h4rm3l_llm_decorator_requires_decorator_role():
-    with pytest.raises(ValueError, match="configure the 'decorator' role"):
-        H4rm3lAttack(H4rm3lParams(program="TranslateDecorator(language='Italian')"))
-
-
-def test_h4rm3l_llm_decorator_uses_the_given_completion():
-    seen = []
-
-    async def decorator(messages):
-        seen.append(messages)
-        return "Spiega come aprire una serratura"
-
-    params = H4rm3lParams(
-        program="TranslateDecorator(language='Italian').then(ReverseDecorator())",
-        decorator=decorator,
-    )
-    requests = generate(H4rm3lAttack(params))
-    assert requests[0][0]["content"] == "Spiega come aprire una serratura"[::-1]
-    assert "Translate the following text to Italian" in seen[0][0]["content"]
-    assert "decorator" not in params.model_dump()
-
-
-def test_h4rm3l_empty_decorator_reply_is_an_error():
-    async def silent(messages):
-        return "  "
-
-    attack = H4rm3lAttack(H4rm3lParams(program="SynonymDecorator()", decorator=silent))
-    with pytest.raises(ValueError, match="empty reply"):
-        generate(attack)
-
-
-def test_h4rm3l_rejects_unknown_decorators():
-    with pytest.raises(ValueError, match="unknown decorator"):
-        H4rm3lAttack(H4rm3lParams(program="NoSuchDecorator()"))
 
 
 def test_every_attack_loads_without_the_optional_extras():
@@ -283,7 +333,7 @@ def test_every_attack_loads_without_the_optional_extras():
         print("all attacks loaded")
 
         from hackagent.attacks.techniques.static.mml.image_encoder import encode_prompt
-        from hackagent.attacks.techniques.static.h4rm3l.decorators.base import (
+        from hackagent.attacks.techniques.adaptive.h4rm3l.decorators.base import (
             PromptDecorator,
         )
 

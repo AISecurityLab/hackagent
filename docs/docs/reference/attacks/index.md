@@ -59,7 +59,7 @@ attacks:
 
 Every technique HackAgent can run.
 
-**Static.** Builds its prompts up front and sends them. It drives no model of its own, so it is cheap and repeatable.
+**Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
 **Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
@@ -73,9 +73,9 @@ Every technique HackAgent can run.
 | [BoN](bon.md) | Adaptive | none | Best-of-N augmentation search with inline judge evaluation. |
 | [CipherChat](cipherchat.md) | Static | none | Cipher-based prompt transformation with optional demonstrations. |
 | [Crescendo](crescendo.md) | Multi-turn | `attacker` | Multi-turn escalation attack that gradually steers a persistent conversation toward the goal, with judge-driven backtracking on refusals. |
-| [FC-Attack](fc.md) | Static | none | FC-Attack: auto-generated flowchart images to jailbreak VLMs. |
+| [FC-Attack](fc.md) | Static | `attacker` | FC-Attack: auto-generated flowchart images to jailbreak VLMs. |
 | [FlipAttack](flipattack.md) | Static | none | Prompt obfuscation via character/word flipping modes. |
-| [h4rm3l](h4rm3l.md) | Static | none | Composable decorator-program attack chaining multiple obfuscations. |
+| [h4rm3l](h4rm3l.md) | Adaptive | none | Composable decorator-program attack chaining multiple obfuscations, with an optional search for the program that works best. |
 | [MML](mml.md) | Static | none | Multi-Modal Linkage attack encoding harmful prompts into images for VLMs. |
 | [PAIR](pair.md) | Adaptive | `attacker` | Prompt Automatic Iterative Refinement with attacker/scorer loops. |
 | [PAP](pap.md) | Adaptive | `attacker` | Persuasive Adversarial Prompts using persuasion-technique taxonomies. |
@@ -83,7 +83,7 @@ Every technique HackAgent can run.
 | [STAC](stac.md) | Multi-turn | none | Sequential tool attack chaining in a persistent conversation, verified by ordered tool execution and final sandbox state. |
 | [Static Template](static_template.md) | Static | none | Template-based static template jailbreak attack. |
 | [TAP](tap.md) | Adaptive | `attacker` | Tree of Attacks with Pruning search attack. |
-| [tFC-Attack](tfc.md) | Static | none | tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII). |
+| [tFC-Attack](tfc.md) | Static | `attacker` | tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII). |
 | [Tool-output IPI](tool_output_ipi.md) | Adaptive | none | Indirect prompt injection via poisoned tool observations (InjecAgent / OPI). |
 | [ToolHijacker](toolhijacker.md) | Adaptive | none | Poison a tool registry description to steer retrieval and tool selection across task paraphrases. |
 

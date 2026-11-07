@@ -39,3 +39,17 @@ One execution of a declarative campaign.
 The campaign owns its immutable specification and judge audit. Individual
 attack runs link back to this record through `campaign_run_id`.
 
+#### campaign\_id
+
+The saved campaign it was launched from, when the dashboard launched it.
+
+## CampaignRecord Objects
+
+```python
+class CampaignRecord(BaseModel)
+```
+
+A campaign saved from the dashboard: a spec without target and execution.
+
+The target comes from the agent&#x27;s config when the campaign is launched.
+

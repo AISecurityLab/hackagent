@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=../../../docs/static/schema/campaign.schema.json
+#
+# h4rm3l with its search switched on: instead of running one decorator
+# program you chose, it writes its own and keeps the ones that work against
+# this target. Everything stays on your machine.
+#
+#   1. ollama pull gemma3:4b
+#   2. ollama serve
+#   3. hackagent campaign run h4rm3l-synth-demo.yaml
+#
+# Start from h4rm3l-demo.yaml if you have not run h4rm3l before: it is the
+# same attack with no search, one request per goal, and finishes in a
+# minute. This one is slower, because searching costs calls before any goal
+# is attacked.
+version: 1
+
+campaign:
+  name: Ollama h4rm3l synthesis demo
+  description: h4rm3l searching for its own decorator programs against a local Ollama model.
+
+dataset:
+  source:
+    type: preset
+    name: harmbench
+  selection:
+    limit: 5
+    shuffle: false
+    seed: 42
+
+target:
+  name: gemma3:4b
+  connection:
+    provider: ollama
+    type: OLLAMA
+  generation:
+    max_tokens: 400
+
+attacks:
+  # The synthesizer role is what turns h4rm3l from a program runner into a
+  # search. Each round it is shown the programs that have scored best so
+  # far and asked for new ones; every proposal is compiled, and the ones
+  # that compile are scored against the target on goals drawn from this
+  # run. Proposals that beat the pool's mean success rate stay in, and the
+  # best survivors are what each goal is finally attacked with.
+  #
+  # Synthesis calls the target `iterations × proposals × scoring_goals`
+  # times — 24 here — before the five goals are attacked, and each of those
+  # calls is judged too. The defaults (10 × 8 × 3) are a real search and
+  # cost ten times this; raise these once you have seen it work.
+  - name: h4rm3l
+    parameters:
+      iterations: 3
+      proposals: 4
+      scoring_goals: 2
+      programs_per_goal: 2
+      seed: 42
+    roles:
+      # A 4b model proposes simple programs and sometimes declines to
+      # propose any — the run's trace says which, and carries on. A larger
+      # or uncensored local model here is the single biggest improvement
+      # you can make to what the search finds.
+      synthesizer:
+        name: gemma3:4b
+        connection:
+          provider: ollama
+          type: OLLAMA
+        generation:
+          max_tokens: 500
+
+evaluation:
+  judges:
+    - name: gemma3:4b
+      connection:
+        provider: ollama
+        type: OLLAMA
+      scoring:
+        type: harmbench_variant

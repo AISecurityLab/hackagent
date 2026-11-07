@@ -47,6 +47,14 @@ def test_labels_take_the_category_from_the_subcategory():
     assert taxonomy.category_of("E2") == "E"
 
 
+def test_an_unspecified_subcategory_is_the_category_s_zero_which_no_entry_uses():
+    assert taxonomy.unspecified("E") == {
+        "category": "E. Cybersecurity Threats",
+        "subcategory": "E0. Unspecified Subcategory",
+    }
+    assert not any(code.endswith("0") for code in taxonomy.subcategories())
+
+
 def test_every_subcategory_appears_in_the_description():
     described = taxonomy.describe()
     for code, label in taxonomy.subcategories().items():
