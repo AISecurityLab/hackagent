@@ -16,12 +16,15 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import socket
 import sqlite3
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 from uuid import UUID
 
 from hackagent.storage.records import (
@@ -41,6 +44,22 @@ logger = logging.getLogger("hackagent.storage.local")
 _DEFAULT_DB_PATH = "~/.local/share/hackagent/hackagent.db"
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS dashboard_snapshots (
+    campaign_id TEXT PRIMARY KEY REFERENCES campaign_runs(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    source_revision TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    finalized INTEGER NOT NULL DEFAULT 0,
+    summary_json TEXT NOT NULL,
+    costs_json TEXT NOT NULL,
+    detail_json TEXT NOT NULL DEFAULT '{}',
+    goals_json TEXT NOT NULL DEFAULT '[]'
+);
+CREATE TABLE IF NOT EXISTS dashboard_worker (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    owner TEXT NOT NULL,
+    lease_until REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS local_context (
     id          TEXT PRIMARY KEY,
     user_id     TEXT NOT NULL DEFAULT 'local',
@@ -187,6 +206,19 @@ class LocalBackend:
     def _upgrade_schema(self) -> None:
         """Apply additive migrations required by older local databases."""
 
+        snapshot_columns = {
+            row[1]
+            for row in self._conn.execute("PRAGMA table_info(dashboard_snapshots)")
+        }
+        if "finalized" not in snapshot_columns:
+            self._conn.execute(
+                "ALTER TABLE dashboard_snapshots ADD COLUMN finalized INTEGER NOT NULL DEFAULT 0"
+            )
+        for column, default in (("detail_json", "{}"), ("goals_json", "[]")):
+            if column not in snapshot_columns:
+                self._conn.execute(
+                    f"ALTER TABLE dashboard_snapshots ADD COLUMN {column} TEXT NOT NULL DEFAULT '{default}'"
+                )
         columns = {
             row[1] for row in self._conn.execute("PRAGMA table_info(runs)").fetchall()
         }
@@ -210,6 +242,223 @@ class LocalBackend:
 
     def flush(self) -> None:
         """No-op: local writes are synchronous (mirrors RemoteBackend.flush)."""
+
+    @contextmanager
+    def dashboard_read_snapshot(self) -> Iterator[LocalBackend]:
+        """Copy a consistent source view; expensive aggregation never holds this store's lock."""
+        snapshot = object.__new__(LocalBackend)
+        snapshot._conn = sqlite3.connect(":memory:", check_same_thread=False)
+        snapshot._conn.row_factory = sqlite3.Row
+        snapshot._conn.create_function(
+            "result_bucket", 2, result_bucket, deterministic=True
+        )
+        snapshot._lock = threading.Lock()
+        snapshot._context = None
+        try:
+            if str(self._db_path) == ":memory:":
+                with self._lock:
+                    self._conn.backup(snapshot._conn)
+            else:
+                source = sqlite3.connect(
+                    f"{self._db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=30
+                )
+                try:
+                    source.backup(snapshot._conn)
+                finally:
+                    source.close()
+            yield snapshot
+        finally:
+            snapshot.close()
+
+    @contextmanager
+    def dashboard_writer(self) -> Iterator[LocalBackend]:
+        """Do not hold the HTTP store's mutex while waiting for cache write locks."""
+        if str(self._db_path) == ":memory:":
+            yield self
+            return
+        writer = LocalBackend(str(self._db_path))
+        writer._conn.execute("PRAGMA busy_timeout = 30000")
+        try:
+            yield writer
+        finally:
+            writer.close()
+
+    def dashboard_snapshots(self, ids: List[UUID]) -> Dict[str, Dict[str, Any]]:
+        if not ids:
+            return {}
+        marks = ",".join("?" for _ in ids)
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT * FROM dashboard_snapshots WHERE campaign_id IN ({marks})",
+                [str(ident) for ident in ids],
+            ).fetchall()
+        return {
+            row["campaign_id"]: {
+                "version": row["version"],
+                "source_revision": row["source_revision"],
+                "generated_at": row["generated_at"],
+                "finalized": bool(row["finalized"]),
+                "summary": json.loads(row["summary_json"]),
+                "costs": json.loads(row["costs_json"]),
+                "detail": json.loads(row["detail_json"]),
+                "goals": json.loads(row["goals_json"]),
+            }
+            for row in rows
+        }
+
+    def claim_dashboard_worker(
+        self, owner: str, now: float, lease_until: float
+    ) -> bool:
+        with self._lock, self._conn:
+            previous = self._conn.execute(
+                "SELECT owner FROM dashboard_worker WHERE id=1"
+            ).fetchone()
+            if previous and previous["owner"] != owner:
+                parts = previous["owner"].split(":", 2)
+                if (
+                    len(parts) == 3
+                    and parts[0] == socket.gethostname()
+                    and parts[1].isdigit()
+                ):
+                    try:
+                        os.kill(int(parts[1]), 0)
+                    except ProcessLookupError:
+                        self._conn.execute(
+                            "DELETE FROM dashboard_worker WHERE id=1 AND owner=?",
+                            (previous["owner"],),
+                        )
+                    except PermissionError:
+                        pass
+            cursor = self._conn.execute(
+                """INSERT INTO dashboard_worker VALUES (1, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET owner=excluded.owner,
+                     lease_until=excluded.lease_until
+                   WHERE dashboard_worker.lease_until < ? OR dashboard_worker.owner = ?""",
+                (owner, lease_until, now, owner),
+            )
+            return cursor.rowcount == 1
+
+    def release_dashboard_worker(self, owner: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM dashboard_worker WHERE owner=?", (owner,))
+
+    def save_dashboard_snapshot(
+        self,
+        campaign_id: UUID,
+        version: int,
+        revision: str,
+        generated_at: str,
+        summary: Dict[str, Any],
+        costs: Dict[str, Any],
+        *,
+        finalized: bool = False,
+        detail: Dict[str, Any],
+        goals: List[Any],
+    ) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                """INSERT INTO dashboard_snapshots
+                   (campaign_id, version, source_revision, generated_at,
+                    summary_json, costs_json, finalized, detail_json, goals_json)
+                   SELECT id, ?, ?, ?, ?, ?, ?, ?, ? FROM campaign_runs WHERE id=?
+                   ON CONFLICT(campaign_id) DO UPDATE SET version=excluded.version,
+                     source_revision=excluded.source_revision,
+                     generated_at=excluded.generated_at, summary_json=excluded.summary_json,
+                     costs_json=excluded.costs_json, finalized=excluded.finalized,
+                     detail_json=excluded.detail_json, goals_json=excluded.goals_json
+                   WHERE excluded.generated_at >= dashboard_snapshots.generated_at""",
+                (
+                    version,
+                    revision,
+                    generated_at,
+                    json.dumps(summary),
+                    json.dumps(costs),
+                    finalized,
+                    json.dumps(detail),
+                    json.dumps(goals),
+                    str(campaign_id),
+                ),
+            )
+
+    def dashboard_refresh_candidates(self, version: int) -> List[UUID]:
+        """Only missing/outdated snapshots and campaigns not yet finalized."""
+        with self._lock:
+            rows = self._conn.execute(
+                """SELECT c.id FROM campaign_runs c
+                   LEFT JOIN dashboard_snapshots d ON d.campaign_id=c.id
+                   WHERE d.campaign_id IS NULL OR d.version != ? OR d.finalized = 0
+                     OR c.status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
+                     OR EXISTS (
+                       SELECT 1 FROM runs n WHERE n.campaign_run_id=c.id
+                       AND n.status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
+                     )
+                   ORDER BY c.created_at DESC, c.id""",
+                (version,),
+            ).fetchall()
+        return [UUID(row["id"]) for row in rows]
+
+    def dashboard_can_finalize(self, campaign_id: UUID) -> bool:
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT c.status IN ('COMPLETED', 'FAILED', 'CANCELLED')
+                     AND NOT EXISTS (
+                       SELECT 1 FROM runs n WHERE n.campaign_run_id=c.id
+                       AND n.status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
+                     ) AS finalized
+                   FROM campaign_runs c WHERE c.id=?""",
+                (str(campaign_id),),
+            ).fetchone()
+        return bool(row and row["finalized"])
+
+    def dashboard_revision(self, campaign_id: UUID) -> str:
+        """Fingerprint all inputs, including late traces and verdict updates."""
+        ident = str(campaign_id)
+        with self._lock:
+            rows = [
+                tuple(self._conn.execute(sql, (ident,)).fetchone())
+                for sql in (
+                    "SELECT updated_at FROM campaign_runs WHERE id=?",
+                    "SELECT COUNT(*), MAX(updated_at) FROM runs WHERE campaign_run_id=?",
+                    """SELECT COUNT(*), MAX(r.updated_at) FROM results r JOIN runs n
+                       ON n.id=r.run_id WHERE n.campaign_run_id=?""",
+                    """SELECT COUNT(*), MAX(t.created_at) FROM traces t JOIN results r
+                       ON r.id=t.result_id JOIN runs n ON n.id=r.run_id
+                       WHERE n.campaign_run_id=?""",
+                    """SELECT a.name, a.updated_at FROM agents a JOIN campaign_runs c
+                       ON c.agent_id=a.id WHERE c.id=?""",
+                )
+            ]
+        return json.dumps(rows)
+
+    def dashboard_run_ids(self, campaign_id: UUID) -> List[UUID]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id FROM runs WHERE campaign_run_id=? ORDER BY created_at, id",
+                (str(campaign_id),),
+            ).fetchall()
+        return [UUID(row["id"]) for row in rows]
+
+    def panel_vote_rows(self, run_ids: List[UUID]) -> List[Dict[str, Any]]:
+        if not run_ids:
+            return []
+        marks = ",".join("?" for _ in run_ids)
+        with self._lock:
+            rows = self._conn.execute(
+                f"""SELECT run_id, goal_index, metrics_json, evaluation_status, evaluation_notes
+                    FROM results WHERE run_id IN ({marks})""",
+                [str(ident) for ident in run_ids],
+            ).fetchall()
+        return [
+            {
+                "run_id": row["run_id"],
+                "goal_index": row["goal_index"],
+                "metrics": json.loads(row["metrics_json"]),
+                "outcome": result_bucket(
+                    row["evaluation_status"], row["evaluation_notes"]
+                ),
+            }
+            for row in rows
+        ]
 
     # ── Context ──────────────────────────────────────────────────────────────
 

@@ -180,6 +180,13 @@ def web(ctx, host, port, db_path, force_local, no_browser):
             db_path if db_path == ":memory:" else str(Path(db_path).expanduser())
         )
         settings = replace(settings, db_path=resolved_db)
+    # Stop the previous server before starting this process's summary worker.
+    if not _free_port(host, port):
+        console.print(
+            f"[bold red]❌ Port {port} is already in use by another process.[/bold red]"
+        )
+        ctx.exit(1)
+        return
     session = HackAgent(settings)
 
     try:
@@ -205,23 +212,22 @@ def web(ctx, host, port, db_path, force_local, no_browser):
     console.print()
     console.print("    Press [bold]Ctrl+C[/bold] to stop.\n")
 
-    # ── Reclaim the port only if a previous HackAgent instance holds it ──────
-    if not _free_port(host, port):
-        console.print(
-            f"[bold red]❌ Port {port} is already in use by another process.[/bold red]"
-        )
-        console.print(
-            "[cyan]Pick a free port with[/cyan] [bold]--port <PORT>[/bold] "
-            "[cyan]or stop the conflicting process first.[/cyan]"
-        )
-        session.close()
-        ctx.exit(1)
-        return
-
     if not no_browser:
         _open_browser_when_up(url, host, port)
 
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+    def stop_server(signum, frame):
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop_server)
     try:
         app.run(host=host, port=port, threaded=True)
     finally:
-        session.close()
+        try:
+            cache = app.extensions.get("dashboard_cache")
+            if cache is not None:
+                cache.close()
+        finally:
+            signal.signal(signal.SIGTERM, previous_sigterm)
+            session.close()

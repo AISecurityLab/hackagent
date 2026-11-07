@@ -101,7 +101,7 @@ def runtime_config(api_url: str = API_PREFIX) -> Dict[str, Any]:
     }
 
 
-def create_app(client) -> Flask:
+def create_app(client, *, dashboard_cache: bool = True) -> Flask:
     """Build the Flask app serving the web UI.
 
     Args:
@@ -139,10 +139,20 @@ def create_app(client) -> Flask:
     else:
         from hackagent.interfaces.web._history import create_history_api
         from hackagent.interfaces.web._local_api import create_local_api
+        from hackagent.interfaces.web._dashboard_cache import DashboardCache
+        from hackagent.storage.local import LocalBackend
+
+        cache = (
+            DashboardCache(client.backend)
+            if dashboard_cache and isinstance(client.backend, LocalBackend)
+            else None
+        )
+        if cache is not None:
+            app.extensions["dashboard_cache"] = cache
 
         app.register_blueprint(create_local_api(client), url_prefix=API_PREFIX)
         app.register_blueprint(
-            create_history_api(client), url_prefix=f"{API_PREFIX}/local/history"
+            create_history_api(client, cache), url_prefix=f"{API_PREFIX}/local/history"
         )
         app.config["HACKAGENT_MODE"] = "local"
         app.config["HACKAGENT_TARGET"] = None
@@ -183,6 +193,8 @@ def create_app(client) -> Flask:
         response.status_code = status
         return response
 
+    if app.extensions.get("dashboard_cache") is not None:
+        app.extensions["dashboard_cache"].start()
     return app
 
 

@@ -74,7 +74,7 @@ class _WebUITestCase(unittest.TestCase):
             ),
             backend=self.backend,
         )
-        self.client = create_app(session).test_client()
+        self.client = create_app(session, dashboard_cache=False).test_client()
 
     def tearDown(self) -> None:
         _static.static_dir = self._real_static_dir
@@ -280,7 +280,7 @@ class TestStaticServing(_WebUITestCase):
             ),
             backend=self.backend,
         )
-        client = create_app(session).test_client()
+        client = create_app(session, dashboard_cache=False).test_client()
         response = client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"via symlink", response.data)

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -24,6 +25,8 @@ from ._history_summary import (
     outcome_counts as _outcome_counts,
     summarize_goals as _goals,
 )
+from ._dashboard_cache import DashboardCache, VERSION
+from ._judge_agreement import judge_agreement
 
 
 def _read_all(read: Callable[..., Any], **kwargs: Any) -> list[Any]:
@@ -37,16 +40,23 @@ def _read_all(read: Callable[..., Any], **kwargs: Any) -> list[Any]:
         page += 1
 
 
-def create_history_api(client: Any) -> Blueprint:
-    bp = Blueprint("local_history", __name__)
+@dataclass
+class HistoryReader:
+    children: Callable[[UUID], list[RunRecord]]
+    records: Callable[..., list[ResultRecord]]
+    load: Callable[[str], CampaignRunRecord | None]
+    names: Callable[[], dict[str, str]]
+    detail: Callable[[CampaignRunRecord, str | None], dict[str, Any]]
+    goals: Callable[..., list[GoalSummary]]
 
+
+def create_history_reader(client: Any) -> HistoryReader:
     def children(campaign_id: UUID) -> list[RunRecord]:
         return [
             run for run in _read_all(client.runs) if run.campaign_run_id == campaign_id
         ]
 
-    def scoped(runs: list[RunRecord]) -> list[RunRecord]:
-        run_id = request.args.get("run_id")
+    def scoped(runs: list[RunRecord], run_id: str | None) -> list[RunRecord]:
         return [run for run in runs if str(run.id) == run_id] if run_id else runs
 
     def records(
@@ -99,78 +109,13 @@ def create_history_api(client: Any) -> Blueprint:
     def names() -> dict[str, str]:
         return {str(a.id): a.name for a in _read_all(client.agents)}
 
-    @bp.get("")
-    def history():
-        page, page_size = _page_args()
-        listing = client.campaign_runs(page=page, page_size=page_size)
-        outcomes = client.campaign_outcomes([campaign.id for campaign in listing.items])
-        agent_names = names()
-        items = []
-        for campaign in listing.items:
-            counts = dict(outcomes[str(campaign.id)])
-            items.append(
-                {
-                    "id": str(campaign.id),
-                    "name": campaign.name,
-                    "target": agent_names.get(
-                        str(campaign.agent_id), str(campaign.agent_id)
-                    ),
-                    "status": campaign.status,
-                    "created_at": campaign.created_at.isoformat(),
-                    "updated_at": campaign.updated_at.isoformat(),
-                    **counts,
-                }
-            )
-        return jsonify(ser.paginate(items, listing.total, page, page_size))
-
-    @bp.delete("")
-    def delete_selected():
-        body = request.get_json(silent=True)
-        ids = body.get("ids") if isinstance(body, dict) else None
-        if (
-            not isinstance(ids, list)
-            or not 1 <= len(ids) <= 100
-            or any(not isinstance(ident, str) or _uuid(ident) is None for ident in ids)
-        ):
-            return jsonify({"detail": "Provide 1 to 100 valid campaign IDs."}), 400
-        try:
-            client.delete_campaign_runs(ids)
-        except NotImplementedError as exc:
-            return jsonify({"detail": str(exc)}), 501
-        except ValueError as exc:
-            return jsonify({"detail": str(exc)}), 409
-        except RuntimeError:
-            return _not_found("Campaign execution")
-        return "", 204
-
-    @bp.delete("/<campaign_id>")
-    def delete(campaign_id: str):
-        parsed = _uuid(campaign_id)
-        if parsed is None:
-            return _not_found("Campaign execution")
-        try:
-            client.delete_campaign_run(parsed)
-        except NotImplementedError as exc:
-            return jsonify({"detail": str(exc)}), 501
-        except ValueError as exc:
-            return jsonify({"detail": str(exc)}), 409
-        except RuntimeError:
-            return _not_found("Campaign execution")
-        return "", 204
-
-    @bp.get("/<campaign_id>")
-    def detail(campaign_id: str):
-        campaign = load(campaign_id)
-        if campaign is None:
-            return _not_found("Campaign execution")
+    def detail(campaign: CampaignRunRecord, run_id: str | None) -> dict[str, Any]:
         runs = children(campaign.id)
-        selected = scoped(runs)
-        if request.args.get("run_id") and not selected:
-            return _not_found("Attack run")
+        selected = scoped(runs, run_id)
         results = records(selected)
         category_goals = _goals(
             results,
-            bool(request.args.get("run_id"))
+            bool(run_id)
             or (
                 campaign.status == "COMPLETED"
                 and all(run.status == "COMPLETED" for run in selected)
@@ -245,10 +190,13 @@ def create_history_api(client: Any) -> Blueprint:
                 )
         payload.update(
             {
+                "judge_agreement": judge_agreement(
+                    client.backend.panel_vote_rows([run.id for run in selected])
+                ),
                 "attack_category_outcomes": attack_categories,
                 "technique_outcomes": technique_outcomes,
                 "category_outcomes": categories,
-                "scope_run_id": request.args.get("run_id"),
+                "scope_run_id": run_id,
                 "configuration": campaign.campaign_config,
                 "audit": campaign.audit,
                 "notes": campaign.run_notes,
@@ -285,31 +233,19 @@ def create_history_api(client: Any) -> Blueprint:
                 ],
             }
         )
-        return jsonify(payload)
+        return payload
 
-    @bp.get("/<campaign_id>/goals")
-    def goals(campaign_id: str):
-        campaign = load(campaign_id)
-        if campaign is None:
-            return _not_found("Campaign execution")
-        runs = scoped(children(campaign.id))
-        if request.args.get("run_id") and not runs:
-            return _not_found("Attack run")
-        completed = bool(request.args.get("run_id")) or (
+    def goals(
+        campaign: CampaignRunRecord,
+        run_id: str | None = None,
+        goal_index: int | None = None,
+    ) -> list[GoalSummary]:
+        runs = scoped(children(campaign.id), run_id)
+        completed = bool(run_id) or (
             campaign.status == "COMPLETED"
             and all(run.status == "COMPLETED" for run in runs)
         )
-        index = None
-        if "goal_index" in request.args:
-            try:
-                index = int(request.args["goal_index"])
-                if index < 0:
-                    raise ValueError
-            except ValueError:
-                return jsonify(
-                    {"detail": "A non-negative goal_index is required."}
-                ), 400
-        results = records(runs, goal_index=index)
+        results = records(runs, goal_index=goal_index)
         items = _goals(results, completed)
         by_run: dict[UUID, list[ResultRecord]] = {run.id: [] for run in runs}
         for result in results:
@@ -330,6 +266,173 @@ def create_history_api(client: Any) -> Blueprint:
                 for run_id, run_goals in per_run.items()
                 if (recorded := run_goals.get(goal["index"])) is not None
             ]
+        return items
+
+    return HistoryReader(children, records, load, names, detail, goals)
+
+
+def create_history_api(client: Any, cache: DashboardCache | None = None) -> Blueprint:
+    bp = Blueprint("local_history", __name__)
+    reader = create_history_reader(client)
+    children, records, load = reader.children, reader.records, reader.load
+
+    def preparing():
+        if cache is not None and cache.error:
+            return jsonify({"detail": cache.error}), 503
+        return (
+            jsonify({"preparing": True, "detail": "Preparing dashboard summaries."}),
+            202,
+            {"Retry-After": "2"},
+        )
+
+    @bp.get("")
+    def history():
+        page, page_size = _page_args()
+        listing = client.campaign_runs(page=page, page_size=page_size)
+        if cache is not None:
+            snapshots = cache.read([campaign.id for campaign in listing.items])
+            progressive = request.args.get("progressive") == "1"
+            if len(snapshots) != len(listing.items) and not progressive:
+                return preparing()
+            items = [
+                snapshots[str(campaign.id)]["summary"]
+                for campaign in listing.items
+                if str(campaign.id) in snapshots
+            ]
+            payload = ser.paginate(items, listing.total, page, page_size)
+            if progressive:
+                positions = {
+                    str(campaign.id): index
+                    for index, campaign in enumerate(listing.items)
+                }
+                items = [
+                    {**item, "page_position": positions[item["id"]]} for item in items
+                ]
+                payload = ser.paginate(items, listing.total, page, page_size)
+                payload["preparing_campaigns"] = [
+                    {
+                        "id": str(campaign.id),
+                        "name": campaign.name,
+                        "status": campaign.status,
+                        "created_at": campaign.created_at.isoformat(),
+                        "page_position": index,
+                    }
+                    for index, campaign in enumerate(listing.items)
+                    if str(campaign.id) not in snapshots
+                ]
+                payload["refresh_error"] = cache.error
+                payload["upgrading_campaigns"] = sum(
+                    snapshot["version"] < VERSION for snapshot in snapshots.values()
+                )
+            if snapshots:
+                payload["dashboard_snapshot"] = cache.metadata(
+                    min(item["generated_at"] for item in snapshots.values()),
+                    min(item["version"] for item in snapshots.values()),
+                )
+            return jsonify(payload)
+        outcomes = client.campaign_outcomes([campaign.id for campaign in listing.items])
+        agent_names = reader.names()
+        items = [
+            {
+                "id": str(campaign.id),
+                "name": campaign.name,
+                "target": agent_names.get(
+                    str(campaign.agent_id), str(campaign.agent_id)
+                ),
+                "status": campaign.status,
+                "created_at": campaign.created_at.isoformat(),
+                "updated_at": campaign.updated_at.isoformat(),
+                **outcomes[str(campaign.id)],
+            }
+            for campaign in listing.items
+        ]
+        return jsonify(ser.paginate(items, listing.total, page, page_size))
+
+    @bp.delete("")
+    def delete_selected():
+        body = request.get_json(silent=True)
+        ids = body.get("ids") if isinstance(body, dict) else None
+        if (
+            not isinstance(ids, list)
+            or not 1 <= len(ids) <= 100
+            or any(not isinstance(ident, str) or _uuid(ident) is None for ident in ids)
+        ):
+            return jsonify({"detail": "Provide 1 to 100 valid campaign IDs."}), 400
+        try:
+            client.delete_campaign_runs(ids)
+        except NotImplementedError as exc:
+            return jsonify({"detail": str(exc)}), 501
+        except ValueError as exc:
+            return jsonify({"detail": str(exc)}), 409
+        except RuntimeError:
+            return _not_found("Campaign execution")
+        return "", 204
+
+    @bp.delete("/<campaign_id>")
+    def delete(campaign_id: str):
+        parsed = _uuid(campaign_id)
+        if parsed is None:
+            return _not_found("Campaign execution")
+        try:
+            client.delete_campaign_run(parsed)
+        except NotImplementedError as exc:
+            return jsonify({"detail": str(exc)}), 501
+        except ValueError as exc:
+            return jsonify({"detail": str(exc)}), 409
+        except RuntimeError:
+            return _not_found("Campaign execution")
+        return "", 204
+
+    @bp.get("/<campaign_id>")
+    def detail(campaign_id: str):
+        campaign = load(campaign_id)
+        if campaign is None:
+            return _not_found("Campaign execution")
+        run_id = request.args.get("run_id")
+        if cache is not None and not run_id and request.args.get("fresh") != "1":
+            snapshot = cache.read([campaign.id]).get(str(campaign.id))
+            if snapshot is None:
+                return preparing()
+            return jsonify(
+                {
+                    **snapshot["detail"],
+                    "dashboard_snapshot": cache.metadata(
+                        snapshot["generated_at"], snapshot["version"]
+                    ),
+                }
+            )
+        if run_id and not any(str(run.id) == run_id for run in children(campaign.id)):
+            return _not_found("Attack run")
+        return jsonify(reader.detail(campaign, run_id))
+
+    @bp.get("/<campaign_id>/goals")
+    def goals(campaign_id: str):
+        campaign = load(campaign_id)
+        if campaign is None:
+            return _not_found("Campaign execution")
+        run_id = request.args.get("run_id")
+        if run_id and not any(str(run.id) == run_id for run in children(campaign.id)):
+            return _not_found("Attack run")
+        index = None
+        if "goal_index" in request.args:
+            try:
+                index = int(request.args["goal_index"])
+                if index < 0:
+                    raise ValueError
+            except ValueError:
+                return jsonify(
+                    {"detail": "A non-negative goal_index is required."}
+                ), 400
+        snapshot = None
+        if cache is not None and not run_id and request.args.get("fresh") != "1":
+            snapshot = cache.read([campaign.id]).get(str(campaign.id))
+            if snapshot is None:
+                return preparing()
+            items = snapshot["goals"]
+            if index is not None:
+                items = [goal for goal in items if goal["index"] == index]
+        else:
+            items = reader.goals(campaign, run_id, index)
         search = request.args.get("search", "").strip().casefold()
         verdict = request.args.get("verdict", "")
         category = request.args.get("category", "")
@@ -347,9 +450,14 @@ def create_history_api(client: Any) -> Blueprint:
                 return jsonify({"detail": "Invalid goal verdict."}), 400
             items = [g for g in items if g["verdict"] == verdict]
         page, page_size = _page_args()
-        return jsonify(
-            ser.paginate(_slice(items, page, page_size), len(items), page, page_size)
+        payload = ser.paginate(
+            _slice(items, page, page_size), len(items), page, page_size
         )
+        if snapshot is not None:
+            payload["dashboard_snapshot"] = cache.metadata(
+                snapshot["generated_at"], snapshot["version"]
+            )
+        return jsonify(payload)
 
     @bp.get("/<campaign_id>/attempts")
     def attempts(campaign_id: str):
@@ -382,6 +490,18 @@ def create_history_api(client: Any) -> Blueprint:
         campaign = load(campaign_id)
         if campaign is None:
             return _not_found("Campaign execution")
+        if cache is not None and request.args.get("fresh") != "1":
+            snapshot = cache.read([campaign.id]).get(str(campaign.id))
+            if snapshot is None:
+                return preparing()
+            return jsonify(
+                {
+                    **snapshot["costs"],
+                    "dashboard_snapshot": cache.metadata(
+                        snapshot["generated_at"], snapshot["version"]
+                    ),
+                }
+            )
         runs = children(campaign.id)
         aggregate = getattr(client, "run_costs", None)
         costs = aggregate([run.id for run in runs]) if callable(aggregate) else None
