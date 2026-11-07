@@ -1,7 +1,6 @@
 """The public credential contract, including configuration and client boundaries."""
 
 import inspect
-import json
 from unittest.mock import patch
 
 import pytest
@@ -134,30 +133,12 @@ def test_chat_and_embeddings_receive_same_runtime_key():
     assert embedding.call_args.kwargs["api_key"] == "runtime-key"
 
 
-def test_saved_settings_reference_overrides_default_and_remains_safe(tmp_path):
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps({"api_key": "${CUSTOM_KEY}"}))
-    settings = Settings.resolve(
-        config_path=path, env={"CUSTOM_KEY": "custom", "HACKAGENT_API_KEY": "default"}
-    )
-    assert settings.api_key == "custom"
-    assert settings.mode is Mode.LOCAL
-    assert "custom" not in repr(settings)
-
-
 def test_campaign_file_rejects_literal_before_validation_can_echo_it(tmp_path):
     path = tmp_path / "campaign.yaml"
     path.write_text('target:\n  connection:\n    api_key: "never-in-errors"\n')
     with pytest.raises(CredentialError) as error:
         load_campaign(path)
     assert "never-in-errors" not in str(error.value)
-
-
-def test_explicit_runtime_value_overrides_an_unused_file_reference(tmp_path):
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps({"api_key": "${NOT_SELECTED}"}))
-    settings = Settings.resolve(api_key="injected", config_path=path, env={})
-    assert settings.api_key == "injected"
 
 
 def test_transport_does_not_fall_back_to_provider_environment(monkeypatch):

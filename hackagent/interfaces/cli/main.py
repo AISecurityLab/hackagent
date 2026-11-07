@@ -116,10 +116,7 @@ def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
     except Exception as e:
         console.print(f"[bold red]❌ Configuration Error: {e}")
         if isinstance(e, CredentialError):
-            console.print(
-                "[dim]Set HACKAGENT_API_KEY or correct the api_key reference "
-                "in the configuration file.[/dim]"
-            )
+            console.print("[dim]Set HACKAGENT_API_KEY.[/dim]")
         ctx.exit(1)
 
     # Launch TUI by default if no subcommand is provided

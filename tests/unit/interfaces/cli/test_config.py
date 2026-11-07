@@ -4,7 +4,6 @@ import json
 
 import pytest
 
-from hackagent.core.credentials import CredentialError
 from hackagent.interfaces.cli.config import CLIConfig
 
 
@@ -27,26 +26,15 @@ def test_environment_default_and_explicit_runtime_override(tmp_path, monkeypatch
     assert config.source_of("api_key") == "CLI argument"
 
 
-def test_file_reference_overrides_default_and_runtime_value_overrides_reference(
-    tmp_path, monkeypatch
-):
+@pytest.mark.parametrize("file_key", ["file-secret", "${TEAM_KEY}"])
+def test_config_file_key_is_ignored(tmp_path, monkeypatch, file_key):
     monkeypatch.setenv("HACKAGENT_API_KEY", "default-secret")
     monkeypatch.setenv("TEAM_KEY", "team-secret")
     path = tmp_path / "config.json"
-    path.write_text(json.dumps({"api_key": "${TEAM_KEY}"}))
-    assert CLIConfig(config_file=path).api_key == "team-secret"
-    assert (
-        CLIConfig(config_file=path, api_key="runtime-secret").api_key
-        == "runtime-secret"
-    )
-
-
-def test_literal_file_key_is_rejected(tmp_path):
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps({"api_key": "file-secret"}))
-    with pytest.raises(CredentialError) as error:
-        CLIConfig(config_file=path)
-    assert "file-secret" not in str(error.value)
+    path.write_text(json.dumps({"api_key": file_key}))
+    config = CLIConfig(config_file=path)
+    assert config.api_key == "default-secret"
+    assert config.source_of("api_key") == "Environment"
 
 
 def test_save_never_writes_injected_or_default_secret(tmp_path, monkeypatch):
@@ -67,14 +55,15 @@ def test_save_never_writes_injected_or_default_secret(tmp_path, monkeypatch):
         assert saved["base_url"] == "https://example.test"
 
 
-def test_save_preserves_file_reference(tmp_path, monkeypatch):
-    monkeypatch.setenv("TEAM_KEY", "team-secret")
+def test_save_drops_a_key_left_in_the_file(tmp_path):
     path = tmp_path / "config.json"
-    path.write_text(json.dumps({"api_key": "${TEAM_KEY}"}))
-    config = CLIConfig(config_file=path)
-    config.save()
-    assert json.loads(path.read_text())["api_key"] == "${TEAM_KEY}"
-    assert "team-secret" not in path.read_text()
+    path.write_text(
+        json.dumps({"api_key": "file-secret", "base_url": "https://f.test"})
+    )
+    CLIConfig(config_file=path).save()
+    saved = json.loads(path.read_text())
+    assert "api_key" not in saved
+    assert saved["base_url"] == "https://f.test"
 
 
 def test_non_secret_settings_follow_argument_environment_file_order(

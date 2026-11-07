@@ -284,23 +284,23 @@ class TestConfigImport(unittest.TestCase):
     def _import(self, payload):
         return self._import_text(json.dumps(payload))
 
-    @patch.dict("os.environ", {"HACKAGENT_API_KEY": "hk_imported"})
     def test_imports_every_known_field(self):
-        result, cfg = self._import(
-            {
-                "api_key": "${HACKAGENT_API_KEY}",
-                "base_url": "https://imported",
-                "verbose": 3,
-            }
-        )
+        result, cfg = self._import({"base_url": "https://imported", "verbose": 3})
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(cfg.api_key, "hk_imported")
         self.assertEqual(cfg.base_url, "https://imported")
         self.assertEqual(cfg.verbose, 3)
         cfg.save.assert_called_once()
-        for field in ("API key", "Base URL", "Verbosity"):
+        for field in ("Base URL", "Verbosity"):
             self.assertIn(field, result.output)
+
+    def test_api_key_is_never_imported(self):
+        result, cfg = self._import({"api_key": "file-secret"})
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(cfg.api_key, "hk_abcdefghijklmnop")
+        cfg.save.assert_not_called()
+        self.assertNotIn("API key", result.output)
 
     def test_partial_file_only_updates_present_fields(self):
         result, cfg = self._import({"base_url": "https://only-url"})
@@ -316,14 +316,11 @@ class TestConfigImport(unittest.TestCase):
         cfg.save.assert_not_called()
         self.assertIn("No valid configuration found", result.output)
 
-    @patch.dict("os.environ", {"HACKAGENT_API_KEY": "hk_from_yaml"})
     def test_yaml_file_is_supported(self):
-        result, cfg = self._import_text(
-            "api_key: '${HACKAGENT_API_KEY}'\n", suffix=".yaml"
-        )
+        result, cfg = self._import_text("base_url: https://from-yaml\n", suffix=".yaml")
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(cfg.api_key, "hk_from_yaml")
+        self.assertEqual(cfg.base_url, "https://from-yaml")
 
     def test_malformed_file_reports_a_click_exception(self):
         result, _ = self._import_text("{not json")

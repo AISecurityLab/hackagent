@@ -8,7 +8,7 @@ Adds CLI flags and verbosity on top of :class:`hackagent.core.settings.Settings`
 so the CLI resolves settings exactly like the SDK:
 CLI args > Environment > Config file > Default.
 
-API keys come from HACKAGENT_API_KEY or an explicit ${VARIABLE} file reference.
+The API key comes from HACKAGENT_API_KEY only, never the config file.
 The local storage default is independent of credentials.
 """
 
@@ -101,7 +101,7 @@ class CLIConfig:
             self._sources["verbose"] = Source.DEFAULT
 
     def save(self, path: Optional[str] = None):
-        """Save non-secret settings and credential references."""
+        """Save the non-secret settings."""
         path = Path(path) if path else self.default_config_path
         path.parent.mkdir(parents=True, exist_ok=True)
         config_dict = {}
@@ -120,11 +120,6 @@ class CLIConfig:
             if attr == "backend" and value == "local" and not kept:
                 continue
             config_dict[attr] = value
-        from hackagent.core.credentials import credential_reference
-
-        reference = credential_reference(self.api_key)
-        if reference is not None and self._sources.get("api_key") is Source.FILE:
-            config_dict["api_key"] = reference
         with open(path, "w") as f:
             json.dump(config_dict, f, indent=2)
 

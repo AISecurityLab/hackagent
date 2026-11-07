@@ -12,7 +12,6 @@ from rich.console import Console
 from rich.table import Table
 
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.core.settings import Source
 from hackagent.interfaces.cli.utils import display_info, display_success, handle_errors
 from hackagent import resolve_remote_base_url
 from hackagent.core.settings import tls_error_hint
@@ -242,14 +241,6 @@ def import_config(ctx, config_file):
         cli_config: CLIConfig = ctx.obj["config"]
 
         updated_fields = []
-        from hackagent.core.credentials import prepare_credentials
-
-        config_data = prepare_credentials(config_data, from_file=True)
-        if "api_key" in config_data:
-            cli_config.set_user_override("api_key", config_data["api_key"])
-            cli_config._sources["api_key"] = Source.FILE
-            updated_fields.append("API key reference")
-
         if config_data.get("backend") in ("local", "remote"):
             cli_config.set_user_override("backend", config_data["backend"])
             updated_fields.append("Storage backend")

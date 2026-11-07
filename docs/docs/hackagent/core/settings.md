@@ -10,10 +10,8 @@ Non-secret values are resolved with the same priority order::
     explicit argument  &gt;  environment variable  &gt;  config file  &gt;  default
 
 Empty non-secret environment settings use the next source in that order.
-The platform `api_key` defaults to `HACKAGENT_API_KEY`. Python callers pass
-resolved values; configuration files contain explicit `${VARIABLE}`
-references. Resolved secret values are held in memory. The selected reference
-must contain a nonempty value.
+The platform `api_key` is an explicit argument or `HACKAGENT_API_KEY`,
+never the config file. Resolved secret values are held in memory.
 
 The storage backend is chosen explicitly (`local` by default) and never
 inferred from the presence of a key. Nothing is resolved at import time; call
@@ -145,8 +143,7 @@ Resolve every setting once, from arguments, environment and file.
 
 **Raises**:
 
-- `CredentialError` - If a selected key is empty or missing, or a
-  configuration file contains a literal key.
+- `CredentialError` - If a selected key is empty or missing.
 - `ValueError` - If `base_url` is given but empty, the backend is
   invalid, or the config file cannot be parsed.
 

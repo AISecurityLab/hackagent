@@ -8,10 +8,8 @@ Non-secret values are resolved with the same priority order::
     explicit argument  >  environment variable  >  config file  >  default
 
 Empty non-secret environment settings use the next source in that order.
-The platform ``api_key`` defaults to ``HACKAGENT_API_KEY``. Python callers pass
-resolved values; configuration files contain explicit ``${VARIABLE}``
-references. Resolved secret values are held in memory. The selected reference
-must contain a nonempty value.
+The platform ``api_key`` is an explicit argument or ``HACKAGENT_API_KEY``,
+never the config file. Resolved secret values are held in memory.
 
 The storage backend is chosen explicitly (``local`` by default) and never
 inferred from the presence of a key. Nothing is resolved at import time; call
@@ -29,7 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 from urllib.parse import urlparse
 
-from hackagent.core.credentials import resolve_api_key, validate_file_credentials
+from hackagent.core.credentials import resolve_api_key
 
 DEFAULT_CONFIG_PATH = Path("~/.config/hackagent/config.json")
 DEFAULT_DB_PATH = Path("~/.local/share/hackagent/hackagent.db")
@@ -194,7 +192,6 @@ def read_config_file(path: Path) -> Dict[str, Any]:
         return {}
     if not isinstance(data, dict):
         raise ValueError(f"Config file {path} must contain a mapping")
-    validate_file_credentials(data)
     return data
 
 
@@ -263,8 +260,7 @@ class Settings:
                 remote client is built (:attr:`verify`).
 
         Raises:
-            CredentialError: If a selected key is empty or missing, or a
-                configuration file contains a literal key.
+            CredentialError: If a selected key is empty or missing.
             ValueError: If ``base_url`` is given but empty, the backend is
                 invalid, or the config file cannot be parsed.
         """
@@ -284,9 +280,8 @@ class Settings:
         else:
             mode, mode_source = Mode.LOCAL, Source.DEFAULT
 
-        selected_key = api_key if api_key is not None else file_values.get("api_key")
         key = resolve_api_key(
-            selected_key,
+            api_key,
             use_default=True,
             required=mode is Mode.REMOTE,
             purpose="HackAgent platform API key",
@@ -295,8 +290,6 @@ class Settings:
         key_source = (
             Source.EXPLICIT
             if api_key is not None
-            else Source.FILE
-            if file_values.get("api_key") is not None
             else Source.ENV
             if key is not None
             else Source.DEFAULT

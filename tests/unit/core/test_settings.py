@@ -112,10 +112,17 @@ def test_api_key_priority(tmp_path, explicit, env, expected, source):
     assert settings.api_key_source is source
 
 
-def test_a_literal_key_saved_in_a_file_is_rejected_without_exposing_it(tmp_path):
-    with pytest.raises(CredentialError) as error:
-        _resolve(tmp_path, file_values={"api_key": "stale-file-key"})
-    assert "stale-file-key" not in str(error.value)
+@pytest.mark.parametrize("file_key", ["stale-file-key", "${FILE_KEY}"])
+def test_the_config_file_never_supplies_the_api_key(tmp_path, file_key):
+    env = {"FILE_KEY": "from-file-reference"}
+    settings = _resolve(tmp_path, file_values={"api_key": file_key}, env=env)
+    assert settings.api_key is None
+    assert settings.api_key_source is Source.DEFAULT
+
+    env["HACKAGENT_API_KEY"] = "from-env"
+    settings = _resolve(tmp_path, file_values={"api_key": file_key}, env=env)
+    assert settings.api_key == "from-env"
+    assert settings.api_key_source is Source.ENV
 
 
 def test_the_api_key_never_appears_when_settings_are_printed(tmp_path):

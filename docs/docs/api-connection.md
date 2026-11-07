@@ -37,16 +37,9 @@ from hackagent import Settings
 settings = Settings.resolve(api_key=os.environ["HACKAGENT_API_KEY"])
 ```
 
-In a YAML or JSON configuration, write an environment reference in `api_key`:
-
-```yaml
-api_key: "${HACKAGENT_API_KEY}"
-```
-
-The reference is resolved when the configuration is loaded. A missing or
-empty referenced variable is a configuration error. Files store references;
-resolved secret values stay in memory and are excluded from saved settings
-and run metadata.
+The platform key is never read from or written to the config file
+(`~/.config/hackagent/config.json`). It stays in memory and is excluded from
+run metadata.
 
 Model connections use the `api_key` reference written in their connection
 configuration. Provider examples name the credential for that provider
