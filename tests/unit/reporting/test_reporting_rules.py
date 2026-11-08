@@ -629,3 +629,15 @@ class TestHttp:
         assert http.etag_matches("*", tag)
         assert not http.etag_matches(None, tag)
         assert not http.etag_matches('W/"other"', tag)
+
+
+def test_interaction_steps_are_one_value_in_the_runner_both_stores_and_the_rules():
+    from hackagent.core.contracts import StepKind
+    from hackagent.reporting.tallies import INTERACTION, INTERACTION_STEP, usage_label
+    from hackagent.storage._http.api.models import StepTypeEnum
+
+    assert StepKind.INTERACTION.value == INTERACTION_STEP
+    assert StepTypeEnum(INTERACTION_STEP) is StepTypeEnum.INTERACTION
+    step = TraceRow.from_content("r", StepTypeEnum.INTERACTION.value, {})
+    assert usage_label(step) == INTERACTION
+    assert trace_flags([step]).interaction

@@ -33,6 +33,12 @@ from hackagent.reporting.buckets import JAILBREAK, result_bucket
 #: Label of the usage row that counts a goal's ``interaction`` steps.
 INTERACTION = ""
 
+#: ``step_type`` of the step the runner records for each exchange with the
+#: target. Both stores keep it as written (``StepKind.INTERACTION``; the
+#: platform's ``Trace.StepType.INTERACTION``) and every rule compares it
+#: exactly.
+INTERACTION_STEP = "interaction"
+
 
 def _text(value: Any) -> Optional[str]:
     return None if value is None or value == "" else str(value)
@@ -304,7 +310,7 @@ def usage_label(trace: TraceRow) -> Optional[str]:
     ``node`` is ``call`` counts under its label. A call node without a label
     names no role and is not counted.
     """
-    if trace.step_type == "interaction":
+    if trace.step_type == INTERACTION_STEP:
         return INTERACTION
     if trace.node == "call" and trace.label:
         return trace.label
@@ -318,7 +324,7 @@ def trace_flags(traces: Iterable[TraceRow]) -> TraceFlags:
         if trace.node == "call" and trace.label:
             labelled = True
             target = target or trace.label == "target"
-        interaction = interaction or trace.step_type == "interaction"
+        interaction = interaction or trace.step_type == INTERACTION_STEP
     return TraceFlags(labelled, target, interaction)
 
 
@@ -465,6 +471,7 @@ __all__ = [
     "GoalOutcome",
     "GoalUsage",
     "INTERACTION",
+    "INTERACTION_STEP",
     "ResultRow",
     "TraceCoverage",
     "TraceFlags",

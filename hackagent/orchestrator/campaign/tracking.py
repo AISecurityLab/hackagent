@@ -15,7 +15,7 @@ from dataclasses import asdict
 from typing import Any, Mapping, Optional
 from uuid import UUID
 
-from hackagent.core.contracts import EvalStatus, RunStatus
+from hackagent.core.contracts import EvalStatus, RunStatus, StepKind
 from hackagent.core.credentials import resolve_api_key
 from hackagent.core.settings import (
     Settings,
@@ -144,7 +144,7 @@ class RunTracker:
             self.store.create_trace(
                 record.id,
                 len(attempt.trace) + 1,
-                "interaction",
+                StepKind.INTERACTION.value,
                 sanitize_for_json(trace),
             )
 

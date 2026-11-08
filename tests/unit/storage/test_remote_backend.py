@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
 from hackagent.storage import remote
-from hackagent.storage._http.api.models import PaginatedAgentList
+from hackagent.storage._http.api.models import PaginatedAgentList, StepTypeEnum
 from hackagent.storage._http.api.agent import agent_create, agent_partial_update
 from hackagent.storage._http.api.campaign import campaign_start_create
 from hackagent.storage._http.api.result import result_create, result_partial_update
@@ -863,6 +863,29 @@ class TestRemoteBackendResult(unittest.TestCase):
         self.assertIsInstance(rec, TraceRecord)
         self.assertEqual(rec.result_id, result_id)
         self.assertEqual(rec.sequence, 1)
+
+    def test_create_trace_sends_the_step_type_it_is_given(self):
+        sent = {}
+        with patch("hackagent.storage.remote.result_trace_create") as mock_create:
+            mock_create.sync_detailed.side_effect = lambda **kwargs: (
+                sent.setdefault(kwargs["body"].sequence, kwargs["body"].step_type),
+                _mock_response(201, parsed=MagicMock()),
+            )[1]
+            for sequence, step_type in enumerate(
+                ("TOOL_CALL", "interaction", "not-a-step-type"), start=1
+            ):
+                self.backend.create_trace(_uid(), sequence, step_type, {})
+            self.backend.flush()
+
+        self.assertEqual(
+            sent,
+            {
+                1: StepTypeEnum.TOOL_CALL,
+                2: StepTypeEnum.INTERACTION,
+                3: StepTypeEnum.OTHER,
+            },
+        )
+        self.assertEqual(sent[2].value, "interaction")
 
     def test_create_trace_failure_surfaces_at_flush(self):
         result_id = _uid()
