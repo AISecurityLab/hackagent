@@ -1,0 +1,19 @@
+{
+  "agent": "a0000000-0000-4000-8000-000000000001",
+  "attack_runs": 2,
+  "attempts": 4,
+  "campaign": "b0000000-0000-4000-8000-000000000001",
+  "created_at": "2026-01-19T09:00:00+00:00",
+  "executor": "local",
+  "finished_at": null,
+  "id": "c0000000-0000-4000-8000-000000000003",
+  "jailbroken": 1,
+  "mitigated": 0,
+  "name": "Weekly jailbreak sweep",
+  "recorded_goals": 2,
+  "revision": 5,
+  "status": "RUNNING",
+  "target": "support-bot",
+  "unresolved": 1,
+  "updated_at": "2026-01-19T09:30:00+00:00"
+}

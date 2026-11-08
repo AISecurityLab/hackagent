@@ -1,0 +1,949 @@
+[
+ {
+  "name": "summary-list",
+  "method": "GET",
+  "path": "/run/summary",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"604292f8abdae3fba9bd158eb2340c05\"",
+  "expected": "summary-list.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-list-campaign",
+  "method": "GET",
+  "path": "/run/summary",
+  "query": [
+   [
+    "campaign",
+    "b0000000-0000-4000-8000-000000000001"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"3d114c89b55c129f46cae52b2c6fe84f\"",
+  "expected": "summary-list-campaign.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-list-agent",
+  "method": "GET",
+  "path": "/run/summary",
+  "query": [
+   [
+    "agent",
+    "a0000000-0000-4000-8000-000000000002"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"fa63f443ba0ea5e983ec4b6febea7f61\"",
+  "expected": "summary-list-agent.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-list-status-page-1",
+  "method": "GET",
+  "path": "/run/summary",
+  "query": [
+   [
+    "status",
+    "COMPLETED"
+   ],
+   [
+    "page_size",
+    "2"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"6cac41f6f44f9cdb6fc4a58342acc444\"",
+  "expected": "summary-list-status-page-1.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-list-status-page-2",
+  "method": "GET",
+  "path": "/run/summary",
+  "query": [
+   [
+    "status",
+    "COMPLETED"
+   ],
+   [
+    "page_size",
+    "2"
+   ],
+   [
+    "page",
+    "2"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"aa663203dd89e8e5ecc9b3149e8b9483\"",
+  "expected": "summary-list-status-page-2.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-completed",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/summary",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"5bea81c5cfdbc35c7b2fa293b72af1ad\"",
+  "expected": "summary-completed.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-running",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000003/summary",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"ec6035a20e86379bbb92e5a71c1091ef\"",
+  "expected": "summary-running.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-empty",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000006/summary",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"fe0270460569ff13581d0f6e34f538c9\"",
+  "expected": "summary-empty.json",
+  "mutates": false
+ },
+ {
+  "name": "summary-attack-run-id",
+  "method": "GET",
+  "path": "/run/e0000000-0000-4000-8000-000000000003/summary",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "summary-attack-run-id.json",
+  "mutates": false
+ },
+ {
+  "name": "report-completed",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/report",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"a9db8d9aabca58756db01f67c67a5504\"",
+  "expected": "report-completed.json",
+  "mutates": false
+ },
+ {
+  "name": "report-completed-scoped",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/report",
+  "query": [
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000003"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"7b24b93e32be62e2e610e7a62fd2391c\"",
+  "expected": "report-completed-scoped.json",
+  "mutates": false
+ },
+ {
+  "name": "report-running",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000003/report",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"abbf91312da5ef2c7834b6de030a381c\"",
+  "expected": "report-running.json",
+  "mutates": false
+ },
+ {
+  "name": "report-failed-no-campaign",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000005/report",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"e992644183092636fa79cba2d4c85479\"",
+  "expected": "report-failed-no-campaign.json",
+  "mutates": false
+ },
+ {
+  "name": "report-oldest",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000001/report",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"0dea33b77190549f4bf816f743908082\"",
+  "expected": "report-oldest.json",
+  "mutates": false
+ },
+ {
+  "name": "report-empty",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000006/report",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"69912ba39d02014d2da413cec44ae035\"",
+  "expected": "report-empty.json",
+  "mutates": false
+ },
+ {
+  "name": "report-foreign-scope",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/report",
+  "query": [
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000006"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "report-foreign-scope.json",
+  "mutates": false
+ },
+ {
+  "name": "report-attack-run-id",
+  "method": "GET",
+  "path": "/run/e0000000-0000-4000-8000-000000000003/report",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "report-attack-run-id.json",
+  "mutates": false
+ },
+ {
+  "name": "report-not-a-uuid",
+  "method": "GET",
+  "path": "/run/not-a-uuid/report",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "report-not-a-uuid.json",
+  "mutates": false
+ },
+ {
+  "name": "goals",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"e7e054e66fe9ff6bedbc2bca9c873c42\"",
+  "expected": "goals.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-scoped",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000004"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"671367c96ff2f19bdff99b3046a830e3\"",
+  "expected": "goals-scoped.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-goal-index",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "goal_index",
+    "2"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"afcb2675d302df389dfd04114c0b6beb\"",
+  "expected": "goals-goal-index.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-category",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "category",
+    "Fraud"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"ef919a047c0fd4d4e4403e012531b8cc\"",
+  "expected": "goals-category.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-subcategory",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "category",
+    "Fraud"
+   ],
+   [
+    "subcategory",
+    "Phishing"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"eef211b6c9ce047d66876410d92afd6c\"",
+  "expected": "goals-subcategory.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-unspecified",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "subcategory",
+    "Unspecified"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"612324ff4b970e1aeff4a1c24dfb0d5e\"",
+  "expected": "goals-unspecified.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-search",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "search",
+    "PHISHING"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"589c5715231183ecc3839e6a40de97a7\"",
+  "expected": "goals-search.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-verdict",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "verdict",
+    "unresolved"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"148b0ca3996c5ac768e1274d385fc216\"",
+  "expected": "goals-verdict.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-page-2",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "page_size",
+    "2"
+   ],
+   [
+    "page",
+    "2"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"a99884575dc6c6e1bba41b21697140eb\"",
+  "expected": "goals-page-2.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-running",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000003/goals",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"24dc296ff255c09c068b1f5ec7508124\"",
+  "expected": "goals-running.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-invalid-verdict",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "verdict",
+    "bogus"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 400,
+  "etag": null,
+  "expected": "goals-invalid-verdict.json",
+  "mutates": false
+ },
+ {
+  "name": "goals-negative-goal-index",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/goals",
+  "query": [
+   [
+    "goal_index",
+    "-1"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 400,
+  "etag": null,
+  "expected": "goals-negative-goal-index.json",
+  "mutates": false
+ },
+ {
+  "name": "matrix",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/matrix",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"b894278c1ae7ff3182ccef266625c73d\"",
+  "expected": "matrix.json",
+  "mutates": false
+ },
+ {
+  "name": "matrix-running",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000003/matrix",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"8215c67a10f25169febf142f45535659\"",
+  "expected": "matrix-running.json",
+  "mutates": false
+ },
+ {
+  "name": "matrix-empty",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000006/matrix",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"a5648f73147c3e4b68e1e79beb28c6b6\"",
+  "expected": "matrix-empty.json",
+  "mutates": false
+ },
+ {
+  "name": "attempts",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/attempts",
+  "query": [
+   [
+    "goal_index",
+    "0"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"1152d5c20d8415ad8e59ae39fc452c9c\"",
+  "expected": "attempts.json",
+  "mutates": false
+ },
+ {
+  "name": "attempts-scoped-first-success",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/attempts",
+  "query": [
+   [
+    "goal_index",
+    "0"
+   ],
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000003"
+   ],
+   [
+    "page_size",
+    "1"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"7a5891353da19fe1f8d109e3b1bfc1b6\"",
+  "expected": "attempts-scoped-first-success.json",
+  "mutates": false
+ },
+ {
+  "name": "attempts-page-2",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/attempts",
+  "query": [
+   [
+    "goal_index",
+    "1"
+   ],
+   [
+    "page_size",
+    "2"
+   ],
+   [
+    "page",
+    "2"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"f1dc713cae40e97246ad1f8706563ca1\"",
+  "expected": "attempts-page-2.json",
+  "mutates": false
+ },
+ {
+  "name": "attempts-missing-goal-index",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/attempts",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 400,
+  "etag": null,
+  "expected": "attempts-missing-goal-index.json",
+  "mutates": false
+ },
+ {
+  "name": "attempts-foreign-scope",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/attempts",
+  "query": [
+   [
+    "goal_index",
+    "0"
+   ],
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000006"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "attempts-foreign-scope.json",
+  "mutates": false
+ },
+ {
+  "name": "structure",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/structure",
+  "query": [
+   [
+    "goal_index",
+    "0"
+   ],
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000003"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"00984347217103f775c91eaa531ae954\"",
+  "expected": "structure.json",
+  "mutates": false
+ },
+ {
+  "name": "structure-goal-scoped-batch",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/structure",
+  "query": [
+   [
+    "goal_index",
+    "0"
+   ],
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000005"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"836d87945c5bc9019d89dd8e2172f6bc\"",
+  "expected": "structure-goal-scoped-batch.json",
+  "mutates": false
+ },
+ {
+  "name": "structure-missing-run-id",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/structure",
+  "query": [
+   [
+    "goal_index",
+    "0"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "structure-missing-run-id.json",
+  "mutates": false
+ },
+ {
+  "name": "structure-missing-goal-index",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/structure",
+  "query": [
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000003"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 400,
+  "etag": null,
+  "expected": "structure-missing-goal-index.json",
+  "mutates": false
+ },
+ {
+  "name": "costs",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/costs",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"5b9174fbde2e328facb221e560f7e759\"",
+  "expected": "costs.json",
+  "mutates": false
+ },
+ {
+  "name": "costs-running",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000003/costs",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"24383dcce809a74458dfb2fa4fa24192\"",
+  "expected": "costs-running.json",
+  "mutates": false
+ },
+ {
+  "name": "costs-failed",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000005/costs",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"bc325be174bf100ef0ca0b28591d2529\"",
+  "expected": "costs-failed.json",
+  "mutates": false
+ },
+ {
+  "name": "costs-empty",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000006/costs",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"595784bec0b6c1c83fd4ab0adf5f35ac\"",
+  "expected": "costs-empty.json",
+  "mutates": false
+ },
+ {
+  "name": "compare",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/compare",
+  "query": [
+   [
+    "baseline",
+    "c0000000-0000-4000-8000-000000000001"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"4270f2bdb7b1026f7e616b8339aa7851\"",
+  "expected": "compare.json",
+  "mutates": false
+ },
+ {
+  "name": "compare-running",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000003/compare",
+  "query": [
+   [
+    "baseline",
+    "c0000000-0000-4000-8000-000000000002"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"ed48a67e7a89480066b71af0d95086ac\"",
+  "expected": "compare-running.json",
+  "mutates": false
+ },
+ {
+  "name": "compare-missing-baseline",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/compare",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 400,
+  "etag": null,
+  "expected": "compare-missing-baseline.json",
+  "mutates": false
+ },
+ {
+  "name": "compare-same-baseline",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/compare",
+  "query": [
+   [
+    "baseline",
+    "c0000000-0000-4000-8000-000000000002"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 400,
+  "etag": null,
+  "expected": "compare-same-baseline.json",
+  "mutates": false
+ },
+ {
+  "name": "compare-unknown-baseline",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/compare",
+  "query": [
+   [
+    "baseline",
+    "00000000-0000-4000-8000-000000000000"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "compare-unknown-baseline.json",
+  "mutates": false
+ },
+ {
+  "name": "report-not-modified",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/report",
+  "query": [],
+  "headers": {
+   "If-None-Match": "W/\"a9db8d9aabca58756db01f67c67a5504\""
+  },
+  "body": null,
+  "status": 304,
+  "etag": "W/\"a9db8d9aabca58756db01f67c67a5504\"",
+  "expected": null,
+  "mutates": false
+ },
+ {
+  "name": "summary-list-not-modified",
+  "method": "GET",
+  "path": "/run/summary",
+  "query": [],
+  "headers": {
+   "If-None-Match": "W/\"604292f8abdae3fba9bd158eb2340c05\""
+  },
+  "body": null,
+  "status": 304,
+  "etag": "W/\"604292f8abdae3fba9bd158eb2340c05\"",
+  "expected": null,
+  "mutates": false
+ },
+ {
+  "name": "matrix-other-etag",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/matrix",
+  "query": [],
+  "headers": {
+   "If-None-Match": "W/\"a9db8d9aabca58756db01f67c67a5504\""
+  },
+  "body": null,
+  "status": 200,
+  "etag": "W/\"b894278c1ae7ff3182ccef266625c73d\"",
+  "expected": "matrix-other-etag.json",
+  "mutates": false
+ },
+ {
+  "name": "delete-empty-selection",
+  "method": "POST",
+  "path": "/run/delete",
+  "query": [],
+  "headers": {},
+  "body": {
+   "ids": []
+  },
+  "status": 400,
+  "etag": null,
+  "expected": "delete-empty-selection.json",
+  "mutates": false
+ },
+ {
+  "name": "delete-malformed-id",
+  "method": "POST",
+  "path": "/run/delete",
+  "query": [],
+  "headers": {},
+  "body": {
+   "ids": [
+    "nope"
+   ]
+  },
+  "status": 400,
+  "etag": null,
+  "expected": "delete-malformed-id.json",
+  "mutates": false
+ },
+ {
+  "name": "delete-unknown-id",
+  "method": "POST",
+  "path": "/run/delete",
+  "query": [],
+  "headers": {},
+  "body": {
+   "ids": [
+    "c0000000-0000-4000-8000-000000000002",
+    "00000000-0000-4000-8000-000000000000"
+   ]
+  },
+  "status": 404,
+  "etag": null,
+  "expected": "delete-unknown-id.json",
+  "mutates": false
+ },
+ {
+  "name": "delete-active",
+  "method": "POST",
+  "path": "/run/delete",
+  "query": [],
+  "headers": {},
+  "body": {
+   "ids": [
+    "c0000000-0000-4000-8000-000000000002",
+    "c0000000-0000-4000-8000-000000000003"
+   ]
+  },
+  "status": 409,
+  "etag": null,
+  "expected": "delete-active.json",
+  "mutates": false
+ },
+ {
+  "name": "delete-one-active",
+  "method": "DELETE",
+  "path": "/run/c0000000-0000-4000-8000-000000000003",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 409,
+  "etag": null,
+  "expected": "delete-one-active.json",
+  "mutates": false
+ },
+ {
+  "name": "delete-selection",
+  "method": "POST",
+  "path": "/run/delete",
+  "query": [],
+  "headers": {},
+  "body": {
+   "ids": [
+    "c0000000-0000-4000-8000-000000000001",
+    "c0000000-0000-4000-8000-000000000004"
+   ]
+  },
+  "status": 204,
+  "etag": null,
+  "expected": null,
+  "mutates": true
+ },
+ {
+  "name": "delete-one",
+  "method": "DELETE",
+  "path": "/run/c0000000-0000-4000-8000-000000000006",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 204,
+  "etag": null,
+  "expected": null,
+  "mutates": true
+ }
+]

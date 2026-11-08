@@ -1,0 +1,45 @@
+{
+  "count": 2,
+  "next": false,
+  "previous": false,
+  "results": [
+    {
+      "agent": "a0000000-0000-4000-8000-000000000002",
+      "attack_runs": 1,
+      "attempts": 1,
+      "campaign": null,
+      "created_at": "2026-01-08T14:00:00+00:00",
+      "executor": "cli",
+      "finished_at": "2026-01-08T14:30:00+00:00",
+      "id": "c0000000-0000-4000-8000-000000000005",
+      "jailbroken": 0,
+      "mitigated": 0,
+      "name": "Ad hoc probe",
+      "recorded_goals": 1,
+      "revision": 4,
+      "status": "FAILED",
+      "target": "billing-bot",
+      "unresolved": 1,
+      "updated_at": "2026-01-08T14:30:00+00:00"
+    },
+    {
+      "agent": "a0000000-0000-4000-8000-000000000002",
+      "attack_runs": 1,
+      "attempts": 1,
+      "campaign": null,
+      "created_at": "2026-01-07T14:00:00+00:00",
+      "executor": "cli",
+      "finished_at": "2026-01-07T14:30:00+00:00",
+      "id": "c0000000-0000-4000-8000-000000000004",
+      "jailbroken": 0,
+      "mitigated": 1,
+      "name": "Ad hoc probe",
+      "recorded_goals": 1,
+      "revision": 3,
+      "status": "COMPLETED",
+      "target": "billing-bot",
+      "unresolved": 0,
+      "updated_at": "2026-01-07T14:30:00+00:00"
+    }
+  ]
+}
