@@ -6,7 +6,9 @@
 With the local backend selected, this blueprint answers dashboard requests
 from the SQLite store through the facade. Local is the default backend.
 
-``DELETE /run/<id>`` deletes a local run. Campaigns are saved to the local
+``DELETE /run/<id>`` deletes a local run. The campaign run report routes
+(``/run/summary``, ``/run/<id>/report``, ...) come from :mod:`._run_reports`.
+Campaigns are saved to the local
 store and launched on this machine: a launch runs the campaign in this process
 (see :mod:`._launcher`), and its parent run and attack runs are served like any
 other while their results land. The other write routes (agents, keys, the
@@ -25,7 +27,9 @@ from flask import Blueprint, jsonify, request
 
 from hackagent.interfaces.web import _serializers as ser
 from hackagent.interfaces.web._launcher import LaunchRefused, LocalLauncher, launch_spec
+from hackagent.interfaces.web._run_reports import register_run_reports
 from hackagent.orchestrator.campaign.loader import load_stored_campaign
+from hackagent.reporting.http import ACTIVE_CAMPAIGN_RUN
 
 logger = logging.getLogger("hackagent.interfaces.web.local")
 
@@ -101,6 +105,7 @@ def create_local_api(client) -> Blueprint:
     """Build the offline REST blueprint backed by a facade ``client``."""
     bp = Blueprint("local_api", __name__)
     launcher = LocalLauncher(client)
+    register_run_reports(bp, client)
 
     def _org_id() -> UUID:
         return client.context().org_id
@@ -410,8 +415,8 @@ def create_local_api(client) -> Blueprint:
                 client.delete_campaign_run(parsed)
             except RuntimeError:
                 return _not_found("Run")
-            except ValueError as exc:
-                return jsonify({"detail": str(exc)}), 409
+            except ValueError:
+                return jsonify({"detail": ACTIVE_CAMPAIGN_RUN}), 409
             return "", 204
         client.delete_run(parsed)
         return "", 204

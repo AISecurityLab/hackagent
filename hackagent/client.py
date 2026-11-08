@@ -512,45 +512,6 @@ class HackAgent:
 
         return self.backend.get_campaign_run(_as_uuid(campaign_run_id))
 
-    def campaign_outcomes(self, campaign_ids: List[Any]) -> Dict[str, Dict[str, int]]:
-        """Local campaign summaries, excluding full result payloads."""
-        aggregate = getattr(self.backend, "campaign_outcomes", None)
-        if not callable(aggregate):
-            raise NotImplementedError("Campaign summaries require local storage.")
-        return aggregate([_as_uuid(ident) for ident in campaign_ids])
-
-    def campaign_results(
-        self,
-        run_ids: List[Any],
-        *,
-        goal_index: Optional[int] = None,
-        full: bool = False,
-    ) -> List[Any]:
-        read = getattr(self.backend, "campaign_results", None)
-        if not callable(read):
-            raise NotImplementedError("Campaign investigation requires local storage.")
-        return read(
-            [_as_uuid(ident) for ident in run_ids], goal_index=goal_index, full=full
-        )
-
-    def campaign_attempts(
-        self,
-        run_ids: List[Any],
-        goal_index: int,
-        *,
-        page: int,
-        page_size: int,
-    ) -> Dict[str, Any]:
-        read = getattr(self.backend, "campaign_attempts", None)
-        if not callable(read):
-            raise NotImplementedError("Campaign investigation requires local storage.")
-        return read(
-            [_as_uuid(ident) for ident in run_ids],
-            goal_index,
-            page=page,
-            page_size=page_size,
-        )
-
     def run(self, run_id: Any) -> Any:
         return self.backend.get_run(_as_uuid(run_id))
 
@@ -573,16 +534,6 @@ class HackAgent:
     def traces(self, result_id: Any) -> List[Any]:
         return self.backend.list_traces(_as_uuid(result_id))
 
-    def run_costs(self, run_ids: List[Any]) -> Optional[Dict[str, Dict[str, Any]]]:
-        """Calls, target tokens, latency and elapsed time per run.
-
-        ``None`` when the backend cannot aggregate them (the remote API).
-        """
-        aggregate = getattr(self.backend, "run_costs", None)
-        if not callable(aggregate):
-            return None
-        return aggregate([_as_uuid(run_id) for run_id in run_ids])
-
     def delete_run(self, run_id: Any) -> None:
         """Delete one run. This is a write; reads never call it."""
         self.backend.delete_run(_as_uuid(run_id))
@@ -604,6 +555,59 @@ class HackAgent:
                 "Campaign execution deletion requires local storage."
             )
         delete([_as_uuid(ident) for ident in campaign_run_ids])
+
+    # -- campaign run reports (local store) ----------------------------------
+
+    # The rows hackagent.reporting builds the dashboard's campaign run routes
+    # from. Only the local store has them: the platform API serves those routes
+    # itself, so remote mode forwards the dashboard's requests instead.
+
+    def _reports(self) -> Any:
+        if not callable(getattr(self.backend, "report_campaign_runs", None)):
+            raise NotImplementedError("Campaign run reports require local storage.")
+        return self.backend
+
+    def report_campaign_runs(self, **filters: Any) -> Any:
+        """A page of campaign runs, newest first (``campaign``, ``agent``,
+        ``status``, ``page``, ``page_size``)."""
+        return self._reports().report_campaign_runs(**filters)
+
+    def report_campaign_run(self, campaign_run_id: str) -> Any:
+        """One campaign run, or None."""
+        return self._reports().report_campaign_run(campaign_run_id)
+
+    def report_previous_candidates(self, current: Any) -> List[Any]:
+        return self._reports().report_previous_candidates(current)
+
+    def report_revisions(self, campaign_run_ids: List[str]) -> Dict[str, int]:
+        return self._reports().report_revisions(campaign_run_ids)
+
+    def report_attack_runs(
+        self, campaign_run_ids: List[str], *, full: bool = False
+    ) -> List[Any]:
+        return self._reports().report_attack_runs(campaign_run_ids, full=full)
+
+    def report_goal_totals(self, campaign_run_ids: List[str]) -> List[Any]:
+        return self._reports().report_goal_totals(campaign_run_ids)
+
+    def report_goal_outcomes(self, campaign_run_id: str) -> List[Any]:
+        return self._reports().report_goal_outcomes(campaign_run_id)
+
+    def report_goal_usage(self, campaign_run_id: str) -> List[Any]:
+        return self._reports().report_goal_usage(campaign_run_id)
+
+    def report_latencies(self, run_ids: List[str]) -> List[Any]:
+        return self._reports().report_latencies(run_ids)
+
+    def report_attempts(
+        self, run_ids: List[str], goal_index: int, *, page: int, page_size: int
+    ) -> Any:
+        return self._reports().report_attempts(
+            run_ids, goal_index, page=page, page_size=page_size
+        )
+
+    def report_structure(self, run_id: str, goal_index: int) -> Any:
+        return self._reports().report_structure(run_id, goal_index)
 
     # -- saved campaigns (local store) -------------------------------------------
 
