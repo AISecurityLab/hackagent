@@ -5,8 +5,10 @@
 
 ``call`` trace nodes are labelled with the role that made them: ``target``,
 ``panel`` (a judge), and anything else (``attacker`` or a helper such as
-``on_topic``) is the attacker side. A run that records no labelled call node
-only has its target interactions, so its judge and attacker calls are
+``on_topic``) is the attacker side. Each goal counts its calls from what it
+recorded: its labelled call nodes when it has any, else its target
+interaction steps, whose attacker and judge calls are unknown. A run sums its
+goals; when any goal's attacker and judge calls are unknown, the run's are
 reported as ``None``: not traced, rather than zero.
 
 A goal sample carries the first successful attempt's ordinal and, when every
@@ -50,8 +52,15 @@ def latency_summary(latencies: Iterable[Latency]) -> Optional[dict[str, Any]]:
     }
 
 
-def _calls(usage: Iterable[GoalUsage]) -> tuple[dict[str, Any], bool]:
-    """A run's calls by role, and whether it traced its call nodes."""
+def _goal_calls(usage: Iterable[GoalUsage]) -> Optional[dict[str, Any]]:
+    """One goal's calls by role, from the source that goal recorded.
+
+    A goal with labelled call nodes counts every role from them (an
+    interaction step mirrors a target call node and is not counted again).
+    A goal with only interaction steps counts them as its target calls; its
+    attacker and judge calls are unknown (None). A goal that recorded
+    neither has no source (None) and contributes nothing.
+    """
     per_label: dict[str, int] = {}
     for row in usage:
         per_label[row.label] = per_label.get(row.label, 0) + row.calls
@@ -63,12 +72,28 @@ def _calls(usage: Iterable[GoalUsage]) -> tuple[dict[str, Any], bool]:
                 n for label, n in nodes.items() if label not in (TARGET, JUDGE)
             ),
             "judge": nodes.get(JUDGE, 0),
-        }, True
+        }
+    if INTERACTION in per_label:
+        return {"target": per_label[INTERACTION], "attacker": None, "judge": None}
+    return None
+
+
+def _calls(per_goal: Iterable[Iterable[GoalUsage]]) -> tuple[dict[str, Any], bool]:
+    """A run's calls by role, and whether it traced its call nodes.
+
+    ``target`` sums every goal's target calls (see :func:`_goal_calls`). The
+    run's calls are traced when at least one goal recorded labelled call
+    nodes and no goal recorded only interaction steps; then ``attacker`` and
+    ``judge`` sum the goals' counts. Otherwise some goal's attacker and judge
+    calls are unknown, and so are the run's: both are None, not zero.
+    """
+    counted = [calls for usage in per_goal if (calls := _goal_calls(usage))]
+    traced = bool(counted) and all(calls["attacker"] is not None for calls in counted)
     return {
-        "target": per_label.get(INTERACTION, 0),
-        "attacker": None,
-        "judge": None,
-    }, False
+        "target": sum(calls["target"] for calls in counted),
+        "attacker": sum(calls["attacker"] for calls in counted) if traced else None,
+        "judge": sum(calls["judge"] for calls in counted) if traced else None,
+    }, traced
 
 
 def goal_sample(
@@ -128,11 +153,10 @@ def run_cost(
     latencies: Iterable[Latency],
 ) -> dict[str, Any]:
     """One attack run's ``RunCost``, from its rows (which must not be empty)."""
-    usage = list(usage)
     by_goal: dict[int, list[GoalUsage]] = {}
     for row in usage:
         by_goal.setdefault(row.goal_index, []).append(row)
-    calls, traced = _calls(usage)
+    calls, traced = _calls(by_goal.values())
     samples = []
     prompt = completion = 0
     known = True

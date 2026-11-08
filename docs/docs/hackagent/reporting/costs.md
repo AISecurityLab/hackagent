@@ -7,8 +7,10 @@ What each attack run spent: calls by role, target tokens and time.
 
 `call` trace nodes are labelled with the role that made them: `target`,
 `panel` (a judge), and anything else (`attacker` or a helper such as
-`on_topic`) is the attacker side. A run that records no labelled call node
-only has its target interactions, so its judge and attacker calls are
+`on_topic`) is the attacker side. Each goal counts its calls from what it
+recorded: its labelled call nodes when it has any, else its target
+interaction steps, whose attacker and judge calls are unknown. A run sums its
+goals; when any goal&#x27;s attacker and judge calls are unknown, the run&#x27;s are
 reported as `None`: not traced, rather than zero.
 
 A goal sample carries the first successful attempt&#x27;s ordinal and, when every

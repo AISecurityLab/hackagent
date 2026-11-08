@@ -12,12 +12,13 @@ from __future__ import annotations
 import hashlib
 import json
 from typing import Any, Iterable, Mapping, Optional, Sequence
+from urllib.parse import urlencode
 from uuid import UUID
 
 from hackagent.reporting.goals import VERDICTS, GoalFilters
 
 #: Bumped when a response format changes, so cached ETags stop matching.
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 CAMPAIGN_RUN_NOT_FOUND = "Campaign run not found."
 ATTACK_RUN_NOT_FOUND = "Attack run not found."
@@ -84,16 +85,29 @@ def page_args(args: Mapping[str, str], sizes: tuple[int, int]) -> tuple[int, int
     return page, max(1, min(page_size, maximum))
 
 
+def page_link(query: Iterable[tuple[str, str]], page: int) -> str:
+    """The link to ``page`` of the request whose query parameters are
+    ``query``: ``?`` and the parameters in request order with every ``page``
+    removed and ``page=<page>`` appended, form-encoded
+    (:func:`urllib.parse.urlencode`). Both servers emit exactly this."""
+    pairs = [(str(key), str(value)) for key, value in query if key != "page"]
+    return "?" + urlencode([*pairs, ("page", str(page))])
+
+
 def paginate(
-    items: Sequence[Any], count: int, page: int, page_size: int
+    items: Sequence[Any],
+    count: int,
+    page: int,
+    page_size: int,
+    query: Iterable[tuple[str, str]] = (),
 ) -> dict[str, Any]:
-    """The DRF page envelope. ``next``/``previous`` are links whose form is
-    the server's own; clients and the conformance cases only test whether
-    they are set."""
+    """The DRF page envelope, with :func:`page_link` links to the next and
+    previous pages of the request whose query parameters are ``query``."""
+    query = list(query)
     return {
         "count": count,
-        "next": f"?page={page + 1}" if page * page_size < count else None,
-        "previous": f"?page={page - 1}" if page > 1 else None,
+        "next": page_link(query, page + 1) if page * page_size < count else None,
+        "previous": page_link(query, page - 1) if page > 1 else None,
         "results": list(items),
     }
 
@@ -160,8 +174,10 @@ def selection(body: Any) -> list[str]:
 
 
 def query_pairs(args: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
-    """A request's query parameters in a canonical order, for :func:`etag`."""
-    return sorted((str(key), str(value)) for key, value in args)
+    """A request's query parameters in a canonical order, for :func:`etag`:
+    sorted by key only, so repeated keys keep their request order (routes
+    read a key's first value)."""
+    return sorted(((str(key), str(value)) for key, value in args), key=lambda p: p[0])
 
 
 def etag(
@@ -174,7 +190,8 @@ def etag(
 
     The SHA-256 of the compact JSON array ``[FORMAT_VERSION, route,
     [[key, value], ...], [[campaign_run_id, revision], ...], *extra]`` (query
-    pairs sorted, revisions in the order given), cut to 32 hex digits:
+    pairs as :func:`query_pairs` orders them, revisions in the order given),
+    cut to 32 hex digits:
     ``W/"<digits>"``. ``route`` is the name of the route (``"summary-list"``,
     ``"summary"``, ``"report"``, ``"matrix"``, ``"goals"``, ``"attempts"``,
     ``"structure"``, ``"costs"``, ``"compare"``); ``revisions`` lists every
@@ -235,6 +252,7 @@ __all__ = [
     "goal_filters",
     "goal_index_arg",
     "page_args",
+    "page_link",
     "page_slice",
     "paginate",
     "parse_uuid",

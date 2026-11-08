@@ -1,7 +1,7 @@
 {
   "count": 3,
-  "next": false,
-  "previous": false,
+  "next": null,
+  "previous": null,
   "results": [
     {
       "agent": "a0000000-0000-4000-8000-000000000001",

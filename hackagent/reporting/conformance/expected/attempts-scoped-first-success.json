@@ -4,8 +4,8 @@
     "id": "f0000000-0000-4000-8000-000000000009",
     "page": 2
   },
-  "next": true,
-  "previous": false,
+  "next": "?goal_index=0&run_id=e0000000-0000-4000-8000-000000000003&page_size=1&page=2",
+  "previous": null,
   "results": [
     {
       "bucket": "mitigated",

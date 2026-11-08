@@ -509,7 +509,59 @@ class TestReports:
         }
 
 
+def traced_goal(run_id, index, *contents):
+    traces = [
+        TraceRow.from_content(f"{run_id}-{index}", step, content)
+        for step, content in contents
+    ]
+    row = goal_outcome(
+        campaign_run_id=CR,
+        run_id=run_id,
+        goal_index=index,
+        results=[result(f"{run_id}-{index}", M, seconds=index)],
+        coverage=trace_coverage(traces),
+    )
+    return row, goal_usage(
+        campaign_run_id=CR, run_id=run_id, goal_index=index, traces=traces
+    )
+
+
+CALL = "TOOL_CALL"
+
+
 class TestCosts:
+    def test_each_goal_counts_its_own_call_source(self):
+        nodes, nodes_usage = traced_goal(
+            "r",
+            0,
+            (CALL, {"node": "call", "label": "target"}),
+            (CALL, {"node": "call", "label": "attacker"}),
+            # Mirrors the target call node: counted once, as the node.
+            ("interaction", {}),
+        )
+        exchanges, exchanges_usage = traced_goal(
+            "r", 1, ("interaction", {}), ("interaction", {})
+        )
+        [cost] = campaign_run_costs(
+            [attack_run("r")], [nodes, exchanges], nodes_usage + exchanges_usage, []
+        )["runs"]
+        assert cost["calls"] == {"target": 3, "attacker": None, "judge": None}
+        assert cost["calls_traced"] is False
+
+    def test_a_goal_that_recorded_nothing_leaves_the_calls_traced(self):
+        nodes, usage = traced_goal(
+            "r",
+            0,
+            (CALL, {"node": "call", "label": "target"}),
+            (CALL, {"node": "call", "label": "panel"}),
+        )
+        silent, _ = traced_goal("r", 1)
+        [cost] = campaign_run_costs([attack_run("r")], [nodes, silent], usage, [])[
+            "runs"
+        ]
+        assert cost["calls"] == {"target": 1, "attacker": 0, "judge": 1}
+        assert cost["calls_traced"] is True
+
     def test_quantiles_interpolate_and_a_single_sample_is_every_quantile(self):
         assert quantile([100.0, 200.0, 300.0], 0.5) == 200
         assert latency_summary([Latency("r", 420)]) == {
@@ -617,6 +669,27 @@ class TestHttp:
             http.baseline_arg({"baseline": ident}, ident.lower())
         with pytest.raises(http.BadRequest):
             http.baseline_arg({}, "x")
+
+    def test_repeated_parameters_keep_their_order_in_the_etag(self):
+        first = http.etag("goals", [("goal_index", "0"), ("goal_index", "1")], [])
+        assert first != http.etag(
+            "goals", [("goal_index", "1"), ("goal_index", "0")], []
+        )
+        assert first == http.etag(
+            "goals", [("x", "z"), ("goal_index", "0"), ("goal_index", "1")][1:], []
+        )
+
+    def test_page_links_keep_the_query_and_replace_the_page(self):
+        query = [
+            ("goal_index", "0"),
+            ("page", "2"),
+            ("search", "a b"),
+            ("page_size", "1"),
+        ]
+        page = http.paginate(["x"], 5, 2, 1, query)
+        assert page["next"] == "?goal_index=0&search=a+b&page_size=1&page=3"
+        assert page["previous"] == "?goal_index=0&search=a+b&page_size=1&page=1"
+        assert http.paginate([], 0, 1, 20, query)["next"] is None
 
     def test_etags_depend_on_route_query_and_revisions_only(self):
         tag = http.etag("report", [("b", "2"), ("a", "1")], [("x", 1)])

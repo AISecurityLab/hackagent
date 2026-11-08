@@ -12,13 +12,19 @@ of the costs counts in.
 #### attempt\_page
 
 ```python
-def attempt_page(rows: Sequence[Attempt], count: int, page: int,
-                 page_size: int,
-                 first: Optional[FirstSuccess]) -> dict[str, Any]
+def attempt_page(
+    rows: Sequence[Attempt],
+    count: int,
+    page: int,
+    page_size: int,
+    first: Optional[FirstSuccess],
+    query: Iterable[tuple[str, str]] = ()
+) -> dict[str, Any]
 ```
 
 `GET /run/{id}/attempts`: one page of rows (already ordered and cut
-by the database), with the page of the first jailbreak.
+by the database), with the page of the first jailbreak. `query` is the
+request&#x27;s query parameters, which the page links keep.
 
 #### attack\_structure
 

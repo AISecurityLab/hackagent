@@ -45,16 +45,30 @@ def page_args(args: Mapping[str, str], sizes: tuple[int,
 
 `(page, page_size)`; invalid values fall back, sizes are clamped.
 
+#### page\_link
+
+```python
+def page_link(query: Iterable[tuple[str, str]], page: int) -> str
+```
+
+The link to `page` of the request whose query parameters are
+`query`: `?` and the parameters in request order with every `page`
+removed and `page=<page>` appended, form-encoded
+(:func:`urllib.parse.urlencode`). Both servers emit exactly this.
+
 #### paginate
 
 ```python
-def paginate(items: Sequence[Any], count: int, page: int,
-             page_size: int) -> dict[str, Any]
+def paginate(
+    items: Sequence[Any],
+    count: int,
+    page: int,
+    page_size: int,
+    query: Iterable[tuple[str, str]] = ()) -> dict[str, Any]
 ```
 
-The DRF page envelope. `next`/`previous` are links whose form is
-the server&#x27;s own; clients and the conformance cases only test whether
-they are set.
+The DRF page envelope, with :func:`page_link` links to the next and
+previous pages of the request whose query parameters are `query`.
 
 #### goal\_index\_arg
 
@@ -103,7 +117,9 @@ The ids of `POST /run/delete`; raises :class:`BadRequest`.
 def query_pairs(args: Iterable[tuple[str, str]]) -> list[tuple[str, str]]
 ```
 
-A request&#x27;s query parameters in a canonical order, for :func:`etag`.
+A request&#x27;s query parameters in a canonical order, for :func:`etag`:
+sorted by key only, so repeated keys keep their request order (routes
+read a key&#x27;s first value).
 
 #### etag
 
@@ -116,7 +132,8 @@ The weak ETag of a response.
 
 The SHA-256 of the compact JSON array ``[FORMAT_VERSION, route,
 [[key, value], ...], [[campaign_run_id, revision], ...], *extra]`` (query
-pairs sorted, revisions in the order given), cut to 32 hex digits:
+pairs as :func:`query_pairs` orders them, revisions in the order given),
+cut to 32 hex digits:
 `W/"<digits>"`. `route` is the name of the route (`"summary-list"`,
 `"summary"`, `"report"`, `"matrix"`, `"goals"`, `"attempts"`,
 `"structure"`, `"costs"`, `"compare"`); `revisions` lists every

@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Optional, Sequence
 
 from hackagent.reporting.buckets import result_bucket
+from hackagent.reporting.http import paginate
 from hackagent.reporting.report import iso
 from hackagent.reporting.rows import (
     Attempt,
@@ -28,14 +29,14 @@ def attempt_page(
     page: int,
     page_size: int,
     first: Optional[FirstSuccess],
+    query: Iterable[tuple[str, str]] = (),
 ) -> dict[str, Any]:
     """``GET /run/{id}/attempts``: one page of rows (already ordered and cut
-    by the database), with the page of the first jailbreak."""
+    by the database), with the page of the first jailbreak. ``query`` is the
+    request's query parameters, which the page links keep."""
     offset = (page - 1) * page_size
     return {
-        "count": count,
-        "next": f"?page={page + 1}" if page * page_size < count else None,
-        "previous": f"?page={page - 1}" if page > 1 else None,
+        **paginate([], count, page, page_size, query),
         "results": [
             {
                 "id": row.id,

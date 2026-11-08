@@ -111,7 +111,7 @@ def register_run_reports(bp: Blueprint, client: Any) -> None:
             items = campaign_run_summaries(
                 listing.items, attack_runs(ids), client.report_goal_totals(ids)
             )
-            return http.paginate(items, listing.total, page, page_size)
+            return http.paginate(items, listing.total, page, page_size, query())
 
         return conditional(tag, build)
 
@@ -175,7 +175,11 @@ def register_run_reports(bp: Blueprint, client: Any) -> None:
                 scope_run_id=http.scope_arg(request.args),
             )
             return http.paginate(
-                http.page_slice(goals, page, page_size), len(goals), page, page_size
+                http.page_slice(goals, page, page_size),
+                len(goals),
+                page,
+                page_size,
+                query(),
             )
 
         return conditional(http.etag("goals", query(), revisions(run)), build)
@@ -206,7 +210,7 @@ def register_run_reports(bp: Blueprint, client: Any) -> None:
                 page=page,
                 page_size=page_size,
             )
-            return attempt_page(rows, count, page, page_size, first)
+            return attempt_page(rows, count, page, page_size, first, query())
 
         return conditional(http.etag("attempts", query(), revisions(run)), build)
 

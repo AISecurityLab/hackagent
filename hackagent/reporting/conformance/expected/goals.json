@@ -1,7 +1,7 @@
 {
   "count": 6,
-  "next": false,
-  "previous": false,
+  "next": null,
+  "previous": null,
   "results": [
     {
       "attack_outcomes": [

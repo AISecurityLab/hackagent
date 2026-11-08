@@ -27,6 +27,13 @@ which is also how Postgres orders `uuid` and SQLite orders `TEXT`.
 
 Label of the usage row that counts a goal&#x27;s `interaction` steps.
 
+#### INTERACTION\_STEP
+
+`step_type` of the step the runner records for each exchange with the
+target. Both stores keep it as written (`StepKind.INTERACTION`; the
+platform&#x27;s `Trace.StepType.INTERACTION`) and every rule compares it
+exactly.
+
 ## ResultRow Objects
 
 ```python

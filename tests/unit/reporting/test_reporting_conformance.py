@@ -72,9 +72,7 @@ class TestConformance(unittest.TestCase):
                 if case.expected is None:
                     self.assertEqual(response.data, b"")
                 else:
-                    self.assertEqual(
-                        conformance.normalized(response.get_json()), case.expected
-                    )
+                    self.assertEqual(response.get_json(), case.expected)
 
     def test_every_successful_read_is_revalidated(self):
         for case in conformance.cases():

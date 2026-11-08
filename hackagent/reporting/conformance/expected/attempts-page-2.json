@@ -1,8 +1,8 @@
 {
   "count": 5,
   "first_success": null,
-  "next": true,
-  "previous": true,
+  "next": "?goal_index=1&page_size=2&page=3",
+  "previous": "?goal_index=1&page_size=2&page=1",
   "results": [
     {
       "bucket": "mitigated",

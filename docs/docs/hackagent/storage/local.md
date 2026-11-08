@@ -58,7 +58,8 @@ saved campaign. The launch stays recorded if the campaign is deleted.
 def delete_campaign(campaign_id: UUID) -> None
 ```
 
-Delete a saved campaign; the runs launched from it are kept.
+Delete a saved campaign; the runs launched from it are kept, and
+their reports, which name the campaign, change.
 
 #### count\_result\_buckets
 

@@ -798,8 +798,16 @@ class LocalBackend:
         )
 
     def delete_campaign(self, campaign_id: UUID) -> None:
-        """Delete a saved campaign; the runs launched from it are kept."""
+        """Delete a saved campaign; the runs launched from it are kept, and
+        their reports, which name the campaign, change."""
         with self._lock:
+            self._bump(
+                row["id"]
+                for row in self._conn.execute(
+                    "SELECT id FROM campaign_runs WHERE campaign_id=?",
+                    (str(campaign_id),),
+                )
+            )
             cursor = self._conn.execute(
                 "DELETE FROM campaigns WHERE id=?", (str(campaign_id),)
             )

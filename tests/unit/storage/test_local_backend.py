@@ -552,7 +552,10 @@ class TestLocalBackendResult(unittest.TestCase):
         self.assertEqual(samples[1]["attempts"], 1)
         self.assertIsNone(samples[1]["calls"])
         self.assertIsNone(samples[1]["target_tokens"])
-        self.assertEqual(cost["calls"], {"target": 2, "attacker": 2, "judge": 2})
+        # Goal 1 recorded only an interaction: its target call counts, and its
+        # attacker and judge calls, so the run's, are unknown.
+        self.assertEqual(cost["calls"], {"target": 3, "attacker": None, "judge": None})
+        self.assertFalse(cost["calls_traced"])
 
     def test_first_success_uses_conversation_order_and_earliest_response_clock(self):
         results = [

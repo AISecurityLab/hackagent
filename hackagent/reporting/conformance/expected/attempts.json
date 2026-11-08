@@ -4,8 +4,8 @@
     "id": "f0000000-0000-4000-8000-000000000009",
     "page": 1
   },
-  "next": false,
-  "previous": false,
+  "next": null,
+  "previous": null,
   "results": [
     {
       "bucket": "mitigated",

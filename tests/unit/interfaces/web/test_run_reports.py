@@ -203,6 +203,69 @@ class TestRevalidation(_CampaignRunCase):
             self.revalidate("/api/proxy/run/summary", tag).status_code, 200
         )
 
+    def test_deleting_the_saved_campaign_changes_the_summary_etag(self):
+        saved = self.backend.create_campaign("Saved", "", self.agent.id, {})
+        self.backend.link_campaign_run(self.campaign.id, saved.id)
+        for path in ("/api/proxy/run/summary", self.base + "/summary"):
+            with self.subTest(path=path):
+                tag = self.etag(path)
+                self.backend.delete_campaign(saved.id)
+                response = self.revalidate(path, tag)
+                self.assertEqual(response.status_code, 200)
+                body = response.get_json()
+                item = body["results"][0] if "results" in body else body
+                self.assertIsNone(item["campaign"])
+                saved = self.backend.create_campaign("Saved", "", self.agent.id, {})
+                self.backend.link_campaign_run(self.campaign.id, saved.id)
+
+    def test_repeated_parameters_are_not_confused(self):
+        self.backend.create_result(self.child.id, "Second goal", 1, {}, {})
+        first = self.client.get(self.base + "/goals?goal_index=0&goal_index=1")
+        second = self.client.get(self.base + "/goals?goal_index=1&goal_index=0")
+        self.assertNotEqual(first.get_json(), second.get_json())
+        self.assertNotEqual(first.headers["ETag"], second.headers["ETag"])
+
+
+class TestPageLinks(_CampaignRunCase):
+    def follow(self, path):
+        pages, url = [], path
+        while url:
+            body = self.get(url)
+            pages.append(body)
+            url = (path.split("?")[0] + body["next"]) if body["next"] else None
+        return pages
+
+    def test_goal_pages_follow_with_their_filters(self):
+        for index in range(1, 5):
+            self.backend.create_result(self.child.id, f"Goal {index}", index, {}, {})
+        pages = self.follow(
+            self.base + "/goals?search=goal&page_size=2&run_id=" + str(self.child.id)
+        )
+        self.assertEqual([len(page["results"]) for page in pages], [2, 2, 1])
+        self.assertEqual(
+            [goal["index"] for page in pages for goal in page["results"]],
+            [0, 1, 2, 3, 4],
+        )
+        back = self.get(self.base + "/goals" + pages[-1]["previous"])
+        self.assertEqual(back["results"], pages[1]["results"])
+
+    def test_attempt_pages_follow_with_their_goal(self):
+        for _ in range(2):
+            self.backend.create_result(self.child.id, "First goal", 0, {}, {})
+        self.backend.create_result(self.child.id, "Other goal", 1, {}, {})
+        pages = self.follow(self.base + "/attempts?goal_index=0&page_size=1")
+        self.assertEqual([page["results"][0]["ordinal"] for page in pages], [1, 2, 3])
+
+    def test_list_pages_follow_with_their_filters(self):
+        for name in ("a", "b", "c"):
+            other = self.backend.start_campaign(
+                self.agent.id, {"campaign": {"name": name}}
+            )
+            self.backend.update_campaign_run(other.id, status="COMPLETED")
+        pages = self.follow("/api/proxy/run/summary?status=COMPLETED&page_size=3")
+        self.assertEqual([page["count"] for page in pages], [4, 4])
+        self.assertEqual(sum(len(page["results"]) for page in pages), 4)
+
 
 class TestDeletion(_CampaignRunCase):
     def test_bulk_delete_removes_selected_runs_and_their_tallies(self):

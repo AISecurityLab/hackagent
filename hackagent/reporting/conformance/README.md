@@ -4,7 +4,7 @@
 it and the exact response each must get, with bodies in `expected/`. The SDK's
 local server (`hackagent web`) and the platform API both load the sample and
 replay every case. Read them with `hackagent.reporting.conformance`
-(`sample()`, `cases()`, `normalized()`).
+(`sample()`, `cases()`).
 
 ## The sample
 
@@ -48,9 +48,11 @@ Each case has `name`, `method`, `path` (below the API root: `/run/summary`;
 the local server serves `/api/proxy/run/summary`), `query` (`[key, value]`
 pairs in request order), `headers`, `body` (JSON or null), `status`, `etag`
 (the response's `ETag`, or null when it must have none) and `expected` (a file
-in `expected/`, or null for a response without a body). Compare a body after
-`normalized()`, which turns a page's `next`/`previous` links into booleans:
-their form is each server's own.
+in `expected/`, or null for a response without a body). Compare a body
+exactly. A page's `next` and `previous` are relative links, `?` followed by
+the request's query parameters in request order with `page` replaced
+(`hackagent.reporting.http.page_link`), so they are identical on both
+servers.
 
 A case with `mutates: true` deletes data: run it against a freshly loaded
 sample. All others leave the store as it was.

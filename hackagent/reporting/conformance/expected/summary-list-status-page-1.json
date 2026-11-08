@@ -1,7 +1,7 @@
 {
   "count": 3,
-  "next": true,
-  "previous": false,
+  "next": "?status=COMPLETED&page_size=2&page=2",
+  "previous": null,
   "results": [
     {
       "agent": "a0000000-0000-4000-8000-000000000001",

@@ -23,7 +23,7 @@ Usage, from any project with `hackagent` installed::
         assert response.status_code == case.status
         if case.etag: assert response.headers[&quot;ETag&quot;] == case.etag
         if case.expected is not None:
-            assert conformance.normalized(response.json()) == case.expected
+            assert response.json() == case.expected
 
 ## Case Objects
 
@@ -37,7 +37,8 @@ One request and the response it must get.
 `path` is below the API root (`/run/summary`; the local server serves
 it at `/api/proxy/run/summary`). `query` is a list of `(key, value)`
 pairs in request order. `body` is a JSON request body, or None.
-`expected` is the :func:`normalized` JSON response body, or None for a
+`expected` is the JSON response body, exactly (page links included, in
+the form of :func:`hackagent.reporting.http.page_link`), or None for a
 response without one (`204`, `304`). `etag` is the response&#x27;s
 `ETag`, or None when it has none (errors, writes). A case that
 `mutates` changes the store: run it against a freshly loaded sample.
@@ -59,13 +60,4 @@ def cases() -> list[Case]
 
 Every case, in the order they are listed (mutating ones last), read
 afresh on every call.
-
-#### normalized
-
-```python
-def normalized(body: Any) -> Any
-```
-
-A response body as the cases compare it: a page&#x27;s `next` and
-`previous` links, whose form is each server&#x27;s own, become booleans.
 
