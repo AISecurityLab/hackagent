@@ -141,6 +141,7 @@ _RENAMED = {
     "interfaces/web/_launcher": "interfaces/web/launcher",
     "interfaces/web/_local_api": "interfaces/web/local_api",
     "interfaces/web/_remote_launcher": "interfaces/web/remote_launcher",
+    "interfaces/web/_run_reports": "interfaces/web/run_reports",
     "interfaces/web/_proxy": "interfaces/web/proxy",
     "interfaces/web/_serializers": "interfaces/web/serializers",
     "interfaces/web/_static": "interfaces/web/static",

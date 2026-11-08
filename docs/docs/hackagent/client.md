@@ -117,16 +117,6 @@ def web_target(url: str, **kwargs: Any) -> tuple[str, Dict[str, Any]]
 
 Build the `("web", operational_config)` pair for a live-browser chatbot.
 
-#### result\_bucket
-
-```python
-def result_bucket(status: Optional[str], notes: Optional[str] = None) -> str
-```
-
-Classify a result the same way the store does.
-
-Interfaces use this instead of importing storage bucket constants.
-
 #### ensure\_graphviz
 
 ```python
@@ -175,6 +165,39 @@ def delete_run(run_id: Any) -> None
 ```
 
 Delete one run. This is a write; reads never call it.
+
+#### delete\_campaign\_run
+
+```python
+def delete_campaign_run(campaign_run_id: Any) -> None
+```
+
+Delete a completed local campaign execution and its recorded child data.
+
+#### delete\_campaign\_runs
+
+```python
+def delete_campaign_runs(campaign_run_ids: List[Any]) -> None
+```
+
+Atomically delete selected local executions and their recorded child data.
+
+#### report\_campaign\_runs
+
+```python
+def report_campaign_runs(**filters: Any) -> Any
+```
+
+A page of campaign runs, newest first (`campaign`, `agent`,
+`status`, `page`, `page_size`).
+
+#### report\_campaign\_run
+
+```python
+def report_campaign_run(campaign_run_id: str) -> Any
+```
+
+One campaign run, or None.
 
 #### save\_campaign
 

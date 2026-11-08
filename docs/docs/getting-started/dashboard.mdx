@@ -17,25 +17,30 @@ The recording shows the runs of the [example run](./example-run.mdx) against a s
 - **Local mode** (the default local backend): reads the runs recorded in your SQLite database, and saves and launches campaigns on this machine.
 - **Remote mode** (`--backend remote`, with `HACKAGENT_API_KEY` set): shows your hosted HackAgent data, and runs the campaigns you launch on this machine.
 
-In local mode, select campaign checkboxes (or select all deletable executions
-on the current page), then **Delete selected** to remove recorded executions.
-You can also use **Delete** in a campaign's header to remove that execution.
-The selection clears when you change pages or refresh. Bulk deletion is atomic:
-if any selected execution is active or missing, none are deleted.
-The confirmation deletes child attack runs,
-results, traces and recorded audit/configuration together. Saved campaign
-definitions and exported log files remain untouched. Active executions cannot
-be deleted; deletion is permanent and is not a way to stop a running campaign.
+The Runs page is the same in both modes: the dashboard reads campaign runs
+through the `/run` report routes (`/run/summary`, `/run/<id>/report`,
+`/goals`, `/matrix`, `/attempts`, `/structure`, `/costs`, `/compare`), which
+the CLI answers from SQLite in local mode and the platform API answers in
+remote mode, with the same rules from `hackagent.reporting`.
 
-The campaign list and overview share summary data. Summary counts are aggregated
-in SQLite without loading result prompts, responses or metadata. Full result
-data is loaded for campaign investigations rather than for the history list.
+Select campaign checkboxes (or select all deletable executions on the current
+page), then **Delete selected** to remove recorded executions. You can also use
+**Delete** in a campaign's header to remove that execution. The selection
+clears when you change pages or refresh. Bulk deletion is atomic: if any
+selected execution is active or missing, none are deleted. The confirmation
+deletes child attack runs, results, traces and recorded audit/configuration
+together. Saved campaign definitions and exported log files remain untouched.
+Active executions cannot be deleted; deletion is permanent and is not a way to
+stop a running campaign.
 
-Campaign charts and goal lists read only outcome fields and category labels, not
-full request/response payloads. Attempts are filtered by goal and paginated in
-SQLite; full conversations and search traces are fetched for the selected goal
-and attack. Campaign sections (including costs and judge audit) load together on
-one scrollable page and remain mounted to preserve their state.
+Reports stay fast on large campaigns. Every write keeps small per-goal tallies
+(outcome counts, first-jailbreak timing, calls and token usage), so the list,
+summaries, report, goal matrix, costs and comparisons never recount results or
+scan traces. Attempts are filtered by goal and paginated in the database; full
+conversations and search traces are fetched only for the selected goal and
+attack. Every campaign run carries a `revision` that each write bumps: a running
+campaign's page polls its small summary and refetches the rest only when the
+revision changes, and unchanged responses are answered `304 Not Modified`.
 
 Your API key never reaches the browser. It stays in the CLI process, which
 attaches it to each request it proxies; the page itself runs with authentication
