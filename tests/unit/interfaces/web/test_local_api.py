@@ -365,7 +365,7 @@ class TestLaunchingOnThisMachine(_CampaignTestCase):
             if run["status"] in ("COMPLETED", "FAILED", "CANCELLED"):
                 return run
             time.sleep(0.02)
-        self.fail(f"run {run_id} did not finish")
+        raise self.failureException(f"run {run_id} did not finish")
 
     @mock.patch("hackagent.interfaces.web._launcher.resolve_campaign")
     @mock.patch(

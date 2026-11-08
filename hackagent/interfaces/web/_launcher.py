@@ -129,7 +129,7 @@ class LocalLauncher:
                     resolved=resolved,
                     on_event=on_event,
                 )
-            except BaseException as exc:  # recorded on the run by the runner
+            except Exception as exc:  # recorded on the run by the runner
                 state.setdefault("error", exc)
                 logger.warning("campaign %s ended: %s", campaign.name, exc)
             finally:
