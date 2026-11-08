@@ -96,15 +96,21 @@ class _SkipGuard:
     """Fail a required test lane that skipped anything.
 
     Counts skips from the reports themselves rather than the terminal
-    reporter's stats, which are absent under ``-p no:terminal``.
+    reporter's stats, which are absent under ``-p no:terminal``. A worse
+    outcome (failures, an interrupted run, an internal error) keeps its own
+    exit status.
     """
 
+    #: Skipped test ids printed when the lane fails; the rest are counted.
+    SHOWN = 10
+
     def __init__(self) -> None:
-        self.skipped: list[str] = []
+        # Insertion-ordered and unique: a test can report a skip more than once.
+        self.skipped: dict[str, None] = {}
 
     def _record(self, report) -> None:
         if report.skipped and not hasattr(report, "wasxfail"):
-            self.skipped.append(report.nodeid)
+            self.skipped[report.nodeid] = None
 
     def pytest_runtest_logreport(self, report) -> None:
         self._record(report)
@@ -112,16 +118,29 @@ class _SkipGuard:
     def pytest_collectreport(self, report) -> None:
         self._record(report)
 
+    def _report(self) -> list[str]:
+        skipped = list(self.skipped)
+        lines = [f"Required test lane skipped {len(skipped)} test(s):"]
+        lines += [f"  {nodeid}" for nodeid in skipped[: self.SHOWN]]
+        if len(skipped) > self.SHOWN:
+            lines.append(f"  ... and {len(skipped) - self.SHOWN} more")
+        return lines
+
+    def pytest_terminal_summary(self, terminalreporter) -> None:
+        if not self.skipped:
+            return
+        title, *details = self._report()
+        terminalreporter.write_sep("!", title)
+        for line in details:
+            terminalreporter.write_line(line)
+
     def pytest_sessionfinish(self, session) -> None:
         if not self.skipped:
             return
-        message = f"Required test lane skipped {len(self.skipped)} test(s)"
-        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-        if reporter is not None:
-            reporter.write_sep("!", message)
-        else:
-            sys.stderr.write(f"{message}\n")
-        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        if session.config.pluginmanager.get_plugin("terminalreporter") is None:
+            sys.stderr.write("\n".join(self._report()) + "\n")
+        if session.exitstatus == pytest.ExitCode.OK:
+            session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 
 def pytest_configure(config):
