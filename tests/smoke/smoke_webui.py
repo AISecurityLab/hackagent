@@ -143,7 +143,9 @@ def drive(base: str) -> list[str]:
         for path in PAGES:
             before = len(failures)
             try:
-                response = page.goto(base + path, wait_until="networkidle", timeout=30_000)
+                response = page.goto(
+                    base + path, wait_until="networkidle", timeout=30_000
+                )
                 if response is not None and response.status >= 400:
                     failures.append(f"{path}: the server answered {response.status}")
                 page.wait_for_timeout(1_200)
