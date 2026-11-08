@@ -233,6 +233,8 @@ jobs:
       HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OLLAMA_MODEL: tinyllama
+      # Pinned so the cached install matches; bump to upgrade.
+      OLLAMA_RELEASE: "0.40.15"
       # Let Ollama serve concurrent requests from pytest-xdist workers.
       OLLAMA_NUM_PARALLEL: "4"
       TEST_MAX_TOKENS_FAST: "15"
@@ -252,29 +254,60 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Ollama
-        # ollama.com sometimes answers 5xx. Retry, and fail here rather than
-        # at the first ollama command: piping curl into sh hid a failed
-        # download behind sh's exit status.
+      - name: Cache Ollama
+        id: ollama-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/ollama
+          key: ollama-${{ env.OLLAMA_RELEASE }}-cpu-${{ runner.os }}
+
+      - name: Download Ollama
+        if: steps.ollama-cache.outputs.cache-hit != 'true'
+        # The release archive is ~1.5 GB, almost all of it CUDA libraries a
+        # CPU runner never loads, and streaming it into tar (as ollama.com's
+        # install script does) fails whenever the connection drops. Download
+        # it to a file so retries resume, keep only the binary and the CPU
+        # libraries (~75 MB), and let the cache serve later runs without any
+        # download.
         run: |
-          for attempt in 1 2 3; do
-            if curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 \
-                 https://ollama.com/install.sh -o "$RUNNER_TEMP/install-ollama.sh" \
-               && sh "$RUNNER_TEMP/install-ollama.sh"; then
-              break
-            fi
-            if [ "$attempt" = 3 ]; then
-              echo "::error::Could not install Ollama from ollama.com"
-              exit 1
-            fi
-            sleep 30
+          archive="$RUNNER_TEMP/ollama.tar.zst"
+          downloaded=""
+          for url in \
+            "https://github.com/ollama/ollama/releases/download/v${OLLAMA_RELEASE}/ollama-linux-amd64.tar.zst" \
+            "https://ollama.com/download/ollama-linux-amd64.tar.zst?version=${OLLAMA_RELEASE}"; do
+            rm -f "$archive"
+            # curl's own --retry rewinds to the offset it started from, so each
+            # attempt is a new curl that resumes from the partial file.
+            for attempt in 1 2 3 4 5 6 7 8; do
+              if curl -fL --connect-timeout 30 -C - -o "$archive" "$url"; then
+                downloaded=yes
+                break 2
+              fi
+              sleep 10
+            done
           done
-          ollama serve &
-          for _ in $(seq 30); do
-            curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1 && break
-            sleep 1
-          done
-          curl -fsS http://127.0.0.1:11434/api/version
+          if [ -z "$downloaded" ]; then
+            echo "::error::Could not download Ollama ${OLLAMA_RELEASE}"
+            exit 1
+          fi
+          mkdir -p ~/ollama
+          zstd -dc "$archive" | tar -xf - -C ~/ollama \
+            --exclude='lib/ollama/cuda_*' --exclude='lib/ollama/rocm*' \
+            --exclude='lib/ollama/vulkan*' --exclude='lib/ollama/mlx*'
+          rm -f "$archive"
+
+      - name: Start Ollama
+        run: |
+          echo "$HOME/ollama/bin" >> "$GITHUB_PATH"
+          "$HOME/ollama/bin/ollama" serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          # At most 30 s in all, and 2 s per probe: a server that accepts the
+          # connection but never answers must not hold the job until it times out.
+          if ! timeout 30 sh -c \
+               'until curl -fsS -m 2 http://127.0.0.1:11434/api/version; do sleep 1; done'; then
+            echo "::error::Ollama did not answer within 30 s"
+            cat "$RUNNER_TEMP/ollama.log"
+            exit 1
+          fi
 
       - name: Cache Ollama models
         uses: actions/cache@v6
