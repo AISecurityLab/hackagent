@@ -83,7 +83,8 @@ def prepare_and_search(p, goals=(GOAL,), target=None, judge=None):
             await attack.prepare(list(goals), target, judge)
         return attack, await attack.run(GOAL, target, judge)
 
-    return (target, *asyncio.run(go()))
+    attack, findings = asyncio.run(go())
+    return target, attack, findings
 
 
 def test_seeds_the_pool_with_the_preset_programs():

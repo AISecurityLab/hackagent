@@ -8,6 +8,8 @@ This file registers command-line options that need to be available
 before pytest collects tests from subdirectories.
 """
 
+import sys
+
 import pytest
 
 pytest_plugins = ["tests.support.campaigns"]
@@ -90,10 +92,38 @@ def pytest_collection_modifyitems(config, items):
                 break
 
 
-def pytest_sessionfinish(session, exitstatus):
-    if not session.config.getoption("--fail-on-skip"):
-        return
-    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-    if reporter is not None and reporter.stats.get("skipped"):
-        reporter.write_sep("!", "Required test lane skipped tests")
+class _SkipGuard:
+    """Fail a required test lane that skipped anything.
+
+    Counts skips from the reports themselves rather than the terminal
+    reporter's stats, which are absent under ``-p no:terminal``.
+    """
+
+    def __init__(self) -> None:
+        self.skipped: list[str] = []
+
+    def _record(self, report) -> None:
+        if report.skipped and not hasattr(report, "wasxfail"):
+            self.skipped.append(report.nodeid)
+
+    def pytest_runtest_logreport(self, report) -> None:
+        self._record(report)
+
+    def pytest_collectreport(self, report) -> None:
+        self._record(report)
+
+    def pytest_sessionfinish(self, session) -> None:
+        if not self.skipped:
+            return
+        message = f"Required test lane skipped {len(self.skipped)} test(s)"
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter is not None:
+            reporter.write_sep("!", message)
+        else:
+            sys.stderr.write(f"{message}\n")
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+def pytest_configure(config):
+    if config.getoption("--fail-on-skip"):
+        config.pluginmanager.register(_SkipGuard(), "fail-on-skip")

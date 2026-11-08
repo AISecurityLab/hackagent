@@ -80,7 +80,7 @@ def _launched_run(content: bytes) -> Optional[UUID]:
         if run.get("executor") == LOCAL_EXECUTOR:
             return UUID(run["id"])
     except (ValueError, TypeError, KeyError, AttributeError):
-        pass
+        return None  # not a run: the launch failed or answered something else
     return None
 
 
