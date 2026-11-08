@@ -271,15 +271,22 @@ jobs:
         # download.
         run: |
           archive="$RUNNER_TEMP/ollama.tar.zst"
+          downloaded=""
           for url in \
             "https://github.com/ollama/ollama/releases/download/v${OLLAMA_RELEASE}/ollama-linux-amd64.tar.zst" \
             "https://ollama.com/download/ollama-linux-amd64.tar.zst?version=${OLLAMA_RELEASE}"; do
-            if curl -fL --retry 8 --retry-all-errors --retry-delay 10 -C - -o "$archive" "$url"; then
-              break
-            fi
             rm -f "$archive"
+            # curl's own --retry rewinds to the offset it started from, so each
+            # attempt is a new curl that resumes from the partial file.
+            for attempt in 1 2 3 4 5 6 7 8; do
+              if curl -fL --connect-timeout 30 -C - -o "$archive" "$url"; then
+                downloaded=yes
+                break 2
+              fi
+              sleep 10
+            done
           done
-          if [ ! -s "$archive" ]; then
+          if [ -z "$downloaded" ]; then
             echo "::error::Could not download Ollama ${OLLAMA_RELEASE}"
             exit 1
           fi
