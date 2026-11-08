@@ -13,7 +13,7 @@ from flask import Blueprint, jsonify, request
 
 from hackagent.attacks.techniques.registry import attack_family
 from hackagent.orchestrator.campaign.spec import redacted
-from hackagent.storage.buckets import result_bucket
+from hackagent.reporting.buckets import result_bucket
 from hackagent.storage.records import CampaignRunRecord, ResultRecord, RunRecord
 
 from . import _serializers as ser

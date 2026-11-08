@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-from hackagent.storage.buckets import result_bucket
+from hackagent.reporting.buckets import result_bucket
 from hackagent.storage.records import ResultRecord
 
 GoalVerdict = Literal["jailbroken", "mitigated", "unresolved"]

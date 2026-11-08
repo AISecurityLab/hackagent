@@ -342,16 +342,6 @@ def web_target(url: str, **kwargs: Any) -> tuple[str, Dict[str, Any]]:
     return build_web_target(url, **kwargs)
 
 
-def result_bucket(status: Optional[str], notes: Optional[str] = None) -> str:
-    """Classify a result the same way the store does.
-
-    Interfaces use this instead of importing storage bucket constants.
-    """
-    from hackagent.storage.buckets import result_bucket as _bucket
-
-    return _bucket(status, notes)
-
-
 def ensure_graphviz(*, allow_download: bool = False) -> Optional[str]:
     """Locate or install the Graphviz ``dot`` binary used by FC-Attack."""
     from hackagent.attacks._lib.graphviz import ensure_graphviz as _ensure
@@ -717,6 +707,5 @@ __all__ = [
     "presets",
     "primary_attacks",
     "primary_dataset",
-    "result_bucket",
     "web_target",
 ]

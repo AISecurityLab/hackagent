@@ -35,7 +35,7 @@ from hackagent.storage.records import (
     RunRecord,
     TraceRecord,
 )
-from hackagent.storage.buckets import result_bucket
+from hackagent.reporting.buckets import result_bucket
 
 logger = logging.getLogger("hackagent.storage.local")
 
