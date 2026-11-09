@@ -1,16 +1,17 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Shared serialization utilities for the tracking subsystem.
+"""JSON-safe cleaning of what a run records.
 
 Single source of truth for:
-- deep_clean: converts Pydantic/OpenAI model objects to plain Python structures
-- sanitize_for_json: unified JSON sanitization (inf/nan, sensitive keys,
+
+- ``deep_clean``: converts Pydantic/OpenAI model objects to plain Python
+  structures
+- ``sanitize_for_json``: unified JSON sanitization (inf/nan, sensitive keys,
   client objects, non-serializable fallback)
 
-Both tracker.py and step.py import from here; any fix or improvement needs
-to be made in exactly one place.
+The campaign runner's tracking and result writers call these before
+anything reaches the store or a results file, so a fix belongs here only.
 """
 
 import json
@@ -83,7 +84,10 @@ def sanitize_for_json(obj: Any) -> Any:
     - ``dict``:
         - Keys in ``_SKIP_KEYS`` (``_client``, ``client``) → ``"<TypeName>"``
         - Keys whose lowercase form contains a sensitive substring
-          (``key``, ``token``, ``secret``, ``password``) → ``"***REDACTED***"``
+          (``key``, ``token``, ``secret``, ``password``) → ``"***REDACTED***"``,
+          except numeric token counts (``prompt_tokens``, ``total_tokens``,
+          ...) and the ``*_tokens_details`` dicts of usage reports, which
+          name tokens without holding one
         - All other values recurse.
     - ``list`` / ``tuple`` → recurse element-wise, preserving type.
     - ``float``: ``inf``/``-inf`` → ``"Infinity"``/``"-Infinity"``,

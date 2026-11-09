@@ -1,9 +1,16 @@
-"""Map provider-neutral verdicts onto stored evaluation fields."""
+"""Map provider-neutral verdicts onto stored evaluation fields.
+
+The judges produce a :class:`~hackagent.core.contracts.Verdict`; the store
+and the result views read flat ``eval_*`` columns. The campaign runner uses
+:func:`eval_columns` to fill a result's ``evaluation_metrics``.
+"""
 
 from typing import Any, Mapping, Optional
 
 from hackagent.core.contracts import EvalStatus, Verdict
 
+#: Short column names of the built-in judges; any other judge gets
+#: ``eval_<name>`` with non-alphanumerics replaced by ``_``.
 JUDGE_SCORE_COLUMNS = {
     "nuanced": "eval_nj",
     "jailbreakbench": "eval_jb",
@@ -21,6 +28,23 @@ def eval_columns(
     *,
     evaluations: Optional[list] = None,
 ) -> dict[str, Any]:
+    """Flatten a verdict and per-judge evaluations into stored result columns.
+
+    Each judge gets an ``eval_<judge>`` column holding 1 or 0 (known judges use
+    the short names in :data:`JUDGE_SCORE_COLUMNS`), plus ``eval_<judge>_mean``
+    for a numeric score and ``explanation_<judge>`` for its reasoning. An
+    abstaining judge's column is None. The verdict itself adds ``success``,
+    ``best_score`` and, when present, ``judge_error`` and ``explanation``.
+
+    Args:
+        verdict: The aggregated verdict, with one vote per judge.
+        evaluations: Extra per-judge results as mappings with ``name`` (or
+            ``judge``), ``score``, ``success`` and ``notes`` (or
+            ``explanation``); non-mappings are skipped.
+
+    Returns:
+        The columns, keyed by name.
+    """
     columns: dict[str, Any] = {}
     if verdict is not None:
         columns["success"] = bool(verdict.success)
@@ -55,6 +79,12 @@ def eval_columns(
 
 
 def evaluation_metrics(result: Any) -> dict[str, Any]:
+    """Return only the ``eval_*`` and ``explanation_*`` columns of a result.
+
+    Args:
+        result: An object with a ``verdict`` and a list of pydantic
+            ``evaluations``.
+    """
     columns = eval_columns(
         result.verdict,
         evaluations=[item.model_dump() for item in result.evaluations],
@@ -67,6 +97,13 @@ def evaluation_metrics(result: Any) -> dict[str, Any]:
 
 
 def evaluation_status(result: Any) -> Optional[str]:
+    """Map a result's verdict to its stored ``EvalStatus`` value.
+
+    Returns:
+        ``ERROR_TEST_FRAMEWORK`` when the judges failed,
+        ``SUCCESSFUL_JAILBREAK`` or ``FAILED_JAILBREAK`` otherwise, and None
+        when the result has no verdict yet.
+    """
     if result.verdict is None:
         return None
     if result.verdict.error:
