@@ -48,18 +48,25 @@ class ReportError(Exception):
         self.detail = detail
 
     def body(self) -> dict[str, str]:
+        """Return the JSON error body, ``{"detail": ...}``."""
         return {"detail": self.detail}
 
 
 class BadRequest(ReportError):
+    """A malformed request (HTTP 400)."""
+
     status = 400
 
 
 class NotFound(ReportError):
+    """A campaign run, attack run or goal that does not exist (HTTP 404)."""
+
     status = 404
 
 
 class Conflict(ReportError):
+    """A request that conflicts with the resource's state (HTTP 409)."""
+
     status = 409
 
 
@@ -113,6 +120,7 @@ def paginate(
 
 
 def page_slice(items: Sequence[Any], page: int, page_size: int) -> list[Any]:
+    """Return the items of 1-based ``page`` of ``page_size`` items."""
     start = (page - 1) * page_size
     return list(items[start : start + page_size])
 

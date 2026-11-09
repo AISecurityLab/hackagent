@@ -35,6 +35,8 @@ from hackagent.reporting.tallies import GoalOutcome
 
 
 class CampaignRunSummary(TypedDict):
+    """One campaign run's row in ``/run/summary``: identity, status, verdicts."""
+
     id: str
     name: str
     campaign: Optional[str]

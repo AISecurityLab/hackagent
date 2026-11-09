@@ -38,6 +38,8 @@ UNSPECIFIED = "Unspecified"
 
 
 class AttackOutcome(TypedDict):
+    """One attack run's verdict on a goal and how many attempts it made."""
+
     run_id: str
     verdict: AttackVerdict
     attempts: int
@@ -58,10 +60,18 @@ class _GoalFields(TypedDict):
 
 
 class GoalSummary(_GoalFields, total=False):
+    """One goal's verdict and counts across a scope (a campaign run or one attack run).
+
+    ``attack_outcomes`` is present only when the per-attack breakdown was
+    requested.
+    """
+
     attack_outcomes: list[AttackOutcome]
 
 
 class OutcomeCounts(TypedDict):
+    """How many recorded goals ended in each verdict."""
+
     recorded_goals: int
     jailbroken: int
     mitigated: int
@@ -69,10 +79,14 @@ class OutcomeCounts(TypedDict):
 
 
 class SubcategorySummary(OutcomeCounts):
+    """Verdict counts of the goals in one subcategory."""
+
     name: str
 
 
 class CategorySummary(OutcomeCounts):
+    """Verdict counts of the goals in one category, with its subcategories."""
+
     category: str
     subcategories: list[SubcategorySummary]
 

@@ -1,12 +1,16 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-RemoteBackend — Store implementation backed by api.hackagent.dev.
+"""RemoteBackend: the :class:`~hackagent.storage.store.Store` on the HackAgent API.
 
-This backend centralises all HTTP calls that were previously scattered across
-the model router, the run orchestrator, Tracker, and StepTracker.  It is instantiated
-when an API key is available and selected automatically by HackAgent.__init__.
+Used when the remote backend is selected explicitly (``backend="remote"``,
+``HACKAGENT_BACKEND=remote`` or ``storage.backend: remote`` in a campaign);
+having an API key alone never selects it. Every HTTP call the SDK makes to
+the platform's tracking API goes through this module, which also implements
+the executor protocol (claim, heartbeat, finish) used by queued runs.
+
+Append-only writes (result updates and traces) are deferred to a background
+thread; reads flush that queue first. See :meth:`RemoteBackend.flush`.
 """
 
 from __future__ import annotations
@@ -426,6 +430,10 @@ class RemoteBackend:
 
         Called before any read that could observe a deferred write, and at run
         completion, so callers always see a consistent server state.
+
+        Raises:
+            RuntimeError: When background writes failed since the last flush.
+                Each failure is reported once.
         """
         self._drain()
         # Each failure is reported once: a later flush that finds nothing new
@@ -474,6 +482,7 @@ class RemoteBackend:
     # ── Context ──────────────────────────────────────────────────────────────
 
     def get_api_key(self) -> Optional[str]:
+        """Return the API key the HTTP client authenticates with."""
         return self._client.token
 
     @property
@@ -482,7 +491,14 @@ class RemoteBackend:
         return self._client
 
     def get_context(self) -> OrganizationContext:
-        """Fetch org_id and user_id from the first agent (cached after first call)."""
+        """Return the organization and user of this API key (cached).
+
+        Read from the first agent the key can see. A new account with no agents
+        falls back to ``/organization/me``, and ``user_id`` is then ``"unknown"``.
+
+        Raises:
+            RuntimeError: When neither lookup succeeds.
+        """
         if self._context is not None:
             return self._context
 
@@ -535,6 +551,15 @@ class RemoteBackend:
         return _to_agent_record(existing)
 
     def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:
+        """Create the agent ``name``, or replace the config of the existing one.
+
+        Looks the name up across every page of agents first. A failed create is
+        retried as an update when the agent turns out to exist, since some server
+        deployments answer a duplicate name with a 5xx.
+
+        Raises:
+            RuntimeError: When the agent can be neither created nor found.
+        """
         existing = self._find_agent_by_name(name)
 
         if existing:
@@ -589,6 +614,11 @@ class RemoteBackend:
     def list_agents(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[AgentRecord]:
+        """Return one page of agents.
+
+        The agent endpoint pages with its own fixed size, so ``page_size`` is
+        ignored. A failed request returns an empty page.
+        """
         # Agent endpoint currently supports page but not page_size.
         resp = agent_list.sync_detailed(client=self._client, page=page)
         if resp.status_code == 200 and resp.parsed:
@@ -597,6 +627,11 @@ class RemoteBackend:
         return PaginatedResult(items=[], total=0)
 
     def get_agent(self, agent_id: UUID) -> AgentRecord:
+        """Return the agent ``agent_id``.
+
+        Raises:
+            RuntimeError: When the server does not return it.
+        """
         from hackagent.storage._http.api.agent import agent_retrieve
 
         resp = agent_retrieve.sync_detailed(id=agent_id, client=self._client)
@@ -605,6 +640,7 @@ class RemoteBackend:
         raise RuntimeError(f"RemoteBackend: Agent {agent_id} not found")
 
     def delete_agent(self, agent_id: UUID) -> None:
+        """Delete the agent; the server's answer is not checked."""
         from hackagent.storage._http.api.agent import agent_destroy
 
         agent_destroy.sync_detailed(id=agent_id, client=self._client)
@@ -618,6 +654,11 @@ class RemoteBackend:
         organization: UUID,
         configuration: Dict[str, Any],
     ) -> AttackRecord:
+        """Create an attack on the server and return it.
+
+        Raises:
+            RuntimeError: When the server does not answer 201.
+        """
         body = AttackRequest.model_validate(
             {
                 "type": attack_type,
@@ -645,6 +686,11 @@ class RemoteBackend:
     def list_attacks(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[AttackRecord]:
+        """Return one page of attacks.
+
+        ``page_size`` is ignored (the server's page size applies). A failed
+        request returns an empty page.
+        """
         resp = attack_list.sync_detailed(client=self._client, page=page)
         if resp.status_code == 200 and resp.parsed:
             items = []
@@ -697,6 +743,17 @@ class RemoteBackend:
         audit: Optional[Dict[str, Any]] = None,
         run_notes: Optional[str] = None,
     ) -> CampaignRunRecord:
+        """Change the given fields of a campaign run and return it.
+
+        Queued writes are flushed first, so a lost result write fails the update
+        before the run can end as COMPLETED. ``audit`` is merged into the run's
+        ``run_config`` as ``evaluation_audit``. A final status finishes the run
+        through the executor protocol (:meth:`finish_run`), with ``run_notes`` as
+        its note.
+
+        Raises:
+            RuntimeError: When a queued write failed or the server refuses the update.
+        """
         final = _is_final(status)
         # Lost result writes surface before the run can end as COMPLETED.
         self.flush()
@@ -728,6 +785,11 @@ class RemoteBackend:
         return _campaign_record(run)
 
     def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord:
+        """Return the campaign run ``campaign_run_id``, after flushing queued writes.
+
+        Raises:
+            RuntimeError: When the server does not return it.
+        """
         self.flush()
         response = run_retrieve.sync_detailed(id=campaign_run_id, client=self._client)
         if response.status_code != 200 or response.parsed is None:
@@ -739,6 +801,11 @@ class RemoteBackend:
     def list_campaign_runs(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[CampaignRunRecord]:
+        """Return one page of campaign runs.
+
+        The API has no campaign-only filter, so this pages through all runs until
+        the requested page is filled; cost grows with the page number.
+        """
         # The hosted API has no campaign-only filter yet. Page through ordinary
         # runs and select the parent markers until the requested page is full.
         found: List[CampaignRunRecord] = []
@@ -770,6 +837,14 @@ class RemoteBackend:
         run_config: Dict[str, Any],
         campaign_run_id: Optional[UUID] = None,
     ) -> RunRecord:
+        """Create an attack run as a child of its campaign run.
+
+        The run starts RUNNING.
+
+        Raises:
+            ValueError: When ``campaign_run_id`` is None.
+            RuntimeError: When the server does not answer 201.
+        """
         if campaign_run_id is None:
             raise ValueError(
                 "RemoteBackend: an attack run is created under its campaign run; "
@@ -805,6 +880,15 @@ class RemoteBackend:
         run_notes: Optional[str] = None,
         run_config: Optional[Dict[str, Any]] = None,
     ) -> RunRecord:
+        """Change the given fields of an attack run.
+
+        A final status flushes queued writes first and finishes the run through
+        :meth:`finish_run`. The returned record carries only the passed fields;
+        the run is not read back.
+
+        Raises:
+            RuntimeError: When a queued write failed or the server refuses the update.
+        """
         final = _is_final(status)
         if final:
             # Lost result writes surface before the run can end as COMPLETED.
@@ -841,6 +925,12 @@ class RemoteBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[RunRecord]:
+        """Return one page of attack runs, optionally of one attack.
+
+        Campaign runs share the server's run endpoint and are filtered out. Once
+        one has been seen, the listing scans every page so that ``total`` counts
+        attack runs only.
+        """
         matching_runs: List[Any] = []
         total = 0
         campaign_markers_seen = 0
@@ -930,6 +1020,11 @@ class RemoteBackend:
         return PaginatedResult(items=items, total=attack_total)
 
     def get_run(self, run_id: UUID) -> RunRecord:
+        """Return the attack run ``run_id``, after flushing queued writes.
+
+        Raises:
+            RuntimeError: When the server does not return it.
+        """
         self.flush()
         resp = run_retrieve.sync_detailed(id=run_id, client=self._client)
         if resp.status_code == 200 and resp.parsed:
@@ -1049,6 +1144,11 @@ class RemoteBackend:
         request_payload: Dict[str, Any],
         agent_specific_data: Dict[str, Any],
     ) -> ResultRecord:
+        """Create an unevaluated result on the server (synchronously, for its id).
+
+        Raises:
+            RuntimeError: When the server does not answer 201.
+        """
         body = ResultRequest(
             run=run_id,
             goal=goal,
@@ -1087,6 +1187,11 @@ class RemoteBackend:
         latency_ms: Optional[int] = None,
         response_status_code: Optional[int] = None,
     ) -> ResultRecord:
+        """Queue the result update for the background writer and return at once.
+
+        The returned record carries only the passed fields. A failed write is
+        reported by the next :meth:`flush`.
+        """
         # Persistence-only: the loop never reads the updated row back (reads
         # drain the queue first), so defer the PATCH to the background worker.
         self._enqueue(
@@ -1154,6 +1259,11 @@ class RemoteBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[ResultRecord]:
+        """Return one page of results, optionally of one run, after flushing.
+
+        When a run's first page comes back empty, the results embedded in the run
+        itself are returned instead.
+        """
         self.flush()  # observe any queued trace/status writes
         items: List[ResultRecord] = []
         total = 0
@@ -1265,6 +1375,11 @@ class RemoteBackend:
         return PaginatedResult(items=items, total=total or len(items))
 
     def get_result(self, result_id: UUID) -> ResultRecord:
+        """Return the result ``result_id``, after flushing queued writes.
+
+        Raises:
+            RuntimeError: When the server does not return it.
+        """
         self.flush()  # observe any queued status update for this result
         resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
         if resp.status_code == 200 and resp.parsed:
@@ -1297,6 +1412,11 @@ class RemoteBackend:
         step_type: str,
         content: Dict[str, Any],
     ) -> TraceRecord:
+        """Queue a trace step for the background writer and return at once.
+
+        The returned id is derived from ``result_id`` and ``sequence``, not the
+        server's; :meth:`list_traces` returns the stored ids.
+        """
         # Traces are append-only audit data, already buffered in memory by the
         # Tracker and never read back mid-run, so the POST is deferred to the
         # background worker. The returned id is synthetic (used only for logging);
@@ -1338,6 +1458,10 @@ class RemoteBackend:
             )
 
     def list_traces(self, result_id: UUID) -> List[TraceRecord]:
+        """Return a result's trace steps ordered by ``sequence``, after flushing.
+
+        A result the server does not return yields an empty list.
+        """
         self.flush()  # observe any queued traces for this result
         resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
         if resp.status_code != 200 or not resp.parsed:
@@ -1370,7 +1494,15 @@ class RemoteBackend:
     # ── Delete ────────────────────────────────────────────────────────────────
 
     def count_result_buckets(self) -> Dict[str, int]:
-        """Efficiently count results by evaluation status using filtered API calls."""
+        """Count all results by reporting bucket, after flushing queued writes.
+
+        Issues one filtered list request per evaluation status and reads each
+        total, so no result is downloaded.
+
+        Returns:
+            A dict with the keys ``total``, ``jailbreaks``, ``mitigated``,
+            ``error`` and ``pending``.
+        """
         self.flush()  # counts depend on queued status updates
         from hackagent.storage._http.api.models import ResultListEvaluationStatus
 
@@ -1403,9 +1535,11 @@ class RemoteBackend:
         }
 
     def delete_run(self, run_id: UUID) -> None:
+        """Delete an attack run; the server's answer is not checked."""
         run_destroy.sync_detailed(id=run_id, client=self._client)
 
     def delete_attack(self, attack_id: UUID) -> None:
+        """Delete every run of the attack, then the attack itself."""
         # Delete all runs belonging to the attack first, then the attack.
         page = 1
         while True:
