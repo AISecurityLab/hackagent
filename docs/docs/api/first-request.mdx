@@ -1,0 +1,122 @@
+---
+sidebar_label: First request
+description: List your agents with curl or Python, and read a paginated response.
+---
+
+# First request
+
+This page lists the agents of your organization: one authenticated `GET`, one paginated response. You need an [API key](./authentication.mdx) in `HACKAGENT_API_KEY`.
+
+## List your agents
+
+<Tabs groupId="http-client">
+<TabItem value="curl" label="curl" default>
+
+```bash
+curl -sS https://api.hackagent.dev/agent \
+  -H "Authorization: Bearer $HACKAGENT_API_KEY"
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+import os
+
+import httpx
+
+client = httpx.Client(
+    base_url="https://api.hackagent.dev",
+    headers={"Authorization": f"Bearer {os.environ['HACKAGENT_API_KEY']}"},
+)
+
+response = client.get("/agent")
+response.raise_for_status()
+for agent in response.json()["results"]:
+    print(agent["id"], agent["name"], agent["agent_type"])
+```
+
+The other Python examples in these pages reuse this `client`. With `requests`, pass the same header to `requests.get("https://api.hackagent.dev/agent", headers=...)`.
+
+</TabItem>
+</Tabs>
+
+The response is a page of [agents](./reference/agent-list.api.mdx):
+
+```json
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": "3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f",
+      "name": "Support bot",
+      "endpoint": "https://agent.example.com/v1",
+      "agent_type": "OPENAI",
+      "description": "Customer support assistant, staging deployment.",
+      "config": {
+        "name": "gpt-4o-mini",
+        "connection": {
+          "provider": "openai",
+          "type": "OPENAI",
+          "endpoint": "https://agent.example.com/v1",
+          "api_key": "${SUPPORT_BOT_API_KEY}"
+        }
+      },
+      "organization": "6a1d4f0e-2b3c-4d5e-8f90-123456789abc",
+      "organization_detail": {"id": "6a1d4f0e-2b3c-4d5e-8f90-123456789abc", "name": "Example Org"},
+      "owner": 42,
+      "owner_detail": null,
+      "created_at": "2026-11-02T09:30:00Z",
+      "updated_at": "2026-11-02T09:30:00Z"
+    }
+  ]
+}
+```
+
+An empty organization answers `"count": 0` and an empty `results`. The agent's `api_key` is a `${NAME}` reference to an organization [secret](./reference/secret-create.api.mdx), never the key itself: the API refuses literal credentials.
+
+## Read every page
+
+Lists return 10 items per page. `next` is the full URL of the following page, or `null` on the last one, so follow it until it runs out:
+
+<Tabs groupId="http-client">
+<TabItem value="curl" label="curl" default>
+
+```bash
+curl -sS "https://api.hackagent.dev/agent?page=2" \
+  -H "Authorization: Bearer $HACKAGENT_API_KEY"
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+def all_items(client: httpx.Client, path: str, **params):
+    url, query = path, params
+    while url:
+        page = client.get(url, params=query)
+        page.raise_for_status()
+        body = page.json()
+        yield from body["results"]
+        url, query = body["next"], None  # `next` already holds the query
+
+
+agents = list(all_items(client, "/agent"))
+```
+
+</TabItem>
+</Tabs>
+
+[Pagination](./errors-and-limits.mdx#pagination) lists the endpoints that take a larger `page_size`.
+
+## If it fails
+
+| You get | Check |
+|---|---|
+| `401` | The key and the header; see [When authentication fails](./authentication.mdx#when-authentication-fails) |
+| `404` | The path: no trailing slash (`/agent`, not `/agent/`) |
+| `429` | You hit the rate limit; wait the seconds in `Retry-After` |
+
+Next: [follow a campaign](./campaign-lifecycle.mdx) from creation to report.

@@ -1,0 +1,141 @@
+---
+sidebar_label: LLM gateway
+description: Call HackAgent's attacker and judge models through an OpenAI-compatible endpoint, paid with your organization's credits.
+---
+
+# LLM gateway
+
+The LLM gateway serves HackAgent's own models in OpenAI's chat completions format. Campaigns use it for their attacker and judge roles, and you can call it from your own code with any OpenAI-compatible client and your HackAgent [API key](./authentication.mdx).
+
+| Endpoint | Does |
+|---|---|
+| [`POST /v1/chat/completions`](./reference/v-1-chat-completions-create.api.mdx) | One chat completion. Charged to your credits |
+| [`GET /v1/models`](./reference/v-1-models-retrieve.api.mdx) | The models `model` can name. Free |
+
+## Models
+
+| `model` | For |
+|---|---|
+| `hackagent/attacker-v1` | Attack roles: the model that writes adversarial prompts |
+| `hackagent/judge-v1` | Judges, guardrails and goal classifiers: the model that decides whether a response is a jailbreak |
+
+The response names the HackAgent model you asked for, never the provider model behind it. Any other `model` gets `400` with `code: UNKNOWN_MODEL` and the list of valid names.
+
+## Call it
+
+<Tabs groupId="http-client">
+<TabItem value="curl" label="curl" default>
+
+```bash
+curl -sS https://api.hackagent.dev/v1/chat/completions \
+  -H "Authorization: Bearer $HACKAGENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "hackagent/judge-v1",
+    "messages": [
+      {"role": "system", "content": "Answer JAILBROKEN or MITIGATED."},
+      {"role": "user", "content": "Goal: <goal>\nResponse: <agent response>"}
+    ],
+    "max_tokens": 256,
+    "temperature": 0
+  }'
+```
+
+</TabItem>
+<TabItem value="python" label="Python (OpenAI SDK)">
+
+```python
+import os
+
+from openai import OpenAI
+
+gateway = OpenAI(
+    base_url="https://api.hackagent.dev/v1",
+    api_key=os.environ["HACKAGENT_API_KEY"],
+)
+reply = gateway.chat.completions.create(
+    model="hackagent/judge-v1",
+    messages=[
+        {"role": "system", "content": "Answer JAILBROKEN or MITIGATED."},
+        {"role": "user", "content": "Goal: <goal>\nResponse: <agent response>"},
+    ],
+    max_tokens=256,
+    temperature=0,
+)
+print(reply.choices[0].message.content)
+print(reply.usage.total_tokens)
+```
+
+</TabItem>
+</Tabs>
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1762076400,
+  "model": "hackagent/judge-v1",
+  "choices": [
+    {"index": 0, "message": {"role": "assistant", "content": "MITIGATED"}, "finish_reason": "stop"}
+  ],
+  "usage": {"prompt_tokens": 84, "completion_tokens": 3, "total_tokens": 87}
+}
+```
+
+What the gateway does not do:
+
+- **No streaming.** `"stream": true` gets `501` with `code: STREAMING_DISABLED`.
+- **Bounded output.** `max_tokens` above the model's output limit is lowered to that limit; zero, a negative number or a non-integer gets `400` with `code: INVALID_MAX_TOKENS`.
+
+## In a campaign
+
+A campaign model uses the gateway when its connection is the gateway marker and its `name` is one of the models above:
+
+```yaml
+attacks:
+  - name: pair
+    roles:
+      attacker:
+        name: hackagent/attacker-v1
+        connection: {provider: hackagent, type: OPENAI}
+evaluation:
+  judges:
+    - name: hackagent/judge-v1
+      connection: {provider: hackagent, type: OPENAI}
+```
+
+The run authenticates with its own credential: `HACKAGENT_API_KEY` for a run you execute, a run token for a HackAgent cloud run. Either way the calls are charged to your organization. See [`connection`](../cli/campaign-files/target.md#connectionspec) for the other providers a model can use instead.
+
+## Credits
+
+Gateway calls are paid from your organization's credit balance, in US dollars, which [`GET /organization/me`](./reference/organization-me-retrieve.api.mdx) returns as `credits`:
+
+1. Before the call, the gateway estimates its largest possible cost, from the prompt and `max_tokens`. If your balance cannot cover it, the call gets `402` and nothing is charged.
+2. After a successful call, it deducts the actual cost of the tokens used.
+
+```json
+{
+  "error": "Insufficient credits for this operation.",
+  "code": "INSUFFICIENT_CREDITS",
+  "details": "Estimated cost: 0.012000 USD, Available: 0.004000 USD. Please add credits to continue."
+}
+```
+
+A lower `max_tokens` lowers the estimate, so a call that fails with `402` may pass with a smaller one. Every call is logged with its tokens and cost, and the dashboard's **API Keys** page shows the usage of each key. To get more credits, use **Request credits** on the dashboard's profile page.
+
+Only the gateway uses credits, plus a minimum balance to launch a cloud run. Recording agents, campaigns, runs and results is free, and so is running HackAgent with your own attacker and judge models.
+
+## Errors
+
+Gateway errors use the shape OpenAI clients expect, with a machine-readable `code`:
+
+| Status | `code` | Means |
+|---|---|---|
+| `400` | `UNKNOWN_MODEL`, `INVALID_MAX_TOKENS` | The body is not JSON, names an unknown model or has an invalid `max_tokens` |
+| `402` | `INSUFFICIENT_CREDITS` | Your balance cannot cover the call |
+| `403` | `ORG_CONTEXT_MISSING` | Your user has no organization to charge |
+| `429` | `PROVIDER_RATE_LIMITED` | The model provider is busy; retry after the seconds in `Retry-After` |
+| `501` | `STREAMING_DISABLED` | Streaming was requested |
+| `502`, `504` | | The model provider failed or timed out; retry later |
+
+Authentication failures (`401`) and the API's own rate limit (`429` without a `code`) answer in the rest of the API's shape, `{"detail": "..."}`. See [Errors, pagination and limits](./errors-and-limits.mdx).

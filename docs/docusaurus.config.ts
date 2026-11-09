@@ -292,10 +292,10 @@ const config: Config = {
             from: '/hackagent/router/tracking/category_classifier',
             to: '/cli/campaign-files/execution',
           },
-          // The six HTTP API pages became sections of /api.
-          ...['first-request', 'authentication', 'runs', 'results', 'errors'].map(
-            (page) => ({from: `/api/${page}`, to: `/api#${page}`}),
-          ),
+          // Old HTTP API pages whose content now lives in the API guides.
+          {from: '/api/runs', to: '/api/campaign-lifecycle#6-follow-the-run'},
+          {from: '/api/results', to: '/api/campaign-lifecycle#7-read-the-results'},
+          {from: '/api/errors', to: '/api/errors-and-limits'},
           ...Object.entries(PAGE_REDIRECTS).map(([from, to]) => ({from, to})),
         ],
       },
