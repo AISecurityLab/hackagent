@@ -14,7 +14,15 @@ from ...contract import Embedder
 async def retrieve(
     queries: Sequence[str], documents: Sequence[str], k: int, embedder: Embedder | None
 ) -> list[list[int]]:
-    """Rank each query independently. Ties preserve library order."""
+    """Return, per query, the indices of the ``k`` documents most similar to it.
+
+    Similarity is cosine over ``embedder`` vectors, or over token counts
+    when there is no embedder. Ties preserve library order.
+
+    Raises:
+        ValueError: The embedder did not return one finite, non-empty,
+            equal-sized vector per text.
+    """
     texts = [*queries, *documents]
     if embedder is None:
         tokens = [Counter(re.findall(r"\w+", text.casefold())) for text in texts]

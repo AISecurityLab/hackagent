@@ -12,6 +12,9 @@ Poison a tool registry description to steer retrieval and tool selection across 
 
 Poison one tool description and measure retrieval plus tool selection.
 
+The full algorithm and the deviations from the paper are documented in
+the module `hackagent.attacks.techniques.indirect.toolhijacker.attack`.
+
 **Taxonomy:** Adaptive; tag: Indirect (no RAG tag).
 
 Each goal is a benign target task. Search tests the same poisoned document
@@ -51,11 +54,11 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `tools` | list of `ToolDocument` (at least 1) | _see the code_ | Benign tool library. Each entry has name, description and parameters. |
-| `malicious_tool` | `ToolDocument` | see `ToolDocument` | Injected tool. Its name and parameters stay fixed; its description is optimized. |
+| `malicious_tool` | `ToolDocument` | see `ToolDocument` | Injected tool. Its name and parameters stay fixed; its description gets the task phrasings and a selection instruction appended. |
 | `paraphrases` | list of string | empty | Additional semantic phrasings of each goal. Empty uses two deterministic rephrasings. The original goal is always tested. |
 | `top_k` | integer (>= 1) | `3` | Number of tool documents retrieved before selection. |
 | `max_attempts` | integer (>= 1) | `3` | Maximum candidate descriptions per goal, each tested on all task phrasings. Without an attacker, at most three built-in variants are tested. |
-| `success_threshold` | number (> 0, <= 1) | `1.0` | End-to-end selection rate across phrasings required to stop searching early. |
+| `success_threshold` | number (> 0, <= 1) | `1.0` | Share of phrasings for which the poisoned tool must be retrieved and called, with no target errors, to stop early and count as a success. |
 
 ## In a campaign file
 

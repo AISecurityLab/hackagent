@@ -10,7 +10,16 @@ Indirect prompt injection via poisoned documents in a retrieval-augmented (RAG) 
 
 **Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
-Poison the retrieved corpus and judge what the target does with it.
+Plant payloads in a knowledge base and judge what the target does with retrieved context.
+
+Implements knowledge-base poisoning after PoisonedRAG (Zou et al., 2024,
+[arXiv:2402.07867](https://arxiv.org/abs/2402.07867)): the `attacker`
+writes payloads that the `embedder` places next to the passages benign
+queries retrieve, the poisoned corpus is chunked and searched locally,
+and the target answers each query with the retrieved chunks as context.
+The campaign's evaluation panel judges every answer; there is no early
+stop. The algorithm and the deviations from the paper are documented in
+the module `hackagent.attacks.techniques.indirect.rag.attack`.
 
 ## Helper models
 
@@ -29,13 +38,13 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 |---|---|---|---|
 | `documents` | list of string (at least 1) | **required** | The knowledge base to poison, one entry per document (raw text). |
 | `benign_queries` | list of string | empty | Benign queries to retrieve with. Empty means the attacker writes them. |
-| `queries_per_goal` | integer (>= 1) | `5` | Queries generated per goal when none are given. |
-| `strategy` | string | `inline_context_override` | How the payload is written: `inline_context_override` \| `append_hidden_directive` \| `maximize_retrieval`. |
-| `poisoned_ratio` | number (> 0.0, <= 1.0) | `0.5` | Fraction of the corpus to poison, most-relevant documents first. |
-| `payloads_per_query` | integer (>= 1) | `5` | Payloads inserted per query anchor, each at its own paragraph. |
-| `chunk_size` | integer (>= 1) | `1000` | Retrieval chunking. |
+| `queries_per_goal` | integer (>= 1) | `5` | Benign queries the attacker writes per goal when benign_queries is empty. |
+| `strategy` | string | `inline_context_override` | How the payload is written: `inline_context_override` weaves it into the text, `append_hidden_directive` adds it as authoritative guidance, `maximize_retrieval` writes a standalone answer-like paragraph. |
+| `poisoned_ratio` | number (> 0.0, <= 1.0) | `0.5` | Fraction of the corpus to poison, rounded up, taking documents in the order given. |
+| `payloads_per_query` | integer (>= 1) | `5` | Payloads inserted per query in each poisoned document, each after its own most-similar paragraph. |
+| `chunk_size` | integer (>= 1) | `1000` | Characters per retrieval chunk. |
 | `chunk_overlap` | integer (>= 0) | `200` | Characters shared between consecutive chunks, so a passage cut at a chunk boundary is still retrievable. |
-| `top_k` | integer (>= 1) | `5` | Chunks retrieved per query. |
+| `top_k` | integer (>= 1) | `5` | Chunks retrieved per query and attached as context. |
 | `vulnerable_prompt` | boolean | `false` | Treat instructions in retrieved context as authoritative. The attack's ceiling, not a realistic defence. |
 
 ## In a campaign file
