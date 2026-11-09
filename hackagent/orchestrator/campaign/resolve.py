@@ -61,6 +61,13 @@ class ResolvedAttack:
 
 @dataclass(frozen=True)
 class ResolvedCampaign:
+    """Everything a campaign spec describes, built and ready to run.
+
+    Produced by :func:`resolve_campaign`: the loaded goals, the target, the
+    judge panel and the constructed attacks. ``probes`` holds one reachability
+    check per distinct model, which preflight runs before any attack.
+    """
+
     spec: CampaignSpec
     goals: tuple[Goal, ...]
     target: Model
