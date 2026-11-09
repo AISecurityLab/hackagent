@@ -1,0 +1,80 @@
+---
+title: "Python SDK"
+description: "Run campaigns and read their results from Python, with the module reference generated from the docstrings."
+sidebar_label: "Overview"
+---
+
+# Python SDK
+
+The `hackagent` package is what the CLI, the terminal app and the dashboard
+are built on. Use it from Python when a campaign is one step of something
+larger: a test suite, a CI job, a notebook, your own tooling.
+
+From Python you do the same two things the CLI does:
+
+- **Run a campaign.** You pass a campaign, as a YAML file or a Python dict, to
+  `run_campaign`. It attacks the target, judges every reply, records the run
+  and returns the result.
+- **Read what runs recorded.** `HackAgent` opens the store a run wrote to and
+  lists campaign runs, attack runs, results and traces. `hackagent.reporting`
+  turns them into the same per-goal verdicts and reports the dashboard shows.
+
+## How it fits with the rest
+
+| Tool | What it shares with the SDK |
+|---|---|
+| [CLI](../cli/index.md) | `hackagent campaign run` loads the same campaign file and calls the same `run_campaign`. A file that runs there runs from Python, and the other way round. |
+| [Dashboard](../getting-started/dashboard.mdx) | `hackagent web` reads the store your Python runs write to, so they show up there with no extra step. |
+| [HTTP API](../api/index.mdx) | The HackAgent platform. A campaign with remote storage records its run there, and the LLM gateway serves the hosted attacker and judge models. The SDK calls the API for you. |
+
+## Install
+
+```bash
+pip install hackagent
+```
+
+Python 3.10 or newer. The base install has the SDK, the CLI and the local
+results store; some attacks and dataset presets need an extra. See
+[Installation](../getting-started/installation.mdx) for the extras and the
+standalone binary.
+
+## The main objects
+
+| Object | What it is for | Reference |
+|---|---|---|
+| `run_campaign`, `arun_campaign` | Run a campaign, synchronously or from async code, and get a `CampaignResult` | [runner](../hackagent/orchestrator/campaign/runner.md) |
+| `load_campaign`, `CampaignSpec` | Read and validate a campaign from a YAML file or a dict, without running it | [loader](../hackagent/orchestrator/campaign/loader.md), [spec](../hackagent/orchestrator/campaign/spec.md) |
+| `CampaignResult`, `AttackOutcome`, `Attempt` | What a run returns: every attempt with its prompt, reply and verdict | [results](../hackagent/orchestrator/campaign/results.md) |
+| `Settings` | Where results are stored, which server and key to use, resolved from arguments, environment and config file | [settings](../hackagent/core/settings.md) |
+| `HackAgent` | Opens the store `Settings` selects and reads campaign runs, runs, results and traces | [client](../hackagent/client.md) |
+| Records | `CampaignRunRecord`, `RunRecord`, `ResultRecord`, `TraceRecord`: what the store returns | [records](../hackagent/storage/records.md) |
+| `hackagent.reporting` | Per-goal verdicts, run reports and costs, built from stored rows by the same rules as the dashboard | [report](../hackagent/reporting/report.md), [goals](../hackagent/reporting/goals.md) |
+
+`HackAgent`, `Settings` and the error types are importable from `hackagent`
+itself. Campaign functions live in `hackagent.orchestrator.campaign`.
+
+## Guides
+
+- [Quickstart](./guides/quickstart.mdx): run your first campaign from Python
+  against a local model and read the verdicts.
+- [Running campaigns](./guides/running-campaigns.mdx): build a campaign as a
+  dict or load a file, validate it, follow progress, stop it early, and find
+  its output files.
+- [Results and storage](./guides/results-and-storage.mdx): the local and
+  remote stores, listing runs and results, and per-goal verdicts with
+  `hackagent.reporting`.
+- [Configuration](./guides/configuration.mdx): how `Settings` resolves each
+  value, and how API keys are passed.
+- [The HackAgent platform](./guides/platform.mdx): record runs on the
+  platform, and use the hosted attacker and judge models.
+- [Extending HackAgent](./guides/extending.mdx): test a Python function as the
+  target, and what is fixed in the code.
+
+## Reference
+
+The Reference section documents every public module, generated from the
+source docstrings on every docs build, so it matches the code. Private
+modules are left out.
+
+For the campaign format itself, see [Campaign files](../cli/campaign-files/index.md).
+For what each attack does, see [Attacks](../attacks/index.mdx).
