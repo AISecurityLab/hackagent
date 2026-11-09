@@ -19,6 +19,8 @@ from hackagent.datasets.registry import load_goals_and_extra_fields_from_config
 
 
 class DatasetModel(BaseModel):
+    """Base of the dataset config models: frozen, and unknown keys are rejected."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
@@ -44,6 +46,7 @@ class PresetSource(DatasetModel):
     @field_validator("name")
     @classmethod
     def validate_preset(cls, value: str) -> str:
+        """Reject a preset name that is not built in, listing the known ones."""
         if value not in PRESETS:
             known = ", ".join(sorted(PRESETS))
             raise ValueError(f"Unknown dataset preset {value!r}. Available: {known}.")
@@ -128,6 +131,11 @@ class DatasetFilters(DatasetModel):
     @field_validator("categories")
     @classmethod
     def validate_categories(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        """Normalise each category to its taxonomy code.
+
+        Raises:
+            ValueError: When a value names no taxonomy category or subcategory.
+        """
         return tuple(_taxonomy_code(value) for value in values)
 
 

@@ -42,9 +42,12 @@ _CODE = re.compile(r"[A-Z][0-9]*", re.IGNORECASE)
 
 
 class ClassifierModel(Protocol):
+    """The model capability labelling needs: an async completion."""
+
     async def acomplete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
-    ) -> CompletionResult: ...
+    ) -> CompletionResult:
+        """Send ``messages`` and return the classifier's reply."""
 
 
 def request(goals: Sequence[str]) -> list[dict[str, str]]:
@@ -65,6 +68,7 @@ def request(goals: Sequence[str]) -> list[dict[str, str]]:
 
 
 def max_tokens(count: int) -> int:
+    """Return the output token budget for labelling ``count`` goals in one request."""
     return max(DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS, TOKENS_PER_GOAL * count)
 
 
@@ -101,6 +105,7 @@ def place(answer: str) -> Optional[dict[str, str]]:
 
 
 def is_labelled(goal: Goal) -> bool:
+    """Return whether ``goal`` already has both a category and a subcategory label."""
     return bool(goal.labels.get("category") and goal.labels.get("subcategory"))
 
 
