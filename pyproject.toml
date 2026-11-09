@@ -231,6 +231,9 @@ layers = [
     "hackagent.orchestrator",
     # Depth 0. Pipes mean these siblings may not import each other.
     "hackagent.catalog | hackagent.attacks | hackagent.models | hackagent.storage | hackagent.evaluation | hackagent.datasets | hackagent.tracking",
+    # Pure reporting rules: storage keeps its tallies with them, and the
+    # platform API imports them, so they depend on nothing else.
+    "hackagent.reporting",
     "hackagent.core",
 ]
 ignore_imports = [

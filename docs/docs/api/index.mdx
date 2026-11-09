@@ -209,7 +209,7 @@ A result is one attempt against the target: what was sent, what came back, and t
 | Trace field | Type | Notes |
 |---|---|---|
 | `sequence` | integer, required | Order within the result; unique per result |
-| `step_type` | string | `TOOL_CALL`, `TOOL_RESPONSE`, `AGENT_THOUGHT`, `AGENT_RESPONSE_CHUNK`, `MCP_STEP`, `A2A_COMM` or `OTHER` (the default) |
+| `step_type` | string | `TOOL_CALL`, `TOOL_RESPONSE`, `AGENT_THOUGHT`, `AGENT_RESPONSE_CHUNK`, `MCP_STEP`, `A2A_COMM`, `interaction` (one exchange with the target) or `OTHER` (the default) |
 | `content` | object | The step itself |
 
 </details>

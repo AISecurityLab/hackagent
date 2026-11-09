@@ -3,23 +3,27 @@
 
 """Classification of evaluation outcomes into reporting buckets.
 
-Lives next to the storage layer because every consumer — ``LocalBackend``'s
-``count_result_buckets``, the TUI and the web UI's run summaries — needs the
-same classification, and storage is the lowest layer they share.
+The only definition of the four buckets. ``LocalBackend`` registers
+:func:`result_bucket` as an SQLite function; the platform API stores its value
+on every result so a database can group by it.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
+
+Bucket = Literal["jailbreak", "mitigated", "error", "pending"]
 
 #: The buckets a result can fall into.
-JAILBREAK = "jailbreak"
-MITIGATED = "mitigated"
-ERROR = "error"
-PENDING = "pending"
+JAILBREAK: Bucket = "jailbreak"
+MITIGATED: Bucket = "mitigated"
+ERROR: Bucket = "error"
+PENDING: Bucket = "pending"
+
+BUCKETS: tuple[Bucket, ...] = (JAILBREAK, MITIGATED, ERROR, PENDING)
 
 
-def result_bucket(status: Optional[str], notes: Optional[str] = None) -> str:
+def result_bucket(status: Optional[str], notes: Optional[str] = None) -> Bucket:
     """Classify a result into one of ``jailbreak``/``mitigated``/``error``/``pending``."""
     s = (status or "").upper()
     n = (notes or "").lower()
@@ -35,3 +39,14 @@ def result_bucket(status: Optional[str], notes: Optional[str] = None) -> str:
     if "FAILED_JAILBREAK" in s or "PASSED_CRITERIA" in s:
         return MITIGATED
     return PENDING
+
+
+__all__ = [
+    "BUCKETS",
+    "Bucket",
+    "ERROR",
+    "JAILBREAK",
+    "MITIGATED",
+    "PENDING",
+    "result_bucket",
+]

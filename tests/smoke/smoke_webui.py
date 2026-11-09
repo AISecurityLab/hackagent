@@ -40,13 +40,13 @@ import urllib.request
 from pathlib import Path
 
 #: Every page the dashboard serves. A new route added to the web app without a
-#: matching entry here simply goes unchecked, so keep it in step.
+#: matching entry here simply goes unchecked, so keep it in step; a route the
+#: web app no longer has fails, because the server answers it with 404.
 PAGES = [
     "/",
     "/agents",
     "/attacks",
-    "/attacks/builder",
-    "/reports",
+    "/secrets",
     "/stats",
     "/api-keys",
     "/profile",
@@ -143,7 +143,11 @@ def drive(base: str) -> list[str]:
         for path in PAGES:
             before = len(failures)
             try:
-                page.goto(base + path, wait_until="networkidle", timeout=30_000)
+                response = page.goto(
+                    base + path, wait_until="networkidle", timeout=30_000
+                )
+                if response is not None and response.status >= 400:
+                    failures.append(f"{path}: the server answered {response.status}")
                 page.wait_for_timeout(1_200)
                 consent = page.get_by_role("button", name="Not now", exact=True)
                 if consent.is_visible():

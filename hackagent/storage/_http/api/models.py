@@ -631,6 +631,7 @@ class StepTypeEnum(Enum):
     OTHER = "OTHER"
     MCP_STEP = "MCP_STEP"
     A2_A_COMM = "A2A_COMM"
+    INTERACTION = "interaction"
 
 
 class TechniqueField(BaseModel):

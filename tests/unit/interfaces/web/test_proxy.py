@@ -127,6 +127,71 @@ class TestRemoteProxy(unittest.TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(response.data, b"")
 
+    def test_campaign_run_report_routes_are_forwarded_with_their_methods(self):
+        run_id = str(uuid4())
+        for method, path, body in (
+            ("GET", "run/summary", None),
+            ("GET", f"run/{run_id}/summary", None),
+            ("GET", f"run/{run_id}/report", None),
+            ("GET", f"run/{run_id}/matrix", None),
+            ("GET", f"run/{run_id}/goals", None),
+            ("GET", f"run/{run_id}/attempts", None),
+            ("GET", f"run/{run_id}/structure", None),
+            ("GET", f"run/{run_id}/costs", None),
+            ("GET", f"run/{run_id}/compare", None),
+            ("POST", "run/delete", {"ids": [run_id]}),
+            ("DELETE", f"run/{run_id}", None),
+        ):
+            with self.subTest(method=method, path=path):
+                recorded, patched = self._capture()
+                with patched:
+                    self.client.open(
+                        f"/api/proxy/{path}?goal_index=1", method=method, json=body
+                    )
+                self.assertEqual(recorded["method"], method)
+                self.assertEqual(recorded["url"], f"https://api.example.test/{path}")
+                self.assertEqual(recorded["params"]["goal_index"], "1")
+                if body is not None:
+                    self.assertEqual(json.loads(recorded["content"]), body)
+
+    def test_conditional_requests_pass_through_untouched(self):
+        tag = 'W/"0123456789abcdef0123456789abcdef"'
+        recorded, patched = self._capture(
+            _StubResponse(
+                status_code=304,
+                content=b"",
+                headers={"ETag": tag, "Cache-Control": "private, no-cache"},
+            )
+        )
+        with patched:
+            response = self.client.get(
+                "/api/proxy/run/summary", headers={"If-None-Match": tag}
+            )
+        self.assertEqual(recorded["headers"]["If-None-Match"], tag)
+        self.assertEqual(response.status_code, 304)
+        self.assertEqual(response.data, b"")
+        self.assertEqual(response.headers["ETag"], tag)
+        self.assertEqual(response.headers["Cache-Control"], "private, no-cache")
+
+    def test_a_fresh_response_keeps_its_etag_and_cache_control(self):
+        tag = 'W/"fedcba9876543210fedcba9876543210"'
+        _, patched = self._capture(
+            _StubResponse(
+                content=b'{"runs": []}',
+                headers={
+                    "Content-Type": "application/json",
+                    "ETag": tag,
+                    "Cache-Control": "private, no-cache",
+                },
+            )
+        )
+        with patched:
+            response = self.client.get(f"/api/proxy/run/{uuid4()}/costs")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["ETag"], tag)
+        self.assertEqual(response.headers["Cache-Control"], "private, no-cache")
+        self.assertEqual(response.get_json(), {"runs": []})
+
     def test_upstream_failure_becomes_502_rather_than_a_traceback(self):
         def _boom(_self, method, url, **kwargs):
             raise httpx.ConnectError("connection refused")

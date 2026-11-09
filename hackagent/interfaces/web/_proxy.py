@@ -12,6 +12,11 @@ executes to the deployment, and this deployment is the user's machine. So the
 proxy launches and preflights every campaign as a ``local`` run, and hands
 each run it launched to ``on_launched`` to execute here.
 
+Everything else crosses unchanged, the campaign run report routes
+(``/run/summary``, ``/run/<id>/report``, ...) included: ``If-None-Match`` goes
+up, ``ETag``, ``Cache-Control`` and a ``304`` come back, so the dashboard's
+conditional polling works through this hop as it does against the API.
+
 Keeping the indirection matters for more than parity: the API key is read from
 the local CLI configuration and attached **here**, so it never reaches the
 browser. The SPA runs with authentication disabled and talks only to

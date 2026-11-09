@@ -21,9 +21,32 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
 
+from hackagent.reporting import (
+    TERMINAL_STATUSES,
+    AttackRun,
+    Attempt,
+    CampaignRun,
+    FirstSuccess,
+    GoalOutcome,
+    GoalTotal,
+    GoalUsage,
+    Latency,
+    ResultRow,
+    StructureResult,
+    StructureTrace,
+    TraceCoverage,
+    TraceRow,
+    add_trace,
+    goal_outcome,
+    goal_usage,
+    result_bucket,
+    trace_coverage,
+    trace_flags,
+)
+from hackagent.reporting.tallies import usage_label
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
@@ -34,12 +57,46 @@ from hackagent.storage.records import (
     ResultRecord,
     RunRecord,
     TraceRecord,
+    canonical_attack_type,
 )
-from hackagent.storage.buckets import result_bucket
 
 logger = logging.getLogger("hackagent.storage.local")
 
 _DEFAULT_DB_PATH = "~/.local/share/hackagent/hackagent.db"
+
+#: ``PRAGMA user_version`` once the per-goal tallies cover every result. A
+#: database written before them has its tallies computed when it is opened.
+_TALLY_VERSION = 1
+
+
+def _json_number(column: str, path: str) -> str:
+    """SQL for the JSON value at ``path`` of ``column`` when it is a number,
+    else NULL, as :mod:`hackagent.reporting` reads numbers."""
+    return (
+        f"CASE WHEN json_type({column}, '{path}') IN ('integer', 'real') "
+        f"THEN json_extract({column}, '{path}') END"
+    )
+
+
+#: The light columns of :class:`hackagent.reporting.ResultRow`.
+_RESULT_ROW = f"""r.id, r.run_id, r.goal_index, r.goal, r.evaluation_status,
+    r.evaluation_notes, r.created_at, r.updated_at,
+    json_extract(r.metadata_json, '$.category') AS category,
+    json_extract(r.metadata_json, '$.subcategory') AS subcategory,
+    {_json_number("r.metadata_json", "$.attack_metadata.goal_active_target_elapsed_s")}
+        AS active_elapsed_s"""
+
+#: The light columns of :class:`hackagent.reporting.TraceRow`.
+_TRACE_ROW = f"""t.result_id, t.step_type,
+    json_extract(t.content_json, '$.node') AS node,
+    json_extract(t.content_json, '$.label') AS label,
+    json_extract(t.content_json, '$.scope') AS scope,
+    COALESCE({_json_number("t.content_json", "$.data.usage.prompt_tokens")},
+             {_json_number("t.content_json", "$.response.usage.prompt_tokens")})
+        AS prompt_tokens,
+    COALESCE({_json_number("t.content_json", "$.data.usage.completion_tokens")},
+             {_json_number("t.content_json", "$.response.usage.completion_tokens")})
+        AS completion_tokens"""
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS local_context (
@@ -90,6 +147,7 @@ CREATE TABLE IF NOT EXISTS campaign_runs (
     audit_json           TEXT,
     status               TEXT NOT NULL DEFAULT 'PENDING',
     run_notes            TEXT,
+    revision             INTEGER NOT NULL DEFAULT 0,
     created_at           TEXT NOT NULL,
     updated_at           TEXT NOT NULL
 );
@@ -129,6 +187,43 @@ CREATE TABLE IF NOT EXISTS traces (
     created_at   TEXT NOT NULL
 );
 
+-- Per-goal tallies (hackagent.reporting.tallies), kept on every write.
+CREATE TABLE IF NOT EXISTS goal_outcomes (
+    campaign_run_id         TEXT,
+    run_id                  TEXT NOT NULL,
+    goal_index              INTEGER NOT NULL,
+    goal                    TEXT NOT NULL,
+    category                TEXT NOT NULL,
+    subcategory             TEXT NOT NULL,
+    attempts                INTEGER NOT NULL,
+    jailbreak               INTEGER NOT NULL,
+    mitigated               INTEGER NOT NULL,
+    error                   INTEGER NOT NULL,
+    pending                 INTEGER NOT NULL,
+    first_jailbreak_attempt INTEGER,
+    min_jailbreak_elapsed_s REAL,
+    timed_jailbreaks        INTEGER NOT NULL,
+    first_created_at        TEXT NOT NULL,
+    last_updated_at         TEXT NOT NULL,
+    labelled_call_attempts  INTEGER NOT NULL,
+    target_call_attempts    INTEGER NOT NULL,
+    interaction_attempts    INTEGER NOT NULL,
+    PRIMARY KEY (run_id, goal_index)
+);
+
+CREATE TABLE IF NOT EXISTS goal_usage (
+    campaign_run_id   TEXT,
+    run_id            TEXT NOT NULL,
+    goal_index        INTEGER NOT NULL,
+    label             TEXT NOT NULL,
+    calls             INTEGER NOT NULL,
+    goal_scoped_calls INTEGER NOT NULL,
+    prompt_tokens     INTEGER NOT NULL,
+    completion_tokens INTEGER NOT NULL,
+    usage_calls       INTEGER NOT NULL,
+    PRIMARY KEY (run_id, goal_index, label)
+);
+
 CREATE TABLE IF NOT EXISTS attack_builder_drafts (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
@@ -143,7 +238,12 @@ CREATE INDEX IF NOT EXISTS idx_runs_attack     ON runs(attack_id);
 CREATE INDEX IF NOT EXISTS idx_results_run     ON results(run_id);
 CREATE INDEX IF NOT EXISTS idx_results_run_goal_order
     ON results(run_id, goal_index, created_at, id);
-CREATE INDEX IF NOT EXISTS idx_traces_result   ON traces(result_id);
+CREATE INDEX IF NOT EXISTS idx_traces_result_sequence
+    ON traces(result_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_goal_outcomes_campaign
+    ON goal_outcomes(campaign_run_id, run_id, goal_index);
+CREATE INDEX IF NOT EXISTS idx_goal_usage_campaign
+    ON goal_usage(campaign_run_id, run_id, goal_index);
 """
 
 
@@ -155,14 +255,6 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _quantile(ordered: List[float], q: float) -> float:
-    """Linear-interpolated quantile of an already sorted, non-empty list."""
-    position = (len(ordered) - 1) * q
-    low = int(position)
-    high = min(low + 1, len(ordered) - 1)
-    return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
-
-
 def _to_dt(s: Optional[str]) -> datetime:
     if not s:
         return _now()
@@ -170,6 +262,86 @@ def _to_dt(s: Optional[str]) -> datetime:
         return datetime.fromisoformat(s)
     except ValueError:
         return _now()
+
+
+def _iso(value: Optional[datetime]) -> Optional[str]:
+    return value.isoformat() if value is not None else None
+
+
+def _label(value: Any) -> Optional[str]:
+    return None if value is None or value == "" else str(value)
+
+
+def _result_row(row: sqlite3.Row) -> ResultRow:
+    return ResultRow(
+        id=row["id"],
+        goal=row["goal"] or "",
+        evaluation_status=row["evaluation_status"],
+        evaluation_notes=row["evaluation_notes"],
+        category=_label(row["category"]),
+        subcategory=_label(row["subcategory"]),
+        active_elapsed_s=row["active_elapsed_s"],
+        created_at=_to_dt(row["created_at"]),
+        updated_at=_to_dt(row["updated_at"]),
+    )
+
+
+def _trace_row(row: sqlite3.Row) -> TraceRow:
+    return TraceRow(
+        result_id=row["result_id"],
+        step_type=row["step_type"],
+        node=_label(row["node"]),
+        label=_label(row["label"]),
+        scope=_label(row["scope"]),
+        prompt_tokens=None
+        if row["prompt_tokens"] is None
+        else int(row["prompt_tokens"]),
+        completion_tokens=None
+        if row["completion_tokens"] is None
+        else int(row["completion_tokens"]),
+    )
+
+
+def _row_to_outcome(row: sqlite3.Row) -> GoalOutcome:
+    return GoalOutcome(
+        campaign_run_id=row["campaign_run_id"],
+        run_id=row["run_id"],
+        goal_index=row["goal_index"],
+        goal=row["goal"],
+        category=row["category"],
+        subcategory=row["subcategory"],
+        attempts=row["attempts"],
+        jailbreak=row["jailbreak"],
+        mitigated=row["mitigated"],
+        error=row["error"],
+        pending=row["pending"],
+        first_jailbreak_attempt=row["first_jailbreak_attempt"],
+        min_jailbreak_elapsed_s=row["min_jailbreak_elapsed_s"],
+        timed_jailbreaks=row["timed_jailbreaks"],
+        first_created_at=_to_dt(row["first_created_at"]),
+        last_updated_at=_to_dt(row["last_updated_at"]),
+        labelled_call_attempts=row["labelled_call_attempts"],
+        target_call_attempts=row["target_call_attempts"],
+        interaction_attempts=row["interaction_attempts"],
+    )
+
+
+def _row_to_usage(row: sqlite3.Row) -> GoalUsage:
+    return GoalUsage(
+        campaign_run_id=row["campaign_run_id"],
+        run_id=row["run_id"],
+        goal_index=row["goal_index"],
+        label=row["label"],
+        calls=row["calls"],
+        goal_scoped_calls=row["goal_scoped_calls"],
+        prompt_tokens=row["prompt_tokens"],
+        completion_tokens=row["completion_tokens"],
+        usage_calls=row["usage_calls"],
+    )
+
+
+def _marks(values: List[Any]) -> str:
+    return ",".join("?" for _ in values)
 
 
 class LocalBackend:
@@ -229,6 +401,15 @@ class LocalBackend:
             self._conn.execute(
                 "UPDATE campaign_runs SET launched=1 WHERE campaign_id IS NOT NULL"
             )
+        if "revision" not in columns:
+            self._conn.execute(
+                "ALTER TABLE campaign_runs ADD COLUMN revision INTEGER NOT NULL "
+                "DEFAULT 0"
+            )
+        self._conn.execute("DROP INDEX IF EXISTS idx_traces_result")
+        if self._conn.execute("PRAGMA user_version").fetchone()[0] < _TALLY_VERSION:
+            self._rebuild_tallies()
+            self._conn.execute(f"PRAGMA user_version = {_TALLY_VERSION}")
 
     def close(self) -> None:
         """Close the underlying SQLite connection.
@@ -474,6 +655,7 @@ class LocalBackend:
                 f"UPDATE campaign_runs SET {set_clause} WHERE id=?",
                 [*updates.values(), str(campaign_run_id)],
             )
+            self._bump([str(campaign_run_id)])
             self._conn.commit()
             row = self._conn.execute(
                 "SELECT * FROM campaign_runs WHERE id=? LIMIT 1",
@@ -521,6 +703,7 @@ class LocalBackend:
                 "UPDATE campaign_runs SET campaign_id=?, launched=1 WHERE id=?",
                 (str(campaign_id), str(campaign_run_id)),
             )
+            self._bump([str(campaign_run_id)])
             self._conn.commit()
 
     @staticmethod
@@ -615,8 +798,16 @@ class LocalBackend:
         )
 
     def delete_campaign(self, campaign_id: UUID) -> None:
-        """Delete a saved campaign; the runs launched from it are kept."""
+        """Delete a saved campaign; the runs launched from it are kept, and
+        their reports, which name the campaign, change."""
         with self._lock:
+            self._bump(
+                row["id"]
+                for row in self._conn.execute(
+                    "SELECT id FROM campaign_runs WHERE campaign_id=?",
+                    (str(campaign_id),),
+                )
+            )
             cursor = self._conn.execute(
                 "DELETE FROM campaigns WHERE id=?", (str(campaign_id),)
             )
@@ -663,6 +854,7 @@ class LocalBackend:
                     now,
                 ),
             )
+            self._bump([str(campaign_run_id) if campaign_run_id else None])
             self._conn.commit()
         return RunRecord(
             id=run_id,
@@ -700,6 +892,7 @@ class LocalBackend:
                     f"UPDATE runs SET {set_clause} WHERE id=?",
                     values,
                 )
+                self._bump([self._parent_of(str(run_id))])
             self._conn.commit()
             row = self._conn.execute(
                 "SELECT * FROM runs WHERE id=? LIMIT 1", (str(run_id),)
@@ -766,159 +959,6 @@ class LocalBackend:
             updated_at=_to_dt(row["updated_at"]),
         )
 
-    def campaign_results(
-        self,
-        run_ids: List[UUID],
-        *,
-        goal_index: Optional[int] = None,
-        full: bool = False,
-    ) -> List[ResultRecord]:
-        """Read only summary fields unless a selected goal needs full conversations."""
-        ids = [str(ident) for ident in run_ids]
-        if not ids:
-            return []
-        if full and goal_index is None:
-            raise ValueError("Full campaign results require a selected goal.")
-        marks = ",".join("?" for _ in ids)
-        fields = (
-            "*"
-            if full
-            else """id, run_id, goal, goal_index,
-            evaluation_status, evaluation_notes, created_at, updated_at,
-            '{}' AS request_payload_json, '{}' AS metrics_json,
-            json_object('category', json_extract(metadata_json, '$.category'),
-                        'subcategory', json_extract(metadata_json, '$.subcategory'))
-                AS metadata_json"""
-        )
-        where = f"run_id IN ({marks})"
-        args: List[Any] = list(ids)
-        if goal_index is not None:
-            where += " AND goal_index=?"
-            args.append(goal_index)
-        with self._lock:
-            rows = self._conn.execute(
-                f"SELECT {fields} FROM results WHERE {where} ORDER BY created_at DESC",
-                args,
-            ).fetchall()
-        return [self._row_to_result(row) for row in rows]
-
-    def campaign_attempts(
-        self,
-        run_ids: List[UUID],
-        goal_index: int,
-        *,
-        page: int,
-        page_size: int,
-    ) -> Dict[str, Any]:
-        """Page lightweight attempt rows after filtering a goal in SQLite."""
-        ids = [str(ident) for ident in run_ids]
-        if not ids:
-            return {"items": [], "total": 0, "first_success": None}
-        marks = ",".join("?" for _ in ids)
-        query = f"""WITH ordered AS (
-            SELECT id, run_id, evaluation_status, evaluation_notes, created_at,
-                ROW_NUMBER() OVER (ORDER BY created_at, id) AS ordinal
-            FROM results WHERE run_id IN ({marks}) AND goal_index=?
-        ) """
-        args = [*ids, goal_index]
-        with self._lock:
-            total = self._conn.execute(
-                f"SELECT COUNT(*) FROM results WHERE run_id IN ({marks}) AND goal_index=?",
-                args,
-            ).fetchone()[0]
-            first = self._conn.execute(
-                query
-                + """SELECT id, ordinal FROM ordered
-                    WHERE result_bucket(evaluation_status, evaluation_notes)='jailbreak'
-                    ORDER BY ordinal LIMIT 1""",
-                args,
-            ).fetchone()
-            rows = self._conn.execute(
-                query + "SELECT * FROM ordered ORDER BY ordinal LIMIT ? OFFSET ?",
-                [*args, page_size, (page - 1) * page_size],
-            ).fetchall()
-        return {
-            "items": [
-                {
-                    "id": row["id"],
-                    "run_id": row["run_id"],
-                    "ordinal": row["ordinal"],
-                    "bucket": result_bucket(
-                        row["evaluation_status"], row["evaluation_notes"]
-                    ),
-                    "notes": row["evaluation_notes"],
-                    "created_at": _to_dt(row["created_at"]).isoformat(),
-                }
-                for row in rows
-            ],
-            "total": total,
-            "first_success": {
-                "id": first["id"],
-                "page": (first["ordinal"] - 1) // page_size + 1,
-            }
-            if first
-            else None,
-        }
-
-    def campaign_outcomes(self, campaign_ids: List[UUID]) -> Dict[str, Dict[str, int]]:
-        """Summary counts without materializing result payloads or metadata."""
-        ids = [str(ident) for ident in campaign_ids]
-        if not ids:
-            return {}
-        marks = ",".join("?" for _ in ids)
-        with self._lock:
-            runs = self._conn.execute(
-                f"""SELECT n.campaign_run_id, COUNT(*) AS attack_runs,
-                           MIN(n.status = 'COMPLETED' AND c.status = 'COMPLETED') AS completed
-                    FROM runs n JOIN campaign_runs c ON c.id = n.campaign_run_id
-                    WHERE n.campaign_run_id IN ({marks})
-                    GROUP BY n.campaign_run_id""",
-                ids,
-            ).fetchall()
-            goals = self._conn.execute(
-                f"""WITH per_goal AS (
-                    SELECT n.campaign_run_id, r.goal_index, COUNT(*) AS attempts,
-                        MAX(result_bucket(r.evaluation_status, r.evaluation_notes)
-                            = 'jailbreak') AS jailbroken,
-                        MIN(result_bucket(r.evaluation_status, r.evaluation_notes)
-                            = 'mitigated') AS mitigated
-                    FROM results r JOIN runs n ON n.id = r.run_id
-                    WHERE n.campaign_run_id IN ({marks})
-                    GROUP BY n.campaign_run_id, r.goal_index
-                )
-                SELECT campaign_run_id, COUNT(*) AS recorded_goals,
-                       SUM(attempts) AS attempts, SUM(jailbroken) AS jailbroken,
-                       SUM(CASE WHEN jailbroken = 0 THEN mitigated ELSE 0 END) AS mitigated
-                FROM per_goal GROUP BY campaign_run_id""",
-                ids,
-            ).fetchall()
-        counts = {
-            sid: {
-                "attack_runs": 0,
-                "recorded_goals": 0,
-                "attempts": 0,
-                "jailbroken": 0,
-                "mitigated": 0,
-                "unresolved": 0,
-            }
-            for sid in ids
-        }
-        completed = {}
-        for row in runs:
-            counts[row["campaign_run_id"]]["attack_runs"] = row["attack_runs"]
-            completed[row["campaign_run_id"]] = bool(row["completed"])
-        for row in goals:
-            item = counts[row["campaign_run_id"]]
-            for key in ("recorded_goals", "attempts", "jailbroken", "mitigated"):
-                item[key] = row[key]
-            if not completed.get(row["campaign_run_id"], True):
-                item["mitigated"] = 0
-        for item in counts.values():
-            item["unresolved"] = (
-                item["recorded_goals"] - item["jailbroken"] - item["mitigated"]
-            )
-        return counts
-
     def delete_campaign_run(self, campaign_run_id: UUID) -> None:
         self.delete_campaign_runs([campaign_run_id])
 
@@ -942,7 +982,8 @@ class LocalBackend:
                 ids,
             ).fetchall()
             if any(row["status"] not in terminal for row in [*campaigns, *runs]):
-                raise ValueError("An active campaign execution cannot be deleted.")
+                raise ValueError("An active campaign run cannot be deleted.")
+            self._drop_tallies(f"campaign_run_id IN ({placeholders})", ids)
             self._conn.execute(
                 "DELETE FROM traces WHERE result_id IN "
                 "(SELECT id FROM results WHERE run_id IN "
@@ -964,6 +1005,8 @@ class LocalBackend:
     def delete_run(self, run_id: UUID) -> None:
         sid = str(run_id)
         with self._lock:
+            self._bump([self._parent_of(sid)])
+            self._drop_tallies("id = ?", [sid])
             # traces → results → run
             self._conn.execute(
                 "DELETE FROM traces WHERE result_id IN (SELECT id FROM results WHERE run_id = ?)",
@@ -976,6 +1019,13 @@ class LocalBackend:
     def delete_attack(self, attack_id: UUID) -> None:
         sid = str(attack_id)
         with self._lock:
+            self._bump(
+                row["campaign_run_id"]
+                for row in self._conn.execute(
+                    "SELECT campaign_run_id FROM runs WHERE attack_id = ?", (sid,)
+                )
+            )
+            self._drop_tallies("attack_id = ?", [sid])
             # traces → results → runs → attack
             self._conn.execute(
                 "DELETE FROM traces WHERE result_id IN "
@@ -1050,6 +1100,8 @@ class LocalBackend:
                     now,
                 ),
             )
+            self._refresh_outcome(str(run_id), goal_index)
+            self._bump([self._parent_of(str(run_id))])
             self._conn.commit()
         return ResultRecord(
             id=result_id,
@@ -1108,10 +1160,13 @@ class LocalBackend:
             set_clause = ", ".join(f"{k}=?" for k in updates)
             values = list(updates.values()) + [str(result_id)]
             self._conn.execute(f"UPDATE results SET {set_clause} WHERE id=?", values)
-            self._conn.commit()
             row = self._conn.execute(
                 "SELECT * FROM results WHERE id=? LIMIT 1", (str(result_id),)
             ).fetchone()
+            if row:
+                self._refresh_outcome(row["run_id"], row["goal_index"])
+                self._bump([self._parent_of(row["run_id"])])
+            self._conn.commit()
         if row:
             return self._row_to_result(row)
         return ResultRecord(
@@ -1203,6 +1258,14 @@ class LocalBackend:
                     now,
                 ),
             )
+            self._bump(
+                [
+                    self._count_trace(
+                        str(trace_id),
+                        TraceRow.from_content(str(result_id), step_type, content),
+                    )
+                ]
+            )
             self._conn.commit()
         return TraceRecord(
             id=trace_id,
@@ -1231,213 +1294,512 @@ class LocalBackend:
             for r in rows
         ]
 
-    def run_costs(self, run_ids: List[UUID]) -> Dict[str, Dict[str, Any]]:
-        """What each run spent, aggregated from its stored results and traces.
+    # ── Per-goal tallies ──────────────────────────────────────────────────────
+    # Kept by hackagent.reporting's functions in the transaction of every write
+    # that changes them, so reports never recount results or scan traces.
+    # These helpers run with the lock held and leave the commit to the caller.
 
-        ``call`` trace nodes are labelled with the role that made them
-        (``target``, ``panel``, ``attacker`` or a helper such as ``on_topic``).
-        Runs that record no call nodes only have their target interactions,
-        so their judge and attacker calls are reported as ``None``: not traced,
-        rather than zero.
+    def _bump(self, campaign_run_ids: Iterable[Optional[str]]) -> None:
+        """Count a write that changes what a campaign run's reports return."""
+        ids = sorted({ident for ident in campaign_run_ids if ident})
+        if ids:
+            self._conn.execute(
+                f"UPDATE campaign_runs SET revision = revision + 1 "
+                f"WHERE id IN ({_marks(ids)})",
+                ids,
+            )
 
-        Goal samples include the first successful conversation ordinal and, when
-        every successful reply carries an active goal clock, the earliest response time.
-        Local scheduling waits are excluded; legacy wall clocks are not substituted.
-        Persistence timestamps cannot recover the latter for batched searches.
-        Token totals are unknown when any target call or attempt lacks usage.
-        """
-        ids = [str(run_id) for run_id in run_ids]
-        if not ids:
-            return {}
-        marks = ",".join("?" for _ in ids)
+    def _parent_of(self, run_id: str) -> Optional[str]:
+        row = self._conn.execute(
+            "SELECT campaign_run_id FROM runs WHERE id=?", (run_id,)
+        ).fetchone()
+        return row["campaign_run_id"] if row else None
+
+    def _store_outcome(self, outcome: GoalOutcome) -> None:
+        values = {
+            "campaign_run_id": outcome.campaign_run_id,
+            "run_id": outcome.run_id,
+            "goal_index": outcome.goal_index,
+            "goal": outcome.goal,
+            "category": outcome.category,
+            "subcategory": outcome.subcategory,
+            "attempts": outcome.attempts,
+            "jailbreak": outcome.jailbreak,
+            "mitigated": outcome.mitigated,
+            "error": outcome.error,
+            "pending": outcome.pending,
+            "first_jailbreak_attempt": outcome.first_jailbreak_attempt,
+            "min_jailbreak_elapsed_s": outcome.min_jailbreak_elapsed_s,
+            "timed_jailbreaks": outcome.timed_jailbreaks,
+            "first_created_at": _iso(outcome.first_created_at),
+            "last_updated_at": _iso(outcome.last_updated_at),
+            "labelled_call_attempts": outcome.labelled_call_attempts,
+            "target_call_attempts": outcome.target_call_attempts,
+            "interaction_attempts": outcome.interaction_attempts,
+        }
+        self._conn.execute(
+            f"INSERT OR REPLACE INTO goal_outcomes ({', '.join(values)}) "
+            f"VALUES ({_marks(list(values))})",
+            list(values.values()),
+        )
+
+    def _store_usage(self, usage: GoalUsage) -> None:
+        self._conn.execute(
+            "INSERT OR REPLACE INTO goal_usage (campaign_run_id, run_id, goal_index, "
+            "label, calls, goal_scoped_calls, prompt_tokens, completion_tokens, "
+            "usage_calls) VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                usage.campaign_run_id,
+                usage.run_id,
+                usage.goal_index,
+                usage.label,
+                usage.calls,
+                usage.goal_scoped_calls,
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                usage.usage_calls,
+            ),
+        )
+
+    def _goal_results(self, run_id: str, goal_index: int) -> List[ResultRow]:
+        rows = self._conn.execute(
+            f"SELECT {_RESULT_ROW} FROM results r WHERE r.run_id=? AND r.goal_index=?",
+            (run_id, goal_index),
+        ).fetchall()
+        return [_result_row(row) for row in rows]
+
+    def _refresh_outcome(self, run_id: str, goal_index: int) -> None:
+        """Recompute a goal's outcome from its results, keeping its coverage."""
+        stored = self._conn.execute(
+            "SELECT * FROM goal_outcomes WHERE run_id=? AND goal_index=?",
+            (run_id, goal_index),
+        ).fetchone()
+        outcome = goal_outcome(
+            campaign_run_id=self._parent_of(run_id),
+            run_id=run_id,
+            goal_index=goal_index,
+            results=self._goal_results(run_id, goal_index),
+            coverage=_row_to_outcome(stored).coverage if stored else TraceCoverage(),
+        )
+        if outcome is not None:
+            self._store_outcome(outcome)
+
+    def _count_trace(self, trace_id: str, trace: TraceRow) -> Optional[str]:
+        """Count a new trace step in its goal's tallies; returns the goal's
+        campaign run."""
+        owner = self._conn.execute(
+            "SELECT r.run_id, r.goal_index FROM results r WHERE r.id=?",
+            (trace.result_id,),
+        ).fetchone()
+        if owner is None:
+            return None
+        run_id, goal_index = owner["run_id"], owner["goal_index"]
+        stored = self._conn.execute(
+            "SELECT * FROM goal_outcomes WHERE run_id=? AND goal_index=?",
+            (run_id, goal_index),
+        ).fetchone()
+        if stored is None:
+            self._rebuild_goal(run_id, goal_index)
+            return self._parent_of(run_id)
+        earlier = self._conn.execute(
+            f"SELECT {_TRACE_ROW} FROM traces t WHERE t.result_id=? AND t.id != ?",
+            (trace.result_id, trace_id),
+        ).fetchall()
+        label = usage_label(trace)
+        usage = (
+            self._conn.execute(
+                "SELECT * FROM goal_usage WHERE run_id=? AND goal_index=? AND label=?",
+                (run_id, goal_index, label),
+            ).fetchone()
+            if label is not None
+            else None
+        )
+        outcome, counted = add_trace(
+            _row_to_outcome(stored),
+            _row_to_usage(usage) if usage else None,
+            trace,
+            trace_flags(_trace_row(row) for row in earlier),
+        )
+        self._store_outcome(outcome)
+        if counted is not None:
+            self._store_usage(counted)
+        return outcome.campaign_run_id
+
+    def _rebuild_goal(self, run_id: str, goal_index: int) -> None:
+        """Recompute both tallies of a goal from its results and traces."""
+        self._conn.execute(
+            "DELETE FROM goal_outcomes WHERE run_id=? AND goal_index=?",
+            (run_id, goal_index),
+        )
+        self._conn.execute(
+            "DELETE FROM goal_usage WHERE run_id=? AND goal_index=?",
+            (run_id, goal_index),
+        )
+        traces = [
+            _trace_row(row)
+            for row in self._conn.execute(
+                f"SELECT {_TRACE_ROW} FROM traces t JOIN results r ON r.id = t.result_id "
+                "WHERE r.run_id=? AND r.goal_index=?",
+                (run_id, goal_index),
+            ).fetchall()
+        ]
+        self._store_goal(
+            self._parent_of(run_id),
+            run_id,
+            goal_index,
+            self._goal_results(run_id, goal_index),
+            traces,
+        )
+
+    def _store_goal(
+        self,
+        campaign_run_id: Optional[str],
+        run_id: str,
+        goal_index: int,
+        results: List[ResultRow],
+        traces: List[TraceRow],
+    ) -> None:
+        outcome = goal_outcome(
+            campaign_run_id=campaign_run_id,
+            run_id=run_id,
+            goal_index=goal_index,
+            results=results,
+            coverage=trace_coverage(traces),
+        )
+        if outcome is None:
+            return
+        self._store_outcome(outcome)
+        for usage in goal_usage(
+            campaign_run_id=campaign_run_id,
+            run_id=run_id,
+            goal_index=goal_index,
+            traces=traces,
+        ):
+            self._store_usage(usage)
+
+    def _rebuild_tallies(self) -> None:
+        """Compute every goal's tallies, for a database written before them."""
+        self._conn.execute("DELETE FROM goal_outcomes")
+        self._conn.execute("DELETE FROM goal_usage")
+        parents = {
+            row["id"]: row["campaign_run_id"]
+            for row in self._conn.execute("SELECT id, campaign_run_id FROM runs")
+        }
+        results: Dict[Tuple[str, int], List[ResultRow]] = {}
+        goal_of: Dict[str, Tuple[str, int]] = {}
+        for row in self._conn.execute(f"SELECT {_RESULT_ROW} FROM results r"):
+            key = (row["run_id"], row["goal_index"])
+            results.setdefault(key, []).append(_result_row(row))
+            goal_of[row["id"]] = key
+        traces: Dict[Tuple[str, int], List[TraceRow]] = {}
+        for row in self._conn.execute(f"SELECT {_TRACE_ROW} FROM traces t"):
+            goal = goal_of.get(row["result_id"])
+            if goal is not None:
+                traces.setdefault(goal, []).append(_trace_row(row))
+        for (run_id, goal_index), rows in results.items():
+            self._store_goal(
+                parents.get(run_id),
+                run_id,
+                goal_index,
+                rows,
+                traces.get((run_id, goal_index), []),
+            )
+
+    def _drop_tallies(self, where: str, args: List[Any]) -> None:
+        """Delete the tallies of the attack runs ``where`` selects in ``runs``."""
+        for table in ("goal_outcomes", "goal_usage"):
+            self._conn.execute(
+                f"DELETE FROM {table} WHERE run_id IN (SELECT id FROM runs WHERE {where})",
+                args,
+            )
+
+    # ── Campaign run reports ──────────────────────────────────────────────────
+    # The rows hackagent.reporting builds the dashboard's campaign run routes
+    # from. Light columns only; the tallies stand in for results and traces.
+
+    _REPORT_RUN = """SELECT c.*, COALESCE(a.name, c.agent_id) AS target
+        FROM campaign_runs c LEFT JOIN agents a ON a.id = c.agent_id"""
+
+    @staticmethod
+    def _row_to_report_run(row: sqlite3.Row) -> CampaignRun:
+        updated_at = _to_dt(row["updated_at"])
+        return CampaignRun(
+            id=row["id"],
+            name=row["name"],
+            campaign=row["campaign_id"],
+            agent=row["agent_id"],
+            target=row["target"],
+            status=row["status"],
+            executor="local" if row["launched"] else "cli",
+            created_at=_to_dt(row["created_at"]),
+            updated_at=updated_at,
+            finished_at=updated_at if row["status"] in TERMINAL_STATUSES else None,
+            revision=row["revision"],
+            configuration=json.loads(row["campaign_config_json"] or "{}"),
+            audit=json.loads(row["audit_json"]) if row["audit_json"] else None,
+            notes=row["run_notes"],
+        )
+
+    def report_campaign_runs(
+        self,
+        *,
+        campaign: Optional[str] = None,
+        agent: Optional[str] = None,
+        status: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> PaginatedResult[CampaignRun]:
+        """Campaign runs, newest first (``created_at`` desc, then ``id``)."""
+        clauses, args = [], []
+        for column, value in (
+            ("c.campaign_id", campaign),
+            ("c.agent_id", agent),
+            ("c.status", status),
+        ):
+            if value:
+                clauses.append(f"{column}=?")
+                args.append(value)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         with self._lock:
-            totals = self._conn.execute(
-                f"""SELECT run_id, COUNT(*) AS attempts,
-                       COUNT(DISTINCT goal_index) AS goals,
-                       MIN(created_at) AS started, MAX(updated_at) AS finished
-                    FROM results WHERE run_id IN ({marks}) GROUP BY run_id""",
-                ids,
+            total = self._conn.execute(
+                f"SELECT COUNT(*) FROM campaign_runs c{where}", args
+            ).fetchone()[0]
+            rows = self._conn.execute(
+                f"{self._REPORT_RUN}{where} ORDER BY c.created_at DESC, c.id "
+                "LIMIT ? OFFSET ?",
+                [*args, page_size, (page - 1) * page_size],
             ).fetchall()
-            latencies = self._conn.execute(
-                f"""SELECT run_id, json_extract(metadata_json, '$.latency_ms') AS ms
-                    FROM results WHERE run_id IN ({marks}) AND ms IS NOT NULL""",
-                ids,
-            ).fetchall()
-            calls = self._conn.execute(
-                f"""SELECT r.run_id AS run_id,
-                       CASE WHEN t.step_type = 'interaction' THEN '' ELSE
-                         json_extract(t.content_json, '$.label') END AS label,
-                       COUNT(*) AS n
-                    FROM traces t JOIN results r ON r.id = t.result_id
-                    WHERE r.run_id IN ({marks})
-                      AND (t.step_type = 'interaction'
-                           OR json_extract(t.content_json, '$.node') = 'call')
-                    GROUP BY 1, 2""",
-                ids,
-            ).fetchall()
-            goal_totals = self._conn.execute(
-                f"""WITH ordered AS (
-                       SELECT *, ROW_NUMBER() OVER (
-                         PARTITION BY run_id, goal_index ORDER BY created_at, id
-                       ) AS ordinal,
-                       result_bucket(evaluation_status, evaluation_notes) AS bucket
-                       FROM results WHERE run_id IN ({marks}) AND goal_index IS NOT NULL
-                    )
-                    SELECT run_id, goal_index, COUNT(*) AS attempts,
-                       MIN(CASE WHEN bucket = 'jailbreak' THEN ordinal END) AS first_jailbreak_attempt,
-                       SUM(bucket = 'jailbreak') AS successes,
-                       COUNT(CASE WHEN bucket = 'jailbreak' THEN
-                         json_extract(metadata_json, '$.attack_metadata.goal_active_target_elapsed_s')
-                       END) AS timed_successes,
-                       MIN(CASE WHEN bucket = 'jailbreak' THEN
-                         json_extract(metadata_json, '$.attack_metadata.goal_active_target_elapsed_s')
-                       END) AS first_jailbreak_elapsed_s,
-                       SUM(EXISTS(SELECT 1 FROM traces t WHERE t.result_id = results.id
-                         AND json_extract(t.content_json, '$.node') = 'call'
-                         AND COALESCE(json_extract(t.content_json, '$.label'), '') != ''
-                       )) AS traced_attempts,
-                       SUM(EXISTS(SELECT 1 FROM traces t WHERE t.result_id = results.id
-                         AND json_extract(t.content_json, '$.node') = 'call'
-                         AND json_extract(t.content_json, '$.label') = 'target'
-                       )) AS target_traced_attempts,
-                       SUM(EXISTS(SELECT 1 FROM traces t WHERE t.result_id = results.id
-                         AND t.step_type = 'interaction'
-                       )) AS interaction_attempts,
-                       MIN(created_at) AS started, MAX(updated_at) AS finished
-                    FROM ordered AS results
-                    GROUP BY run_id, goal_index""",
-                ids,
-            ).fetchall()
-            goal_calls = self._conn.execute(
-                f"""SELECT r.run_id, r.goal_index,
-                       CASE WHEN t.step_type = 'interaction' THEN '' ELSE
-                         json_extract(t.content_json, '$.label') END AS label,
-                       COUNT(*) AS n,
-                       SUM(CASE WHEN json_extract(t.content_json, '$.scope') = 'goal'
-                         THEN 1 ELSE 0 END) AS goal_scoped_n,
-                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
-                                    json_extract(t.content_json, '$.response.usage.prompt_tokens'))) AS prompt,
-                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.completion_tokens'),
-                                    json_extract(t.content_json, '$.response.usage.completion_tokens'))) AS completion,
-                       SUM(COALESCE(json_extract(t.content_json, '$.data.usage.prompt_tokens'),
-                                    json_extract(t.content_json, '$.response.usage.prompt_tokens'), 0)
-                         + COALESCE(json_extract(t.content_json, '$.data.usage.completion_tokens'),
-                                    json_extract(t.content_json, '$.response.usage.completion_tokens'), 0)) AS tokens,
-                       COUNT(CASE WHEN COALESCE(
-                         json_extract(t.content_json, '$.data.usage.prompt_tokens'),
-                         json_extract(t.content_json, '$.response.usage.prompt_tokens')) IS NOT NULL
-                         AND COALESCE(
-                         json_extract(t.content_json, '$.data.usage.completion_tokens'),
-                         json_extract(t.content_json, '$.response.usage.completion_tokens')) IS NOT NULL
-                         THEN 1 END) AS usage_samples
-                    FROM traces t JOIN results r ON r.id = t.result_id
-                    WHERE r.run_id IN ({marks}) AND r.goal_index IS NOT NULL
-                      AND (t.step_type = 'interaction'
-                           OR json_extract(t.content_json, '$.node') = 'call')
-                    GROUP BY 1, 2, 3""",
-                ids,
-            ).fetchall()
+        return PaginatedResult(
+            items=[self._row_to_report_run(row) for row in rows], total=total
+        )
 
-        by_run: Dict[str, Dict[str, Any]] = {}
-        for row in totals:
-            started, finished = _to_dt(row["started"]), _to_dt(row["finished"])
-            by_run[row["run_id"]] = {
-                "attempts": row["attempts"],
-                "goals": row["goals"],
-                "elapsed_s": max((finished - started).total_seconds(), 0.0),
-                "calls": {"target": 0, "attacker": None, "judge": None},
-                "calls_traced": False,
-                "target_tokens": None,
-                "target_latency_ms": None,
-            }
-        labelled: Dict[str, Dict[str, Any]] = {}
-        for row in calls:
-            labelled.setdefault(row["run_id"], {})[row["label"] or ""] = row
-        for run_id, labels in labelled.items():
-            cost = by_run.get(run_id)
-            if cost is None:
-                continue
-            nodes = {label: row for label, row in labels.items() if label}
-            interactions = labels.get("")
-            if nodes:
-                cost["calls_traced"] = True
-                target = nodes.get("target")
-                cost["calls"] = {
-                    "target": target["n"] if target else 0,
-                    "attacker": sum(
-                        row["n"]
-                        for label, row in nodes.items()
-                        if label not in ("target", "panel")
-                    ),
-                    "judge": nodes["panel"]["n"] if "panel" in nodes else 0,
-                }
-            elif interactions:
-                cost["calls"]["target"] = interactions["n"]
-        samples: Dict[str, List[float]] = {}
-        for row in latencies:
-            samples.setdefault(row["run_id"], []).append(float(row["ms"]))
-        for run_id, values in samples.items():
-            if run_id not in by_run:
-                continue
-            values.sort()
-            by_run[run_id]["target_latency_ms"] = {
-                "median": _quantile(values, 0.5),
-                "p90": _quantile(values, 0.9),
-                "samples": len(values),
-            }
-        goal_labels: Dict[Any, Dict[str, Any]] = {}
-        for row in goal_calls:
-            goal_labels.setdefault((row["run_id"], row["goal_index"]), {})[
-                row["label"] or ""
-            ] = row
-        for cost in by_run.values():
-            cost["goal_samples"] = []
-        token_totals = {run_id: {"prompt": 0, "completion": 0} for run_id in by_run}
-        incomplete_usage: set[str] = set()
-        for row in goal_totals:
-            labels = goal_labels.get((row["run_id"], row["goal_index"]), {})
-            nodes = {label: item for label, item in labels.items() if label}
-            target = nodes.get("target") if nodes else labels.get("")
-            usage = target
-            if usage is None or not usage["usage_samples"]:
-                usage = labels.get("")
-            usage_complete = usage is not None and usage["usage_samples"] == usage["n"]
-            if usage is not None:
-                usage_complete = usage_complete and (
-                    row["interaction_attempts"] == row["attempts"]
-                    if usage["label"] == ""
-                    else row["target_traced_attempts"] == row["attempts"]
-                    or usage["goal_scoped_n"] >= row["attempts"]
+    def report_campaign_run(self, campaign_run_id: str) -> Optional[CampaignRun]:
+        with self._lock:
+            row = self._conn.execute(
+                f"{self._REPORT_RUN} WHERE c.id=?", (campaign_run_id,)
+            ).fetchone()
+        return self._row_to_report_run(row) if row else None
+
+    def report_previous_candidates(self, current: CampaignRun) -> List[CampaignRun]:
+        """The completed runs of ``current``'s campaign created up to it, newest
+        first: a superset of its ``previous`` that the reporting rule narrows."""
+        if current.campaign is not None:
+            where, args = "c.campaign_id=?", [current.campaign]
+        else:
+            where = "c.campaign_id IS NULL AND c.agent_id=? AND c.name=?"
+            args = [current.agent, current.name]
+        with self._lock:
+            rows = self._conn.execute(
+                f"{self._REPORT_RUN} WHERE {where} AND c.status='COMPLETED' "
+                "AND c.id != ? AND c.created_at <= ? "
+                "ORDER BY c.created_at DESC, c.id DESC LIMIT 5",
+                [*args, current.id, _iso(current.created_at)],
+            ).fetchall()
+        return [self._row_to_report_run(row) for row in rows]
+
+    def report_revisions(self, campaign_run_ids: List[str]) -> Dict[str, int]:
+        """The current revision of each campaign run that exists."""
+        if not campaign_run_ids:
+            return {}
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT id, revision FROM campaign_runs "
+                f"WHERE id IN ({_marks(campaign_run_ids)})",
+                campaign_run_ids,
+            ).fetchall()
+        return {row["id"]: row["revision"] for row in rows}
+
+    def report_attack_runs(
+        self, campaign_run_ids: List[str], *, full: bool = False
+    ) -> List[AttackRun]:
+        """The attack runs of campaign runs. Without ``full`` only id, parent,
+        status and creation are read. With it, ``attack_configuration`` is the
+        attack's stored configuration, unredacted, and ``family`` is unset:
+        the caller completes both."""
+        if not campaign_run_ids:
+            return []
+        columns = (
+            "n.*, a.type AS technique, a.config_json AS attack_config_json"
+            if full
+            else "n.id, n.campaign_run_id, n.status, n.created_at"
+        )
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT {columns} FROM runs n LEFT JOIN attacks a ON a.id = n.attack_id "
+                f"WHERE n.campaign_run_id IN ({_marks(campaign_run_ids)})",
+                campaign_run_ids,
+            ).fetchall()
+        runs = []
+        for row in rows:
+            light = AttackRun(
+                id=row["id"],
+                campaign_run=row["campaign_run_id"],
+                status=row["status"],
+                created_at=_to_dt(row["created_at"]),
+            )
+            if full:
+                light = AttackRun(
+                    id=light.id,
+                    campaign_run=light.campaign_run,
+                    status=light.status,
+                    created_at=light.created_at,
+                    attack=row["attack_id"],
+                    technique=canonical_attack_type(row["technique"])
+                    if row["technique"] is not None
+                    else "Unknown",
+                    notes=row["run_notes"],
+                    configuration=json.loads(row["config_json"] or "{}"),
+                    attack_configuration=json.loads(row["attack_config_json"] or "{}")
+                    if row["attack_config_json"] is not None
+                    else None,
                 )
-            if not usage_complete:
-                incomplete_usage.add(row["run_id"])
-            else:
-                token_totals[row["run_id"]]["prompt"] += int(usage["prompt"])
-                token_totals[row["run_id"]]["completion"] += int(usage["completion"])
-            started, finished = _to_dt(row["started"]), _to_dt(row["finished"])
-            # A batched phase can attach all its goal-scoped calls to one result.
-            calls_complete = row["traced_attempts"] == row["attempts"] or (
-                target is not None and target["goal_scoped_n"] >= row["attempts"]
+            runs.append(light)
+        return runs
+
+    def report_goal_totals(self, campaign_run_ids: List[str]) -> List[GoalTotal]:
+        if not campaign_run_ids:
+            return []
+        with self._lock:
+            rows = self._conn.execute(
+                f"""SELECT campaign_run_id, goal_index, SUM(attempts) AS attempts,
+                       SUM(jailbreak) AS jailbreak, SUM(mitigated) AS mitigated,
+                       SUM(error) AS error, SUM(pending) AS pending
+                    FROM goal_outcomes
+                    WHERE campaign_run_id IN ({_marks(campaign_run_ids)})
+                    GROUP BY campaign_run_id, goal_index""",
+                campaign_run_ids,
+            ).fetchall()
+        return [
+            GoalTotal(
+                campaign_run=row["campaign_run_id"],
+                goal_index=row["goal_index"],
+                attempts=row["attempts"],
+                jailbreak=row["jailbreak"],
+                mitigated=row["mitigated"],
+                error=row["error"],
+                pending=row["pending"],
             )
-            by_run[row["run_id"]]["goal_samples"].append(
-                {
-                    "goal_index": row["goal_index"],
-                    "first_jailbreak_attempt": row["first_jailbreak_attempt"],
-                    "first_jailbreak_elapsed_s": row["first_jailbreak_elapsed_s"]
-                    if row["successes"] and row["timed_successes"] == row["successes"]
-                    else None,
-                    "attempts": row["attempts"],
-                    "calls": sum(item["n"] for item in nodes.values())
-                    if nodes and calls_complete
-                    else None,
-                    "target_tokens": usage["tokens"] if usage_complete else None,
-                    "elapsed_s": max((finished - started).total_seconds(), 0.0),
-                }
+            for row in rows
+        ]
+
+    def report_goal_outcomes(self, campaign_run_id: str) -> List[GoalOutcome]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM goal_outcomes WHERE campaign_run_id=?",
+                (campaign_run_id,),
+            ).fetchall()
+        return [_row_to_outcome(row) for row in rows]
+
+    def report_goal_usage(self, campaign_run_id: str) -> List[GoalUsage]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM goal_usage WHERE campaign_run_id=?", (campaign_run_id,)
+            ).fetchall()
+        return [_row_to_usage(row) for row in rows]
+
+    def report_latencies(self, run_ids: List[str]) -> List[Latency]:
+        if not run_ids:
+            return []
+        with self._lock:
+            rows = self._conn.execute(
+                f"""SELECT run_id, latency_ms, COUNT(*) AS count FROM (
+                        SELECT run_id,
+                            {_json_number("metadata_json", "$.latency_ms")} AS latency_ms
+                        FROM results WHERE run_id IN ({_marks(run_ids)})
+                    ) WHERE latency_ms IS NOT NULL GROUP BY run_id, latency_ms""",
+                run_ids,
+            ).fetchall()
+        return [
+            Latency(
+                run_id=row["run_id"], latency_ms=row["latency_ms"], count=row["count"]
             )
-        for run_id, cost in by_run.items():
-            if run_id not in incomplete_usage:
-                cost["target_tokens"] = token_totals[run_id]
-        return by_run
+            for row in rows
+        ]
+
+    def report_attempts(
+        self, run_ids: List[str], goal_index: int, *, page: int, page_size: int
+    ) -> Tuple[List[Attempt], int, Optional[FirstSuccess]]:
+        """One page of a goal's attempts in ``created_at``, ``id`` order, their
+        count, and the first jailbreak with its position."""
+        if not run_ids:
+            return [], 0, None
+        where = f"run_id IN ({_marks(run_ids)}) AND goal_index=?"
+        args: List[Any] = [*run_ids, goal_index]
+        with self._lock:
+            total = self._conn.execute(
+                f"SELECT COUNT(*) FROM results WHERE {where}", args
+            ).fetchone()[0]
+            rows = self._conn.execute(
+                f"""SELECT id, run_id, evaluation_status, evaluation_notes, created_at
+                    FROM results WHERE {where} ORDER BY created_at, id
+                    LIMIT ? OFFSET ?""",
+                [*args, page_size, (page - 1) * page_size],
+            ).fetchall()
+            first = self._conn.execute(
+                f"""SELECT id, created_at FROM results WHERE {where}
+                    AND result_bucket(evaluation_status, evaluation_notes)='jailbreak'
+                    ORDER BY created_at, id LIMIT 1""",
+                args,
+            ).fetchone()
+            success = None
+            if first:
+                position = self._conn.execute(
+                    f"""SELECT COUNT(*) FROM results WHERE {where}
+                        AND (created_at < ? OR (created_at = ? AND id <= ?))""",
+                    [*args, first["created_at"], first["created_at"], first["id"]],
+                ).fetchone()[0]
+                success = FirstSuccess(id=first["id"], position=position)
+        attempts = [
+            Attempt(
+                id=row["id"],
+                run_id=row["run_id"],
+                bucket=result_bucket(row["evaluation_status"], row["evaluation_notes"]),
+                notes=row["evaluation_notes"],
+                created_at=_to_dt(row["created_at"]),
+            )
+            for row in rows
+        ]
+        return attempts, total, success
+
+    def report_structure(
+        self, run_id: str, goal_index: int
+    ) -> Tuple[List[StructureResult], List[StructureTrace]]:
+        """Every attempt of a goal in one attack run, in full, and their traces."""
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT * FROM results WHERE run_id=? AND goal_index=?",
+                (run_id, goal_index),
+            ).fetchall()
+            traces = self._conn.execute(
+                """SELECT t.* FROM traces t JOIN results r ON r.id = t.result_id
+                   WHERE r.run_id=? AND r.goal_index=?""",
+                (run_id, goal_index),
+            ).fetchall()
+        return (
+            [
+                StructureResult(
+                    id=row["id"],
+                    run_id=row["run_id"],
+                    evaluation_status=row["evaluation_status"],
+                    evaluation_notes=row["evaluation_notes"],
+                    request_payload=json.loads(row["request_payload_json"] or "{}"),
+                    agent_specific_data=json.loads(row["metadata_json"] or "{}"),
+                    created_at=_to_dt(row["created_at"]),
+                )
+                for row in results
+            ],
+            [
+                StructureTrace(
+                    id=row["id"],
+                    result_id=row["result_id"],
+                    sequence=row["sequence"],
+                    step_type=row["step_type"],
+                    content=json.loads(row["content_json"] or "{}"),
+                    timestamp=_to_dt(row["created_at"]),
+                )
+                for row in traces
+            ],
+        )
 
     # ── Attack builder drafts ─────────────────────────────────────────────────
 

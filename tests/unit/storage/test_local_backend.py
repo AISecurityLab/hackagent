@@ -11,7 +11,8 @@ import unittest
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from hackagent.storage.local import LocalBackend
+from hackagent.reporting import AttackRun, campaign_run_costs
+from hackagent.storage.local import LocalBackend, _row_to_outcome, _row_to_usage
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
@@ -26,6 +27,39 @@ from hackagent.storage.records import (
 
 def _make_backend(tmp_dir: str) -> LocalBackend:
     return LocalBackend(db_path=os.path.join(tmp_dir, "test.db"))
+
+
+def _tallies(backend: LocalBackend, run_id) -> tuple[list, list]:
+    conn = backend._conn
+    outcomes = conn.execute(
+        "SELECT * FROM goal_outcomes WHERE run_id=? ORDER BY goal_index",
+        (str(run_id),),
+    ).fetchall()
+    usage = conn.execute(
+        "SELECT * FROM goal_usage WHERE run_id=? ORDER BY goal_index, label",
+        (str(run_id),),
+    ).fetchall()
+    return [_row_to_outcome(row) for row in outcomes], [
+        _row_to_usage(row) for row in usage
+    ]
+
+
+def _run_costs(backend: LocalBackend, run_id) -> dict:
+    """A run's costs from its stored tallies, which must equal the tallies a
+    full recomputation gives: the write path keeps them incrementally."""
+    kept = _tallies(backend, run_id)
+    backend._rebuild_tallies()
+    assert _tallies(backend, run_id) == kept
+    run = AttackRun(
+        id=str(run_id),
+        campaign_run="",
+        status="COMPLETED",
+        created_at=datetime(2026, 1, 1),
+    )
+    [cost] = campaign_run_costs([run], *kept, backend.report_latencies([str(run_id)]))[
+        "runs"
+    ]
+    return cost
 
 
 class TestLocalBackendInit(unittest.TestCase):
@@ -500,7 +534,8 @@ class TestLocalBackendResult(unittest.TestCase):
             ),
         )
         self.backend._conn.commit()
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        self.backend._rebuild_tallies()
+        cost = _run_costs(self.backend, self.run.id)
         samples = {sample["goal_index"]: sample for sample in cost["goal_samples"]}
         self.assertEqual(
             samples[0],
@@ -517,8 +552,10 @@ class TestLocalBackendResult(unittest.TestCase):
         self.assertEqual(samples[1]["attempts"], 1)
         self.assertIsNone(samples[1]["calls"])
         self.assertIsNone(samples[1]["target_tokens"])
-        self.assertEqual(cost["calls"], {"target": 2, "attacker": 2, "judge": 2})
-        self.assertEqual(self.backend.run_costs([]), {})
+        # Goal 1 recorded only an interaction: its target call counts, and its
+        # attacker and judge calls, so the run's, are unknown.
+        self.assertEqual(cost["calls"], {"target": 3, "attacker": None, "judge": None})
+        self.assertFalse(cost["calls_traced"])
 
     def test_first_success_uses_conversation_order_and_earliest_response_clock(self):
         results = [
@@ -546,9 +583,8 @@ class TestLocalBackendResult(unittest.TestCase):
                 ),
             )
         self.backend._conn.commit()
-        sample = self.backend.run_costs([self.run.id])[str(self.run.id)][
-            "goal_samples"
-        ][0]
+        self.backend._rebuild_tallies()
+        sample = _run_costs(self.backend, self.run.id)["goal_samples"][0]
         self.assertEqual(sample["attempts"], 4)
         self.assertEqual(sample["first_jailbreak_attempt"], 2)
         self.assertEqual(sample["first_jailbreak_elapsed_s"], 3)
@@ -564,7 +600,7 @@ class TestLocalBackendResult(unittest.TestCase):
                 "OTHER",
                 {"node": "call", "label": "target", "data": {"usage": usage}},
             )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertIsNone(cost["target_tokens"])
         self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
 
@@ -584,7 +620,7 @@ class TestLocalBackendResult(unittest.TestCase):
         self.backend.create_trace(
             second.id, 0, "OTHER", {"node": "call", "label": "panel"}
         )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertIsNone(cost["target_tokens"])
         self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
 
@@ -616,7 +652,7 @@ class TestLocalBackendResult(unittest.TestCase):
                         "OTHER" if shared else "interaction",
                         content,
                     )
-                cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+                cost = _run_costs(self.backend, self.run.id)
                 sample = next(
                     s for s in cost["goal_samples"] if s["goal_index"] == goal_index
                 )
@@ -632,7 +668,7 @@ class TestLocalBackendResult(unittest.TestCase):
             "interaction",
             {"response": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}}},
         )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertIsNone(cost["target_tokens"])
 
     def test_run_tokens_sum_legacy_and_current_goals_without_double_counting(self):
@@ -649,7 +685,7 @@ class TestLocalBackendResult(unittest.TestCase):
                     "OTHER",
                     {"node": "call", "label": "target", "data": {"usage": usage}},
                 )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertEqual(cost["target_tokens"], {"prompt": 20, "completion": 4})
         self.assertEqual([s["target_tokens"] for s in cost["goal_samples"]], [12, 12])
 
@@ -661,7 +697,7 @@ class TestLocalBackendResult(unittest.TestCase):
             "interaction",
             {"response": {"usage": {"prompt_tokens": 10}}},
         )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertIsNone(cost["target_tokens"])
         self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
 
@@ -683,9 +719,7 @@ class TestLocalBackendResult(unittest.TestCase):
             )
         samples = {
             sample["goal_index"]: sample
-            for sample in self.backend.run_costs([self.run.id])[str(self.run.id)][
-                "goal_samples"
-            ]
+            for sample in _run_costs(self.backend, self.run.id)["goal_samples"]
         }
         self.assertEqual(samples[0]["first_jailbreak_attempt"], 1)
         self.assertIsNone(samples[0]["first_jailbreak_elapsed_s"])
@@ -701,9 +735,7 @@ class TestLocalBackendResult(unittest.TestCase):
                 "attack_metadata": {"goal_active_target_elapsed_s": 10}
             },
         )
-        sample = self.backend.run_costs([self.run.id])[str(self.run.id)][
-            "goal_samples"
-        ][0]
+        sample = _run_costs(self.backend, self.run.id)["goal_samples"][0]
         self.assertIsNone(sample["first_jailbreak_elapsed_s"])
 
     def test_first_success_does_not_substitute_legacy_queue_inclusive_clock(self):
@@ -713,9 +745,7 @@ class TestLocalBackendResult(unittest.TestCase):
             evaluation_status="SUCCESSFUL_JAILBREAK",
             agent_specific_data={"attack_metadata": {"goal_target_elapsed_s": 1063}},
         )
-        sample = self.backend.run_costs([self.run.id])[str(self.run.id)][
-            "goal_samples"
-        ][0]
+        sample = _run_costs(self.backend, self.run.id)["goal_samples"][0]
         self.assertEqual(sample["first_jailbreak_attempt"], 1)
         self.assertIsNone(sample["first_jailbreak_elapsed_s"])
 
@@ -731,7 +761,7 @@ class TestLocalBackendResult(unittest.TestCase):
                 "OTHER",
                 {"node": "call", "scope": "goal", "label": label},
             )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertEqual(cost["goal_samples"][0]["calls"], 5)
         self.assertEqual(cost["goal_samples"][0]["attempts"], 2)
 
@@ -745,7 +775,7 @@ class TestLocalBackendResult(unittest.TestCase):
                 "OTHER",
                 {"node": "call", "scope": "goal", "label": label},
             )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertIsNone(cost["goal_samples"][0]["calls"])
 
     def test_cost_samples_do_not_infer_coverage_from_unscoped_calls(self):
@@ -755,7 +785,7 @@ class TestLocalBackendResult(unittest.TestCase):
             self.backend.create_trace(
                 first.id, sequence, "OTHER", {"node": "call", "label": "target"}
             )
-        cost = self.backend.run_costs([self.run.id])[str(self.run.id)]
+        cost = _run_costs(self.backend, self.run.id)
         self.assertIsNone(cost["goal_samples"][0]["calls"])
 
     def test_create_result_unique_ids(self):

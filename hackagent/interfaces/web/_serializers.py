@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.client import result_bucket
+from hackagent.reporting import result_bucket
 
 #: Identity presented by offline mode. The local store has a single implicit
 #: user; the SPA still needs a stable id/username pair to render headers.
