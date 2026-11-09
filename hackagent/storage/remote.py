@@ -3,9 +3,10 @@
 
 """RemoteBackend: the :class:`~hackagent.storage.store.Store` on the HackAgent API.
 
-Used when the remote backend is selected explicitly (``backend="remote"``,
-``HACKAGENT_BACKEND=remote`` or ``storage.backend: remote`` in a campaign);
-having an API key alone never selects it. Every HTTP call the SDK makes to
+Used when the remote backend is selected explicitly
+(``Settings.resolve(backend="remote")``, ``HACKAGENT_BACKEND=remote`` or
+``storage.backend: remote`` in a campaign); having an API key alone never
+selects it. Every HTTP call the SDK makes to
 the platform's tracking API goes through this module, which also implements
 the executor protocol (claim, heartbeat, finish) used by queued runs.
 
