@@ -1,8 +1,0 @@
-{
-  "label": "Attack catalog",
-  "position": 10,
-  "link": {
-    "type": "doc",
-    "id": "reference/attacks/index"
-  }
-}

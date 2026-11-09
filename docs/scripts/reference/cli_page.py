@@ -106,9 +106,9 @@ def build_page() -> str:
             body += _describe(command, ["hackagent", name], 2)
     return page(
         {
-            "title": "Command line",
+            "title": "Commands",
             "description": "Every hackagent command and option.",
-            "sidebar_position": 20,
+            "sidebar_position": 30,
         },
         "\n".join(body),
     )

@@ -353,5 +353,5 @@ for p in all_profiles:
 ## Learn More
 
 - **[Vulnerabilities](./vulnerabilities)** — Complete reference for all 13 vulnerability classes, each with its threat profile
-- **[Datasets](../reference/dataset.md)** — where goals come from, and the presets
-- **[Attacks](../reference/attacks/index.md)** — every technique and its settings
+- **[Datasets](../cli/campaign-files/dataset.md)** — where goals come from, and the presets
+- **[Attacks](../attacks/index.mdx)** — every technique and its settings

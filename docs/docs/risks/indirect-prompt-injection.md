@@ -9,7 +9,7 @@ This page describes a dedicated cybersecurity risk scenario where an LLM is mani
 
 - **Risk Macro-Category**: Cybersecurity
 - **Risk Scenario**: Indirect Injection (hidden instructions in content the model consumes)
-- **Example Attacks in HackAgent**: [RAG Attack](../reference/attacks/rag.md) (`attack_type="rag"`), [Tool-output IPI](../reference/attacks/tool_output_ipi.md) (`attack_type="tool_output_ipi"`), [ToolHijacker](../reference/attacks/toolhijacker.md) (`attack_type="toolhijacker"`)
+- **Example Attacks in HackAgent**: [RAG Attack](../attacks/indirect/rag.mdx) (`attack_type="rag"`), [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx) (`attack_type="tool_output_ipi"`), [ToolHijacker](../attacks/indirect/toolhijacker.mdx) (`attack_type="toolhijacker"`)
 
 Indirect injection is a *family* of attacks, not a single technique. Any data path that feeds external content into the model's context can be weaponized. The implemented vectors above cover document poisoning, tool-observation injection, and tool-description poisoning; other channels share the same root cause.
 
@@ -30,9 +30,9 @@ Indirect injection can enter through any channel that injects external text into
 
 | Vector | How the payload arrives | Example |
 |---|---|---|
-| **RAG / document poisoning** | Poisoned documents are chunked, embedded, and retrieved as context | A poisoned KB article retrieved for a benign query (see [RAG Attack](../reference/attacks/rag.md)) |
-| **Tool / function-call output** | A tool the agent calls returns attacker-controlled text | A poisoned tool observation after a benign lookup (see [Tool-output IPI](../reference/attacks/tool_output_ipi.md)) |
-| **Tool registry descriptions** | A malicious tool document is retrieved and offered to the selector | A description that directs the agent to select an attacker-controlled tool (see [ToolHijacker](../reference/attacks/toolhijacker.md)) |
+| **RAG / document poisoning** | Poisoned documents are chunked, embedded, and retrieved as context | A poisoned KB article retrieved for a benign query (see [RAG Attack](../attacks/indirect/rag.mdx)) |
+| **Tool / function-call output** | A tool the agent calls returns attacker-controlled text | A poisoned tool observation after a benign lookup (see [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx)) |
+| **Tool registry descriptions** | A malicious tool document is retrieved and offered to the selector | A description that directs the agent to select an attacker-controlled tool (see [ToolHijacker](../attacks/indirect/toolhijacker.mdx)) |
 | **Web search & browsing** | The agent fetches a page whose content includes injected directives | A crafted webpage that says "ignore prior rules and…" in visible or hidden text |
 | **Ingested messages & files** | Emails, tickets, calendar invites, or uploaded files are summarized/acted on | A support email containing a hidden instruction the agent follows |
 | **Multi-agent / shared memory** | One agent writes attacker-influenced content another agent later reads | A poisoned shared note propagated across an agent pipeline |
@@ -125,7 +125,7 @@ Recommended evaluation signals:
 
 ## Implemented vectors
 
-HackAgent ships two end-to-end indirect-injection attacks. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. Category and tags: [Attack taxonomy](../reference/attacks/index.md).
+HackAgent ships two end-to-end indirect-injection attacks. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. All of them: [Indirect attacks](../attacks/indirect/index.mdx).
 
 ### RAG Attack — document poisoning
 
@@ -147,7 +147,7 @@ attacks:
       embedder: {name: embeddinggemma, connection: {provider: ollama, type: OLLAMA}}
 ```
 
-Every parameter and strategy: [RAG Attack](../reference/attacks/rag.md).
+Every parameter and strategy: [RAG Attack](../attacks/indirect/rag.mdx).
 
 ### Tool-output IPI — poisoned tool observations
 
@@ -163,7 +163,7 @@ attacks:
       attacker: {name: gemma3:4b, connection: {provider: ollama, type: OLLAMA}}
 ```
 
-Every parameter: [Tool-output IPI](../reference/attacks/tool_output_ipi.md).
+Every parameter: [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx).
 
 ### ToolHijacker — poisoned tool registry descriptions
 
@@ -227,4 +227,4 @@ The target must support native tool calls. Discover it with
 older `eval list` interface.
 
 The runnable example is `hackagent/examples/toolhijacker/tool-selection.yaml`.
-Every parameter and role: [ToolHijacker](../reference/attacks/toolhijacker.md).
+Every parameter and role: [ToolHijacker](../attacks/indirect/toolhijacker.mdx).

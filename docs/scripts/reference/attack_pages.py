@@ -1,11 +1,19 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Build one reference page per attack technique, from its own code.
+"""Build the facts about each attack technique, from its own code.
 
-Each page carries what the attack is (its class docstring and catalog entry),
-the helper models it drives (its role fields), the knobs it accepts (its
-parameter fields) and a snippet that can be pasted into a campaign file.
+Every attack has a hand-written page at ``attacks/<type>/<name>.mdx`` that
+explains it. What the code already says — the helper models it drives (its
+role fields), the knobs it accepts (its parameter fields) and a snippet that
+can be pasted into a campaign file — is generated here as an MDX partial,
+``attacks/<type>/_<name>.generated.mdx``, which the page imports and renders
+under its own ``## Configuration`` heading. Its sections are therefore
+``###``.
+
+The type folder comes from the registry's module path (``static``,
+``adaptive``, ``multi_turn`` -> ``multi-turn``, ``indirect``), never from a
+list kept here, so a new attack lands in the right place on its own.
 """
 
 from __future__ import annotations
@@ -13,7 +21,8 @@ from __future__ import annotations
 from typing import Any
 
 from .fields import Links, field_table
-from .markup import admonition, clean, first_sentence, page, table, yaml_block
+from .markup import admonition, clean, partial, table, yaml_block
+from .paths import attack_page, attack_type, relative, type_label
 
 CHAT_MODEL: dict[str, Any] = {
     "name": "llama3.2",
@@ -24,28 +33,18 @@ EMBED_MODEL: dict[str, Any] = {
     "connection": {"provider": "ollama", "type": "OLLAMA"},
 }
 
-KINDS = {
-    "static": (
-        "Static",
-        "Builds its prompts up front and sends them, without reading the "
-        "target's replies, so it is cheap and repeatable.",
-    ),
-    "adaptive": (
-        "Adaptive",
-        "Searches across independent attempts, optionally using helper models "
-        "to refine candidates.",
-    ),
-    "multi_turn": (
-        "Multi-turn",
-        "Holds one growing conversation with the target, escalating turn by turn.",
-    ),
-}
 
-
-def _entries() -> list[dict[str, Any]]:
+def entries() -> list[dict[str, Any]]:
+    """Every registered attack's catalog entry, sorted by name."""
     from hackagent.client import catalog_entries
 
     return sorted(catalog_entries(), key=lambda entry: entry["attack_type"])
+
+
+def _params_type(name: str) -> Any:
+    from hackagent.attacks.techniques.registry import get_attack_class
+
+    return get_attack_class(name).params_type
 
 
 def _example(name: str, params_type: Any) -> dict[str, Any]:
@@ -84,7 +83,7 @@ def _roles_section(params_type: Any, links: Links, page_name: str) -> str:
     roles = sorted(params_type.role_names())
     if not roles:
         return (
-            "## Helper models\n\nNone. This attack drives no model of its own, so "
+            "### Helper models\n\nNone. This attack drives no model of its own, so "
             "`roles` can be left out."
         )
     required = params_type.REQUIRED_ROLES
@@ -102,7 +101,7 @@ def _roles_section(params_type: Any, links: Links, page_name: str) -> str:
         )
     return "\n".join(
         [
-            "## Helper models",
+            "### Helper models",
             "",
             "Models this attack drives, configured under its `roles`. Each one is "
             f"a {links.to(_model_config(), page_name)}.",
@@ -124,12 +123,12 @@ def _parameters_section(params_type: Any, links: Links, page_name: str) -> str:
     )
     if not body:
         return (
-            "## Parameters\n\nNone. This attack takes no settings, so "
+            "### Parameters\n\nNone. This attack takes no settings, so "
             "`parameters` can be left out."
         )
     return "\n".join(
         [
-            "## Parameters",
+            "### Parameters",
             "",
             "Settings for the algorithm itself, written under the attack's "
             "`parameters`. Anything left out keeps its default.",
@@ -139,100 +138,133 @@ def _parameters_section(params_type: Any, links: Links, page_name: str) -> str:
     )
 
 
-def build_pages(links: Links, section: str = "") -> dict[str, str]:
-    """A page per attack, plus the index that doubles as the `attacks` section.
+def _roles(params_type: Any, required: bool) -> str:
+    names = sorted(
+        role
+        for role in params_type.role_names()
+        if (role in params_type.REQUIRED_ROLES) == required
+    )
+    return ", ".join(f"`{role}`" for role in names) or "none"
 
-    ``section`` is the campaign format's `attacks` documentation, rendered by
-    :mod:`spec_pages`; putting it here keeps the section and the catalog on one
-    page instead of two near-identical routes.
-    """
-    from hackagent.attacks.techniques.registry import get_attack_class
 
-    pages: dict[str, str] = {}
-    rows = []
-    for position, entry in enumerate(_entries(), start=1):
-        name = entry["attack_type"]
-        attack = get_attack_class(name)
-        params_type = attack.params_type
-        kind_label, kind_text = KINDS[entry["category"]]
-        page_name = f"attacks/{name}"
+def _helper_models(params_type: Any) -> str:
+    """Required and optional roles in one cell, for the catalog tables."""
+    required = _roles(params_type, required=True)
+    optional = _roles(params_type, required=False)
+    if optional == "none":
+        return required
+    if required == "none":
+        return f"optional: {optional}"
+    return f"{required}; optional: {optional}"
 
-        needs = sorted(params_type.REQUIRED_ROLES)
-        body = [
-            clean(entry["description"]),
+
+def build_partial(name: str, links: Links) -> str:
+    """The generated facts about one attack, as an MDX partial."""
+    params_type = _params_type(name)
+    page_name = f"attacks/{attack_type(name)}/_{name}.generated"
+    needs = sorted(params_type.REQUIRED_ROLES)
+    body = [
+        _roles_section(params_type, links, page_name),
+        "",
+        _parameters_section(params_type, links, page_name),
+        "",
+        "### In a campaign file",
+        "",
+        yaml_block(_example(name, params_type)),
+    ]
+    if needs:
+        body += [
             "",
-            f"**{kind_label}.** {kind_text}",
-            "",
-            clean(attack.__doc__),
-            "",
-            _roles_section(params_type, links, page_name),
-            "",
-            _parameters_section(params_type, links, page_name),
-            "",
-            "## In a campaign file",
-            "",
-            yaml_block(_example(name, params_type)),
+            admonition(
+                "note",
+                "Needs a helper model",
+                "This attack cannot run without "
+                + ", ".join(f"`{role}`" for role in needs)
+                + ". A campaign that leaves it out fails to resolve, before "
+                "anything is attacked.",
+            ),
         ]
-        if needs:
-            body += [
-                "",
-                admonition(
-                    "note",
-                    "Needs a helper model",
-                    "This attack cannot run without "
-                    + ", ".join(f"`{role}`" for role in needs)
-                    + ". A campaign that leaves it out fails to resolve, before "
-                    "anything is attacked.",
-                ),
-            ]
-        pages[f"attacks/{name}.md"] = page(
-            {
-                "title": entry["label"],
-                "description": first_sentence(entry["description"]),
-                "sidebar_position": position,
-            },
-            "\n".join(body),
-        )
+    return partial("\n".join(body))
+
+
+def _list(folder: str, chosen: list[dict[str, Any]]) -> str:
+    """The table of one type's attacks, for that type's index page."""
+    page_name = f"attacks/{folder}/_list.generated"
+    rows = []
+    for entry in chosen:
+        name = entry["attack_type"]
+        params_type = _params_type(name)
         rows.append(
             [
-                f"[{entry['label']}]({name}.md)",
-                kind_label,
-                ", ".join(f"`{role}`" for role in needs) or "none",
+                f"[{entry['label']}]({relative(page_name, attack_page(name) + '.mdx')})",
+                f"`{name}`",
                 clean(entry["description"]),
+                _roles(params_type, required=True),
+                _roles(params_type, required=False),
             ]
         )
-
-    groups = "\n\n".join(f"**{label}.** {text}" for label, text in KINDS.values())
-    index = [
-        section,
-        "",
-        "## The catalog",
-        "",
-        "Every technique HackAgent can run.",
-        "",
-        groups,
-        "",
-        table(["Attack", "Kind", "Needs", "What it does"], rows),
-        "",
-        admonition(
-            "tip",
-            "Where these come from",
-            "Each attack follows a published paper or reference implementation. "
-            "Parameter defaults follow the paper unless the description says "
-            "otherwise, which happens when a value assumes local model weights "
-            "rather than an API endpoint.",
-        ),
-    ]
-    pages["attacks/index.md"] = page(
-        {
-            "title": "Attacks",
-            "description": "The techniques to run, and the catalog of every one.",
-            "sidebar_position": 6,
-            "sidebar_label": "Attacks",
-        },
-        "\n".join(index),
+    return partial(
+        table(
+            ["Attack", "Name", "What it does", "Needs", "Can also use"],
+            rows,
+        )
     )
-    return pages
 
 
-__all__ = ["build_pages"]
+def _catalog(all_entries: list[dict[str, Any]]) -> str:
+    """Every attack in one table, for the Attacks overview."""
+    page_name = "attacks/_catalog.generated"
+    rows = []
+    for entry in all_entries:
+        name = entry["attack_type"]
+        folder = attack_type(name)
+        rows.append(
+            [
+                f"[{entry['label']}]({relative(page_name, attack_page(name) + '.mdx')})",
+                f"[{type_label(folder)}]"
+                f"({relative(page_name, f'attacks/{folder}/index.mdx')})",
+                clean(entry["description"]),
+                _helper_models(_params_type(name)),
+            ]
+        )
+    return partial(table(["Attack", "Type", "What it does", "Helper models"], rows))
+
+
+def campaign_table(page_name: str) -> str:
+    """Every attack name a campaign file accepts, linked to its page."""
+    rows = []
+    for entry in entries():
+        name = entry["attack_type"]
+        folder = attack_type(name)
+        rows.append(
+            [
+                f"`{name}`",
+                f"[{entry['label']}]({relative(page_name, attack_page(name) + '.mdx')})",
+                type_label(folder),
+                _roles(_params_type(name), required=True),
+            ]
+        )
+    return table(["`name`", "Attack", "Type", "Needs"], rows)
+
+
+def build_partials(links: Links) -> dict[str, str]:
+    """Every attack partial, keyed by its path relative to ``docs/docs``.
+
+    One ``_<name>.generated.mdx`` per attack, one ``_list.generated.mdx`` per
+    type folder, and ``_catalog.generated.mdx`` for the overview.
+    """
+    all_entries = entries()
+    files: dict[str, str] = {}
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    for entry in all_entries:
+        name = entry["attack_type"]
+        folder = attack_type(name)
+        by_type.setdefault(folder, []).append(entry)
+        files[f"attacks/{folder}/_{name}.generated.mdx"] = build_partial(name, links)
+    for folder, chosen in sorted(by_type.items()):
+        files[f"attacks/{folder}/_list.generated.mdx"] = _list(folder, chosen)
+    files["attacks/_catalog.generated.mdx"] = _catalog(all_entries)
+    return files
+
+
+__all__ = ["build_partial", "build_partials", "campaign_table", "entries"]

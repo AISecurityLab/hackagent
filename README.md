@@ -67,7 +67,7 @@ otherwise.
 - [Installation](https://docs.hackagent.dev/getting-started/installation) — extras, and standalone binaries that need no Python
 - [Your first campaign](https://docs.hackagent.dev/getting-started/first-campaign) — write, check and run one
 - [Concepts](https://docs.hackagent.dev/concepts) — attacks, judges and how a run works
-- [Attacks](https://docs.hackagent.dev/reference/attacks) and the [campaign file reference](https://docs.hackagent.dev/reference/campaign)
+- [Attacks](https://docs.hackagent.dev/attacks) and the [campaign file reference](https://docs.hackagent.dev/cli/campaign-files)
 - [Dashboard](https://docs.hackagent.dev/getting-started/dashboard) — `hackagent web`, locally or against your account
 
 Questions? Join the [discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.

@@ -5,7 +5,7 @@ sidebar_position: 1
 ---
 
 A campaign turns **goals** into **verdicts**. This page follows one goal all the
-way through, so the words in the [reference](../reference/index.md) have
+way through, so the words in the [campaign-file pages](../cli/campaign-files/index.md) have
 something concrete behind them.
 
 ## The whole pipeline
@@ -100,7 +100,7 @@ attack.
 | `./logs/runs/<run id>/audit.json` | When the judge audit is on, how the panel measured up. |
 
 The output folder and formats are set under
-[`execution.output`](../reference/execution.md#outputspec).
+[`execution.output`](../cli/campaign-files/execution.md#outputspec).
 
 ## Next
 

@@ -206,4 +206,4 @@ TAP calls its attacker model many times per goal. Start with small `width` and
   and what each role is for.
 - [Judges](../concepts/judges.md) — how a verdict is decided, and why a judge may
   abstain.
-- [Campaign reference](../reference/index.md) — every field of the format.
+- [Campaign files](../cli/campaign-files/index.md) — every field of the format.

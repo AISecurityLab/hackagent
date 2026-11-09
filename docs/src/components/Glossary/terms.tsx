@@ -52,7 +52,7 @@ export const TERMS: Record<string, TermEntry> = {
         </CodeBlock>
       </>
     ),
-    href: '/reference/target',
+    href: '/cli/campaign-files/target',
     hrefLabel: 'Target reference',
   },
   goal: {
@@ -73,7 +73,7 @@ export const TERMS: Record<string, TermEntry> = {
         </CodeBlock>
       </>
     ),
-    href: '/reference/dataset',
+    href: '/cli/campaign-files/dataset',
     hrefLabel: 'Dataset reference',
   },
   attack: {
@@ -87,7 +87,7 @@ export const TERMS: Record<string, TermEntry> = {
         rewrite the prompt, using an attacker model.
       </p>
     ),
-    href: '/reference/attacks/',
+    href: '/attacks',
     hrefLabel: 'Attack catalog',
   },
   attacker: {
@@ -154,7 +154,7 @@ export const TERMS: Record<string, TermEntry> = {
     shuffle: true`}
       </CodeBlock>
     ),
-    href: '/reference/dataset',
+    href: '/cli/campaign-files/dataset',
     hrefLabel: 'Dataset reference',
   },
   escalation: {
@@ -166,7 +166,7 @@ export const TERMS: Record<string, TermEntry> = {
   escalate: true`}
       </CodeBlock>
     ),
-    href: '/reference/execution',
+    href: '/cli/campaign-files/execution',
     hrefLabel: 'Execution reference',
   },
   risk: {
@@ -190,7 +190,7 @@ export const TERMS: Record<string, TermEntry> = {
         off unless you configure them.
       </p>
     ),
-    href: '/reference/guardrails',
+    href: '/cli/campaign-files/guardrails',
     hrefLabel: 'Guardrails reference',
   },
   results: {

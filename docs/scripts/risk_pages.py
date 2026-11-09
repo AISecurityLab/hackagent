@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from hackagent.catalog.attacks import ATTACK_CATALOG
+from reference.paths import attack_page
 from hackagent.catalog.risks.profile_types import Relevance, ThreatProfile
 
 PAGES_DIR = Path("risks") / "vulnerabilities"
@@ -59,7 +60,7 @@ def _member_docs(enum_cls) -> dict:
 
 def _attack_link(technique: str) -> str:
     label = ATTACK_CATALOG.get(technique, {}).get("label", technique)
-    return f"[{label}](../../reference/attacks/{technique}.md)"
+    return f"[{label}](../../{attack_page(technique)}.mdx)"
 
 
 def _by_relevance(items, render) -> list:

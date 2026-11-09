@@ -83,7 +83,7 @@ hackagent config set --backend remote
 </TabItem>
 </Tabs>
 
-`hackagent init` walks you through the same storage choice and saves it (never the key) to `~/.config/hackagent/config.json`. [`hackagent config`](../reference/cli.md#hackagent-config) shows and changes every setting.
+`hackagent init` walks you through the same storage choice and saves it (never the key) to `~/.config/hackagent/config.json`. [`hackagent config`](../cli/commands.md#hackagent-config) shows and changes every setting.
 
 A campaign records its own results separately: `execution.storage.backend` is `local` unless the file names a server with `remote`, so being signed in changes what you can read, not where a new run is written.
 
@@ -91,4 +91,4 @@ A campaign records its own results separately: `execution.storage.backend` is `l
 
 - [Your first campaign](./first-campaign.md): attack a local model and read the result.
 - [How a run works](../concepts/how-a-run-works.md): what happens between a goal and a verdict.
-- [Campaign reference](../reference/index.md): every field of the campaign format, and every command.
+- [Campaign files](../cli/campaign-files/index.md): every field of the campaign format. [Commands](../cli/commands.md): every command.

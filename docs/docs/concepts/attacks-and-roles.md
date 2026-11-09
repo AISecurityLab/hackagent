@@ -29,7 +29,7 @@ flowchart TB
 ```
 
 Start with a static attack to confirm the plumbing works end to end, then add
-adaptive ones. The [attack catalog](../reference/attacks/index.md) lists every
+adaptive ones. The [attack catalog](../attacks/index.mdx) lists every
 technique with its kind and what it needs.
 
 h4rm3l sits across the line: it is listed as adaptive because it can search,
@@ -66,7 +66,7 @@ three different models, and the attacker is usually one with few refusals,
 since it has to write adversarial text on request.
 
 Every role is written the same way a target is — see
-[Target](../reference/target.md):
+[Target](../cli/campaign-files/target.md):
 
 ```yaml
 attacks:
@@ -110,13 +110,13 @@ those also costs a call to the **attacker** model, plus one to each **judge**.
 
 Two settings keep this under control:
 
-- [`execution.escalate`](../reference/execution.md#executionspec) drops a goal
+- [`execution.escalate`](../cli/campaign-files/execution.md#executionspec) drops a goal
   once it falls, so later attacks face fewer goals.
-- [`execution.concurrency`](../reference/execution.md#concurrencyspec) decides how
+- [`execution.concurrency`](../cli/campaign-files/execution.md#concurrencyspec) decides how
   much runs at once. Raise it to finish sooner; lower it if a provider starts
   rate-limiting you.
 
 ## Next
 
-- [Attack catalog](../reference/attacks/index.md) — every technique in detail.
+- [Attack catalog](../attacks/index.mdx) — every technique in detail.
 - [Judges](judges.md) — how replies become verdicts.

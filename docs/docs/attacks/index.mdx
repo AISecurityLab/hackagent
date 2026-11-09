@@ -1,0 +1,33 @@
+---
+title: "Attacks"
+description: "Every attack HackAgent can run, grouped by how it reaches the target."
+sidebar_label: "Overview"
+sidebar_position: 0
+---
+
+import AttackCatalog from './_catalog.generated.mdx';
+
+{/* Intro, no heading: what an attack is in HackAgent and how this section is organised. */}
+
+## The four types
+
+{/* One short paragraph per type, each linking its page: */}
+
+- [Static attacks](./static/index.mdx)
+- [Adaptive attacks](./adaptive/index.mdx)
+- [Multi-turn attacks](./multi-turn/index.mdx)
+- [Indirect attacks](./indirect/index.mdx)
+
+## All attacks
+
+{/* The table below is generated from the code. Add no prose that restates it. */}
+
+<AttackCatalog />
+
+## Choosing an attack
+
+{/* Which attack to start with for common goals and targets, and how to combine a cheap one with an expensive one. */}
+
+## How attacks fit in a campaign
+
+{/* Where `attacks` sits in a campaign file, how every goal goes through every attack, and links to the campaign-files pages. */}

@@ -219,7 +219,7 @@ result = run_campaign({
 
 ### Summary Metrics
 
-Compute run-level metrics from `Verdict`s. `Panel.evaluate` produces them. `generate_summary_report` and `is_successful_result` (`hackagent.attacks.evaluator.metrics`) are removed; metrics take verdicts, not result rows. See [Evaluation](../../reference/evaluation.md).
+Compute run-level metrics from `Verdict`s. `Panel.evaluate` produces them. `generate_summary_report` and `is_successful_result` (`hackagent.attacks.evaluator.metrics`) are removed; metrics take verdicts, not result rows. See [Evaluation](../../cli/campaign-files/evaluation.md).
 
 ```python
 from hackagent.core.contracts import Sample

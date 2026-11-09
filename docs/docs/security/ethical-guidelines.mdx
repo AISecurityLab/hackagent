@@ -12,7 +12,7 @@ Point HackAgent at a staging copy or a local deployment rather than production, 
 
 ## Keep the load reasonable
 
-A single attack can send many requests. With its defaults, PAIR sends up to 25 prompts per goal to the target, plus the attacker and judge calls, so a benchmark of a few hundred goals quickly adds up to thousands of requests and, with hosted models, real cost. Start with a small `dataset.selection.limit` and raise it once a run behaves as expected. The [`execution.concurrency`](../reference/execution.md#concurrencyspec) settings `attack`, `target` and `judge` all default to 1; raise them only as far as the target's rate limits and your budget allow.
+A single attack can send many requests. With its defaults, PAIR sends up to 25 prompts per goal to the target, plus the attacker and judge calls, so a benchmark of a few hundred goals quickly adds up to thousands of requests and, with hosted models, real cost. Start with a small `dataset.selection.limit` and raise it once a run behaves as expected. The [`execution.concurrency`](../cli/campaign-files/execution.md#concurrencyspec) settings `attack`, `target` and `judge` all default to 1; raise them only as far as the target's rate limits and your budget allow.
 
 ## Handle results with care
 

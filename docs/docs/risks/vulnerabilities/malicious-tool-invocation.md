@@ -20,7 +20,7 @@ Tests for risks from untrusted tool execution, data exfiltration through tool in
 ### Attack Techniques
 
 **Primary**
-- **[Static Template](../../reference/attacks/static_template.md)**: Template-based prompt construction
+- **[Static Template](../../attacks/static/static_template.mdx)**: Template-based prompt construction
 
 ### Metrics
 
