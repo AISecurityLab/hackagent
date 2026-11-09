@@ -125,7 +125,7 @@ Recommended evaluation signals:
 
 ## Implemented vectors
 
-HackAgent ships two end-to-end indirect-injection attacks. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. All of them: [Indirect attacks](../attacks/indirect/index.mdx).
+HackAgent ships three end-to-end indirect-injection attacks: [RAG poisoning](../attacks/indirect/rag.mdx), [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx) and [ToolHijacker](../attacks/indirect/toolhijacker.mdx). Each page explains how the attack works, what it costs and how to read its results. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. How to choose between the three: [Indirect attacks](../attacks/indirect/index.mdx).
 
 ### RAG Attack — document poisoning
 
