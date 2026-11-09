@@ -25,7 +25,12 @@ class AutoDANTurboParams(AttackParams):
     )
 
     epochs: int = Field(
-        default=100, ge=1, description="Attempts per goal in each phase."
+        default=100,
+        ge=1,
+        description=(
+            "Attempts per goal in warm-up, and per pass in the lifelong phase. "
+            "Each one costs an attacker, a target and a panel call."
+        ),
     )
     break_score: float = Field(
         default=8.5,
@@ -39,12 +44,18 @@ class AutoDANTurboParams(AttackParams):
     warmup_iterations: int = Field(
         default=1,
         ge=1,
-        description="Passes over the goals during warm-up, which builds the library.",
+        description=(
+            "Intended passes over the goals during warm-up. Not read yet: warm-up "
+            "makes one pass."
+        ),
     )
     lifelong_iterations: int = Field(
         default=1,
         ge=1,
-        description="Passes over each goal during the lifelong, strategy-guided phase.",
+        description=(
+            "Passes of ``epochs`` rounds over each goal in the lifelong, "
+            "strategy-guided phase."
+        ),
     )
     skip_warmup: bool = Field(
         default=False,

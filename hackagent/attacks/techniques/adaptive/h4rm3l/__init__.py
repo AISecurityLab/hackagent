@@ -3,7 +3,9 @@
 
 """h4rm3l: compose prompt decorators into a program, and search for one.
 
-Based on: https://arxiv.org/abs/2408.04811
+Implements Doumbouya et al., "h4rm3l: A language for Composable Jailbreak
+Attack Synthesis" (2024, arXiv:2408.04811). See :mod:`.attack` for the
+algorithm.
 """
 
 from . import decorators

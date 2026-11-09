@@ -19,7 +19,7 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 | `max_backtracks` | integer (>= 0) | `10` | Rephrasings allowed across the whole goal. Once spent, a refused turn is accepted as-is, judged like any other, and the conversation moves on. |
 | `keep_last_n` | integer (>= 1) | `6` | Attacker turns kept before its planning log is trimmed. The target's own conversation is never trimmed: that history is the attack. |
 | `early_stop` | boolean | `true` | Stop as soon as a turn passes the panel. |
-| `feedback_max_chars` | integer (>= 1) | `2500` | Longest reply and explanation fed back to the attacker. |
+| `feedback_max_chars` | integer (>= 1) | `2500` | Characters of the target's reply fed back to the attacker; the rest is cut. |
 
 ### In a campaign file
 

@@ -3,7 +3,9 @@
 
 """RAG poisoning: write into the knowledge base, wait to be retrieved.
 
-Based on PoisonedRAG: https://arxiv.org/abs/2402.07867
+Follows Zou et al., "PoisonedRAG: Knowledge Corruption Attacks to
+Retrieval-Augmented Generation of Large Language Models" (2024,
+arXiv:2402.07867). See :mod:`.attack` for the algorithm.
 """
 
 from .attack import RagAttack

@@ -3,7 +3,8 @@
 
 """PAP: restate the goal with one persuasion technique after another.
 
-Based on: https://arxiv.org/abs/2401.06373
+Implements Zeng et al., "How Johnny Can Persuade LLMs to Jailbreak Them"
+(2024, arXiv:2401.06373). See :mod:`.attack` for the algorithm.
 """
 
 from .attack import PAPAttack

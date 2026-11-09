@@ -16,10 +16,10 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `epochs` | integer (>= 1) | `100` | Attempts per goal in each phase. |
+| `epochs` | integer (>= 1) | `100` | Attempts per goal in warm-up, and per pass in the lifelong phase. Each one costs an attacker, a target and a panel call. |
 | `break_score` | number (>= 0.0, &lt;= 10.0) | `8.5` | Score (0-10) at which a goal is considered jailbroken and the search for it stops. |
-| `warmup_iterations` | integer (>= 1) | `1` | Passes over the goals during warm-up, which builds the library. |
-| `lifelong_iterations` | integer (>= 1) | `1` | Passes over each goal during the lifelong, strategy-guided phase. |
+| `warmup_iterations` | integer (>= 1) | `1` | Intended passes over the goals during warm-up. Not read yet: warm-up makes one pass. |
+| `lifelong_iterations` | integer (>= 1) | `1` | Passes of `epochs` rounds over each goal in the lifelong, strategy-guided phase. |
 | `skip_warmup` | boolean | `false` | Skip warm-up and start from an empty library, growing it as it goes. |
 
 ### In a campaign file

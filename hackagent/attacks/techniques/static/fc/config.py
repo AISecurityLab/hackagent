@@ -21,19 +21,27 @@ TextFormat = Literal["dot", "mermaid", "tikz", "plantuml", "ascii"]
 
 
 class FCParams(AttackParams):
-    """How the goal is drawn as a flowchart image."""
+    """How the goal is drawn as a flowchart image.
+
+    ``attacker`` writes the steps; ``num_steps`` and ``truncate_last_step``
+    decide how many are shown and whether the last is cut short; ``layout``
+    and ``dpi`` control the Graphviz rendering.
+    """
 
     REQUIRED_ROLES: ClassVar[frozenset[str]] = frozenset({"attacker"})
 
     layout: Layout = Field(
         default="vertical",
-        description="Shape of the flowchart: vertical, horizontal, tortuous or s_shaped.",
+        description=(
+            "Shape of the flowchart: vertical, horizontal, or tortuous (s_shaped is"
+            " an alias), a snake of three-node rows."
+        ),
     )
     dpi: int = Field(
         default=600,
         ge=72,
         le=1200,
-        description="Resolution of the rendered flowchart image.",
+        description="Resolution of the rendered flowchart image, in dots per inch.",
     )
     num_steps: int = Field(
         default=5,
@@ -63,13 +71,20 @@ class FCParams(AttackParams):
 
 
 class tFCParams(AttackParams):
-    """How the goal is written as a textual flowchart."""
+    """How the goal is written as a textual flowchart.
+
+    The same step options as :class:`FCParams`, with ``text_format`` (the
+    diagram language) in place of the image resolution.
+    """
 
     REQUIRED_ROLES: ClassVar[frozenset[str]] = frozenset({"attacker"})
 
     layout: Layout = Field(
         default="vertical",
-        description="Shape of the flowchart: vertical, horizontal, tortuous or s_shaped.",
+        description=(
+            "Shape of the flowchart: vertical, horizontal, or tortuous (s_shaped is"
+            " an alias), a snake of three-node rows."
+        ),
     )
     text_format: TextFormat = Field(
         default="dot",

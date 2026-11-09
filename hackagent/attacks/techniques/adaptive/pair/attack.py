@@ -3,21 +3,57 @@
 
 """PAIR: let an attacker model rewrite its own prompt until one lands.
 
-Several streams run side by side, each an independent conversation with the
-attacker. A round gives every stream one attempt: the attacker writes a
-prompt, it goes to the target, the reply is rated, and the reply and its
-score are fed back so the next attempt can build on what happened. The
-streams never see each other, so a dead end in one does not poison the rest.
+Prompt Automatic Iterative Refinement (PAIR) pits an attacker LLM against
+the target in a black-box loop. The attacker, told the goal and the reply
+opening to aim for, writes a jailbreak prompt; the target answers; a judge
+rates the reply; and the attacker reads reply and rating, explains in an
+``improvement`` field what went wrong, and writes a better prompt. Running
+several such streams in parallel finds a semantic, human-readable jailbreak
+in a few dozen queries.
 
-Who rates depends on the run. With a ``scorer`` role the paper's own 1-10
-judge rates every reply, the search stops at the first score that reaches
-``jailbreak_threshold``, and the panel is asked only about the best attempt.
-Without one the panel rates every reply itself and its verdict decides.
+Paper: Patrick Chao, Alexander Robey, Edgar Dobriban, Hamed Hassani, et
+al., "Jailbreaking Black Box Large Language Models in Twenty Queries",
+2023, [arXiv:2310.08419](https://arxiv.org/abs/2310.08419).
 
-Every attempt that reached the target is returned, so the run shows which
-stream and which round got there.
+Algorithm (one goal), with the parameters of :class:`~.config.PairParams`:
 
-Based on: https://arxiv.org/abs/2310.08419
+1. Open ``streams`` attacker conversations. Each gets the PAIR attacker
+   system prompt for the goal and ``target_str``, one of the reference's
+   three approaches in rotation (role-play, logical appeal, authority
+   endorsement), and an opening request for a first prompt.
+2. For each of ``iterations`` rounds, every stream concurrently:
+
+   - asks the ``attacker`` for its next turn, a JSON object with
+      ``improvement`` and ``prompt``; prose or a turn without a prompt
+      skips the stream for this round;
+   - sends the prompt to the target as a fresh single-message
+      conversation (the target never sees the history);
+   - rates the reply: with a ``scorer`` role, PAIR's 1-10 judge prompt
+      (an unreadable answer is "unscored"); without one, the campaign's
+      evaluation panel, whose score and verdict are used directly;
+   - appends the reply (cut to ``feedback_max_chars``), the score and the
+      rater's explanation to the stream, then trims it to the system prompt
+      plus the last ``keep_last_n`` attacker turns and their feedback.
+
+3. With ``early_stop``, stop after a round in which any stream passed: a
+   scorer score at or above ``jailbreak_threshold``, or a panel success.
+4. With a ``scorer``, put only the best-scoring attempt to the panel at the
+   end; its verdict is the one the run reports for that attempt.
+
+Deviations from the paper: the paper runs 20 streams of depth 3 with a
+GPT-4 judge; the defaults here are 5 by 5, and the judge is either the
+optional ``scorer`` or the campaign's panel. The rater's explanation is fed
+back alongside the score, and long replies are truncated in the feedback.
+A malformed attacker turn is skipped rather than regenerated.
+
+Roles: ``attacker`` (required) writes and refines prompts, one call per
+stream per round; ``scorer`` (optional) rates every reply 1-10.
+
+Attempts and success: every prompt that got a usable reply from the target
+is one attempt, tagged with its round, stream and score. Without a scorer
+each attempt carries the panel's verdict and the goal succeeds when any is
+a success; with a scorer only the best-scoring attempt is judged, and the
+goal succeeds when the panel calls that one a success.
 """
 
 from __future__ import annotations
@@ -55,7 +91,18 @@ class Rating:
 
 
 class PAIRAttack(IterativeAttack[PairParams]):
-    """Parallel streams of attacker-refined prompts."""
+    """Let an attacker model refine jailbreak prompts over parallel streams.
+
+    Implements PAIR (Chao et al., 2023,
+    [arXiv:2310.08419](https://arxiv.org/abs/2310.08419)): ``streams``
+    independent attacker conversations each propose a prompt per round,
+    read the target's reply and its rating, and improve the prompt, for up
+    to ``iterations`` rounds. Replies are rated by the optional ``scorer``
+    (PAIR's 1-10 judge, with only the best attempt sent to the campaign's
+    panel) or by the panel itself. The algorithm and the deviations from
+    the paper are documented in the module
+    ``hackagent.attacks.techniques.adaptive.pair.attack``.
+    """
 
     name = "pair"
     params_type = PairParams
@@ -70,6 +117,12 @@ class PAIRAttack(IterativeAttack[PairParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Run the rounds and return every attempt that got a usable reply.
+
+        Calls the ``attacker`` once per stream per round, the target once per
+        usable proposal, and the ``scorer`` or the panel once per reply (plus
+        one panel review of the best attempt when a scorer is configured).
+        """
         params = self.params
         streams = [self._open(goal, index) for index in range(params.streams)]
         findings: list[Finding] = []
@@ -251,6 +304,7 @@ def _score_of(finding: Finding) -> float:
 
 
 def _prompt_of(finding: Finding) -> str:
+    """The last message's text, which is the prompt the target received."""
     return str(finding.messages[-1].get("content", "")) if finding.messages else ""
 
 

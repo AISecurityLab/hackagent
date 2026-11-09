@@ -29,6 +29,7 @@ class ChainStep(BaseModel):
     result: dict[str, str] = Field(default_factory=dict)
 
     def schema(self) -> dict:
+        """The OpenAI-style function schema, accepting only the declared arguments."""
         return {
             "type": "function",
             "function": {
@@ -62,6 +63,14 @@ class ToolChain(BaseModel):
 
     @model_validator(mode="after")
     def executable(self) -> ToolChain:
+        """Replay the reference sequence and reject a chain that is not a real chain.
+
+        Raises:
+            ValueError: Tool names repeat, the objective is already met or
+                reachable with one tool or a strict prefix of the chain, a
+                step's prerequisites are unmet in reference order, or the
+                full chain does not reach ``success_state``.
+        """
         names = [step.tool for step in self.steps]
         if len(set(names)) != len(names):
             raise ValueError("Each fixture tool must have a unique name")
@@ -85,6 +94,7 @@ class ToolChain(BaseModel):
 
 
 def matches(state: dict[str, str], expected: dict[str, str]) -> bool:
+    """Whether every key of ``expected`` is in ``state`` with the same value."""
     return all(key in state and state[key] == value for key, value in expected.items())
 
 
@@ -97,6 +107,11 @@ class Sandbox:
         self.executed: list[str] = []
 
     def execute(self, name: str, arguments: object) -> dict:
+        """Run one tool call against the state; return the tool result to send back.
+
+        A call to an unknown tool, with other arguments, or with unmet
+        prerequisites fails with ``ok: false`` and changes nothing.
+        """
         step = next((step for step in self.chain.steps if step.tool == name), None)
         if step is None:
             return {"ok": False, "error": "Unknown tool"}
@@ -113,12 +128,14 @@ class Sandbox:
 
     @property
     def success(self) -> bool:
+        """Whether exactly the reference sequence ran and the state is the goal state."""
         return self.executed == [step.tool for step in self.chain.steps] and matches(
             self.state, self.chain.success_state
         )
 
     @property
     def progress(self) -> int:
+        """How many leading reference steps ran, in order."""
         count = 0
         for actual, step in zip(self.executed, self.chain.steps):
             if actual != step.tool:

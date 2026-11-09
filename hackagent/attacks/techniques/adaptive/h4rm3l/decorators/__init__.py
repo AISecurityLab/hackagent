@@ -1,7 +1,14 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Composable h4rm3l prompt decorators and compiler."""
+"""Composable h4rm3l prompt decorators and compiler.
+
+A decorator is a parameterised prompt transformation; ``a.then(b)`` applies
+``a`` and then ``b``. :mod:`.static` holds the pure string transformations,
+:mod:`.llm` the ones that rewrite the prompt with the ``decorator`` role's
+model, and :mod:`.compiler` turns a program string into a callable,
+accepting only registered decorators with literal arguments.
+"""
 
 from .base import (
     DecorationResult,

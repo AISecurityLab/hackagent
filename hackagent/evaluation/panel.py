@@ -3,8 +3,12 @@
 
 """Panel: several judges, one verdict.
 
-``Panel`` matches the attacks-local ``Judge`` port (``score`` / ``evaluate``)
-by structure. This package does not import ``attacks``.
+The campaign runner asks :meth:`Panel.aevaluate` about every sample and
+hands that call, traced, to iterative attacks as their ``Judge``;
+:meth:`Panel.evaluate` and :meth:`Panel.score` are the synchronous forms.
+A panel member is a :class:`ModelJudge` (a registered judge type bound to a
+model) or any object with ``vote``, ``evaluate`` or ``score``. This package
+does not import ``attacks``.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ AGGREGATIONS = ("mean", "max", "majority", "any")
 
 
 def score_range_maximum(judge_range: str) -> float:
+    """The top of a judge's native scale: 1 for ``binary``, 10 otherwise."""
     return 1.0 if judge_range == "binary" else NORMALIZED_SCORE_MAX
 
 
@@ -71,6 +76,11 @@ class ModelJudge:
         self.threshold = threshold
 
     def vote(self, sample: Sample) -> JudgeVote:
+        """Ask the model about ``sample`` and return its vote, retrying once on an unparsed reply.
+
+        Makes one or two blocking model calls. The vote abstains (carries
+        ``error``) when the call fails or the retry is still not confident.
+        """
         prompt = self.kind.render(sample)
         parsed = self._complete(prompt)
         if not parsed.is_confident:
@@ -78,6 +88,7 @@ class ModelJudge:
         return self._to_vote(parsed)
 
     async def avote(self, sample: Sample) -> JudgeVote:
+        """Async :meth:`vote`: the same retry and abstention rules, without blocking."""
         prompt = self.kind.render(sample)
         parsed = await self._acomplete(prompt)
         if not parsed.is_confident:
@@ -221,9 +232,15 @@ class Panel:
         self.threshold = min(NORMALIZED_SCORE_MAX, max(0.0, float(threshold)))
 
     def score(self, sample: Sample) -> float:
+        """Return the aggregated 0-10 score of :meth:`evaluate`."""
         return self.evaluate(sample).score
 
     def evaluate(self, sample: Sample) -> Verdict:
+        """Ask every judge in turn and combine their votes into one verdict.
+
+        A judge that raises abstains. When every judge abstains the verdict
+        carries ``error`` and is not a judgement.
+        """
         votes = [_as_vote(judge, sample, self.threshold) for judge in self.judges]
         return self._combine(votes)
 

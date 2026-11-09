@@ -89,6 +89,7 @@ class ProgramPool:
         return [program for _, program in scored[:count]]
 
     def size(self) -> int:
+        """Number of programs in the pool."""
         return len(self.entries)
 
 

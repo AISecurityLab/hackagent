@@ -28,7 +28,10 @@ class ToolOutputIPIParams(AttackParams):
 
     benign_tasks: tuple[str, ...] = Field(
         default=DEFAULT_BENIGN_TASKS,
-        description="Benign user tasks that elicit the tool call. Cycled across goals.",
+        description=(
+            "Benign user requests that open the fabricated history; one is picked "
+            "per goal by hashing the goal, so the pick can vary between runs."
+        ),
     )
     injection_template: str = Field(
         default=DEFAULT_INJECTION_TEMPLATE,
@@ -39,7 +42,10 @@ class ToolOutputIPIParams(AttackParams):
     )
     observation_prefix: str = Field(
         default=DEFAULT_OBSERVATION_PREFIX,
-        description="Benign-looking payload wrapped around the injection.",
+        description=(
+            "Benign-looking tool output placed before the injection, so the result "
+            "reads like a real one."
+        ),
     )
     tools: tuple[dict[str, Any], ...] = Field(
         default=(DEFAULT_TOOL_SCHEMA,),
@@ -51,12 +57,17 @@ class ToolOutputIPIParams(AttackParams):
     )
     tool_arguments: str = Field(
         default='{"query": "latest updates"}',
-        description="Arguments JSON for the simulated assistant tool call.",
+        description=(
+            "Arguments, as a JSON string, of the simulated assistant call to "
+            "``tool_name``."
+        ),
     )
     success_setting: str = Field(
         default="both",
         description=(
-            "InjecAgent success family: ``direct_harm`` | ``data_stealing`` | ``both``."
+            "InjecAgent success family: ``direct_harm``, ``data_stealing`` or "
+            "``both``. It picks the framing appended to the payload and the hint "
+            "the panel judges with; other values act as ``both``."
         ),
     )
     max_attempts: int = Field(
@@ -69,9 +80,9 @@ class ToolOutputIPIParams(AttackParams):
         exclude=True,
         repr=False,
         description=(
-            "Optional. Rewrites the injected instruction after a failed attempt, "
-            "for up to max_attempts tries. Without it, the attack makes a single "
-            "attempt with the built-in injection."
+            "Optional. Writes a fresh rewrite of the injection for each attempt "
+            "after the first, up to max_attempts. Without it, the attack makes a "
+            "single attempt with the template."
         ),
     )
 

@@ -21,8 +21,54 @@ A refusal is decided by an LLM Refusal Judge (paper, section 4.1), as in
 the reference implementation, PyRIT's ``CrescendoAttack`` with its default
 ``SelfAskRefusalScorer``: the strict rubric, read against the attack's goal.
 
-Based on: https://arxiv.org/abs/2404.01833
-Reference: https://github.com/microsoft/PyRIT (pyrit/executor/attack/multi_turn/crescendo.py)
+Paper: Mark Russinovich, Ahmed Salem, Ronen Eldan, "Great, Now Write an
+Article About That: The Crescendo Multi-Turn LLM Jailbreak Attack", 2024,
+[arXiv:2404.01833](https://arxiv.org/abs/2404.01833). The paper's
+automated variant (Crescendomation) is reproduced after the reference
+implementation, PyRIT's ``CrescendoAttack``
+(https://github.com/microsoft/PyRIT,
+``pyrit/executor/attack/multi_turn/crescendo.py``).
+
+Algorithm (one goal), with the parameters of
+:class:`~.config.CrescendoParams`:
+
+1. Open the attacker's planning log: the Crescendo system prompt for the
+   goal and an opening request. The target's own history starts empty.
+2. While fewer than ``max_turns`` turns have been accepted:
+
+   - ask the ``attacker`` for the next question (a JSON turn; an unusable
+     one ends the search);
+   - send the target its history plus the question; an unusable reply
+     counts as a turn and is fed back as ``[no reply]``;
+   - ask the Refusal Judge (the ``refusal`` role, or the ``attacker`` when
+     it is not set) whether the reply refuses the goal; an unreadable or
+     failed answer is not a refusal;
+   - on a refusal, while fewer than ``max_backtracks`` backtracks have been
+     used: record the exchange as not judged, leave it out of the target's
+     history, tell the attacker it was refused, and ask again for the same
+     turn;
+   - otherwise have the campaign's evaluation panel judge the question and
+     reply, feed the reply (cut to ``feedback_max_chars``) and the panel's
+     score back to the attacker, append the exchange to the target's
+     history, and advance the turn; with ``early_stop``, stop at the first
+     panel success.
+
+   The attacker's log is trimmed to its system prompt plus the last
+   ``keep_last_n`` turns; the target's history is never trimmed.
+
+Deviations from the paper: the paper's evaluation judge is replaced by the
+campaign's panel, which sees the latest question and reply rather than the
+whole conversation. A reply the target could not give still uses up a
+turn.
+
+Roles: ``attacker`` (required) plans the conversation and writes every
+question; ``refusal`` (optional) is the Refusal Judge, defaulting to the
+attacker model.
+
+Attempts and success: every exchange is one attempt carrying the whole
+conversation sent, its turn and whether it was refused or backtracked.
+Backtracked exchanges carry a "not judged" verdict; the goal succeeds when
+the panel calls any judged exchange a success.
 """
 
 from __future__ import annotations
@@ -39,7 +85,17 @@ from .config import CrescendoParams
 
 
 class CrescendoAttack(IterativeAttack[CrescendoParams]):
-    """One conversation with the target, escalated a turn at a time."""
+    """Escalate one conversation with the target, backtracking on refusals.
+
+    Implements Crescendo (Russinovich et al., 2024,
+    [arXiv:2404.01833](https://arxiv.org/abs/2404.01833)), after PyRIT's
+    reference implementation: the ``attacker`` writes each next question a
+    little closer to the goal, the whole conversation is re-sent, a refused
+    turn is dropped and rephrased while the backtrack budget lasts, and the
+    campaign's evaluation panel judges every accepted reply. The algorithm
+    and the deviations from the paper are documented in the module
+    ``hackagent.attacks.techniques.multi_turn.crescendo.attack``.
+    """
 
     name = "crescendo"
     params_type = CrescendoParams
@@ -54,6 +110,11 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Run the conversation for ``goal``; return every exchange, in order.
+
+        Calls the ``attacker``, the target and the Refusal Judge once per
+        exchange, and the panel once per exchange that is not backtracked.
+        """
         params = self.params
         plan: Messages = [
             {"role": "system", "content": prompts.system_prompt(goal)},
