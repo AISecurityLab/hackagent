@@ -38,9 +38,9 @@ three Llama Guard versions and WildGuard).
 HackAgent's prompts follow the authors' code. Where it differs:
 
 - **Guidance options are independent.** The paper's four variants are
-  cumulative: vanilla, then + chain of thought, then + LangGPT, then
-  + few-shot. In HackAgent `cot`, `lang_gpt` and `few_shot` are separate
-  switches you can combine in any way.
+  cumulative: vanilla, then adding chain of thought, then LangGPT, then
+  few-shot examples. In HackAgent `cot`, `lang_gpt` and `few_shot` are
+  separate switches you can combine in any way.
 - **One configuration per attack entry.** The paper picks a mode and variant
   per target model (its appendix lists them). HackAgent uses the one you
   configure for every goal; to compare modes, run separate campaigns.
@@ -71,7 +71,7 @@ HackAgent's prompts follow the authors' code. Where it differs:
 6. The target replies; the panel judges the reply against the original goal.
 
 ```mermaid
-flowchart LR
+flowchart TB
   G["goal"] --> F["flip<br/><small>flip_mode</small>"]
   F --> U["user message<br/><small>TASK is '…'</small>"]
   R["rules + decode steps<br/><small>cot · lang_gpt · few_shot</small>"] --> S["system message"]

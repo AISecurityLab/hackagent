@@ -77,7 +77,7 @@ the upstream MIT notice). Where it differs:
 7. The panel judges the deciphered reply against the original goal.
 
 ```mermaid
-flowchart LR
+flowchart TB
   G["goal"] --> E["encipher<br/><small>encode_method</small>"]
   E --> U["user message<br/><small>reply in cipher · QUESTION</small>"]
   R["role prompt + enciphered<br/>demonstrations"] --> S["system message"]

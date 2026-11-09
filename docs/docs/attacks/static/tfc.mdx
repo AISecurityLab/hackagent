@@ -57,7 +57,7 @@ the fine-tuned generator, one layout per attack entry, and the optional
 5. The panel judges the reply against the original goal. Nothing is decoded.
 
 ```mermaid
-flowchart LR
+flowchart TB
   G["goal"] --> A["attacker<br/><small>step generator</small>"]
   A --> S["first num_steps<br/>steps"]
   S --> C["flowchart code<br/><small>text_format · layout</small>"]
