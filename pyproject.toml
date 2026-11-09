@@ -213,7 +213,33 @@ extend-exclude = ["*.md"]
 [tool.ruff.lint]
 # Ruff 0.16 widened its implicit default rule selection. Pin the rule set the
 # codebase was linted against so version bumps do not silently add new rules.
-select = ["E4", "E7", "E9", "F"]
+#
+# D100-D104 and D106 require a docstring on every public module, package,
+# class, method and function. Only the missing-docstring rules are selected,
+# not pydocstyle's formatting rules; magic methods (D105) and __init__ (D107)
+# are exempt. Google style is the convention: see CONTRIBUTING.md.
+select = ["E4", "E7", "E9", "F", "D100", "D101", "D102", "D103", "D104", "D106"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Packages not yet documented to the D1 standard. They are removed package
+# by package: delete an entry, document what `ruff check` then reports, and
+# commit both together so the rule covers the package from then on.
+"hackagent/attacks/**" = ["D1"]
+"hackagent/evaluation/**" = ["D1"]
+"hackagent/interfaces/**" = ["D1"]
+"hackagent/examples/**" = ["D1"]
+# Generated from the API's OpenAPI schema by its scripts/generate.py, which
+# would discard hand-written docstrings; private to storage.remote.
+"hackagent/storage/_http/**" = ["D1"]
+# Not part of the SDK's API.
+"tests/**" = ["D1"]
+"docs/**" = ["D1"]
+"scripts/**" = ["D1"]
+"tools/**" = ["D1"]
+"deploy/**" = ["D1"]
 
 [tool.importlinter]
 root_packages = ["hackagent"]
