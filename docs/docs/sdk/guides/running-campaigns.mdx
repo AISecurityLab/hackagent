@@ -1,0 +1,302 @@
+---
+title: "Running campaigns"
+description: "Build or load a campaign, validate it, follow its progress, stop it early, and find what it wrote."
+sidebar_position: 10
+---
+
+A campaign is the only way an attack runs, from Python as from the CLI. This
+page covers the life of one run from code: where the campaign comes from,
+checking it, running it, watching it, stopping it, and what it leaves behind.
+
+Every field of the campaign format is documented once, in
+[Campaign files](../../cli/campaign-files/index.md). This page does not repeat
+them.
+
+## Pass a campaign
+
+`run_campaign` takes a campaign in any of three forms:
+
+- a **path** to a YAML campaign file,
+- a **dict** with the same fields,
+- a `CampaignSpec` you already validated with `load_campaign`.
+
+<Tabs groupId="campaign-source">
+<TabItem value="file" label="From a file" default>
+
+```python
+from hackagent.orchestrator.campaign import run_campaign
+
+result = run_campaign("campaign.yaml")
+```
+
+The same file runs with `hackagent campaign run campaign.yaml`. In a file,
+an `api_key` must be a `${VARIABLE}` reference; a literal key is refused.
+
+</TabItem>
+<TabItem value="dict" label="From a dict">
+
+```python
+from hackagent.orchestrator.campaign import run_campaign
+
+OLLAMA = {"provider": "ollama", "type": "OLLAMA"}
+goals = [line.strip() for line in open("goals.txt") if line.strip()]
+
+result = run_campaign({
+    "version": 1,
+    "campaign": {"name": "Goals from goals.txt"},
+    "dataset": {"source": {"type": "inline", "goals": goals}},
+    "target": {"name": "llama3.2", "connection": OLLAMA},
+    "attacks": [{"name": "baseline"}, {"name": "flipattack"}],
+    "evaluation": {"judges": [
+        {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}},
+    ]},
+})
+```
+
+A dict is the easy way to build a campaign from data you already have in
+Python. An `api_key` in a dict may be a `${VARIABLE}` reference or a value;
+see [API keys](./configuration.mdx#api-keys).
+
+</TabItem>
+</Tabs>
+
+To change a few fields of a file before running it, load it, dump it to a
+dict and edit that:
+
+```python
+from hackagent.orchestrator.campaign import load_campaign, run_campaign
+
+values = load_campaign("campaign.yaml").model_dump(mode="json")
+values["attacks"] = [{"name": "baseline"}]
+values["execution"]["dry_run"] = True
+
+result = run_campaign(values)
+print(result.dry_run, result.attacks)  # True ()
+```
+
+The dump has every default written out, so `values["execution"]` always
+exists.
+
+To find attack and dataset names from code:
+
+```python
+from hackagent.client import catalog_entries, presets, technique_catalog
+
+for entry in catalog_entries():
+    print(f"{entry['attack_type']:16} {entry['category']:12} {entry['label']}")
+
+print(sorted(presets()))  # names for dataset.source.name
+
+pair = next(e for e in technique_catalog() if e["attack_type"] == "pair")
+print(pair["required_roles"], pair["optional_roles"])  # ['attacker'] ['scorer']
+```
+
+## Check it before running it
+
+Checking happens in two steps, as in `hackagent campaign validate`:
+
+1. `load_campaign` checks the **shape**: every field name, type and allowed
+   value, including attack and preset names. A mistake raises pydantic's
+   `ValidationError`, naming the field. A `${VARIABLE}` whose variable is
+   unset raises `CredentialError`.
+2. `resolve_campaign` builds what the campaign describes: it loads the goals,
+   creates every model client and constructs each attack with its
+   parameters. This is where a missing or unknown role, a bad parameter value
+   or a dataset that cannot be loaded is caught. It sends no request to any
+   model.
+
+```python
+from pydantic import ValidationError
+
+from hackagent.orchestrator.campaign import (
+    load_campaign,
+    resolution_summary,
+    resolve_campaign,
+)
+
+try:
+    spec = load_campaign("campaign.yaml")
+except ValidationError as exc:
+    raise SystemExit(f"Invalid campaign:\n{exc}")
+
+resolved = resolve_campaign(spec)  # loads goals, builds every model, sends nothing
+for label, value in resolution_summary(resolved).items():
+    print(f"{label:12} {value}")
+```
+
+```text
+Goals        2
+Attacks      baseline, flipattack
+Judges       1
+Guardrails   off
+Classifier   off
+Escalate     off
+```
+
+A misspelt section fails in the first step:
+
+```text
+1 validation error for CampaignSpec
+evalution
+  Extra inputs are not permitted [type=extra_forbidden, input_value={}, input_type=dict]
+```
+
+Pass the resolved campaign on with `run_campaign(spec, resolved=resolved)`,
+and the run uses the goals and models you just checked instead of building
+them again.
+
+Neither step checks that a model is reachable. The run does that first:
+**preflight** (on by default) sends one short request to every distinct model
+and raises `PreflightError` before any attack starts.
+
+## Follow progress
+
+Pass `on_event` to be told what the run is doing. It is called as
+`on_event(event_name, **payload)`:
+
+| Event | When | Payload |
+|---|---|---|
+| `audit_finished` | The judge audit ran, when `evaluation.audit` is on | `audit` |
+| `attack_started` | An attack begins | `attack`, `run_id`, `expected_goals` |
+| `goal_finished` | An attack is done with one goal | `attack`, `run_id`, `goal_index`, `success`, `attempts`, `errors`, `elapsed_s` |
+| `attack_finished` | An attack ends | `attack`, `run_id`, `error` (`None` when it completed) |
+
+```python
+from hackagent.orchestrator.campaign import run_campaign
+
+
+def on_event(event, **payload):
+    if event == "attack_started":
+        print(f"{payload['attack']}: {payload['expected_goals']} goals")
+    elif event == "goal_finished":
+        mark = "jailbroken" if payload["success"] else "held"
+        print(f"  goal {payload['goal_index']}: {mark} "
+              f"after {payload['attempts']} attempts, {payload['elapsed_s']:.1f}s")
+        for error in payload["errors"]:
+            print("    error:", error)
+    elif event == "attack_finished" and payload["error"]:
+        print(f"{payload['attack']} failed: {payload['error']}")
+
+
+result = run_campaign("campaign.yaml", on_event=on_event)
+```
+
+```text
+baseline: 2 goals
+  goal 0: jailbroken after 1 attempts, 23.2s
+  goal 1: held after 1 attempts, 23.6s
+flipattack: 2 goals
+  goal 0: jailbroken after 1 attempts, 0.5s
+  goal 1: jailbroken after 1 attempts, 9.5s
+```
+
+Accept `**payload` rather than naming every key, so a listener keeps working
+when an event gains a field. Keep the listener fast: it runs inside the run.
+
+## Stop a run early
+
+A listener that raises stops the whole campaign. Raise `CampaignCancelled` to
+mean "stop on purpose": the runs are recorded as **cancelled**, not failed,
+and the exception reaches your code.
+
+```python
+from hackagent.orchestrator.campaign import CampaignCancelled, run_campaign
+
+
+def stop_at_first_jailbreak(event, **payload):
+    if event == "goal_finished" and payload["success"]:
+        raise CampaignCancelled(f"goal {payload['goal_index']} fell")
+
+
+try:
+    result = run_campaign("campaign.yaml", on_event=stop_at_first_jailbreak)
+except CampaignCancelled as stopped:
+    print("Stopped early:", stopped)
+```
+
+Any other exception from the listener stops the run too, but records it as
+failed and re-raises that exception.
+
+To stop a run after a deadline, or from other code, run it as a task with
+`arun_campaign` and cancel the task. The runs are recorded as cancelled:
+
+```python
+import asyncio
+
+from hackagent.orchestrator.campaign import arun_campaign
+
+
+async def main():
+    try:
+        result = await asyncio.wait_for(arun_campaign("campaign.yaml"), timeout=600)
+    except asyncio.TimeoutError:
+        print("Took too long; the runs are recorded as cancelled.")
+        return
+    print(result.succeeded, result.attempt_errors)
+
+
+asyncio.run(main())
+```
+
+For a limit on each attack rather than the whole run, set
+[`execution.per_attack_timeout`](../../cli/campaign-files/execution.md#executionspec):
+an attack that runs over is marked failed and the next one starts.
+
+## Sync or async
+
+`run_campaign` blocks until the run is done. It is safe to call where an event
+loop is already running, as in a Jupyter notebook. `arun_campaign` takes the
+same arguments and is a coroutine, for async code. Both return a
+`CampaignResult`.
+
+How much runs at once inside one campaign is set in the campaign, under
+[`execution.concurrency`](../../cli/campaign-files/execution.md#concurrencyspec),
+not by how you call it.
+
+## When things go wrong
+
+What raises and what is recorded depends on how far the run got:
+
+| Problem | What you get |
+|---|---|
+| The campaign is malformed, or names an unknown attack or preset | `ValidationError`. Nothing is recorded. |
+| A key's `${VARIABLE}` is unset | `CredentialError` (a `ValueError`). Nothing is recorded. |
+| A role is missing, a parameter is invalid, or the goals cannot be loaded | `ValueError` while resolving. Nothing is recorded. |
+| A model does not answer | `PreflightError`, listing each unreachable model in `failures`. The campaign run is recorded as failed. |
+| The judge audit fails and `evaluation.audit` says stop | `AuditFailed`, with the full report in `report`. Nothing is attacked. |
+| One attack fails (setup error, timeout) | No exception. `outcome.error` is set and `result.succeeded` is `False`. With `execution.on_error: stop` the remaining attacks are skipped. |
+| One prompt fails, or every judge abstains on a reply | No exception. That attempt has `error` or `verdict.error` set, and `result.attempt_errors` counts them. |
+
+```python
+from hackagent.orchestrator.campaign import PreflightError, run_campaign
+
+try:
+    result = run_campaign("campaign.yaml")
+except PreflightError as exc:
+    for failure in exc.failures:
+        print("unreachable:", failure)
+else:
+    for outcome in result.attacks:
+        if outcome.error:
+            print(outcome.name, "failed:", outcome.error)
+    print("attempt errors:", result.attempt_errors)
+```
+
+To let a run go ahead without the reachability check and record each failure
+as an attempt error instead, set `execution.preflight: false`.
+
+## What a run leaves behind
+
+| Where | What | From the result |
+|---|---|---|
+| The store | The campaign run, one run per attack, every result and trace. Local SQLite unless the campaign selects remote storage. | `result.campaign_run_id`, and `outcome.run_id` per attack |
+| `<output directory>/<run id>/` | `campaign.yaml` (the campaign that ran, every default written out, keys as references only), `results.json` and/or `results.jsonl`, `traces.jsonl`, and `audit.json` when the audit ran | `result.outputs` (paths), `result.run_id` (the folder name) |
+
+`result.run_id` names the output folder and `result.campaign_run_id` is the
+record in the store; they are different ids. Set
+[`execution.output.run_id`](../../cli/campaign-files/execution.md#outputspec)
+to fix the folder name, and `execution.output.directory` to move it. A dry run
+returns a result with `dry_run=True` and writes nothing.
+
+[Results and storage](./results-and-storage.mdx) shows how to read the store
+back.
