@@ -5,13 +5,16 @@
 
 The data is inserted with plain SQL and its tallies computed the way an
 existing database's are when it is opened, which is the slow part of the
-test; the reads it times touch only the tallies.
+test; the reads it times touch only the tallies. Each read is timed as the
+best of a few, with coverage paused: its tracer and a busy CI runner would
+otherwise be what gets measured.
 """
 
 from __future__ import annotations
 
 import json
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -27,7 +30,37 @@ GOALS = 2_000
 ATTEMPTS = 10  # per attack run and goal: 5 * 2000 * 10 = 100k results
 STEPS = 3  # per attempt: 300k traces
 BUDGET_S = 1.0
+TRIES = 3
 CAMPAIGN = "c0000000-0000-4000-8000-000000000100"
+
+
+@contextmanager
+def _untraced():
+    """Pause coverage, if it is measuring this test, for the timed reads."""
+    try:
+        import coverage
+    except ImportError:
+        cov = None
+    else:
+        cov = coverage.Coverage.current()
+    if cov is None:
+        yield
+        return
+    cov.stop()
+    try:
+        yield
+    finally:
+        cov.start()
+
+
+def _best_time(client, path: str) -> float:
+    best = float("inf")
+    for _ in range(TRIES):
+        start = time.perf_counter()
+        response = client.get(path)
+        best = min(best, time.perf_counter() - start)
+        assert response.status_code == 200, path
+    return best
 
 
 def _seed(backend: LocalBackend) -> str:
@@ -140,17 +173,14 @@ def test_large_campaign_runs_report_in_well_under_a_second():
                 backend=backend,
             )
             client = create_app(session).test_client()
-            timings = {}
-            for path in (
+            paths = (
                 "/api/proxy/run/summary",
                 f"/api/proxy/run/{campaign}/summary",
                 f"/api/proxy/run/{campaign}/report",
                 f"/api/proxy/run/{campaign}/matrix",
-            ):
-                start = time.perf_counter()
-                response = client.get(path)
-                timings[path] = time.perf_counter() - start
-                assert response.status_code == 200, path
+            )
+            with _untraced():
+                timings = {path: _best_time(client, path) for path in paths}
             summary = client.get(f"/api/proxy/run/{campaign}/summary").get_json()
             assert summary["attempts"] == ATTACK_RUNS * GOALS * ATTEMPTS
             assert summary["recorded_goals"] == GOALS
