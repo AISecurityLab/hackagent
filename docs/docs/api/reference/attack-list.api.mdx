@@ -1,0 +1,70 @@
+---
+id: attack-list
+title: "List attack configurations"
+description: "Returns the attack configurations of the caller's organization, newest first, 10 per page (`page`). Staff users see every organization's; a user without an organization sees the ones they created. Each records one technique and its parameters against an agent; its executions are runs (`GET /run?attack=<id>`)."
+sidebar_label: "List attack configurations"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"List attack configurations"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/attack"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the attack configurations of the caller's organization, newest first, 10 per page (`page`). Staff users see every organization's; a user without an organization sees the ones they created. Each records one technique and its parameters against an agent; its executions are runs (`GET /run?attack=<id>`).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A page number within the paginated result set.","in":"query","name":"page","required":false,"schema":{"type":"integer"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"count":{"description":"Total number of items across all pages.","example":123,"type":"integer"},"next":{"description":"URL of the next page, or null on the last page.","example":"http://api.example.org/accounts/?page=4","format":"uri","nullable":true,"type":"string"},"previous":{"description":"URL of the previous page, or null on the first page.","example":"http://api.example.org/accounts/?page=2","format":"uri","nullable":true,"type":"string"},"results":{"description":"The items of this page.","items":{"description":"Serializer for the Attack model, which represents an Attack configuration.\n\nHandles the conversion of Attack configuration instances to JSON (and vice-versa)\nfor API requests and responses. It includes read-only fields for related\nobject names (like agent_name, owner_username) for convenience in API outputs.","properties":{"id":{"description":"Unique identifier of the attack configuration.","format":"uuid","readOnly":true,"type":"string"},"type":{"description":"The attack technique, as the SDK names it (e.g. `pair`, `baseline`, `tap`; see `GET /campaign/techniques`).","maxLength":100,"title":"Attack Type","type":"string"},"agent":{"description":"Id of the target agent.","format":"uuid","title":"Target Agent","type":"string"},"agent_name":{"description":"Name of the target agent.","readOnly":true,"type":"string"},"owner":{"description":"Id of the user who created the configuration.","nullable":true,"readOnly":true,"title":"Defined By","type":"integer"},"owner_username":{"description":"Username of the user who created the configuration.","readOnly":true,"type":"string"},"organization":{"description":"Id of the organization.","format":"uuid","readOnly":true,"type":"string"},"organization_name":{"description":"Name of the organization.","readOnly":true,"type":"string"},"configuration":{"description":"The technique's parameters and settings, as the client recorded them (free-form JSON).","title":"Attack Configuration"},"created_at":{"description":"When the configuration was created.","format":"date-time","readOnly":true,"type":"string"},"updated_at":{"description":"When the configuration was last changed.","format":"date-time","readOnly":true,"type":"string"}},"required":["agent","agent_name","configuration","created_at","id","organization","organization_name","owner","owner_username","type","updated_at"],"type":"object","title":"Attack"},"type":"array"}},"required":["count","results"],"type":"object","title":"PaginatedAttackList"}}},"description":"OK"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

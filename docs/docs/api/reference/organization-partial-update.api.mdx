@@ -1,0 +1,71 @@
+---
+id: organization-partial-update
+title: "Update an organization"
+description: "Changes the fields sent of the caller's organization; the dashboard uses it to rename the organization. Login tokens only: API keys get 401."
+sidebar_label: "Update an organization"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "patch api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Update an organization"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"patch"}
+  path={"/organization/{id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Changes the fields sent of the caller's organization; the dashboard uses it to rename the organization. Login tokens only: API keys get 401.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A UUID string identifying this Organization.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+  body={{"content":{"application/json":{"schema":{"properties":{"name":{"description":"Name of the organization, unique across HackAgent.","maxLength":200,"minLength":1,"title":"Organization Name","type":"string"}},"type":"object","title":"PatchedOrganizationRequest"}},"application/x-www-form-urlencoded":{"schema":{"properties":{"name":{"description":"Name of the organization, unique across HackAgent.","maxLength":200,"minLength":1,"title":"Organization Name","type":"string"}},"type":"object","title":"PatchedOrganizationRequest"}},"multipart/form-data":{"schema":{"properties":{"name":{"description":"Name of the organization, unique across HackAgent.","maxLength":200,"minLength":1,"title":"Organization Name","type":"string"}},"type":"object","title":"PatchedOrganizationRequest"}}}}}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"id":{"description":"Unique identifier of the organization.","format":"uuid","readOnly":true,"type":"string"},"name":{"description":"Name of the organization, unique across HackAgent.","maxLength":200,"title":"Organization Name","type":"string"},"created_at":{"description":"When the organization was created.","format":"date-time","readOnly":true,"type":"string"},"updated_at":{"description":"When the organization was last changed.","format":"date-time","readOnly":true,"type":"string"},"credits":{"description":"Credit balance in US dollars, charged by LLM gateway calls. Read-only: credits are granted by HackAgent.","format":"decimal","pattern":"^-?\\d{0,13}(?:\\.\\d{0,6})?$","readOnly":true,"type":"string"},"credits_last_updated":{"description":"When the credit balance last changed.","format":"date-time","readOnly":true,"type":"string"}},"required":["created_at","credits","credits_last_updated","id","name","updated_at"],"type":"object","title":"Organization"}}},"description":"OK"},"400":{"content":{"application/json":{"schema":{"additionalProperties":{},"description":"The request did not validate. Each invalid field maps to its list of\nmessages (``{\"name\": [\"This field is required.\"]}``); errors inside a\nJSON field are keyed by their dotted path\n(``{\"config\": {\"connection.api_key\": \"...\"}}``).","properties":{"non_field_errors":{"description":"Errors that are not about a single field.","items":{"type":"string"},"type":"array"}},"type":"object","title":"ValidationError"}}},"description":"Validation error: the request is invalid and nothing was changed."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this (for example a run token outside its own run, or a caller without an organization), or the installation is read-only because its license is not valid (`code: license_read_only`)."},"404":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Not found: no such object in the caller's organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

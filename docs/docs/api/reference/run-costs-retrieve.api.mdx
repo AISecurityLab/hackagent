@@ -1,0 +1,70 @@
+---
+id: run-costs-retrieve
+title: "Get a campaign run's costs"
+description: "Returns what each attack run of a campaign run spent: model calls by role (target, attacker, judge), the target's tokens, elapsed time and the target's latency, with per-goal samples (calls and time to the first jailbreak). Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed."
+sidebar_label: "Get a campaign run's costs"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get a campaign run's costs"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/run/{id}/costs"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns what each attack run of a campaign run spent: model calls by role (target, attacker, judge), the target's tokens, elapsed time and the target's latency, with per-goal samples (calls and time to the first jailbreak). Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"The ETag of a previous response: 304 while it still holds.","in":"header","name":"If-None-Match","schema":{"type":"string"}},{"description":"A UUID string identifying this Run.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"runs":{"description":"One entry per attack run with results, oldest first.","items":{"properties":{"run_id":{"description":"The attack run.","format":"uuid","type":"string"},"attempts":{"description":"Attempts it made.","type":"integer"},"goals":{"description":"Goals it attempted.","type":"integer"},"elapsed_s":{"description":"Seconds between its first and last recorded attempt.","format":"double","type":"number"},"calls":{"allOf":[{"properties":{"target":{"description":"Calls to the target agent.","type":"integer"},"attacker":{"description":"Calls to attacker models; null when not traced.","nullable":true,"type":"integer"},"judge":{"description":"Calls to judge models; null when not traced.","nullable":true,"type":"integer"}},"required":["attacker","judge","target"],"type":"object","title":"Calls"}],"description":"Model calls by role."},"calls_traced":{"description":"Whether the calls of every role were traced (otherwise attacker and judge counts may be missing).","type":"boolean"},"target_tokens":{"allOf":[{"properties":{"prompt":{"description":"Prompt tokens.","type":"integer"},"completion":{"description":"Completion tokens.","type":"integer"}},"required":["completion","prompt"],"type":"object","title":"Tokens"}],"description":"Target tokens spent; null when not every goal's usage was recorded.","nullable":true},"target_latency_ms":{"allOf":[{"properties":{"median":{"description":"Median latency, in milliseconds.","format":"double","type":"number"},"p90":{"description":"90th percentile latency, in milliseconds.","format":"double","type":"number"},"samples":{"description":"Number of measured calls.","type":"integer"}},"required":["median","p90","samples"],"type":"object","title":"Latency"}],"description":"The target's latency; null without measurements.","nullable":true},"goal_samples":{"description":"Per-goal figures.","items":{"properties":{"goal_index":{"description":"The goal.","type":"integer"},"first_jailbreak_attempt":{"description":"The attempt (from 1) that first jailbroke the agent; null when none did.","nullable":true,"type":"integer"},"first_jailbreak_elapsed_s":{"description":"Seconds from the goal's first attempt to its first jailbreak; null when unknown.","format":"double","nullable":true,"type":"number"},"attempts":{"description":"Attempts made on the goal.","type":"integer"},"calls":{"description":"Model calls made for the goal; null when not fully traced.","nullable":true,"type":"integer"},"target_tokens":{"description":"Target tokens spent on the goal; null when not fully recorded.","nullable":true,"type":"integer"},"elapsed_s":{"description":"Seconds between the goal's first and last recorded attempt.","format":"double","type":"number"}},"required":["attempts","calls","elapsed_s","first_jailbreak_attempt","first_jailbreak_elapsed_s","goal_index","target_tokens"],"type":"object","title":"GoalSample"},"type":"array"}},"required":["attempts","calls","calls_traced","elapsed_s","goal_samples","goals","run_id","target_latency_ms","target_tokens"],"type":"object","title":"RunCost"},"type":"array"}},"required":["runs"],"type":"object","title":"RunCosts"}}},"description":"OK"},"304":{"description":"The If-None-Match ETag still holds."},"400":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Invalid query parameter."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"404":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Not a visible campaign run."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

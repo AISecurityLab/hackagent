@@ -1,0 +1,60 @@
+---
+id: v-1-models-retrieve
+title: "List gateway models"
+description: "The models `POST /v1/chat/completions` serves, by the name its `model` field takes, in OpenAI's model list format. Free; accepts an API key or a login token."
+sidebar_label: "List gateway models"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"List gateway models"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/v1/models"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+The models `POST /v1/chat/completions` serves, by the name its `model` field takes, in OpenAI's model list format. Free; accepts an API key or a login token.
+
+<ParamsDetails>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"examples":{"GatewayModels":{"summary":"Gateway models","value":{"data":[{"id":"hackagent/attacker-v1","object":"model","owned_by":"hackagent"},{"id":"hackagent/judge-v1","object":"model","owned_by":"hackagent"}],"object":"list"}}},"schema":{"properties":{"object":{"description":"Always 'list'","type":"string"},"data":{"description":"The models served.","items":{"properties":{"id":{"description":"The name to send as ``model``","type":"string"},"object":{"description":"Always 'model'","type":"string"},"owned_by":{"description":"Always 'hackagent'","type":"string"}},"required":["id","object","owned_by"],"type":"object","title":"GatewayModel"},"type":"array"}},"required":["data","object"],"type":"object","title":"GatewayModelList"}}},"description":"OK"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

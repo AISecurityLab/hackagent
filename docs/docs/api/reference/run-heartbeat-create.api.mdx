@@ -1,0 +1,70 @@
+---
+id: run-heartbeat-create
+title: "Send an executor heartbeat"
+description: "Executor protocol. Reports that the executor of the run's campaign run is alive; any run of the tree may be named. A running campaign run whose executor sends no heartbeat for 5 minutes is failed. The answer says whether a cancel was requested, so the executor can stop and finish the run as `CANCELLED`. Not rate limited."
+sidebar_label: "Send an executor heartbeat"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Send an executor heartbeat"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/run/{id}/heartbeat"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Executor protocol. Reports that the executor of the run's campaign run is alive; any run of the tree may be named. A running campaign run whose executor sends no heartbeat for 5 minutes is failed. The answer says whether a cancel was requested, so the executor can stop and finish the run as `CANCELLED`. Not rate limited.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A UUID string identifying this Run.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"cancel_requested":{"description":"Whether a cancel was requested: the executor should stop and finish the run as `CANCELLED`.","type":"boolean"}},"required":["cancel_requested"],"type":"object","title":"Heartbeat"}}},"description":"OK"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The caller is not the run's executor (the run token of its campaign run, or the user who claimed a local or CLI run while it is running)."},"404":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Not found: no such object in the caller's organization."}}}
+>
+  
+</StatusCodes>
+
+
+      

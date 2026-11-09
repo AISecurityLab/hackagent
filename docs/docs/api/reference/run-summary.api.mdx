@@ -1,0 +1,70 @@
+---
+id: run-summary
+title: "Get a campaign run's summary"
+description: "Returns one campaign run's status and goal verdicts (about 1 KB): what a live view polls while the run executes. Its `revision` moves whenever any report of the run changes, so poll this and refetch the heavier reports only when it moves. Attack runs are 404: name their campaign run. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed."
+sidebar_label: "Get a campaign run's summary"
+hide_title: true
+hide_table_of_contents: true
+api: eJztWt1y2ziyfpUu7kVkFyU7iW9WmZoqjePJeuI4Lts5uYhSJkS2RIxBgAuAcrQevfupboAUZSuJt3a2ztbZ3CQyCDT6D91fN3CfFOhyK2svjU7GySX6xmoHRiPkoqqFXGiwjX7mwHnhGwdCF7AwQsESbSFz72AgZqbx8Bze/rI3hrtSeBCg5BJhKfEOaqOUg7tSKgRfIlED/IJ549GN4NQ7yCwupZNGZ1CZJdJk1LhEC0KvwGJtrAcz71bnpdALdCk4w9TBlzIwZnGOPi95ZoliKdHG9SSSWjFlkD7sM4KJ9yK/JaIOhEU4OjwagxYVcyrtlgpGMMlzrL0j6cxCavDmFjUYYhMmF6dwiysYaEPiE5v8eW8EJ0u0JIarjXYIpSAKdyhuITu5FotsDA51QVzNiBnhIDudD8+NxuE74fMyA29ggR6yl4dHGdxJX5K+BcxMsYqK1caXUi+iaopRkiamRivIrKdFMk5so29cU1XCrpI0qYUVFXq0Lhl/un/gA9clAjFGKhdQk3FM4zoBxvDy8ChuKz04L5WC0qjC0a6SKJQoCrRJmpAqk3GyJU6SJi4vsRLJ+D7xq5omOG+lXiTrdfqQmQl8+HD6GsIEkAVqL+cr+s1Gv2x0t2stfLnZUxZJmlj8eyMtFsnY2wb7G8+NrYRPxknT8MyHjHymxUFgR/NfHB7Sf7nRHrWnn6KulcxZwwe/O2L2vkf/oRR9T2JXld49OEeGPB7ZWUTnlyRdbcmWXgZOLObGFljc0Gr3eK83NMxeAsKDQuE8H+d2HRHHqvajjdRSe1ygTdZp8ruQambJc59O2TV5js7NGwVhOYrb3dQr6eVCeDLIbuKd+MQhOeBdKfMS7oSDbm0KRuchlrjc1AjSQW6qWqHH3ds22qIzavn1fTVKX6KFjfigjYXBCv3eZudx9HbbaC31IoUadUG+iEuhGnYFCgdorbHhED7mRe7g4bRow9tWwEnS77lp6+27jnBL6pnjiDbatbqd8y2WnFhisWFMeraGEo3OSyxgbk2VgpxTrN7FsW6UEjOF7RF8xINYxAP1NQZ4wpOU4YVd4A5a1y2Vb+ki5Dc+2Uq9n+8IjPuQXZycvz49f5PBEC6C7ad6H7LLD+fncfgy+AYPH79/d3F2cn3ymj4cRxct+NOvk9OzMP6rkCoOHk/Oj0/O4vix0DkqhSQp6qZKxp+SuH2SJnHHJE26TZI0CVRpsKWUfH4oapp46ckeyRVLfEK0Kd491lk/8Y+mmnn8P9HAOk0CZDD2OwbKlWkKWvw3kd9OyObAQ0xdmVwo+nhGP6ASeSk18qdcychiRdFZSY09vTOJJE2YQJImuZLfUuxlo08iu1/R7sfSdCCoxTWthv9MEeiMW6TYdSN2HIyPBIdaWEXHOk7eOm2F8Dj0ssJdp6apiydRf+Y6IKYob/SAytM2mkstXfkUOdqZr4BizwapEEbMvVziVzf9fqzivHxDePExE+dNNUPLqGkDK3cngZjgdhCZxC+9dJ1b4xwIpb5PtwXSu9IcOmjqkL1Dlr2z0lMaFa01XMBUD3B/NNu4hdqU7xlHPkLcFp1/gLB3cLnuw7JPMfxvq7anoF6O2nLlXkDY9o00IL8ejunDjpgw04coqqe6LhN0+WQLQGy5/CYGmNnvmPteDDiObF82+iri7jXJvm2W92/JbC8Pj3YnrS3gHED5Ft5ep8nRvwZMdUArAetzaaaL2siQcLeBZ4FeSLXr8AkPdxSm7qwhVDQ3Fmo0tdqVaB+YPxL9hiIvG/2aJ50Qo7uUeKqXQskC/t6QW3e1TVTP8z9DPQH0QtlUQg8tioLCBGRZYD/LxiAaX1JxEigTNLSVdORR6VRTUTg3jS7CmaGQo2QlfaDuUh6mI6RkjlQk8lc3gitTYZwEoiimVOehpUqT6u5uemBSFIWDLOM/sizlEmOJVs4jU5CbAvf+XYZNEyL/mMq7kKI2WstF4zANgYKkYQBvNI4hi/Lc0NwbKtgzGHCYojA0bxwW0GgvFQgIJm8VIB1I7bwgtLCX9gg1+oZ1mcGA9FsZ7Uu1ChV/xJctDWoAhC3qvT/Dcdlfg+vu8tp35B2kVRncNwX8UhN1KiEsLs0twW6LXPIKlXKjoTcQgnV7XKGgAM/NB+5SROd/+cP5fzj/f6Dzc4G6ceVKrNh3C8NePWZl4xdB9UK/mwam8U4WyNY1dwxR2oNB4ttNd4wq8YXQ8h9s/Xgcjv7bU+U5dycJ6QRn7HcbSEMv/vojYPwIGP+BAeNS+GhnasNZ9FR/zD1aZkp3pZfD3OiC5OMP2SXNHE5oZgahLz1i7hzmjZV+xW2ESePLw98+Xk+4kXkd2p+fPlM7enJx+hZXNIFHSAKxoLY5tdRJoAp9aajFHkoF7kKPkwPb6IN7WawPNl13h3a5u+X+oNKnIsMqaqR7X7vxwYGo5agU+W1ohRW45JZCK8IVncfgnH1u75MZCov217bUnVycDt/iqm3Ak9bDjI35aENyzp0KeUTwt4/XTyF22Wim8BW2Lhs9vI6V2ndpfTT2Fu23yIUZT6eYG3MrsSXGNwlhaHOX4JBDU7/pKGpJqiRPknpudpdvG7PS9ZDzxsZuD9vRwco0YLEYehRVutX/jd8aPdViIeiw0ueKIx9X7+G6x5fGYTieoaCFgUXXKO9S8FbkdEkW6/c9umubaqGcAXbEwMmGxbOzd0BF8p1YBV5CRc63cAX83hQLCggFKsc9g6ne8No4HAEJnHVOmsHV67e88vjstAvYm90K4cqZEbagQDLVs0YqukwA6bkN9pe/wC/CIXy4PKM/iXZpnMeCeZc5xzDhIfvqCcleAR3FGAkkh0S0qHOcaopdFpWgZhBdrkkPgz7i+DrVgyDc3ggmU+1QzYeRrRhPQ+bo6dfRZWJgpNEF2g65iKKw6FwKjWuEUqupnmEpdQEZ7Zq1WphsJUoaDNeJHe7XiAVdKAb3jjCpjX602tiIgdr4NyYqWZZN9dbnMfwSSPy0Mo194Lu3uPo5LprqIezvx0G3v8+ZIHZm2o031h20cCC7eH91DQe3uMr22B9cae70VAPf5rD7rKg/R/efRKJxhOZK05Em/0+ZFm8iPE955phEH+rBB4fhtJBNidbV67fBpVtfDAeVetoky9nmNpfkGXDwI2f0j9wuhbe4ypURt8B27hyAuOj7gNtjvfBt+LZG6LKXrp5hjndUrJlG+86cLpZvQS9q1b9pduPWFNSjY5QUdAMbmEPHXRTQOLFAWuvAWKJVCU0jfKzDlgFF8bXy0eHzLGCLqJDLpq+OrBTW3/xUW5zLLz+PfnKYW/Q/Z0FC6VxD1jGEwSl5hV5y6AKyVhzkSsgKA5wLRW7XJoytOxcdICfcTnK3t/7R1BwJgQkQ0GdBegGL+aYgsb9/x+E/sL+/T7tzXGXOwje60ohBZFOCvCJm2t1pK+Z5I1G4/5hA1VbtlVDUQ8bv1e2kYhd03J7p9z1vdd2RDhF9hsrohWN9Pihh4ETkZTgXvVlG4wYQTy5Op5r1R6crvIloe7sBcbnNTSPVS8/c1h7j/iz2qqnufyeK7g4tyXOUjeDKi/m89SheJPR2KIz5hl2PchnlvTSmFvJWfnnBfWROW0QidKe3RI+KuxALqbtAeCZd/+BYfrpCLxbEAsdTnd1PE+Zrmozh6EUK00TjF/5rmvzUWPXzNKHB9oEDfaALABqL3NDQp9Fo9HmdjWDibimgTLWIZQXtE2Mb/cxg8Hw4Ew4LevPRscXuGw51mHfj5D8wAydW4Ew61UwhPDepxBdZNdWrEDFwLhrlwza0hnz5+eEIMhIjY61lLfNZSKN0+FdDb4ZNyJ2Oi+OMxMooXcZbbtRFq1KG3cEJY91kEX67en8+gv+hmiFYcS6kagi8DLKjw8NsDypRA5I7xuYVzCWqGAWUdH6qzRwqdBSHXLpVzpNdCFexcqfJNeXmsJqTdKgZRtPk8zp71RZzAXAQa9zh4vdG9PIgrCNhM230Df95E9Zk4VRo5PCdGz2Xi8ZG58GNrLe4wgJmq2iCwniaTxkbBhl5kNaYsxOKWt7c4mqaUPp/HxQZtZcLS/XIo4o3FryBFTP3SP5ZPSzxMioFM07Lf0C4lIU/4B0KukaFP2h0OBxC/Jf+ZCvAHxzySGV08cJFHRvjVfcciK/04k1bt/I5rYzdR3KP1oTf7DWu6pA9OtwRKky3IfuCyFJ/AbVpFiWvJrAzDw+ketGaY89m4ctWkq83hJgh2n4rtrC/iGLIAW+GXCkzvurVuUQkiDdgNY/hcdW8t+HlKAhBT1rKGAtbTLMzYG5W/rWzR6PbjSWZm26T4jWbUIqicksNBkLxiW0TZNrdXabxnidcWG4YfMHb9IvhV4+K4aeUwEQvwOq+XQbZwfL5wWg0YohGgd61J1DqDrm6UtSYhgDLX0NIHY1GIaCSmntDa3J/B+9r1JPTIT3UET50n5TkKgi/1Jh3sP84uA1HJAowfW3Ht3MzoehlAOWK6GTURIcPV1AYpYR1MHCIU529ObmGgz6BgwrJ2seCniR68xBGUFYvkIIBVV/G0i/RXr6TXY0GBsczLIWapwH6lnRLWIQ6YgwznBuLsSEZukoxrENu+JhO6eFMTiihV9p1Qg3CUZLzrdEW7/EbMen30vYN2VSL3DdCtcShwKLJKYSxQ9wJG8BmADLh1U5bM0x1JTVzFrfpkhxUJEMft0dFH8Ro02GZjSuyyS7D5xBabc9NqcMXsMtgtupy2/P08PCQokNpGrv3qge3oBRLnOoQlM2dTkGRmi3MqBD1TK5rC28A0NYzu4gh6Yi5TdqmvNEyQ5ppGWzjKOG1qQ5HLTYyd3eRNr2rrVopSRPq8oQuwOHo+eiQugy1cb4S3ESJTYU36NlLth/Zds2irW5CryX744nu/58nurGX5PGLP6iVkJpf1FhuLoc+YugypsmYe0+td3xOE6o66fP9PUHOD1at1zTMV+DUqEyTpbAyPGahdqN09LtIxnOhHH7DvQaXEYLtwdPe3u4Uou2SaXJlehxJfyVpcour8DZ3/Xmdtu+E/zkG/6XnyTuZDUw9fKTccU1d4DAleFfv26PbkXW/IfzmhNqjInYW49ZdGzL+IOF3auv+PszgRuZ63SmPfZb0t17/L6rcqtY=
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get a campaign run's summary"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/run/{id}/summary"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns one campaign run's status and goal verdicts (about 1 KB): what a live view polls while the run executes. Its `revision` moves whenever any report of the run changes, so poll this and refetch the heavier reports only when it moves. Attack runs are 404: name their campaign run. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"The ETag of a previous response: 304 while it still holds.","in":"header","name":"If-None-Match","schema":{"type":"string"}},{"description":"A UUID string identifying this Run.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"description":"A campaign run and its goal verdicts over every attack run.","properties":{"recorded_goals":{"description":"Goals with at least one recorded attempt.","type":"integer"},"jailbroken":{"description":"Goals with at least one successful jailbreak.","type":"integer"},"mitigated":{"description":"Goals every attempt of which was mitigated, once the scope is complete.","type":"integer"},"unresolved":{"description":"Goals neither jailbroken nor (yet) mitigated: still running, pending evaluation or errored.","type":"integer"},"id":{"description":"Id of the campaign run.","format":"uuid","type":"string"},"name":{"description":"The campaign's name.","type":"string"},"campaign":{"description":"Id of the saved campaign it was launched from, if any.","format":"uuid","nullable":true,"type":"string"},"agent":{"description":"Id of the agent.","format":"uuid","type":"string"},"target":{"description":"The agent's name.","type":"string"},"status":{"allOf":[{"description":"* `PENDING` - Pending\n* `RUNNING` - Running\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `CANCELLED` - Cancelled","enum":["PENDING","RUNNING","COMPLETED","FAILED","CANCELLED"],"type":"string","title":"StatusEnum"}],"description":"The run's status.\n\n* `PENDING` - Pending\n* `RUNNING` - Running\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `CANCELLED` - Cancelled"},"executor":{"allOf":[{"description":"* `cloud` - HackAgent cloud\n* `local` - Local machine\n* `cli` - Command line","enum":["cloud","local","cli"],"type":"string","title":"RunExecutorEnum"}],"description":"Who executes the run.\n\n* `cloud` - HackAgent cloud\n* `local` - Local machine\n* `cli` - Command line"},"created_at":{"description":"When the run was created.","format":"date-time","type":"string"},"updated_at":{"description":"When the run's reports last changed.","format":"date-time","type":"string"},"finished_at":{"description":"When the run finished; null while it is active.","format":"date-time","nullable":true,"type":"string"},"attack_runs":{"description":"Number of attack runs.","type":"integer"},"attempts":{"description":"Attempts recorded across all attack runs.","type":"integer"},"revision":{"description":"Goes up with every write that changes this campaign run's reports: poll the summary and refetch the rest when it moves.","type":"integer"}},"required":["agent","attack_runs","attempts","campaign","created_at","executor","finished_at","id","jailbroken","mitigated","name","recorded_goals","revision","status","target","unresolved","updated_at"],"type":"object","title":"CampaignRunSummary"}}},"description":"OK"},"304":{"description":"The If-None-Match ETag still holds."},"400":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Invalid query parameter."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"404":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Not a visible campaign run."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

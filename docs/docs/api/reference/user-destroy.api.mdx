@@ -1,0 +1,70 @@
+---
+id: user-destroy
+title: "Delete a user profile"
+description: "Deletes the caller's profile, unlinking their account from its organization; the dashboard uses it to delete an account. Login tokens only: API keys get 401."
+sidebar_label: "Delete a user profile"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "delete api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Delete a user profile"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"delete"}
+  path={"/user/{id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Deletes the caller's profile, unlinking their account from its organization; the dashboard uses it to delete an account. Login tokens only: API keys get 401.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A UUID string identifying this User Profile.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"204":{"description":"No response body"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this (for example a run token outside its own run, or a caller without an organization), or the installation is read-only because its license is not valid (`code: license_read_only`)."},"404":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Not found: no such object in the caller's organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      
