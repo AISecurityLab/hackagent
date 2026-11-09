@@ -6,7 +6,6 @@
 import os
 import sqlite3
 import tempfile
-import threading
 import unittest
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -23,6 +22,8 @@ from hackagent.storage.records import (
     ResultRecord,
     TraceRecord,
 )
+
+from .threads import run_concurrently
 
 
 def _make_backend(tmp_dir: str) -> LocalBackend:
@@ -1081,13 +1082,7 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
                     except Exception as e:
                         errors.append(e)
 
-                threads = [
-                    threading.Thread(target=create, args=(i,)) for i in range(10)
-                ]
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
+                run_concurrently(create, range(10))
 
                 self.assertEqual(errors, [], f"Thread errors: {errors}")
                 result = backend.list_agents()
@@ -1114,13 +1109,7 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
                     except Exception as e:
                         errors.append(e)
 
-                threads = [
-                    threading.Thread(target=create_result, args=(i,)) for i in range(20)
-                ]
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
+                run_concurrently(create_result, range(20))
 
                 self.assertEqual(errors, [])
                 result = backend.list_results(run_id=run.id)

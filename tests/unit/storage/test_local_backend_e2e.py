@@ -12,7 +12,6 @@ Run with: pytest tests/integration/storage/ -v
 
 import os
 import tempfile
-import threading
 import unittest
 
 import pytest
@@ -24,6 +23,8 @@ from hackagent.storage.records import (
     OrganizationContext,
     RunRecord,
 )
+
+from .threads import run_concurrently
 
 
 pytestmark = pytest.mark.integration
@@ -247,14 +248,13 @@ class TestLocalBackendConcurrentWorkflow(unittest.TestCase):
             except Exception as e:
                 errors.append(e)
 
-        threads = []
-        for i, rid in enumerate(result_ids):
-            status = "SUCCESSFUL_JAILBREAK" if i % 3 == 0 else "FAILED_JAILBREAK"
-            threads.append(threading.Thread(target=evaluate, args=(rid, status)))
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        run_concurrently(
+            lambda item: evaluate(*item),
+            [
+                (rid, "SUCCESSFUL_JAILBREAK" if i % 3 == 0 else "FAILED_JAILBREAK")
+                for i, rid in enumerate(result_ids)
+            ],
+        )
 
         self.assertEqual(errors, [], f"Thread errors: {errors}")
 
