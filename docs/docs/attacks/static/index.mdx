@@ -5,11 +5,42 @@ description: "Attacks that build their prompts up front and send them without re
 
 import AttackList from './_list.generated.mdx';
 
-{/* Intro, no heading: what makes an attack of this type, in two or three sentences. */}
+A static attack applies a fixed transformation to each goal (a wrapper, a
+reversal, a cipher, an image) and sends the result. It never reads the
+target's reply to decide what to send next, and most drive no model of their
+own. That makes static attacks cheap, fast and comparable from run to run, and
+it is why a campaign should start with them.
 
 ## What they have in common
 
-{/* How these attacks talk to the target, what they need (helper models, turns) and what that means for cost and repeatability. */}
+- **Prompts are decided before anything is sent.** Each goal becomes one
+  request, or a fixed set of them for [Static Template](static_template.mdx).
+  Every request is one turn: a user message, often with a system message
+  before it. Requests for the same goal are sent concurrently, and all of them
+  are sent even after one succeeds.
+- **Every reply is judged.** Each request is one attempt, and the panel
+  judges every reply. A goal counts as jailbroken if any of its attempts does.
+  [CipherChat](cipherchat.mdx) deciphers a reply that looks enciphered first;
+  the others judge it as written.
+- **Few or no helper models.** Five of the seven need no `roles` at all.
+  [FC-Attack](fc.mdx) and [tFC-Attack](tfc.mdx) need one `attacker` model,
+  called once per goal to write the steps they draw. None of them searches.
+- **Cost is fixed and small.** Per goal: one target call (nine for Static
+  Template's defaults), one panel evaluation per target call, and one helper
+  call for FC and tFC. The number never depends on how the target answers.
+- **Mostly repeatable.** Baseline, Static Template, FlipAttack and CipherChat
+  build the same prompt for the same goal every time. MML shuffles words at
+  random, and FC and tFC depend on what the step generator writes.
+- **The whole request matters.** Chat-model targets (`OPENAI`, `OLLAMA`,
+  `LITELLM`, `LANGCHAIN`) receive every message, images included. Agent
+  targets reached through `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES` or
+  `WEB` receive only the text of the last user message, which drops the system
+  message FlipAttack and CipherChat depend on and the images MML and FC need.
+
+What a static attack cannot do is adapt. If the target refuses its fixed
+prompt, it has no second try. That is the job of the
+[adaptive](../adaptive/index.mdx) and [multi-turn](../multi-turn/index.mdx)
+attacks.
 
 ## The attacks
 
@@ -19,4 +50,39 @@ import AttackList from './_list.generated.mdx';
 
 ## Choosing between them
 
-{/* Which attack of this type to start with, and when to switch to another, with a link to each page. */}
+Start with **[Baseline](baseline.mdx)** in every campaign. It is the control:
+the rate at which the target complies when simply asked. Every other attack's
+rate means something only next to it.
+
+Then pick by what you want to learn and what the target accepts:
+
+| You want to test | Use | Notes |
+|---|---|---|
+| Whether famous jailbreak and injection prompts still work | [Static Template](static_template.mdx) | Nine prompts per goal by default; good for regression tests |
+| Whether obfuscated text gets past refusals and input filters | [FlipAttack](flipattack.mdx) | One call; needs a capable chat model and its system message |
+| Whether safety holds in a cipher | [CipherChat](cipherchat.mdx) | One call; only meaningful on models that can write the cipher |
+| Whether a vision model follows instructions hidden in an image | [MML](mml.mdx) | Needs image input |
+| Whether a vision model completes a harmful diagram | [FC-Attack](fc.mdx) | Needs image input, Graphviz and an `attacker` model |
+| The same for a text-only model or agent | [tFC-Attack](tfc.mdx) | Needs an `attacker` model; the goal stays readable |
+
+**FC-Attack and tFC-Attack are one technique in two forms.** Both ask a helper
+model for the goal's first steps and present them as a flowchart to complete,
+with the same prompts. FC draws the flowchart as an image for vision models;
+tFC writes it as diagram code (DOT, Mermaid, TikZ, PlantUML or ASCII) for any
+chat model. Use FC when the target reads images, since the paper's text-only
+comparison scored far lower than its images, and tFC everywhere else.
+
+A cheap first pass that covers most targets: Baseline, Static Template and
+FlipAttack, with
+[`execution.escalate`](../../cli/campaign-files/execution.md#executionspec) on
+so later attacks only see the goals still standing. Add MML or FC for vision
+models.
+
+Move to adaptive attacks when the static ones come back clean, or when the
+target is an agent that drops system messages and images.
+[PAIR](../adaptive/pair.mdx) and [TAP](../adaptive/tap.mdx) rewrite the prompt
+from the target's replies, [PAP](../adaptive/pap.mdx) uses persuasion, and
+[BoN](../adaptive/bon.mdx) samples many random perturbations. For defences
+that judge one turn at a time, try [Crescendo](../multi-turn/crescendo.mdx).
+A clean static result is not evidence of robustness; it means the target
+resists these particular fixed prompts.
