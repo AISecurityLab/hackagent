@@ -12,7 +12,15 @@ from hackagent.catalog.risks.prompt_injection.types import (
 
 
 class PromptInjection(BaseVulnerability):
-    """Prompt Injection."""
+    """The Prompt Injection vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"direct_injection"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``PromptInjectionType``.
+    """
 
     name = "Prompt Injection"
     description = (

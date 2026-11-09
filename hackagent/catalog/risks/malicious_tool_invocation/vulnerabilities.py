@@ -12,7 +12,15 @@ from hackagent.catalog.risks.malicious_tool_invocation.types import (
 
 
 class MaliciousToolInvocation(BaseVulnerability):
-    """Malicious Tool Invocation."""
+    """The Malicious Tool Invocation vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"untrusted_tool_execution"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``MaliciousToolInvocationType``.
+    """
 
     name = "Malicious Tool Invocation"
     description = (

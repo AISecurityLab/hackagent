@@ -1,7 +1,15 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Persistence of agents, attacks, runs, results and traces."""
+"""Persistence of agents, attacks, campaign runs, runs, results and traces.
+
+:class:`~hackagent.storage.store.Store` is the protocol every caller depends
+on; :mod:`~hackagent.storage.local` (SQLite) and
+:mod:`~hackagent.storage.remote` (the HackAgent API) implement it, and
+:mod:`~hackagent.storage.records` defines the records they return. The
+remote-only executor types are importable from here without loading the HTTP
+client until first use.
+"""
 
 from __future__ import annotations
 

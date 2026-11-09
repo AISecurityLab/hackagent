@@ -168,6 +168,20 @@ def run_campaign(
     """Synchronous form of :func:`arun_campaign`.
 
     Safe to call while an event loop is already running, as in a notebook.
+    Takes the same arguments and raises the same errors.
+
+    Example:
+        Run a campaign file, printing each progress event:
+
+        ```python
+        from hackagent.orchestrator.campaign import run_campaign, summary
+
+        def show(event, **data):
+            print(event)
+
+        result = run_campaign("campaign.yaml", on_event=show)
+        print(summary(result))
+        ```
     """
     return run_coroutine_blocking(
         lambda: arun_campaign(
@@ -213,6 +227,43 @@ async def arun_campaign(
     started there claimed by this machine, heartbeating, its gateway models
     bound to that server, and finished once (see
     :func:`~hackagent.orchestrator.execution.execute.arun_remote_campaign`).
+
+    Args:
+        source: A campaign file path, an already-decoded mapping, or a
+            :class:`CampaignSpec`.
+        on_event: Called as ``on_event(name, **payload)`` for each progress
+            event, on the event loop. An exception it raises stops the
+            campaign; raising ``CampaignCancelled`` ends it as cancelled.
+        build: Builds a model from its config; replaced in tests.
+        load: Loads the goals of the dataset spec.
+        store: Store to record the run in, instead of the one
+            ``execution.storage`` selects.
+        calibration: Loads the labelled samples of a judge audit.
+        build_embed: Builds the embedders of retrieval attacks.
+        settings: Settings for gateway credentials and storage; resolved
+            once when omitted.
+        resolved: The campaign already resolved by the caller.
+
+    Returns:
+        The attacks' outcomes, the audit report and the output files. With
+        ``execution.dry_run`` the campaign is only resolved and the result
+        has no attacks.
+
+    Raises:
+        ValueError: When ``resolved`` was built from a different campaign,
+            or the campaign is invalid.
+        AuditFailed: When the judge audit fails and is configured to stop.
+
+    Example:
+        Inside an event loop:
+
+        ```python
+        from hackagent.orchestrator.campaign import arun_campaign, load_campaign
+
+        spec = load_campaign("campaign.yaml")
+        result = await arun_campaign(spec)
+        print(result.succeeded, result.outputs)
+        ```
     """
     spec = source if isinstance(source, CampaignSpec) else load_campaign(source)
     run_id = spec.execution.output.run_id or str(uuid4())

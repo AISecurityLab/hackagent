@@ -20,35 +20,53 @@ class LLM(Protocol):
         self,
         messages: Union[str, Sequence[Union[Message, Mapping[str, Any]]]],
         **params: Any,
-    ) -> Completion: ...
+    ) -> Completion:
+        """Send ``messages`` and return the completion.
+
+        Args:
+            messages: A prompt string, or a conversation of messages.
+            **params: Per-call overrides such as ``temperature`` or ``max_tokens``.
+
+        Returns:
+            The completion; a provider failure is in its ``error``, never raised.
+        """
 
     async def acomplete(
         self,
         messages: Union[str, Sequence[Union[Message, Mapping[str, Any]]]],
         **params: Any,
-    ) -> Completion: ...
+    ) -> Completion:
+        """Asynchronous :meth:`complete`."""
 
-    def with_params(self, **params: Any) -> "LLM": ...
+    def with_params(self, **params: Any) -> "LLM":
+        """Return an LLM that applies ``params`` to every call."""
 
-    def describe(self) -> ModelSpec: ...
+    def describe(self) -> ModelSpec:
+        """Return the spec that says how this model is reached."""
 
 
 @runtime_checkable
 class LLMFactory(Protocol):
     """Builds the LLM for a role model."""
 
-    def for_role(self, spec: ModelSpec) -> LLM: ...
+    def for_role(self, spec: ModelSpec) -> LLM:
+        """Build the callable model for ``spec``."""
 
 
 class CompletionResult(Protocol):
-    @property
-    def text(self) -> Optional[str]: ...
+    """The part of a completion that evaluation reads."""
 
     @property
-    def ok(self) -> bool: ...
+    def text(self) -> Optional[str]:
+        """The generated text, or None when the call produced none."""
 
     @property
-    def error(self) -> Optional[LLMError]: ...
+    def ok(self) -> bool:
+        """Whether the call succeeded."""
+
+    @property
+    def error(self) -> Optional[LLMError]:
+        """Why the call failed, or None."""
 
 
 class CompletionModel(Protocol):
@@ -56,7 +74,8 @@ class CompletionModel(Protocol):
 
     def complete(
         self, messages: Sequence[Mapping[str, Any]], **params: Any
-    ) -> CompletionResult: ...
+    ) -> CompletionResult:
+        """Send ``messages`` and return the result; provider errors are returned, not raised."""
 
 
 __all__ = [

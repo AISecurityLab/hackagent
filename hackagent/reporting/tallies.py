@@ -107,6 +107,11 @@ class ResultRow:
         created_at: datetime,
         updated_at: datetime,
     ) -> ResultRow:
+        """Build the row from a result already in memory.
+
+        Category, subcategory and the goal clock are read from
+        ``agent_specific_data``, as the stored columns are.
+        """
         data = agent_specific_data or {}
         return cls(
             id=id,
@@ -157,6 +162,10 @@ class TraceRow:
     def from_content(
         cls, result_id: str, step_type: str, content: Optional[Mapping[str, Any]]
     ) -> TraceRow:
+        """Build the row from a trace step's content.
+
+        Token usage is read from ``data.usage``, else from ``response.usage``.
+        """
         content = content if isinstance(content, Mapping) else {}
 
         def usage(key: str) -> Optional[int]:
@@ -259,6 +268,7 @@ class GoalOutcome:
 
     @property
     def coverage(self) -> TraceCoverage:
+        """The trace coverage counts of this goal as a :class:`TraceCoverage`."""
         return TraceCoverage(
             self.labelled_call_attempts,
             self.target_call_attempts,

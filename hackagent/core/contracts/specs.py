@@ -34,6 +34,7 @@ class ModelSpec(BaseModel):
     @field_validator("capabilities", mode="before")
     @classmethod
     def normalize_capabilities(cls, value: Any) -> frozenset[str]:
+        """Accept a string or an iterable and store lowercase, stripped, non-empty names."""
         if value is None:
             return frozenset()
         values = [value] if isinstance(value, str) else value

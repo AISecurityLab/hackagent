@@ -188,6 +188,11 @@ class ModelFactory:
         )
 
     def for_role(self, spec: ModelSpec) -> Model:
+        """Connect the model ``spec`` describes.
+
+        The platform key is added first when ``spec`` targets the gateway and
+        names no key of its own.
+        """
         return connect(self.with_credentials(spec))
 
 

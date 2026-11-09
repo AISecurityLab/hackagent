@@ -17,7 +17,33 @@ from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 
 def load_campaign(source: str | Path | Mapping[str, Any]) -> CampaignSpec:
-    """Validate and return one campaign specification."""
+    """Validate and return one campaign specification.
+
+    A file may name API keys only as ``${VARIABLE}`` references; a mapping
+    built in Python may also carry key values.
+
+    Args:
+        source: Path of a YAML campaign file, or the decoded mapping.
+
+    Returns:
+        The validated campaign.
+
+    Raises:
+        FileNotFoundError: When the path is not a file.
+        ValueError: When the YAML cannot be parsed, is not a mapping, or
+            fails validation (``pydantic.ValidationError`` is a subclass).
+        CredentialError: When a file contains a literal API key.
+
+    Example:
+        Load a file and inspect it before running:
+
+        ```python
+        from hackagent.orchestrator.campaign import load_campaign
+
+        spec = load_campaign("campaign.yaml")
+        print(spec.campaign.name, [attack.name for attack in spec.attacks])
+        ```
+    """
     if isinstance(source, Mapping):
         data = dict(source)
     else:

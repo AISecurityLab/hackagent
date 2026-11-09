@@ -1,18 +1,15 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Base vulnerability class for all hackagent risk assessments.
+"""Base class of the vulnerabilities in the risk catalog.
 
-Architecture (mirrors the attack layer):
-    run_campaign() → campaign runner → a technique
-                                            ↕
-                   BaseVulnerability ← vulnerability.assess()
-
-Each concrete vulnerability:
-  1. Defines an Enum of sub-types in its ``types.py``
-  2. Provides prompt templates in its ``templates.py``
-  3. Extends this class in its main module (e.g. ``bias.py``)
+Each risk package under :mod:`hackagent.catalog.risks` defines an Enum of
+sub-types (``types.py``), a :class:`BaseVulnerability` subclass that names
+and describes the risk (``vulnerabilities.py``) and a threat profile
+(``profile.py``) that maps it to datasets, attacks and metrics. The classes
+are reference data for planning and the docs: campaigns do not call the
+``assess`` / ``simulate_attacks`` hooks, and no built-in vulnerability
+implements them.
 """
 
 import abc
@@ -35,10 +32,9 @@ class BaseVulnerability(abc.ABC):
         - ``ALLOWED_TYPES``    – list of valid sub-type *values* (strings)
         - ``_type_enum``       – the Enum class used for validation
 
-    Parameters
-    ----------
-    types : list[Enum]
-        Sub-types to evaluate (defaults to all allowed types).
+    Args:
+        types: Sub-types to evaluate. Defaults to every member of
+            ``_type_enum``.
     """
 
     # ── Class-level attributes (set by each concrete vulnerability) ──
@@ -63,6 +59,7 @@ class BaseVulnerability(abc.ABC):
         return [t.value for t in self.types]
 
     def get_name(self) -> str:
+        """Return the vulnerability's human-readable name."""
         return self.name
 
     # ── Assess / simulate stubs (overridden by concrete classes) ─────
@@ -84,7 +81,7 @@ class BaseVulnerability(abc.ABC):
         model_callback: Any = None,
         purpose: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Async variant of :pymeth:`assess`."""
+        """Async variant of :meth:`assess`."""
         raise NotImplementedError
 
     def simulate_attacks(self, purpose: Optional[str] = None) -> List[str]:
@@ -96,7 +93,7 @@ class BaseVulnerability(abc.ABC):
         raise NotImplementedError
 
     async def a_simulate_attacks(self, purpose: Optional[str] = None) -> List[str]:
-        """Async variant of :pymeth:`simulate_attacks`."""
+        """Async variant of :meth:`simulate_attacks`."""
         raise NotImplementedError
 
     # ── Display ──────────────────────────────────────────────────────

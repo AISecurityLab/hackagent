@@ -45,9 +45,11 @@ class EndpointOverrides:
     attacker: Optional[str] = None
 
     def any_openai(self) -> bool:
+        """Return whether an OpenAI-compatible override is set."""
         return bool(self.openai or self.judge or self.attacker)
 
     def any(self) -> bool:
+        """Return whether any override is set."""
         return bool(self.ollama) or self.any_openai()
 
 

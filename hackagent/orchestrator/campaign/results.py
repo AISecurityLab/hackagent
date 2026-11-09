@@ -104,6 +104,12 @@ class AttackOutcome:
 
 @dataclass(frozen=True)
 class CampaignResult:
+    """The outcome of one campaign run: every attack's attempts and the files written.
+
+    A dry run has no attacks and no ``campaign_run_id``. Pass it to
+    :func:`summary` for a short machine-readable report.
+    """
+
     campaign_name: str
     run_id: str
     dry_run: bool

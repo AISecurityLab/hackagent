@@ -12,7 +12,15 @@ from hackagent.catalog.risks.misinformation.types import (
 
 
 class Misinformation(BaseVulnerability):
-    """Misinformation."""
+    """The Misinformation vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"factual_fabrication"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``MisinformationType``.
+    """
 
     name = "Misinformation"
     description = (

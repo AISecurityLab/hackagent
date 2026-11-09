@@ -7,6 +7,8 @@ The runner is the only place that wires catalog, attacks, models, storage,
 evaluation, datasets and tracking into one run.
 
 - :mod:`~hackagent.orchestrator.campaign`: a campaign, start to finish
+- :mod:`~hackagent.orchestrator.execution`: runs the platform tracks,
+  executed on this machine (claim, heartbeat, credits, finish)
 - :mod:`~hackagent.orchestrator.planning`: the LLM attack planner
 """
 

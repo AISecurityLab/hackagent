@@ -1,15 +1,18 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-LocalBackend — Store implementation backed by SQLite.
+"""LocalBackend: the :class:`~hackagent.storage.store.Store` backed by SQLite.
 
-Selected automatically by HackAgent when no API key is available.  All data
-is persisted in ~/.local/share/hackagent/hackagent.db with a stable schema
-for TUI/SDK access.
+Used when the local backend is selected (the default; see
+:attr:`hackagent.core.settings.Settings.mode`). All data is persisted in
+``~/.local/share/hackagent/hackagent.db`` unless another path is given, with
+a stable schema that the TUI, the web dashboard and the SDK all read. Besides
+the Store protocol it keeps per-goal tallies and a revision counter per
+campaign run, updated in the transaction of every write, so the reporting
+reads (``report_*``) never recount results.
 
-Thread safety: a per-instance lock ensures safe concurrent writes from the
-goal-batch parallel execution workers.
+Thread safety: a per-instance lock serialises access to the one connection,
+so goal-batch workers may write concurrently.
 """
 
 from __future__ import annotations
@@ -426,9 +429,15 @@ class LocalBackend:
     # ── Context ──────────────────────────────────────────────────────────────
 
     def get_api_key(self) -> Optional[str]:
-        return None  # no API key in local mode
+        """Return None: local storage has no API key."""
+        return None
 
     def get_context(self) -> OrganizationContext:
+        """Return the local organization context, creating it on first use.
+
+        The organization id is generated once and kept in the database, so every
+        record written by this database shares it. ``user_id`` is ``"local"``.
+        """
         if self._context is not None:
             return self._context
         with self._lock:
@@ -449,6 +458,11 @@ class LocalBackend:
     # ── Agent ─────────────────────────────────────────────────────────────────
 
     def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:
+        """Insert the agent ``name``, or replace the config of the existing one.
+
+        Agent names are unique in the local database. ``agent_type`` and
+        ``endpoint`` are taken from ``config["connection"]``.
+        """
         ctx = self.get_context()
         now = _now_str()
         connection = config.get("connection") or {}
@@ -504,6 +518,7 @@ class LocalBackend:
     def list_agents(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[AgentRecord]:
+        """Return one page of agents, newest first."""
         ctx = self.get_context()
         offset = (page - 1) * page_size
         with self._lock:
@@ -517,6 +532,11 @@ class LocalBackend:
         return PaginatedResult(items=items, total=total)
 
     def get_agent(self, agent_id: UUID) -> AgentRecord:
+        """Return the agent ``agent_id``.
+
+        Raises:
+            RuntimeError: When no such agent exists.
+        """
         ctx = self.get_context()
         with self._lock:
             row = self._conn.execute(
@@ -527,6 +547,7 @@ class LocalBackend:
         raise RuntimeError(f"LocalBackend: Agent {agent_id} not found")
 
     def delete_agent(self, agent_id: UUID) -> None:
+        """Delete the agent row; a missing agent is not an error."""
         with self._lock:
             self._conn.execute("DELETE FROM agents WHERE id = ?", (str(agent_id),))
             self._conn.commit()
@@ -553,6 +574,7 @@ class LocalBackend:
         organization: UUID,
         configuration: Dict[str, Any],
     ) -> AttackRecord:
+        """Insert an attack row and return it."""
         attack_id = uuid.uuid4()
         now = _now_str()
         with self._lock:
@@ -580,6 +602,7 @@ class LocalBackend:
     def list_attacks(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[AttackRecord]:
+        """Return one page of attacks, newest first."""
         offset = (page - 1) * page_size
         with self._lock:
             total = self._conn.execute("SELECT COUNT(*) FROM attacks").fetchone()[0]
@@ -603,6 +626,10 @@ class LocalBackend:
     # ── Campaign run ──────────────────────────────────────────────────────────
 
     def start_campaign(self, agent_id: UUID, spec: Dict[str, Any]) -> CampaignRunRecord:
+        """Insert a RUNNING campaign run for ``spec``.
+
+        The run is named after ``spec["campaign"]["name"]``, or ``"Campaign"``.
+        """
         campaign_run_id = uuid.uuid4()
         name = str((spec.get("campaign") or {}).get("name") or "Campaign")
         now = _now_str()
@@ -641,6 +668,14 @@ class LocalBackend:
         audit: Optional[Dict[str, Any]] = None,
         run_notes: Optional[str] = None,
     ) -> CampaignRunRecord:
+        """Change the given fields of a campaign run and return it.
+
+        ``None`` leaves a field unchanged. Every update counts as a new report
+        revision of the campaign run.
+
+        Raises:
+            RuntimeError: When no such campaign run exists.
+        """
         now = _now_str()
         with self._lock:
             updates: Dict[str, Any] = {"updated_at": now}
@@ -670,6 +705,7 @@ class LocalBackend:
     def list_campaign_runs(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[CampaignRunRecord]:
+        """Return one page of campaign runs, newest first."""
         offset = (page - 1) * page_size
         with self._lock:
             total = self._conn.execute("SELECT COUNT(*) FROM campaign_runs").fetchone()[
@@ -684,6 +720,11 @@ class LocalBackend:
         )
 
     def get_campaign_run(self, campaign_run_id: UUID) -> CampaignRunRecord:
+        """Return the campaign run ``campaign_run_id``.
+
+        Raises:
+            RuntimeError: When no such campaign run exists.
+        """
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM campaign_runs WHERE id=? LIMIT 1",
@@ -728,6 +769,7 @@ class LocalBackend:
     def create_campaign(
         self, name: str, description: str, agent_id: UUID, spec: Dict[str, Any]
     ) -> CampaignRecord:
+        """Save a dashboard campaign and return it."""
         campaign_id = uuid.uuid4()
         now = _now_str()
         with self._lock:
@@ -756,6 +798,11 @@ class LocalBackend:
         agent_id: UUID,
         spec: Dict[str, Any],
     ) -> CampaignRecord:
+        """Replace a saved campaign's name, description, agent and spec.
+
+        Raises:
+            RuntimeError: When no such campaign exists.
+        """
         with self._lock:
             cursor = self._conn.execute(
                 "UPDATE campaigns SET name=?, description=?, agent_id=?, spec_json=?, "
@@ -775,6 +822,11 @@ class LocalBackend:
         return self.get_campaign(campaign_id)
 
     def get_campaign(self, campaign_id: UUID) -> CampaignRecord:
+        """Return the saved campaign ``campaign_id``.
+
+        Raises:
+            RuntimeError: When no such campaign exists.
+        """
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM campaigns WHERE id=? LIMIT 1", (str(campaign_id),)
@@ -786,6 +838,7 @@ class LocalBackend:
     def list_campaigns(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[CampaignRecord]:
+        """Return one page of saved campaigns, most recently updated first."""
         offset = (page - 1) * page_size
         with self._lock:
             total = self._conn.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
@@ -836,6 +889,10 @@ class LocalBackend:
         run_config: Dict[str, Any],
         campaign_run_id: Optional[UUID] = None,
     ) -> RunRecord:
+        """Insert a PENDING attack run, linked to ``campaign_run_id`` if given.
+
+        Unlike the remote backend, a run without a campaign run is allowed.
+        """
         run_id = uuid.uuid4()
         now = _now_str()
         with self._lock:
@@ -875,6 +932,11 @@ class LocalBackend:
         run_notes: Optional[str] = None,
         run_config: Optional[Dict[str, Any]] = None,
     ) -> RunRecord:
+        """Change the given fields of an attack run and return it.
+
+        ``None`` leaves a field unchanged. When the run does not exist, a
+        placeholder record carrying only the passed fields is returned.
+        """
         now = _now_str()
         with self._lock:
             updates: Dict[str, Any] = {"updated_at": now}
@@ -917,6 +979,7 @@ class LocalBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[RunRecord]:
+        """Return one page of attack runs, newest first, optionally of one attack."""
         offset = (page - 1) * page_size
         with self._lock:
             if attack_id:
@@ -936,6 +999,11 @@ class LocalBackend:
         return PaginatedResult(items=[self._row_to_run(r) for r in rows], total=total)
 
     def get_run(self, run_id: UUID) -> RunRecord:
+        """Return the attack run ``run_id``.
+
+        Raises:
+            RuntimeError: When no such run exists.
+        """
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM runs WHERE id=? LIMIT 1", (str(run_id),)
@@ -960,9 +1028,22 @@ class LocalBackend:
         )
 
     def delete_campaign_run(self, campaign_run_id: UUID) -> None:
+        """Delete one campaign run; see :meth:`delete_campaign_runs`."""
         self.delete_campaign_runs([campaign_run_id])
 
     def delete_campaign_runs(self, campaign_run_ids: List[UUID]) -> None:
+        """Delete campaign runs with their attack runs, results, traces and tallies.
+
+        All deletions happen in one transaction.
+
+        Args:
+            campaign_run_ids: The campaign runs to delete; duplicates are ignored.
+
+        Raises:
+            ValueError: When the list is empty, or a campaign run or one of its
+                attack runs has not reached a final status.
+            RuntimeError: When one of the campaign runs does not exist.
+        """
         ids = list(dict.fromkeys(str(ident) for ident in campaign_run_ids))
         if not ids:
             raise ValueError("Select at least one campaign execution.")
@@ -1003,6 +1084,7 @@ class LocalBackend:
             )
 
     def delete_run(self, run_id: UUID) -> None:
+        """Delete an attack run with its results, traces and per-goal tallies."""
         sid = str(run_id)
         with self._lock:
             self._bump([self._parent_of(sid)])
@@ -1017,6 +1099,7 @@ class LocalBackend:
             self._conn.commit()
 
     def delete_attack(self, attack_id: UUID) -> None:
+        """Delete an attack with its runs, results, traces and per-goal tallies."""
         sid = str(attack_id)
         with self._lock:
             self._bump(
@@ -1042,7 +1125,12 @@ class LocalBackend:
             self._conn.commit()
 
     def count_result_buckets(self) -> dict:
-        """Return {total, jailbreaks, mitigated, error, pending} via SQL."""
+        """Count all results by reporting bucket.
+
+        Returns:
+            A dict with the keys ``total``, ``jailbreaks``, ``mitigated``,
+            ``error`` and ``pending``.
+        """
         with self._lock:
             rows = self._conn.execute(
                 "SELECT evaluation_status, evaluation_notes FROM results"
@@ -1077,6 +1165,11 @@ class LocalBackend:
         request_payload: Dict[str, Any],
         agent_specific_data: Dict[str, Any],
     ) -> ResultRecord:
+        """Insert an unevaluated result and update its goal's tally.
+
+        The returned record's metadata merges ``request_payload`` and
+        ``agent_specific_data`` and keeps the payload under ``request_payload``.
+        """
         result_id = uuid.uuid4()
         now = _now_str()
         metadata = {**request_payload, **agent_specific_data}
@@ -1126,6 +1219,12 @@ class LocalBackend:
         latency_ms: Optional[int] = None,
         response_status_code: Optional[int] = None,
     ) -> ResultRecord:
+        """Change the given fields of a result and update its goal's tally.
+
+        ``latency_ms`` and ``response_status_code`` have no columns locally and
+        are merged into the metadata. When the result does not exist, a
+        placeholder record carrying only the passed fields is returned.
+        """
         now = _now_str()
         updates: Dict[str, Any] = {"updated_at": now}
         if evaluation_status is not None:
@@ -1188,6 +1287,7 @@ class LocalBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[ResultRecord]:
+        """Return one page of results, newest first, optionally of one run."""
         offset = (page - 1) * page_size
         with self._lock:
             if run_id:
@@ -1209,6 +1309,11 @@ class LocalBackend:
         )
 
     def get_result(self, result_id: UUID) -> ResultRecord:
+        """Return the result ``result_id``.
+
+        Raises:
+            RuntimeError: When no such result exists.
+        """
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM results WHERE id=? LIMIT 1", (str(result_id),)
@@ -1244,6 +1349,7 @@ class LocalBackend:
         step_type: str,
         content: Dict[str, Any],
     ) -> TraceRecord:
+        """Insert a trace step and add it to its goal's usage tally."""
         trace_id = uuid.uuid4()
         now = _now_str()
         with self._lock:
@@ -1277,6 +1383,7 @@ class LocalBackend:
         )
 
     def list_traces(self, result_id: UUID) -> List[TraceRecord]:
+        """Return the trace steps of a result, ordered by ``sequence``."""
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM traces WHERE result_id=? ORDER BY sequence ASC",
@@ -1574,6 +1681,7 @@ class LocalBackend:
         )
 
     def report_campaign_run(self, campaign_run_id: str) -> Optional[CampaignRun]:
+        """Return the campaign run ``campaign_run_id`` as a report row, or None."""
         with self._lock:
             row = self._conn.execute(
                 f"{self._REPORT_RUN} WHERE c.id=?", (campaign_run_id,)
@@ -1657,6 +1765,10 @@ class LocalBackend:
         return runs
 
     def report_goal_totals(self, campaign_run_ids: List[str]) -> List[GoalTotal]:
+        """Return each goal's attempt and bucket totals per campaign run.
+
+        Summed over the campaign run's attack runs, from the stored tallies.
+        """
         if not campaign_run_ids:
             return []
         with self._lock:
@@ -1683,6 +1795,7 @@ class LocalBackend:
         ]
 
     def report_goal_outcomes(self, campaign_run_id: str) -> List[GoalOutcome]:
+        """Return the per-goal outcome tallies of a campaign run's attack runs."""
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM goal_outcomes WHERE campaign_run_id=?",
@@ -1691,6 +1804,10 @@ class LocalBackend:
         return [_row_to_outcome(row) for row in rows]
 
     def report_goal_usage(self, campaign_run_id: str) -> List[GoalUsage]:
+        """Return the per-goal call and token tallies of a campaign run.
+
+        One row per attack run, goal and call label.
+        """
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM goal_usage WHERE campaign_run_id=?", (campaign_run_id,)
@@ -1698,6 +1815,11 @@ class LocalBackend:
         return [_row_to_usage(row) for row in rows]
 
     def report_latencies(self, run_ids: List[str]) -> List[Latency]:
+        """Return the distinct target latencies recorded per run.
+
+        Each row is one run and latency (milliseconds) with how many results
+        recorded it.
+        """
         if not run_ids:
             return []
         with self._lock:

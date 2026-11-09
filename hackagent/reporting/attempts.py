@@ -58,6 +58,7 @@ def attempt_page(
 
 
 def trace_item(trace: StructureTrace) -> dict[str, Any]:
+    """Render one trace step as it appears in a ``/structure`` response."""
     return {
         "id": trace.id,
         "result": trace.result_id,
