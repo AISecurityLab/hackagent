@@ -10,7 +10,11 @@ Direct goal submission without transformation (control condition).
 
 **Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
-Send the goal as a single user message.
+Send the goal, unmodified, as a single user message.
+
+One request per goal, judged by the campaign's evaluation panel. It is
+the control that measures how often the target complies without any
+jailbreak.
 
 ## Helper models
 

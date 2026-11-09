@@ -13,35 +13,46 @@ from .encodings import SUPPORTED_ENCODINGS
 
 
 class CipherChatParams(AttackParams):
-    """Cipher, demonstrations, and whether target replies are decoded."""
+    """Cipher, demonstrations, and whether target replies are decoded.
+
+    ``encode_method`` picks the cipher. ``use_system_role``,
+    ``use_demonstrations``, ``demonstration_toxicity``, ``instruction_type``,
+    ``language`` and ``num_demonstrations`` shape the system prompt that
+    teaches it, and ``decode_response`` controls whether the reply is
+    deciphered before judging. Validation rejects unknown ciphers and
+    demonstration topics.
+    """
 
     encode_method: str = Field(
         default="caesar-3",
         description=(
-            "Cipher used to encode the conversation, e.g. caesar-3, atbash, morse, "
-            "ascii, unicode or selfdefine. The target is told to reply in the same "
-            "cipher."
+            "Cipher used to encode the conversation: caesar-0 to caesar-25, atbash,"
+            " morse, ascii, unicode, utf, gbk, selfdefine, unchange (no cipher, "
+            "role prompt only) or baseline (plain text). The target is told to "
+            "reply in the same cipher."
         ),
     )
     use_system_role: bool = Field(
         default=True,
         description=(
-            "Put the cipher instructions in a system message instead of the user "
-            "message."
+            "Open the system prompt with the cipher's role prompt (\"You are an "
+            'expert on ..."). When off it is left out; enciphered demonstrations '
+            "are still sent as a system message."
         ),
     )
     use_demonstrations: bool = Field(
         default=True,
         description=(
             "Include example conversations written in the cipher, to teach the "
-            "target the format."
+            "target the format. Ignored for the baseline method."
         ),
     )
     demonstration_toxicity: Literal["toxic", "harmless"] = Field(
         default="toxic",
         description=(
             "Whether the example conversations are toxic or harmless. Toxic "
-            "examples push the target further toward unsafe replies."
+            "examples push the target further toward unsafe replies; harmless ones"
+            " exist only for Crimes_And_Illegal_Activities."
         ),
     )
     instruction_type: str = Field(
@@ -66,6 +77,7 @@ class CipherChatParams(AttackParams):
     @field_validator("encode_method")
     @classmethod
     def validate_encode_method(cls, value: str) -> str:
+        """Reject a cipher not in :data:`~.encodings.SUPPORTED_ENCODINGS`."""
         if value not in SUPPORTED_ENCODINGS:
             supported = ", ".join(sorted(SUPPORTED_ENCODINGS))
             raise ValueError(
@@ -76,6 +88,7 @@ class CipherChatParams(AttackParams):
     @field_validator("instruction_type")
     @classmethod
     def validate_instruction_type(cls, value: str) -> str:
+        """Reject a topic with no demonstrations."""
         if value not in DEMONSTRATIONS:
             supported = ", ".join(sorted(DEMONSTRATIONS))
             raise ValueError(

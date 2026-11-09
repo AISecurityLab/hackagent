@@ -10,7 +10,16 @@ Cipher-based prompt transformation with optional demonstrations.
 
 **Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
-One request carrying the enciphered goal and cipher instructions.
+Ask the goal in a cipher, after enciphered demonstrations, and decode the reply.
+
+Implements CipherChat (Yuan et al., ICLR 2024,
+[arXiv:2308.06463](https://arxiv.org/abs/2308.06463)): one request per
+goal whose system prompt casts the target as an expert in the cipher and
+whose user message carries the enciphered goal. The reply is deciphered
+when it looks enciphered and then judged once by the campaign's
+evaluation panel. The step-by-step algorithm and the deviations from
+the paper are documented in the module
+`hackagent.attacks.techniques.static.cipherchat.attack`.
 
 ## Helper models
 
@@ -22,10 +31,10 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `encode_method` | string | `caesar-3` | Cipher used to encode the conversation, e.g. caesar-3, atbash, morse, ascii, unicode or selfdefine. The target is told to reply in the same cipher. |
-| `use_system_role` | boolean | `true` | Put the cipher instructions in a system message instead of the user message. |
-| `use_demonstrations` | boolean | `true` | Include example conversations written in the cipher, to teach the target the format. |
-| `demonstration_toxicity` | one of `toxic`, `harmless` | `toxic` | Whether the example conversations are toxic or harmless. Toxic examples push the target further toward unsafe replies. |
+| `encode_method` | string | `caesar-3` | Cipher used to encode the conversation: caesar-0 to caesar-25, atbash, morse, ascii, unicode, utf, gbk, selfdefine, unchange (no cipher, role prompt only) or baseline (plain text). The target is told to reply in the same cipher. |
+| `use_system_role` | boolean | `true` | Open the system prompt with the cipher's role prompt ("You are an expert on ..."). When off it is left out; enciphered demonstrations are still sent as a system message. |
+| `use_demonstrations` | boolean | `true` | Include example conversations written in the cipher, to teach the target the format. Ignored for the baseline method. |
+| `demonstration_toxicity` | one of `toxic`, `harmless` | `toxic` | Whether the example conversations are toxic or harmless. Toxic examples push the target further toward unsafe replies; harmless ones exist only for Crimes_And_Illegal_Activities. |
 | `instruction_type` | string | `Crimes_And_Illegal_Activities` | Topic of the example conversations, e.g. Crimes_And_Illegal_Activities or Privacy_And_Property. |
 | `language` | one of `en`, `zh` | `en` | Language of the examples: en (English) or zh (Chinese). |
 | `num_demonstrations` | integer (>= 0) | `3` | How many example conversations to include. |

@@ -10,7 +10,14 @@ Prompt obfuscation via character/word flipping modes.
 
 **Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
-One system + user request carrying the flipped goal.
+Disguise the goal by flipping it and ask the target to unflip and solve it.
+
+Implements FlipAttack (Liu et al., 2024,
+[arXiv:2410.02832](https://arxiv.org/abs/2410.02832)): one request per
+goal, a system prompt with the flipping guidance and a user message with
+the flipped task, judged once by the campaign's evaluation panel. The
+flip modes, guidance options and deviations from the paper are
+documented in the module `hackagent.attacks.techniques.static.flipattack.attack`.
 
 ## Helper models
 
@@ -22,10 +29,10 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `flip_mode` | one of `FWO`, `FCW`, `FCS`, `FMM` | `FCS` | How the goal is flipped: FWO reverses word order, FCW reverses the characters inside each word, FCS reverses the whole sentence character by character, and FMM reverses the sentence but shows word-level flips as the example. |
-| `cot` | boolean | `false` | Add a chain-of-thought instruction asking the model to decode step by step. |
-| `lang_gpt` | boolean | `false` | Wrap the instructions in a structured LangGPT-style role prompt. |
-| `few_shot` | boolean | `false` | Include worked examples of flipping and un-flipping a sentence. |
+| `flip_mode` | one of `FWO`, `FCW`, `FCS`, `FMM` | `FCS` | How the goal is flipped: FWO reverses word order, FCW reverses the characters inside each word, FCS reverses the whole sentence character by character, and FMM (fool model mode) flips like FCS but describes and demonstrates word-order flips. |
+| `cot` | boolean | `false` | Add a chain-of-thought instruction asking the model to give its solution step by step. |
+| `lang_gpt` | boolean | `false` | Wrap the persona in a structured LangGPT-style role prompt and move the decoding steps into the user message. |
+| `few_shot` | boolean | `false` | Show the two halves of the goal flipped and unflipped as worked examples. The goal needs at least two words. |
 
 ## In a campaign file
 

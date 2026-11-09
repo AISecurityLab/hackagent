@@ -10,7 +10,15 @@ tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ,
 
 **Static.** Builds its prompts up front and sends them, without reading the target's replies, so it is cheap and repeatable.
 
-One text request with the flowchart serialized as code.
+Write helper-written steps for the goal as flowchart source code and ask for the details.
+
+HackAgent's text-only variant of FC-Attack (Zhang et al., Findings of
+EMNLP 2025, [arXiv:2502.21059](https://arxiv.org/abs/2502.21059)): the
+`attacker` role writes the goal's steps, they are serialized as DOT,
+Mermaid, TikZ, PlantUML or ASCII art, and one text request asks the
+target to complete the flowchart. That one attempt is judged by the
+campaign's evaluation panel. The step-by-step algorithm is documented
+in the module `hackagent.attacks.techniques.static.fc.attack`.
 
 ## Helper models
 
@@ -26,7 +34,7 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `layout` | one of `vertical`, `horizontal`, `tortuous`, `s_shaped` | `vertical` | Shape of the flowchart: vertical, horizontal, tortuous or s_shaped. |
+| `layout` | one of `vertical`, `horizontal`, `tortuous`, `s_shaped` | `vertical` | Shape of the flowchart: vertical, horizontal, or tortuous (s_shaped is an alias), a snake of three-node rows. |
 | `text_format` | one of `dot`, `mermaid`, `tikz`, `plantuml`, `ascii` | `dot` | Text language the flowchart is written in: dot, mermaid, tikz, plantuml or ascii. |
 | `num_steps` | integer (>= 1, <= 10) | `5` | How many of the generated steps the flowchart shows, from the first. The paper compares 1, 3, 5 and all (at most 10). |
 | `truncate_last_step` | boolean | `false` | Cut the last step off mid-sentence. Not part of FC-Attack, whose flowcharts keep every step whole. |

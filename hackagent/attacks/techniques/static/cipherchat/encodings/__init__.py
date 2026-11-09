@@ -1,7 +1,12 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""CipherChat encoding strategies."""
+"""CipherChat encoding strategies.
+
+Each cipher is an :class:`EncodeExpert`: it enciphers and deciphers text and
+supplies the system prompt that casts the target as an expert in it.
+:func:`create_encode_expert` builds one from an ``encode_method`` name.
+"""
 
 from .base import (
     BaselineExpert,

@@ -10,6 +10,7 @@ transformation techniques:
 - Mirror: renders text then flips horizontally
 - Rotate: renders text then rotates 180 degrees
 - Base64: encodes text to Base64 then renders the encoded string
+- Mixed: word replacement, then mirror and 180-degree rotation
 
 All images are returned as base64-encoded data URLs suitable for inclusion
 in multimodal LLM API requests.

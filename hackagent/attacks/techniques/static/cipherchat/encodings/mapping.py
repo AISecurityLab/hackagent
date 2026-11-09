@@ -23,6 +23,16 @@ class MappingExpert(EncodeExpert, ABC):
 
 
 class CharacterTranslationExpert(MappingExpert):
+    """A one-to-one character substitution between two alphabets.
+
+    Characters outside ``source_alphabet`` pass through unchanged. With
+    ``lowercase`` the text is lowercased before enciphering, for ciphers
+    that only map lowercase letters.
+
+    Raises:
+        ValueError: The alphabets differ in length or repeat a character.
+    """
+
     def __init__(
         self,
         source_alphabet: str,
@@ -44,14 +54,18 @@ class CharacterTranslationExpert(MappingExpert):
         self._decode_table = str.maketrans(cipher_alphabet, source_alphabet)
 
     def encode(self, text: str) -> str:
+        """Map every source character to its cipher character."""
         normalized = text.lower() if self.lowercase else text
         return normalized.translate(self._encode_table)
 
     def decode(self, text: str) -> str:
+        """Map every cipher character back to its source character."""
         return text.translate(self._decode_table)
 
 
 class ChineseSubstitutionExpert(CharacterTranslationExpert):
+    """``selfdefine``: each lowercase letter becomes one of 26 Chinese characters."""
+
     SOURCE_ALPHABET = "abcdefghijklmnopqrstuvwxyz"
     CIPHER_ALPHABET = "甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午未申酉戌亥天地人黄"
 
@@ -63,6 +77,7 @@ class ChineseSubstitutionExpert(CharacterTranslationExpert):
         )
 
     def system_prompt(self) -> str:
+        """Return the role prompt, with the letter-to-character mapping spelled out."""
         return CHINESE_SUBSTITUTION_SYSTEM_PROMPT_TEMPLATE.format(
             source_alphabet=self.SOURCE_ALPHABET,
             cipher_alphabet=self.CIPHER_ALPHABET,
@@ -70,6 +85,12 @@ class ChineseSubstitutionExpert(CharacterTranslationExpert):
 
 
 class CaesarExpert(CharacterTranslationExpert):
+    """``caesar-N``: shift every letter ``shift`` places, preserving case.
+
+    Raises:
+        TypeError: ``shift`` is not an integer.
+    """
+
     ALPHABET = "abcdefghijklmnopqrstuvwxyz"
 
     def __init__(self, shift: int = 3) -> None:
@@ -85,6 +106,7 @@ class CaesarExpert(CharacterTranslationExpert):
         )
 
     def system_prompt(self) -> str:
+        """Return the role prompt, with the shift and an enciphered example."""
         return CAESAR_SYSTEM_PROMPT_TEMPLATE.format(
             shift=self.shift,
             cipher_alphabet=self.encode(self.ALPHABET.upper()),
@@ -93,6 +115,8 @@ class CaesarExpert(CharacterTranslationExpert):
 
 
 class AtbashExpert(CharacterTranslationExpert):
+    """``atbash``: map the alphabet onto itself reversed (a to z, b to y, ...)."""
+
     ALPHABET = "abcdefghijklmnopqrstuvwxyz"
     REVERSED_ALPHABET = ALPHABET[::-1]
     SYSTEM_PROMPT = ATBASH_SYSTEM_PROMPT
@@ -105,6 +129,8 @@ class AtbashExpert(CharacterTranslationExpert):
 
 
 class TokenExpert(MappingExpert, ABC):
+    """A cipher that writes each character as a separate token."""
+
     @abstractmethod
     def encode_token(self, token: str) -> str:
         """Encode one token."""
@@ -115,18 +141,23 @@ class TokenExpert(MappingExpert, ABC):
 
 
 class AsciiExpert(TokenExpert):
+    """``ascii``: every character as its decimal code point, space-separated."""
+
     SYSTEM_PROMPT = ASCII_SYSTEM_PROMPT
 
     def encode_token(self, token: str) -> str:
+        """Return the decimal code point of one character."""
         return str(ord(token))
 
     def decode_token(self, token: str) -> str:
+        """Return the character for a decimal code, or the token if it is not one."""
         try:
             return chr(int(token))
         except (ValueError, OverflowError):
             return token
 
     def encode(self, text: str) -> str:
+        """Encode line by line, each code followed by a space."""
         encoded = ""
         for line in text.split("\n"):
             encoded += "".join(f"{self.encode_token(character)} " for character in line)
@@ -134,6 +165,7 @@ class AsciiExpert(TokenExpert):
         return encoded
 
     def decode(self, text: str) -> str:
+        """Decode every whitespace-separated token; line breaks are not kept."""
         return "".join(
             self.decode_token(token)
             for line in text.split("\n")
@@ -142,6 +174,12 @@ class AsciiExpert(TokenExpert):
 
 
 class MorseExpert(TokenExpert):
+    """``morse``: International Morse code, letters space-separated.
+
+    Text is uppercased first; a word gap is an extra space, and characters
+    with no Morse code pass through unchanged.
+    """
+
     SYSTEM_PROMPT = MORSE_SYSTEM_PROMPT
     TOKEN_MAP = {
         "A": ".-",
@@ -191,12 +229,15 @@ class MorseExpert(TokenExpert):
     REVERSE_TOKEN_MAP = {value: key for key, value in TOKEN_MAP.items()}
 
     def encode_token(self, token: str) -> str:
+        """Return the Morse code of one character, or the character itself."""
         return self.TOKEN_MAP.get(token, token)
 
     def decode_token(self, token: str) -> str:
+        """Return the character for a Morse code, or the token itself."""
         return self.REVERSE_TOKEN_MAP.get(token, token)
 
     def encode(self, text: str) -> str:
+        """Encode line by line, uppercasing first."""
         encoded_lines = []
         for line in text.upper().split("\n"):
             encoded = ""
@@ -208,6 +249,7 @@ class MorseExpert(TokenExpert):
         return "\n".join(encoded_lines) + "\n"
 
     def decode(self, text: str) -> str:
+        """Decode line by line; two or more spaces separate words."""
         decoded_lines = []
         for line in text.split("\n"):
             words = re.split(r"\s{2,}", line.strip()) if line.strip() else [""]
