@@ -132,6 +132,11 @@ class RobustnessSpec(_Spec):
     )
 
     def resolve(self) -> tuple[str, ...]:
+        """Return the wrapper names to apply, validated.
+
+        Raises:
+            ValueError: No wrapper is named, or a name is not a known wrapper.
+        """
         if not self.wrappers:
             raise ValueError("robustness.wrappers must name at least one wrapper.")
         unknown = [name for name in self.wrappers if name not in WRAPPERS]
@@ -387,6 +392,7 @@ class Robustness(_Report):
     @computed_field
     @property
     def passed(self) -> bool:
+        """Whether the share of verdicts any wrapper flipped stays within ``max_flip_rate``."""
         return self.any_wrapper_flip_rate <= self.max_flip_rate
 
 
@@ -441,6 +447,7 @@ class AuditReport(_Report):
         return all(checked) if checked else None
 
     def report_for(self, judge: str) -> Optional[JudgeReport]:
+        """Return the row for ``judge`` (a judge name, or the panel's), or ``None``."""
         return next((row for row in self.judges if row.judge == judge), None)
 
 
