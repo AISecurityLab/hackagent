@@ -3,7 +3,9 @@
 
 """TAP: a tree of attacker prompts, pruned twice per round.
 
-Based on: https://arxiv.org/abs/2312.02119
+Implements Mehrotra et al., "Tree of Attacks: Jailbreaking Black-Box LLMs
+Automatically" (2023, arXiv:2312.02119). See :mod:`.attack` for the
+algorithm.
 """
 
 from .attack import TAPAttack

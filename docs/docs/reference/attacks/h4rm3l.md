@@ -10,7 +10,18 @@ Composable decorator-program attack chaining multiple obfuscations, with an opti
 
 **Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
-A decorator program per goal, found by search when one is configured.
+Rewrite the goal with a composed decorator program, optionally synthesised against the target.
+
+Implements h4rm3l (Doumbouya et al., 2024,
+[arXiv:2408.04811](https://arxiv.org/abs/2408.04811)): without a
+`synthesizer` role it applies one program (a preset or a hand-written
+composition of decorators) to each goal and sends the result once; with
+one, it first searches for programs that work against this target,
+scoring each on a few goals with the campaign's evaluation panel, and
+then attacks every goal with the best `programs_per_goal` of them,
+stopping at the first success. The algorithm and the deviations from the
+paper are documented in the module
+`hackagent.attacks.techniques.adaptive.h4rm3l.attack`.
 
 ## Helper models
 

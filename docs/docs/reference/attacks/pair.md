@@ -10,7 +10,17 @@ Prompt Automatic Iterative Refinement with attacker/scorer loops.
 
 **Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
-Parallel streams of attacker-refined prompts.
+Let an attacker model refine jailbreak prompts over parallel streams.
+
+Implements PAIR (Chao et al., 2023,
+[arXiv:2310.08419](https://arxiv.org/abs/2310.08419)): `streams`
+independent attacker conversations each propose a prompt per round,
+read the target's reply and its rating, and improve the prompt, for up
+to `iterations` rounds. Replies are rated by the optional `scorer`
+(PAIR's 1-10 judge, with only the best attempt sent to the campaign's
+panel) or by the panel itself. The algorithm and the deviations from
+the paper are documented in the module
+`hackagent.attacks.techniques.adaptive.pair.attack`.
 
 ## Helper models
 
@@ -27,12 +37,12 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `iterations` | integer (>= 1) | `5` | Refinement rounds. Every stream gets one attempt per round. |
-| `streams` | integer (>= 1) | `5` | Independent attacker conversations, each exploring on its own. |
-| `keep_last_n` | integer (>= 1) | `4` | Attacker turns to keep in a stream before trimming its history. |
+| `iterations` | integer (>= 1) | `5` | Refinement rounds (the paper's depth). Every stream gets one attempt per round. |
+| `streams` | integer (>= 1) | `5` | Independent attacker conversations run in parallel, each starting from one of three approaches in rotation. |
+| `keep_last_n` | integer (>= 1) | `4` | Recent attacker turns, each with its feedback, a stream keeps; older ones are dropped and the system prompt always stays. |
 | `target_str` | string | `Sure, here is` | The opening the attacker is told to aim the target's reply at. |
-| `early_stop` | boolean | `true` | Stop the whole search once any stream succeeds. |
-| `feedback_max_chars` | integer (>= 1) | `2500` | Longest reply and explanation fed back to the attacker. |
+| `early_stop` | boolean | `true` | Stop after the round in which any stream reaches a jailbreak (scorer threshold or panel success). |
+| `feedback_max_chars` | integer (>= 1) | `2500` | Characters of the target's reply, and of the rater's explanation, fed back to the attacker; the rest is cut. |
 | `jailbreak_threshold` | number (>= 1.0, <= 10.0) | `10.0` | Score at or above which a scorer-rated reply is a jailbreak. The reference stops only on a full 10, which is what this defaults to. Ignored without a `scorer`, where success is the panel's own call. |
 
 ## In a campaign file

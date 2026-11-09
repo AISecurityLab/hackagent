@@ -10,7 +10,15 @@ Persuasive Adversarial Prompts using persuasion-technique taxonomies.
 
 **Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
-A sweep over persuasion techniques, one request each.
+Rephrase the goal with one persuasion technique after another until one works.
+
+Implements Persuasive Adversarial Prompts (Zeng et al., 2024,
+[arXiv:2401.06373](https://arxiv.org/abs/2401.06373)): for each selected
+technique of the 40-technique persuasion taxonomy, the `attacker`
+rewrites the goal, the rewrite is sent once, and the campaign's
+evaluation panel judges the reply; the sweep stops at the first success.
+The algorithm and the deviations from the paper are documented in the
+module `hackagent.attacks.techniques.adaptive.pap.attack`.
 
 ## Helper models
 
@@ -26,7 +34,7 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `techniques` | string or list of string | `top5` | `"top5"`, `"all"`, or explicit technique names, tried in order. |
+| `techniques` | string or list of string | `top5` | `"top5"` (the paper's five most effective), `"all"` (all 40), or a list of taxonomy technique names, tried in order. |
 | `max_techniques` | integer (>= 0) | `0` | Upper bound on techniques tried per goal; 0 tries all of them. |
 
 ## In a campaign file

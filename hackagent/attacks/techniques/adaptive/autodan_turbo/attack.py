@@ -23,7 +23,54 @@ The panel is the scorer: its 0-10 verdict drives the search and
 ``break_score`` ends it. Every judged attempt of the lifelong phase is
 reported.
 
-Based on: https://arxiv.org/abs/2410.05295
+Paper: Xiaogeng Liu, Peiran Li, Edward Suh, Yevgeniy Vorobeychik, et al.,
+"AutoDAN-Turbo: A Lifelong Agent for Strategy Self-Exploration to Jailbreak
+LLMs", 2024, [arXiv:2410.05295](https://arxiv.org/abs/2410.05295).
+
+Algorithm, with the parameters of :class:`~.config.AutoDANTurboParams`:
+
+1. **Warm-up** (:meth:`AutoDANTurboAttack.prepare`, once per run, skipped
+   with ``skip_warmup``). For each goal of the run, up to ``epochs`` times:
+   the ``attacker`` writes a prompt from the free-exploration system prompt
+   (its reply is read between ``[START OF JAILBREAK PROMPT]`` tags; a
+   refusal or failure falls back to the bare goal), the target answers as a
+   single user message, and the panel scores the reply; stop early at
+   ``break_score``. Then the ``summarizer`` compares the goal's
+   lowest- and highest-scoring prompts (or the bare goal against the best,
+   when nothing improved) and names the strategy behind the stronger one;
+   it is stored with the score gain, the winning prompt as its example, and
+   the ``embedder``'s vector of the weaker prompt's response.
+2. **Lifelong** (:meth:`AutoDANTurboAttack.search`, per goal), for
+   ``lifelong_iterations`` passes of ``epochs`` rounds:
+
+   - after the first round, embed the target's previous response and
+      retrieve the nearest strategies by L2 distance: a strategy whose
+      average gain is at least 5 is used alone, ones at least 2 are
+      offered to reuse, and otherwise the nearest are listed as ones to
+      avoid;
+   - the ``attacker`` writes a prompt from the matching system prompt
+      (reuse, avoid, or free exploration when the library is empty);
+   - send it, have the panel score the reply, and record the attempt;
+   - when the score beats the previous round's, summarise the previous
+      and the new prompt into a strategy and add it to the library;
+   - stop the goal once a score reaches ``break_score``.
+
+Deviations from the paper: the paper's scorer LLM is replaced by the
+campaign's evaluation panel, and the warm-up explores the campaign's own
+goals rather than a separate dataset. The library lives in memory for one
+run and starts empty; strategies are not persisted across runs, and no
+external human-written strategies can be injected. ``warmup_iterations`` is
+accepted but not read: warm-up makes a single pass over the goals.
+
+Roles: ``attacker`` (required) writes every prompt; ``summarizer``
+(required) names strategies; ``embedder`` (required, an embedding model)
+indexes them by response. numpy is needed for retrieval.
+
+Attempts and success: warm-up exchanges are run-scoped work and produce no
+attempt. Per goal, every lifelong prompt that got a usable reply is one
+attempt carrying its panel verdict and score; the goal succeeds when the
+panel calls any attempt a success (the search itself stops at
+``break_score``, which may differ from the panel's success threshold).
 """
 
 from __future__ import annotations
@@ -41,7 +88,19 @@ _REFUSAL = "Sorry, I cannot help you with that."
 
 
 class AutoDANTurboAttack(IterativeAttack[AutoDANTurboParams]):
-    """A lifelong strategy search over a shared, growing library."""
+    """Learn named jailbreak strategies across the run's goals and reuse them per goal.
+
+    Implements AutoDAN-Turbo (Liu et al., 2024,
+    [arXiv:2410.05295](https://arxiv.org/abs/2410.05295)): a warm-up pass
+    over every goal builds a strategy library from what the campaign's
+    evaluation panel scored highest, then each goal is attacked by an
+    ``attacker`` steered with the strategies retrieved for the target's last
+    response, while new strategies keep being summarised into the library.
+    Every lifelong attempt is judged by the panel; a goal stops at
+    ``break_score``. The algorithm and the deviations from the paper are
+    documented in the module
+    ``hackagent.attacks.techniques.adaptive.autodan_turbo.attack``.
+    """
 
     name = "autodan_turbo"
     params_type = AutoDANTurboParams
@@ -104,6 +163,12 @@ class AutoDANTurboAttack(IterativeAttack[AutoDANTurboParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Run the strategy-guided rounds for ``goal``; return every judged attempt.
+
+        Calls the ``attacker``, the target and the panel once per round, the
+        ``embedder`` to retrieve strategies, and the ``summarizer`` whenever
+        the score improves. Grows the shared library as a side effect.
+        """
         findings: list[Finding] = []
         prev_score, prev_prompt, prev_response = 1.0, goal, _REFUSAL
 
@@ -205,6 +270,7 @@ class AutoDANTurboAttack(IterativeAttack[AutoDANTurboParams]):
         self.library.add(strategy, example=strong["prompt"], score=delta, vector=vector)
 
     async def _embed(self, text: str) -> Optional[list[float]]:
+        """Embed ``text``; ``None`` when the embedder fails or returns nothing."""
         try:
             vectors = await self.embedder([text])
         except Exception:

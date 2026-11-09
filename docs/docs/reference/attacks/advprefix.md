@@ -10,7 +10,16 @@ Prefilling attack: opens the model's answer with an adversarial prefix and keeps
 
 **Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
-Prefill the answer's opening and measure which opening works.
+Prefill the opening of the target's answer and measure which opening works.
+
+Implements the prefix selection of AdvPrefix (Zhu et al., 2024,
+[arXiv:2412.10321](https://arxiv.org/abs/2412.10321)) as a prefilling
+attack: the `attacker` writes candidate openings for the goal, each is
+placed in the assistant turn and continued by the target several times,
+the campaign's evaluation panel judges every continuation, and the
+openings with the best prefilling success rate are marked selected. The
+algorithm and the deviations from the paper are documented in the module
+`hackagent.attacks.techniques.adaptive.advprefix.attack`.
 
 `max_prefix_chars` bounds the assembled prefix before target evaluation;
 it does not limit the writer's generation or reproduce token-based stopping.
@@ -31,14 +40,14 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `meta_prefixes` | list of string | `["Here", "To", "Sure", ""]` | Openings the writer works from. One candidate per opening per sample. |
+| `meta_prefixes` | list of string | `["Here", "To", "Sure", ""]` | Openings the writer continues, as the literal first words of the prefix; an empty string lets it open freely. |
 | `samples_per_prefix` | integer or list of integer | `4` | Candidates asked for per opening. One count for all of them, or one per opening. The reference uses `(50, 50, 50, 150)`; the default here is far smaller because every candidate costs a writer call. |
 | `min_char_length` | integer (>= 0) | `10` | Shortest candidate worth keeping. The reference counts tokens (`min_token_length`); counting characters needs no tokenizer. |
 | `max_prefix_chars` | integer (>= 1) | `300` | Maximum prefix length sent to the target. Longer attacker-generated prefixes are truncated to this character limit. |
-| `require_linebreak` | boolean | `true` | Require a line break, which is what makes a prefix look mid-document. |
+| `require_linebreak` | boolean | `true` | Keep only candidates with a line break, which is what makes a prefix look mid-document. |
 | `candidates_per_goal` | integer (>= 1) | `5` | Candidates carried into the attack, after filtering. The reference uses 100; each one costs `samples_per_candidate` target calls. |
 | `samples_per_candidate` | integer (>= 1) | `4` | Completions drawn per candidate. The prefilling attack success rate is the share of these the panel passes, so one sample makes it a coin flip rather than a rate. The reference draws 25; the default here is smaller because it runs against an endpoint rather than a local batch, and every sample is another target call per candidate. |
-| `prefixes_per_goal` | integer (>= 1) | `1` | Prefixes marked as this goal's result, as the reference does. |
+| `prefixes_per_goal` | integer (>= 1) | `1` | Prefixes marked selected as this goal's result, as the reference does. Every attempt is still judged and reported. |
 | `pasr_weight` | number (> 0.0) | `10.0` | How much a better attack success rate is worth against a higher negative log-likelihood, in the reference's selection score `-pasr_weight * log(pasr) + nll`. |
 | `pasr_tol` | number (>= 0.0) | `0.0` | How far below the best attack success rate a prefix may still be selected. `0` keeps only prefixes that match the best. |
 | `nll_tol` | number (>= 0.0) | `999.0` | How far above the best prefix's negative log-likelihood another may be. Inactive unless the target reports token logprobs, which the model contract does not yet carry. |

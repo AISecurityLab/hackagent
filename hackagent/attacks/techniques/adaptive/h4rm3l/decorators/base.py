@@ -42,6 +42,7 @@ class PromptDecorator:
         self._chain: list[PromptDecorator] = [self]
 
     def decorate(self, prompt: str) -> DecorationResult:
+        """Return the transformed prompt; model-backed decorators return an awaitable."""
         raise NotImplementedError
 
     def then(self, composing_decorator: "PromptDecorator") -> "PromptDecorator":
@@ -74,6 +75,11 @@ class LLMPromptDecorator(PromptDecorator):
         self._completion = completion
 
     async def prompt_model(self, prompt: str) -> str:
+        """Send ``prompt`` to the decorator model as one user message; return the reply.
+
+        Raises:
+            ValueError: The model returned an empty reply.
+        """
         text = await self._completion([{"role": "user", "content": prompt}])
         if not text.strip():
             raise ValueError(

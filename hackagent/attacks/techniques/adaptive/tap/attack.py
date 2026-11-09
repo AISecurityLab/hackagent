@@ -19,7 +19,52 @@ There are two prunes, and the order is the point:
 The best branch always survives the score prune. A round that pruned to
 nothing would end the search on one bad judging pass.
 
-Based on: https://arxiv.org/abs/2312.02119
+Paper: Anay Mehrotra, Manolis Zampetakis, Paul Kassianik, Blaine Nelson, et
+al., "Tree of Attacks: Jailbreaking Black-Box LLMs Automatically", 2023,
+[arXiv:2312.02119](https://arxiv.org/abs/2312.02119). Tree of Attacks with
+Pruning (TAP) extends PAIR (:mod:`..pair`) with tree-of-thought branching
+and an evaluator that prunes before and after each target query.
+
+Algorithm (one goal), with the parameters of :class:`~.config.TapParams`:
+
+1. Start ``streams`` root branches, each an attacker conversation holding
+   the TAP attacker system prompt for the goal and ``target_str`` and an
+   opening request.
+2. For each of ``depth`` levels:
+
+   - **Branch.** Ask the ``attacker`` for ``branching_factor`` refinements
+      of every surviving branch, each on its own copy of the parent's
+      conversation. A refinement must be a JSON turn with ``improvement``
+      and ``prompt``; the attacker gets up to ``max_attempts`` tries before
+      that child is dropped.
+   - **Prune off-topic.** With an ``on_topic`` role, ask it YES/NO whether
+      each new prompt still asks for the goal and drop the NOs (an
+      unreadable answer keeps the branch). If nothing is left, stop.
+   - **Attack and assess.** Send every remaining prompt to the target as
+      a fresh single-message conversation, have the campaign's evaluation
+      panel judge each usable reply, and feed reply and score back into the
+      branch's conversation, trimmed to the system prompt plus the last
+      ``keep_last_n`` attacker turns.
+   - With ``early_stop``, stop when any reply is a panel success.
+   - **Prune by score.** Shuffle (to break ties at random), rank by panel
+      score, keep the branches scoring above ``min_prune_score``, at most
+      ``width`` of them; when none scores above it, keep the single best.
+
+Deviations from the paper: the paper's defaults are depth 10, width 10
+and branching factor 4, with one GPT-4 evaluator doing both prunes; here
+the defaults are smaller, the off-topic check is a separate optional
+``on_topic`` role, and the score prune and the success decision use the
+campaign's panel. Feedback to the attacker carries the reply and the score,
+not the panel's explanation. With no judges every score is 0, so each round
+keeps a single random branch.
+
+Roles: ``attacker`` (required) writes every refinement; ``on_topic``
+(optional) filters off-topic prompts before they cost a target call.
+
+Attempts and success: every prompt that got a usable reply from the target
+is one attempt, judged by the campaign's evaluation panel and tagged with
+its position in the tree (``candidate_path``, ``parent_path``) and score.
+The goal succeeds when any attempt is a success.
 """
 
 from __future__ import annotations
@@ -57,9 +102,11 @@ class Branch:
 
     @property
     def score(self) -> float:
+        """The panel's score for the last reply; 0 when it was not judged."""
         return 0.0 if self.verdict is None else self.verdict.score
 
     def child(self) -> "Branch":
+        """A new branch under this one, with a copy of its conversation."""
         return Branch(
             conversation=[dict(turn) for turn in self.conversation],
             parent_path=self.path,
@@ -75,7 +122,17 @@ class Round:
 
 
 class TAPAttack(IterativeAttack[TapParams]):
-    """A pruned tree of attacker-refined prompts."""
+    """Grow a tree of attacker-refined prompts, pruning off-topic and low-scoring branches.
+
+    Implements Tree of Attacks with Pruning (Mehrotra et al., 2023,
+    [arXiv:2312.02119](https://arxiv.org/abs/2312.02119)): every round the
+    ``attacker`` branches each surviving prompt ``branching_factor`` ways,
+    the optional ``on_topic`` role drops prompts that drifted from the goal
+    before they reach the target, the campaign's evaluation panel judges
+    every reply, and only the best ``width`` branches continue, for up to
+    ``depth`` rounds. The algorithm and the deviations from the paper are
+    documented in the module ``hackagent.attacks.techniques.adaptive.tap.attack``.
+    """
 
     name = "tap"
     params_type = TapParams
@@ -90,6 +147,12 @@ class TAPAttack(IterativeAttack[TapParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Grow and prune the tree; return every attempt that got a usable reply.
+
+        Calls the ``attacker`` at least once per child, ``on_topic`` once per
+        child when configured, and the target and the panel once per kept
+        child.
+        """
         params = self.params
         branches = [self._root(goal) for _ in range(params.streams)]
         findings: list[Finding] = []
@@ -196,6 +259,7 @@ class TAPAttack(IterativeAttack[TapParams]):
         return kept
 
     async def _ask_on_topic(self, goal: str, prompt: str) -> Optional[bool]:
+        """Ask the ``on_topic`` role about one prompt; ``None`` when it gave no answer."""
         assert self.on_topic is not None
         messages = [
             {"role": "system", "content": prompts.on_topic_system_prompt(goal)},

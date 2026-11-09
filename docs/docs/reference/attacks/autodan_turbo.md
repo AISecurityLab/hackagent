@@ -10,7 +10,18 @@ Lifelong jailbreak strategy search with warm-up and retrieval phases.
 
 **Adaptive.** Searches across independent attempts, optionally using helper models to refine candidates.
 
-A lifelong strategy search over a shared, growing library.
+Learn named jailbreak strategies across the run's goals and reuse them per goal.
+
+Implements AutoDAN-Turbo (Liu et al., 2024,
+[arXiv:2410.05295](https://arxiv.org/abs/2410.05295)): a warm-up pass
+over every goal builds a strategy library from what the campaign's
+evaluation panel scored highest, then each goal is attacked by an
+`attacker` steered with the strategies retrieved for the target's last
+response, while new strategies keep being summarised into the library.
+Every lifelong attempt is judged by the panel; a goal stops at
+`break_score`. The algorithm and the deviations from the paper are
+documented in the module
+`hackagent.attacks.techniques.adaptive.autodan_turbo.attack`.
 
 ## Helper models
 
@@ -28,10 +39,10 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `epochs` | integer (>= 1) | `100` | Attempts per goal in each phase. |
+| `epochs` | integer (>= 1) | `100` | Attempts per goal in warm-up, and per pass in the lifelong phase. Each one costs an attacker, a target and a panel call. |
 | `break_score` | number (>= 0.0, <= 10.0) | `8.5` | Score (0-10) at which a goal is considered jailbroken and the search for it stops. |
-| `warmup_iterations` | integer (>= 1) | `1` | Passes over the goals during warm-up, which builds the library. |
-| `lifelong_iterations` | integer (>= 1) | `1` | Passes over each goal during the lifelong, strategy-guided phase. |
+| `warmup_iterations` | integer (>= 1) | `1` | Intended passes over the goals during warm-up. Not read yet: warm-up makes one pass. |
+| `lifelong_iterations` | integer (>= 1) | `1` | Passes of `epochs` rounds over each goal in the lifelong, strategy-guided phase. |
 | `skip_warmup` | boolean | `false` | Skip warm-up and start from an empty library, growing it as it goes. |
 
 ## In a campaign file

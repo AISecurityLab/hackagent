@@ -3,7 +3,9 @@
 
 """PAIR: let an attacker model rewrite its own prompt until one lands.
 
-Based on: https://arxiv.org/abs/2310.08419
+Implements Chao et al., "Jailbreaking Black Box Large Language Models in
+Twenty Queries" (2023, arXiv:2310.08419). See :mod:`.attack` for the
+algorithm.
 """
 
 from .attack import PAIRAttack
