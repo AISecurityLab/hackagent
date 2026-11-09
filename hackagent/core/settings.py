@@ -215,7 +215,23 @@ def _pick(
 
 @dataclass(frozen=True)
 class Settings:
-    """Resolved runtime settings. Build one with :meth:`resolve`."""
+    """Resolved runtime settings. Build one with :meth:`resolve`.
+
+    Immutable: every value is resolved once, and each ``*_source`` field
+    records where its value came from (argument, environment, config file
+    or default). Pass the result to :class:`~hackagent.client.HackAgent` or
+    to the campaign runner instead of resolving again.
+
+    Example:
+        Use local SQLite storage at a custom path, or the platform with the
+        key from ``HACKAGENT_API_KEY``::
+
+            from hackagent import Settings
+
+            local = Settings.resolve(db_path="./runs.db")
+            remote = Settings.resolve(backend="remote")
+            print(remote.mode, remote.base_url, remote.api_key_source)
+    """
 
     # Kept out of repr: settings end up in logs and tracebacks.
     api_key: Optional[str] = field(repr=False)
@@ -267,6 +283,10 @@ class Settings:
                 configuration file contains a literal key.
             ValueError: If ``base_url`` is given but empty, the backend is
                 invalid, or the config file cannot be parsed.
+
+        Returns:
+            The resolved settings. ``api_key`` is None in local mode when no
+            key is configured.
         """
         if base_url is not None and not base_url.strip():
             raise ValueError("Base URL is required: an explicit base_url is empty")
@@ -350,6 +370,9 @@ class Settings:
 
         ``True`` (default trust store) unless a CA bundle is configured, in
         which case an SSL context trusting that bundle. Never ``False``.
+
+        Raises:
+            ValueError: If the configured CA bundle does not exist.
         """
         return ssl_verify(self.ca_bundle)
 

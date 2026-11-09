@@ -1,11 +1,21 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Contains shared errors types that can be raised from API functions"""
+"""Exception types shared across the SDK.
+
+:class:`UnexpectedStatus` is raised by the generated HTTP client behind the
+remote storage backend. :class:`HackAgentError` and :class:`ApiError` are
+re-exported from :mod:`hackagent` for callers that wrap the SDK.
+"""
 
 
 class UnexpectedStatus(Exception):
-    """Raised by api functions when the response status an undocumented status and Client.raise_on_unexpected_status is True"""
+    """An HTTP response with a status the API schema does not document.
+
+    Raised by the generated HTTP client only when it was built with
+    ``raise_on_unexpected_status=True``; otherwise the response comes back
+    with ``parsed`` set to None. ``content`` is the raw response body.
+    """
 
     def __init__(self, status_code: int, content: bytes):
         self.status_code = status_code
@@ -16,13 +26,17 @@ class UnexpectedStatus(Exception):
 
 
 class HackAgentError(Exception):
-    """Base exception class for HackAgent errors"""
+    """Base class of the exceptions HackAgent defines for its callers."""
 
     pass
 
 
 class ApiError(HackAgentError):
-    """Raised when an API call fails"""
+    """A failed call to the HackAgent API.
+
+    Carries the server's ``status_code`` and decoded ``response`` body when
+    they are known.
+    """
 
     def __init__(
         self, message: str, status_code: int | None = None, response: dict | None = None
