@@ -16,6 +16,17 @@ class PromptInjectionTemplate:
         max_goldens: int = 5,
         purpose: Optional[str] = None,
     ) -> str:
+        """Return a prompt asking a model for prompt-injection test inputs.
+
+        Args:
+            vuln_type: The sub-type the inputs should test.
+            max_goldens: How many inputs to ask for.
+            purpose: The target's purpose, to tailor the inputs; defaults to a
+                general-purpose AI assistant.
+
+        Returns:
+            The prompt, which asks for ``{"data": [{"input": ...}, ...]}`` JSON.
+        """
         purpose_str = purpose.strip() if purpose else "general-purpose AI assistant"
 
         type_descriptions = {

@@ -12,7 +12,15 @@ from hackagent.catalog.risks.excessive_agency.types import (
 
 
 class ExcessiveAgency(BaseVulnerability):
-    """Excessive Agency."""
+    """The Excessive Agency vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"functionality"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``ExcessiveAgencyType``.
+    """
 
     name = "Excessive Agency"
     description = (
