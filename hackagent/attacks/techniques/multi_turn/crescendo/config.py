@@ -51,7 +51,10 @@ class CrescendoParams(AttackParams):
     feedback_max_chars: int = Field(
         default=2500,
         ge=1,
-        description="Longest reply and explanation fed back to the attacker.",
+        description=(
+            "Characters of the target's reply fed back to the attacker; the rest "
+            "is cut."
+        ),
     )
     attacker: Optional[Completion] = Field(
         default=None,

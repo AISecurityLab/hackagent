@@ -10,7 +10,16 @@ Multi-turn escalation attack that gradually steers a persistent conversation tow
 
 **Multi-turn.** Holds one growing conversation with the target, escalating turn by turn.
 
-One conversation with the target, escalated a turn at a time.
+Escalate one conversation with the target, backtracking on refusals.
+
+Implements Crescendo (Russinovich et al., 2024,
+[arXiv:2404.01833](https://arxiv.org/abs/2404.01833)), after PyRIT's
+reference implementation: the `attacker` writes each next question a
+little closer to the goal, the whole conversation is re-sent, a refused
+turn is dropped and rephrased while the backtrack budget lasts, and the
+campaign's evaluation panel judges every accepted reply. The algorithm
+and the deviations from the paper are documented in the module
+`hackagent.attacks.techniques.multi_turn.crescendo.attack`.
 
 ## Helper models
 
@@ -31,7 +40,7 @@ Settings for the algorithm itself, written under the attack's `parameters`. Anyt
 | `max_backtracks` | integer (>= 0) | `10` | Rephrasings allowed across the whole goal. Once spent, a refused turn is accepted as-is, judged like any other, and the conversation moves on. |
 | `keep_last_n` | integer (>= 1) | `6` | Attacker turns kept before its planning log is trimmed. The target's own conversation is never trimmed: that history is the attack. |
 | `early_stop` | boolean | `true` | Stop as soon as a turn passes the panel. |
-| `feedback_max_chars` | integer (>= 1) | `2500` | Longest reply and explanation fed back to the attacker. |
+| `feedback_max_chars` | integer (>= 1) | `2500` | Characters of the target's reply fed back to the attacker; the rest is cut. |
 
 ## In a campaign file
 

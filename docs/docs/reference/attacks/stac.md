@@ -12,6 +12,14 @@ Sequential tool attack chaining in a persistent conversation, verified by ordere
 
 Sequential Tool Attack Chaining with execution-based verification.
 
+Leads a tool-calling target through a preloaded chain of individually
+harmless tool calls, one scripted user turn per step, executes its calls
+in an in-memory sandbox, and succeeds only when the full chain ran in
+order and reached its terminal state (Li et al., 2025,
+[arXiv:2509.25624](https://arxiv.org/abs/2509.25624)). The algorithm and
+the deviations from the paper are documented in the module
+`hackagent.attacks.techniques.multi_turn.stac.attack`.
+
 Taxonomy: `multi_turn` + `indirect`. This v1 loads a declarative
 chain and runs only in-memory fixture tools. It does not synthesize
 arbitrary chains or execute host tools. The dataset goal must match the
@@ -28,7 +36,7 @@ prompt. Only user turns actually sent count toward `max_turns`.
 
 The fixtures illustrate FM4 (ignored constraints), FM5 (potential risks),
 and FM6 (incorrect parameters), rather than reproducing the paper's full
-benchmark. Based on https://arxiv.org/abs/2509.25624.
+benchmark.
 
 Run the shipped example from a checkout with
 `hackagent campaign run hackagent/examples/ollama/stac-local.yaml`.

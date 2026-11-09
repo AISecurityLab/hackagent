@@ -3,7 +3,9 @@
 
 """Crescendo: escalate one conversation instead of restarting it.
 
-Based on: https://arxiv.org/abs/2404.01833
+Implements Russinovich et al., "Great, Now Write an Article About That: The
+Crescendo Multi-Turn LLM Jailbreak Attack" (2024, arXiv:2404.01833). See
+:mod:`.attack` for the algorithm.
 """
 
 from .attack import CrescendoAttack
