@@ -224,13 +224,15 @@ class Settings:
 
     Example:
         Use local SQLite storage at a custom path, or the platform with the
-        key from ``HACKAGENT_API_KEY``::
+        key from ``HACKAGENT_API_KEY``:
 
-            from hackagent import Settings
+        ```python
+        from hackagent import Settings
 
-            local = Settings.resolve(db_path="./runs.db")
-            remote = Settings.resolve(backend="remote")
-            print(remote.mode, remote.base_url, remote.api_key_source)
+        local = Settings.resolve(db_path="./runs.db")
+        remote = Settings.resolve(backend="remote")
+        print(remote.mode, remote.base_url, remote.api_key_source)
+        ```
     """
 
     # Kept out of repr: settings end up in logs and tracebacks.
