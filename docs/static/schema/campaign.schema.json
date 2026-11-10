@@ -153,6 +153,7 @@
           "discriminator": {
             "mapping": {
               "inline": "#/$defs/InlineSource",
+              "intents": "#/$defs/IntentsSource",
               "preset": "#/$defs/PresetSource",
               "provider": "#/$defs/ProviderSource"
             },
@@ -167,6 +168,9 @@
             },
             {
               "$ref": "#/$defs/ProviderSource"
+            },
+            {
+              "$ref": "#/$defs/IntentsSource"
             }
           ],
           "title": "Source"
@@ -185,7 +189,7 @@
             }
           ],
           "default": null,
-          "description": "A model that labels each goal with the risk taxonomy. Only needed when ``selection.filters.categories`` is set. Off by default."
+          "description": "A model that labels each goal with the risk taxonomy. Only needed when ``selection.filters.categories`` is set for an unlabelled source. Bundled intents need no classifier. Off by default."
         }
       },
       "title": "CampaignDatasetSpec",
@@ -358,7 +362,7 @@
       "properties": {
         "categories": {
           "default": [],
-          "description": "Risk taxonomy categories or subcategories to keep, as a code (`E`, `E2`) or a name (`Cybersecurity Threats`). Matched on each goal's labels, so it needs `dataset.classifier`.",
+          "description": "Risk taxonomy categories or subcategories to keep, as a code (`E`, `E2`) or a name (`Cybersecurity Threats`). Matched on each goal's labels. Bundled intents already have labels; other sources need `dataset.classifier`.",
           "items": {
             "type": "string"
           },
@@ -816,6 +820,73 @@
       "title": "InlineSource",
       "type": "object"
     },
+    "IntentSelection": {
+      "additionalProperties": false,
+      "description": "One category of bundled OmniSafeBench goals.",
+      "properties": {
+        "category": {
+          "description": "Risk category code or name, e.g. `E`.",
+          "title": "Category",
+          "type": "string"
+        },
+        "subcategories": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Subcategory codes or names; omit to include the whole category.",
+          "title": "Subcategories"
+        },
+        "samples_per_subcategory": {
+          "default": 1,
+          "description": "Take up to this many bundled goals from each subcategory.",
+          "minimum": 1,
+          "title": "Samples Per Subcategory",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "category"
+      ],
+      "title": "IntentSelection",
+      "type": "object"
+    },
+    "IntentsSource": {
+      "additionalProperties": false,
+      "description": "Prelabelled OmniSafeBench goals shipped with HackAgent; no download.",
+      "properties": {
+        "type": {
+          "const": "intents",
+          "description": "Load bundled OmniSafeBench goals.",
+          "title": "Type",
+          "type": "string"
+        },
+        "selections": {
+          "description": "Categories and subcategories to include, in order.",
+          "items": {
+            "$ref": "#/$defs/IntentSelection"
+          },
+          "minItems": 1,
+          "title": "Selections",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "selections"
+      ],
+      "title": "IntentsSource",
+      "type": "object"
+    },
     "JudgeSpec": {
       "additionalProperties": false,
       "description": "A judge: a model that reads the target's reply and decides whether the\nattack succeeded, plus how its answer is scored.",
@@ -1244,5 +1315,342 @@
     "attacks"
   ],
   "title": "HackAgent campaign",
-  "type": "object"
+  "type": "object",
+  "x-hackagent-intent-categories": [
+    {
+      "code": "A",
+      "label": "Ethical and Social Risks",
+      "subcategories": [
+        {
+          "code": "A1",
+          "label": "Bias and Discrimination",
+          "count": 434
+        },
+        {
+          "code": "A2",
+          "label": "Insulting or Harassing Speech",
+          "count": 113
+        },
+        {
+          "code": "A3",
+          "label": "Hate Speech",
+          "count": 411
+        },
+        {
+          "code": "A4",
+          "label": "Discriminatory Behavior",
+          "count": 30
+        }
+      ]
+    },
+    {
+      "code": "B",
+      "label": "Privacy and Data Risks",
+      "subcategories": [
+        {
+          "code": "B1",
+          "label": "Personal Data Leakage",
+          "count": 250
+        },
+        {
+          "code": "B2",
+          "label": "Biometric or Health Data Exposure",
+          "count": 30
+        },
+        {
+          "code": "B3",
+          "label": "Doxxing or Tracking",
+          "count": 164
+        },
+        {
+          "code": "B4",
+          "label": "Surveillance Misuse",
+          "count": 30
+        },
+        {
+          "code": "B5",
+          "label": "Training Data Leakage",
+          "count": 30
+        }
+      ]
+    },
+    {
+      "code": "C",
+      "label": "Safety and Physical Harm",
+      "subcategories": [
+        {
+          "code": "C1",
+          "label": "Dangerous Instructions",
+          "count": 29
+        },
+        {
+          "code": "C2",
+          "label": "Self-harm Promotion",
+          "count": 30
+        },
+        {
+          "code": "C3",
+          "label": "Physical Harm",
+          "count": 599
+        },
+        {
+          "code": "C4",
+          "label": "Human Trafficking",
+          "count": 30
+        },
+        {
+          "code": "C5",
+          "label": "Animal Abuse",
+          "count": 132
+        },
+        {
+          "code": "C6",
+          "label": "Drug Guidance",
+          "count": 29
+        },
+        {
+          "code": "C7",
+          "label": "Environmental Damage",
+          "count": 28
+        }
+      ]
+    },
+    {
+      "code": "D",
+      "label": "Criminal and Economic Risks",
+      "subcategories": [
+        {
+          "code": "D1",
+          "label": "Fraud or Scams",
+          "count": 367
+        },
+        {
+          "code": "D2",
+          "label": "Economic Crime",
+          "count": 245
+        },
+        {
+          "code": "D3",
+          "label": "White-Collar Crime",
+          "count": 30
+        },
+        {
+          "code": "D4",
+          "label": "Illegal Activity",
+          "count": 345
+        },
+        {
+          "code": "D5",
+          "label": "Evasion of Law",
+          "count": 30
+        }
+      ]
+    },
+    {
+      "code": "E",
+      "label": "Cybersecurity Threats",
+      "subcategories": [
+        {
+          "code": "E1",
+          "label": "Malware Generation",
+          "count": 275
+        },
+        {
+          "code": "E2",
+          "label": "Exploit Development",
+          "count": 201
+        },
+        {
+          "code": "E3",
+          "label": "Phishing or Ransomware",
+          "count": 30
+        },
+        {
+          "code": "E4",
+          "label": "Jailbreak or Prompt Injection",
+          "count": 30
+        },
+        {
+          "code": "E5",
+          "label": "Cross-modal Attack",
+          "count": 30
+        },
+        {
+          "code": "E6",
+          "label": "Data Poisoning",
+          "count": 30
+        },
+        {
+          "code": "E7",
+          "label": "Unauthorized Model Access",
+          "count": 129
+        }
+      ]
+    },
+    {
+      "code": "F",
+      "label": "Information and Political Manipulation",
+      "subcategories": [
+        {
+          "code": "F1",
+          "label": "Misinformation or Disinformation",
+          "count": 30
+        },
+        {
+          "code": "F2",
+          "label": "Deepfakes or Synthetic Media",
+          "count": 30
+        },
+        {
+          "code": "F3",
+          "label": "Political Propaganda",
+          "count": 384
+        },
+        {
+          "code": "F4",
+          "label": "Election Interference",
+          "count": 30
+        },
+        {
+          "code": "F5",
+          "label": "Public Order Disruption",
+          "count": 30
+        },
+        {
+          "code": "F6",
+          "label": "National Security Threat",
+          "count": 30
+        }
+      ]
+    },
+    {
+      "code": "G",
+      "label": "Content and Cultural Safety",
+      "subcategories": [
+        {
+          "code": "G1",
+          "label": "Pornography or Nudity",
+          "count": 118
+        },
+        {
+          "code": "G2",
+          "label": "Sexual Content",
+          "count": 137
+        },
+        {
+          "code": "G3",
+          "label": "Violence or Gore",
+          "count": 152
+        },
+        {
+          "code": "G4",
+          "label": "Cultural or Religious Offense",
+          "count": 130
+        }
+      ]
+    },
+    {
+      "code": "H",
+      "label": "Intellectual Property and Ownership",
+      "subcategories": [
+        {
+          "code": "H1",
+          "label": "Copyright Infringement",
+          "count": 117
+        },
+        {
+          "code": "H2",
+          "label": "Trademark or Brand Misuse",
+          "count": 30
+        },
+        {
+          "code": "H3",
+          "label": "Proprietary Data Leakage",
+          "count": 127
+        },
+        {
+          "code": "H4",
+          "label": "Unauthorized Style or Persona Imitation",
+          "count": 30
+        }
+      ]
+    },
+    {
+      "code": "I",
+      "label": "Decision and Cognitive Risks",
+      "subcategories": [
+        {
+          "code": "I1",
+          "label": "Medical Advice",
+          "count": 321
+        },
+        {
+          "code": "I2",
+          "label": "Health Misguidance",
+          "count": 128
+        },
+        {
+          "code": "I3",
+          "label": "Legal Advice",
+          "count": 372
+        },
+        {
+          "code": "I4",
+          "label": "Government Decision Support",
+          "count": 308
+        },
+        {
+          "code": "I5",
+          "label": "Financial Advice",
+          "count": 290
+        },
+        {
+          "code": "I6",
+          "label": "Market Manipulation",
+          "count": 30
+        },
+        {
+          "code": "I7",
+          "label": "Psychological Manipulation",
+          "count": 114
+        },
+        {
+          "code": "I8",
+          "label": "Cognitive Bias or Overreliance",
+          "count": 30
+        }
+      ]
+    },
+    {
+      "code": "J",
+      "label": "Child Safety",
+      "subcategories": [
+        {
+          "code": "J1",
+          "label": "CSAM & Sexualization",
+          "count": 171
+        },
+        {
+          "code": "J2",
+          "label": "Grooming & Enticement",
+          "count": 147
+        },
+        {
+          "code": "J3",
+          "label": "Child Trafficking",
+          "count": 144
+        },
+        {
+          "code": "J4",
+          "label": "Harmful Content Targeting Minors",
+          "count": 161
+        },
+        {
+          "code": "J5",
+          "label": "Age Verification Evasion",
+          "count": 124
+        }
+      ]
+    }
+  ]
 }

@@ -14,6 +14,7 @@ from pydantic import (
 
 from hackagent.core.contracts import Goal
 from hackagent.datasets import taxonomy
+from hackagent.datasets.intents import load_goals_from_intents_config
 from hackagent.datasets.presets import PRESETS
 from hackagent.datasets.registry import load_goals_and_extra_fields_from_config
 
@@ -107,11 +108,74 @@ class ProviderSource(DatasetModel):
     )
 
 
+class IntentSelection(DatasetModel):
+    """One category of bundled OmniSafeBench goals."""
+
+    category: str = Field(description="Risk category code or name, e.g. `E`.")
+    subcategories: Optional[tuple[str, ...]] = Field(
+        default=None,
+        min_length=1,
+        description="Subcategory codes or names; omit to include the whole category.",
+    )
+    samples_per_subcategory: int = Field(
+        default=1,
+        ge=1,
+        strict=True,
+        description="Take up to this many bundled goals from each subcategory.",
+    )
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, value: str) -> str:
+        """Use the canonical category code."""
+        return taxonomy.resolve_category(value)
+
+    @field_validator("subcategories")
+    @classmethod
+    def validate_subcategories(
+        cls, values: Optional[tuple[str, ...]]
+    ) -> Optional[tuple[str, ...]]:
+        """Use unique canonical subcategory codes."""
+        if values is None:
+            return None
+        codes = tuple(taxonomy.resolve_subcategory(value) for value in values)
+        if len(set(codes)) != len(codes):
+            raise ValueError("Subcategories must not repeat")
+        return codes
+
+    @model_validator(mode="after")
+    def validate_parent(self) -> "IntentSelection":
+        """Keep every subcategory under its actual category."""
+        if any(
+            taxonomy.category_of(code) != self.category
+            for code in self.subcategories or ()
+        ):
+            raise ValueError("Every subcategory must belong to its selected category")
+        return self
+
+
+class IntentsSource(DatasetModel):
+    """Prelabelled OmniSafeBench goals shipped with HackAgent; no download."""
+
+    type: Literal["intents"] = Field(description="Load bundled OmniSafeBench goals.")
+    selections: tuple[IntentSelection, ...] = Field(
+        min_length=1, description="Categories and subcategories to include, in order."
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_categories(self) -> "IntentsSource":
+        """Prevent overlapping entries from duplicating goals."""
+        categories = [selection.category for selection in self.selections]
+        if len(set(categories)) != len(categories):
+            raise ValueError("Select each category only once")
+        return self
+
+
 #: Where goals come from. ``type`` picks the shape, so only the fields that
 #: belong to that shape exist — a preset source has no ``goals``, an inline one
 #: has no ``split``.
 DatasetSource = Annotated[
-    Union[PresetSource, InlineSource, ProviderSource],
+    Union[PresetSource, InlineSource, ProviderSource, IntentsSource],
     Field(discriminator="type"),
 ]
 
@@ -124,7 +188,7 @@ class DatasetFilters(DatasetModel):
         description=(
             "Risk taxonomy categories or subcategories to keep, as a code (`E`, "
             "`E2`) or a name (`Cybersecurity Threats`). Matched on each goal's "
-            "labels, so it needs `dataset.classifier`."
+            "labels. Bundled intents already have labels; other sources need `dataset.classifier`."
         ),
     )
 
@@ -231,6 +295,8 @@ class DatasetSpec(DatasetModel):
         """Which kind of source the fields present describe."""
         if "goals" in source:
             return "inline"
+        if "selections" in source:
+            return "intents"
         if "provider" in source:
             return "provider"
         return "preset"
@@ -277,6 +343,30 @@ class DatasetSpec(DatasetModel):
 
 def load_goals(spec: DatasetSpec) -> list[Goal]:
     """Load and select the goals ``spec`` describes."""
+    if isinstance(spec.source, IntentsSource):
+        texts, labels = load_goals_from_intents_config(
+            [
+                entry.model_dump(mode="json", exclude_none=True)
+                for entry in spec.source.selections
+            ]
+        )
+        goals = [
+            Goal(text=text, index=index, labels=labels[index])
+            for index, text in enumerate(texts)
+        ]
+        selection = spec.selection
+        # Label-based filters and their range are applied by the campaign runner.
+        if selection.filters.categories:
+            return goals
+        goals = goals[selection.start : selection.end]
+        if selection.shuffle:
+            random.Random(selection.seed).shuffle(goals)
+        goals = goals[: selection.limit]
+        if not goals:
+            raise ValueError("The dataset selection produced no goals.")
+        return [
+            goal.model_copy(update={"index": index}) for index, goal in enumerate(goals)
+        ]
     if isinstance(spec.source, InlineSource):
         texts: list[str] = [text for text in spec.source.goals if text.strip()]
         extra_by_index: dict[int, dict[str, Any]] = {}
