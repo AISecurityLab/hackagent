@@ -1,0 +1,70 @@
+---
+id: agent-retrieve
+title: "Retrieve an agent"
+description: "Returns one agent of the caller's organization. A cloud run's token may read its run's agent only."
+sidebar_label: "Retrieve an agent"
+hide_title: true
+hide_table_of_contents: true
+api: eJztGl1z2zbyr+zwbsZyhqKdXF5O7nRGTdyeG6fO2M71ocyYELkSUYMAC4BSVFf//WYB8EMfdnzXmZs+xA8JRQKL3cV+7z5EBZpc89pyJaNJdI220dKAkghsgdKCmoMtEXImBOojA0ovmOS/M9qQwBRyoZoCdCOPDFh1jxIqtgaNrABuTfgQQEmxTqI4UjVqt/+iiCaR+3an0WqOS4ziqGaaVWhRm2jyy8MOglP4+PHiLRiruVwAL1BaPl/Tsy25gSkBozM4La6ZLaM4kqzCaBLxIoojjb81XGMRTaxuMI5MXmLFoslDNFe6YjaaRE3jVtp1Tbv8SdFm84k2m1pJg4bWvzo9pf9yJS1KS4+srgXPHWUnvxpC92EAf5uOG9ScCf47BpyhUgUK4NJYJnMkXsKPN1c/AZMFLJngBbNooGCWwVxpyDUyy+UilUpDUxfuRwDVAUlSmcpb4otpj9NQa7XkBRpgkKuq1liiNHyJoLHWaFBaRwFdPJMeYpxKLnPRFI7n1gDxJgaURa24tLFDUqKxWECBlnFhHJIaBaN3R0OhOUolLT9SK4n6KKxjBXRSYWJYlVwgMCHUio7c3g/D7RdvTSoJxkpziwMgjvaptZrPGotmkkoA2JLeO48qjK4GL99zySsmuuvRxxO4RlaMSXgDjR4U/Q3YSjiQojhx3tOTt9zUgq0NVB5+y6YkoEXEdPh8NKg/aDXnAp+DzgCLHrM9dBy7DDTGiwAB/yJa9PeGSZghyEYI4PMeJpTMgFQeMITT/I/wpT3Fw/JqToIDozcl099zFMXxBG5LdOLUGhoPnJF4etXrUdn+G2GySGK4vLg9v7x8H8PVh/Ofphd3N2/fxfDD1dUPl+d307fvjp0cvEfLggR4PRs5uQ7H+1e5YMaALZn1pmRwtyul7w2suC0DMXNC3sDINrXAACW8swq8riBw6SjqABWgGls3dsDdC7/UAGlswXQRVDgAE/we4ajVs6MYjohVR3EPgHSBDtG7QrF9k/T5jj7f7aL+fUCb6GZ6CIhA50xKZWGGQ5m3UDTO/DojhCfO/Ax1D2ypVbModxk5INxZJd5Sf8QLIs7DK+6YI9WDDb8CnT2ALTIDv8jw15rwsNwbaV7sm96Pkv/WYOs7OEnvQPQIxq4rIJ5cSbFuncaOa2g9zO5BQbuAvsbQ+GNJioJgbJmIKI4q9vkS5cKW0eTV6WkcWW4FneNF4ic648DZrXTsn/9G1WuiLcuVnPNFkispMXentZuyM8CqtmtYlSiBt1otMTlEdsDnPGyGj9eXhzDqVf2/wok2ZDGQWkPmtTmLIQsKnpGNyXrFzp7C0HPs5u27k+nbd3BLmBzAcwuzXUS/14hji58tDN7vScoeTE/WPrjbgS0O9satbLzKxGTxCHLJ8nvWYu+U0QC3E8hIiDIY2dZeHceOh4F5GYyy4Ng1MS3wkrRGORSYEGvIumuPIWM1v7vHNT2WyArUxm3kFarGZsd7excog35n7lvmP5osGSKStGChagwZDmCQ/f3h39Pri+l3l+ebDDTOUaPMkUwlk1taAAZzjfYMBLeomSAL49SUCROs07wxWCTE6uHGfYZfFFuXteuR/xctPxA8uLBPiKu5C1X/hO3508gdNkFkNB474jHlGYZDj1idzTCQ/sVH1g6BT91SNfsVcxsdBhvCmoiC6n092ZKIPiaYoVByQR52H3u6HYo9npIDF/qsShXcVrGtyRTgsBlh6rnxCMO5tLhAHbUHPkMO6Nwv4XXwPvZOpJWH7/k2wAkRHi16AuRhkf4Sjn9ehXbEZutwT100IPIJWdqPkB8Rpcfv/KwLaRt5L9VKflkIyLx3Eco+t34mF9qL64qZ9tQtVlFQMyYz+5z76WOgZ50nmLGQl0wu/vdDdy5p4Mw777bFh0EEEg8sQbx7vYesZ6u1O8q0RfcTYuDcfLTZ7Pry6OodMe/16cs/kaFPJaDWlFlyWwKDsqmYHBPzSEIgyzyyWTYB1tiSDHoefHmNuuLG0HPq4ue5amThvKamixC84tZDN11oC4LnKA39X3FrErhRFYZFwIoilcqWqOEe1wZGrFvukWRFYSDL3I8si12WvkTN5wEpyFWBx/sBcm++doWLWVg5udJKLmKXUNaoaoGPxD3FAbP0nuUll9hzLWeNwdhHm0QNAnfFpglkgZ67LlXJYOSSetN6fWik5QKYr4d0DHCJhLFUoCooKuoANfLO8bILm6QtxZpKUqa1ay0Mii38EfXxAfp2dCIw7QnJPKd7eOuXHZDP9yQdxFUuHS0x4OeaoIOrhizVPRaD2Cem12zwwidWrd5BoZCidgssz7G2iRf+f3wV/q/C/xcUfvLLA1GmcjGJSaGcVE8cs/Ezq2oqARLCoa6sGms4lVWsK2fRl1YxXHHayapq7G5SEdTh9Vd1+KoOf0F1+KmViQkVTU2Tl+BBtPXDw60XJ9Sv/vlVqL8K9V9QqK+pIOxww2IC1NxbA5tb9G0C2VQzX/owmCtJJS4v6tk1rRxPaWUGviyVOOwM5o3mdu3y62ljy9Mff76d5jkac0veIZr88mkTP0TTDxfvcE0L2jfXjXQrundEFVuYLrkhMiu0paJu5AKta0HS2ujEfT954MUmIhT08nBT8l8sv/clR9cNpfxFi2gSldbWZnJywmqedIW9pMCly1Zbkm5IP72wDrF/iGbINOrv2xxu+uFi/A7XUWha0i34Ff110oEkrAcZtAfwx59vnwNsm4F7UK4bOfYnPAPWz0rfo34KnF/xfIi5UvccW2Cu7etf9Y1fg85UDbu6rObESpIsLufqcEGlv9bphwswVmk0fcJtYK0a0FiMLbIqDqa6qhlfyPCtkalkC0bKS58rZwlxiXpNPQBqWSuDXl015koXMNJoGmFNDFazHE1MXVmlrTlO4MKmkgmjwAmix6RH8fLyPSyYxRVbe1yYtSy/R+0O/bUpFqFw7Hs9qexxbQwmroWVdUKaufIz7XxzedEZ8P60gplypqhfxTSmctZwQf194Nb12/72N/iOGaQGgW9BI5Sq7VUuee5sGrOQPaoh2RmQEgbLwE1fNk6lLwQLZqlrTf02C6Nh0Pg4VK/Q2XEC01QaFPNxQCvY17YI3fHXUP3UI9LIAnUXfLKi0GhMDI1pqD6eyhmWnMridGrWcmG65Tjp5Tldf5+6ScSCep1evEOk21pD2q108PitPZwQlCzLUrn1eQLfeRDfrFWjd2T3Htffhk2pHMOLF+GlefHCeYa2OhYO7m931IYH2Yerm1s4ocq+bw2YUq0kteOUzL34rIHltu1jHCq8VXHf/WI21BQdiK1e+UeDXlvaHrZr6dJDK4teUam3SbRcqgUPOQLRM3LGD0LpeFvsYniH61wodg/unjsBICyGMmCOHV9Wvhs85IhBWRgafJnjivJt1UjbXacJGbjni1iDGOA2aa/CtG1Vzxvow57Yj0I0hi2Q9lLMR7AqJumNU2t/pI+qFmghe336MvOxRmDIdTNkR1Yybe++qTXO+edvk298i+XbzFPIjWnodhSlUe0oT9sNdFwx1BnnFfrwztcpunbhnEtuSjRBAHJKvYhub7X8JTDrLSGEjrIQjpCBwXJ4k5F48WLlzL9H/8ULOt3ZVYeZ/3ZkOiPSZ5FnhEx7Oh3lcO4pCuMgULWFl4oJKo7il0ovxGLjedzq9LCRYTqV9ha971HsZaFwzvLS68VglZLYB8jTDxepdPwj7TKeX66aa0JOYJ6cx5oMVzmpovGgAbbApFmhJnpeZwncWDaftxJlwsTPlikM/gZ97937vTi4FpLWRnosg9siEM6/bZMeGPeBLbjsDOElN0PF0W7yDBjUbIGTVGYPaeTwSqMJvH4VQxpJ/Ox+pdE3jRbfphG9rDUuuWoMfaDyPb0L2NCrX5Ik+bTJEpiaezIoNHzk9Y3OCbaNHjMYvRzPmMHiOIHzDi0/F+GU2q+7M/x3zMCwNRgVp9JBsCVyDRX7zKumOvMWA+esEdYfQ3tIll+eJpARGaGF2iKfeTdKyr8eWzVuvO80rr6REVkZuUvkDnOURctSF4Z7IQx5lEY3N5bAv/3QGN3inHHRUPAyyl6fnmbHULEakMQx1B/9/IS3AoIbm0o1hwoN2SETb1Vk6F4ornLMTSM3x+F3Oyftc4gkjT5taLbAI+UDDkLNFSlnVKShCUO/j4jNpJJ+NOXO78m2hsq2euWpxJ7We1xjAbN1uIJCWVpPHhtGGUnQbmM6jcj9X3lGBu7lTFN+spcBhwQ49NHnFkk+q92UL6PUMHNu+Q9SKdsY+APeI5NkEf6gt+PxGMK/9NPdAvzhTB6xDI31SZ67jDPikrMmroUUujndzpe0MxSQSTzaK3yyXEwDViSVXdzhM07Tg31FYKkWgdKN7tBuCnbo7pkcWmtne/qN/2gpebymF7fzYVu2xclLO2w0Q5c5u/hqkPcSEE/eyLF5AvtZ9HGPy2tPxPOrKN3Of3b30cj2YC7dEBq5aG8GaB7RdNBgxITT2NZBxq07LGIwlgtBARFfYo/gK3fMMDk+20uOn5MSEzwfVg/vZZSdLF+eJEniQjQy9KbVQC67yNWUrMbYG1j31ZvUJEm8QSU2D15tMjebclWjnF6MaWKUWe4qHYK7LAg/15h3Yf8bLzbOIpGB2erll26sb8YETaeSrwhCRn0Q+HgDhRKCaQMjg5jK7IfzWzgZAjipkG77DRPCOc+dMIK8eoFkDCj7UpqeQlSTSrpXJcEFxzMsmZjHPvQtmV74CIjmbGY4VxpDTdlXmYJZh1w5NU1lXmJOUcIgteuIGnlVCpOS7ds23lNLl0Ice4vi+MRy29CgiwcOBRZNTibMCcSKaR9s+kBGsEbmZZszpNJNbTZVe0zn5KAiGoZxe2D0SbA2XSzTi6K7smv/OczaDMSUKn4+dhnN1p1vexmfnp6SdShVo4/PBuEWlGyJqfRGWa1kDILYrGFGiah14LrKfh8AtTmp+xZiSDcD1btt8hstMsSZFsHWjlK8lkqvaqGwebiq1NeytnKlKI6oyuOrAKfJy+SUqgy1MrZirogSigrXYWCdyPdlpL2Bsq4u+/8Zqw+lDZpZO6kF49INEGhX+/QFrbbgFUcTXlDZi5Ifev3wQJHPRy02G3r9W4OaKm2f4mjJNPcTEVT14oaei2gyZ8LgEwSPrkMkcAzPndg/iH5brpFU9loy0dCvKI7uce0n+jefNnHkr9Sh6D9MXcA22LJXF98Mi34/nFMhjIUaUjizKziFB4J+EJ2HB7/Claw2mw47d22E4GbzH+X3VoQ=
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Retrieve an agent"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/agent/{id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns one agent of the caller's organization. A cloud run's token may read its run's agent only.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A UUID string identifying this Agent.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"description":"Serializes Agent model instances to JSON and validates data for creating\nor updating Agent instances.\n\nThis serializer provides a comprehensive representation of an Agent,\nincluding its type, endpoint, and nested details for related 'organization'\nand 'owner' for read operations, while allowing 'organization' and 'owner' IDs\nfor write operations.\n\nAttributes:\n    organization_detail (OrganizationMinimalSerializer): Read-only nested\n        serializer for the agent's organization. Displays minimal details.\n    owner_detail (UserProfileMinimalSerializer): Read-only nested serializer\n        for the agent's owner's user profile. Displays minimal details.\n        Can be null if the agent has no owner or the owner has no profile.\n    agent_type (CharField): The type of the agent as a string\n                      (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).\n\nMeta:\n    model (Agent): The model class that this serializer works with.\n    fields (tuple): The fields to include in the serialized output.\n        Includes standard Agent fields like 'endpoint', 'type',\n        and the read-only nested details.\n    read_only_fields (tuple): Fields that are read-only and cannot be\n        set during create/update operations through this serializer.\n        This includes 'id', 'created_at', 'updated_at', and the\n        nested detail fields.","properties":{"id":{"description":"Unique identifier of the agent.","format":"uuid","readOnly":true,"type":"string"},"name":{"description":"Display name, unique within the organization.","maxLength":200,"title":"Agent Name","type":"string"},"endpoint":{"description":"Copy of `config.connection.endpoint`; empty when it has none.","readOnly":true,"title":"Endpoint URL","type":"string"},"agent_type":{"description":"Copy of `config.connection.type`, e.g. `OPENAI`, `LITELLM` or `GOOGLE_ADK`.","readOnly":true,"title":"Agent SDK/ADK Type","type":"string"},"description":{"description":"Free-text description of the agent.","type":"string"},"config":{"description":"The agent's model configuration, as the hackagent SDK reads it: `name` (the model), `connection` (`provider`, `type`, and optionally `endpoint`, `api_key`, `headers`, `timeout`) and optionally `generation` and `options`. `connection.api_key` must be a `${VARIABLE}` reference to an organization secret; literal credentials are refused."},"organization":{"description":"Id of the agent's organization.","format":"uuid","readOnly":true,"type":"string"},"organization_detail":{"allOf":[{"properties":{"id":{"description":"Unique identifier of the organization.","format":"uuid","readOnly":true,"type":"string"},"name":{"description":"Name of the organization.","readOnly":true,"title":"Organization Name","type":"string"}},"required":["id","name"],"type":"object","title":"OrganizationMinimal"}],"description":"The organization the agent belongs to.","readOnly":true},"owner":{"description":"Id of the user who created the agent.","nullable":true,"readOnly":true,"type":"integer"},"owner_detail":{"allOf":[{"properties":{"user":{"description":"Id of the user.","readOnly":true,"type":"integer"},"username":{"description":"The user's username.","readOnly":true,"type":"string"},"organization":{"description":"Id of the user's organization.","format":"uuid","readOnly":true,"type":"string"}},"required":["organization","user","username"],"type":"object","title":"UserProfileMinimal"}],"description":"The user who created the agent; null if unknown.","nullable":true,"readOnly":true},"created_at":{"description":"When the agent was created.","format":"date-time","readOnly":true,"type":"string"},"updated_at":{"description":"When the agent was last changed.","format":"date-time","readOnly":true,"type":"string"}},"required":["agent_type","config","created_at","endpoint","id","name","organization","organization_detail","owner","owner_detail","updated_at"],"type":"object","title":"Agent"}}},"description":"OK"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"404":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Not found: no such object in the caller's organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

@@ -1,0 +1,76 @@
+---
+sidebar_label: Authentication
+description: Create a HackAgent API key and send it as a bearer token.
+---
+
+# Authentication
+
+Every request carries a credential in the `Authorization` header:
+
+```text
+Authorization: Bearer <api-key>
+```
+
+For scripts, CI and your own integrations, that credential is an **API key**. It acts as the user who created it, inside that user's organization, so it sees and changes what that user can.
+
+## Create an API key
+
+1. Sign in to the [dashboard](https://app.hackagent.dev) and open **API Keys** in the sidebar.
+2. Type a name for the key, such as `CI pipeline`, and select **Create Key**.
+3. Copy the key now. The dashboard shows it once and cannot show it again.
+
+Store the key like a password. The SDK and the CLI read it from the `HACKAGENT_API_KEY` environment variable, and so do the examples in these pages:
+
+```bash
+export HACKAGENT_API_KEY="<your key>"
+```
+
+A key looks like `<prefix>.<secret>`. The prefix is the part before the dot; the dashboard lists your keys by it, and the API names a key by it in [`/key/{prefix}`](./reference/key-retrieve.api.mdx).
+
+## Check a key
+
+[`GET /key/context`](./reference/key-context-retrieve.api.mdx) returns the user and organization a key acts as. It is a cheap way to check that a key works:
+
+```bash
+curl -sS https://api.hackagent.dev/key/context \
+  -H "Authorization: Bearer $HACKAGENT_API_KEY"
+```
+
+```json
+{"user_id": 42, "username": "ada", "organization_id": "6a1d4f0e-2b3c-4d5e-8f90-123456789abc", "organization_name": "Example Org"}
+```
+
+## Revoke a key
+
+Delete the key on the dashboard's **API Keys** page. Requests made with it get `401` from then on, and deleting cannot be undone. Create a new key before you delete the one a running system uses.
+
+## What an API key cannot do
+
+Account management needs the dashboard's login, not an API key. These endpoints answer an API key with `401` and `"API key authentication not allowed on this endpoint. Use session/login token authentication instead."`:
+
+- creating, listing and deleting API keys (`/key`, except `GET /key/context`), so a leaked key cannot create others;
+- the gateway usage logs (`/apilogs`);
+- the organization and user endpoints other than `GET /organization/me`, `GET /user/me` and `PUT /user/me`;
+- asking for more credits (`POST /credits/request`).
+
+Use the dashboard for these. Everything else in the API, including campaigns, runs, results and the LLM gateway, accepts an API key.
+
+## Other credentials
+
+You only need API keys, but the reference mentions three other bearer credentials:
+
+| Credential | Who uses it |
+|---|---|
+| Login token | The dashboard, after you sign in |
+| Run token | A HackAgent cloud run. It is issued when the run starts, expires when it finishes, and can only report on that run and call the LLM gateway |
+| Worker token | HackAgent's cloud worker, to pick up queued cloud runs |
+
+## When authentication fails
+
+A missing, malformed, expired or revoked credential gets `401` with a `WWW-Authenticate: Bearer` header and a `detail` message:
+
+```json
+{"detail": "Authentication credentials were not provided."}
+```
+
+Check that the header reads `Authorization: Bearer <key>`, with a single space and no quotes around the key, and that the key has not been deleted. A request whose credential is valid but not allowed to do something gets `403`; see [Errors, pagination and limits](./errors-and-limits.mdx).

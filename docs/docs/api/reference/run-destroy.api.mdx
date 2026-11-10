@@ -1,0 +1,70 @@
+---
+id: run-destroy
+title: "Delete a run"
+description: "Deletes a run with its results and traces. A campaign run is deleted with all its attack runs, and only when it and all of them are `COMPLETED`, `FAILED` or `CANCELLED` (409 otherwise: cancel it first). This cannot be undone. To delete several campaign runs at once, use `POST /run/delete`."
+sidebar_label: "Delete a run"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "delete api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Delete a run"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"delete"}
+  path={"/run/{id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Deletes a run with its results and traces. A campaign run is deleted with all its attack runs, and only when it and all of them are `COMPLETED`, `FAILED` or `CANCELLED` (409 otherwise: cancel it first). This cannot be undone. To delete several campaign runs at once, use `POST /run/delete`.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A UUID string identifying this Run.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"204":{"description":"Deleted."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this (for example a run token outside its own run, or a caller without an organization), or the installation is read-only because its license is not valid (`code: license_read_only`)."},"404":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Not Found"},"409":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"The campaign run or one of its attack runs is still active."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

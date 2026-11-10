@@ -1,0 +1,121 @@
+---
+sidebar_label: Errors, pagination and limits
+description: Error bodies and status codes, the pagination envelope, rate limits and credits.
+---
+
+# Errors, pagination and limits
+
+## Error bodies
+
+Every error is JSON, in one of these shapes.
+
+<Tabs groupId="error-shape">
+<TabItem value="detail" label="Most errors" default>
+
+Authentication, permission, not-found, conflict and rate-limit errors carry a human-readable `detail`, and sometimes a machine-readable `code`:
+
+```json
+{"detail": "Authentication credentials were not provided."}
+```
+
+</TabItem>
+<TabItem value="validation" label="Validation (400)">
+
+A request that fails validation maps each invalid field to its messages. Errors inside a JSON field, such as a campaign `spec` or an agent `config`, are keyed by their dotted path, and errors not about one field are under `non_field_errors`:
+
+```json
+{"name": ["This field is required."]}
+```
+
+```json
+{"spec": {"attacks.1.parameters.bogus": "Extra inputs are not permitted"}}
+```
+
+</TabItem>
+<TabItem value="launch" label="Refused launch (400)">
+
+A launch that fails its checks lists them in `problems`, the same objects the [preflight](./reference/campaign-preflight-retrieve.api.mdx) returns:
+
+```json
+{
+  "problems": [
+    {
+      "code": "INSUFFICIENT_CREDITS",
+      "message": "Your organization does not have enough credits for a cloud run.",
+      "details": {"balance": "0.42"}
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="gateway" label="LLM gateway">
+
+The [gateway](./llm-gateway.mdx#errors) answers its own errors in the shape OpenAI clients expect:
+
+```json
+{
+  "error": "Insufficient credits for this operation.",
+  "code": "INSUFFICIENT_CREDITS",
+  "details": "Estimated cost: 0.012000 USD, Available: 0.004000 USD. Please add credits to continue."
+}
+```
+
+</TabItem>
+</Tabs>
+
+Match on the status code and on `code` when there is one; the messages are for people and can change.
+
+## Status codes
+
+| Status | Means | What to do |
+|---|---|---|
+| `200`, `201` | Done; `201` when something was created | |
+| `204` | Done, no body (a delete) | |
+| `304` | Not modified: the `ETag` you sent in `If-None-Match` still holds | Keep the copy you have |
+| `400` | The request is invalid; nothing was changed | Fix the fields named in the body |
+| `401` | Missing, invalid, expired or revoked credential, or an API key on an endpoint that needs the dashboard's login | See [Authentication](./authentication.mdx#when-authentication-fails) |
+| `402` | Not enough credits for a gateway call | See [Credits](./llm-gateway.mdx#credits) |
+| `403` | The credential may not do this, for example a user without an organization | Check which user the key belongs to with `GET /key/context` |
+| `404` | No such object in your organization, or a page past the end of a list | Check the id and the path |
+| `409` | The run is not in a state that allows the call: already finished, still active, or already claimed | Read the run's `status`, then cancel it or wait |
+| `429` | Rate limited | Wait the seconds in the `Retry-After` header, then retry |
+| `500`, `502`, `503`, `504` | A server or upstream failure | Retry later, with backoff |
+
+The reference lists, for each operation, the statuses it can answer and why.
+
+## Pagination
+
+List endpoints return one page at a time:
+
+```json
+{
+  "count": 42,
+  "next": "https://api.hackagent.dev/agent?page=3",
+  "previous": "https://api.hackagent.dev/agent?page=1",
+  "results": []
+}
+```
+
+`count` is the total across all pages, and `next` and `previous` are ready-to-use URLs, or `null` at either end. Ask for a page with `page`, starting at 1. Pages hold 10 items, except where an endpoint accepts `page_size`:
+
+| Endpoint | Largest `page_size` |
+|---|---|
+| [`GET /result`](./reference/result-list.api.mdx), [`GET /run/{id}/goals`](./reference/run-goals-retrieve.api.mdx) | 1000 |
+| [`GET /run`](./reference/run-list.api.mdx), [`GET /run/summary`](./reference/run-summary-list.api.mdx), [`GET /run/{id}/attempts`](./reference/run-attempts-retrieve.api.mdx) | 100 |
+
+A larger `page_size` is lowered to the largest. A page past the end gets `404` on most lists; the run report lists (`/run/summary`, `/run/{id}/goals`, `/run/{id}/attempts`) treat an invalid page as page 1 instead. A few endpoints return everything at once, such as `GET /campaign/techniques` and `GET /run/{id}/matrix`. To read every page, follow `next` until it is `null`; [First request](./first-request.mdx#read-every-page) has a Python loop.
+
+## Rate limits
+
+Each user can make **1,000 requests an hour**, shared by all of the user's API keys and dashboard sessions. Past that, requests get `429` with a `Retry-After` header saying how many seconds to wait. The run report reads (`GET /run/summary` and the `/run/{id}/...` reports) count against a separate, larger budget, so a live view that polls a run does not use up the main one.
+
+Large campaigns that record their results from your machine make a request for every result and trace step, so they can reach the limit. To stay under it:
+
+- Poll [`GET /run/{id}/summary`](./reference/run-summary.api.mdx) with `If-None-Match`, and read the heavier reports only when its `revision` moves.
+- Ask for larger pages where `page_size` is accepted, and leave out what you do not need (`include_traces=false` on `GET /result`, `include_results=false` on `GET /run/{id}`).
+- Launch on HackAgent cloud: a cloud run's requests count against its own budget, not yours.
+
+## Credits
+
+Only the [LLM gateway](./llm-gateway.mdx#credits) is paid, from your organization's credit balance, and a cloud launch needs a minimum balance. Everything else in the API is free.

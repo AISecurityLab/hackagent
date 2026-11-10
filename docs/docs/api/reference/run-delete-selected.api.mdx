@@ -1,0 +1,69 @@
+---
+id: run-delete-selected
+title: "Delete campaign runs"
+description: "Deletes 1 to 100 campaign runs at once, with their attack runs, results and traces: all of them or none. 404 if any id is not a campaign run visible to the caller, 409 if any of them or of their attack runs is still `PENDING` or `RUNNING` (cancel them first). This cannot be undone. Accepts a login token or an API key."
+sidebar_label: "Delete campaign runs"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Delete campaign runs"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/run/delete"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Deletes 1 to 100 campaign runs at once, with their attack runs, results and traces: all of them or none. 404 if any id is not a campaign run visible to the caller, 409 if any of them or of their attack runs is still `PENDING` or `RUNNING` (cancel them first). This cannot be undone. Accepts a login token or an API key.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+  body={{"content":{"application/json":{"examples":{"DeleteTwoCampaignRuns":{"summary":"Delete two campaign runs","value":{"ids":["c7d8e9f0-1a2b-4c3d-9e4f-5a6b7c8d9e0f","0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"]}}},"schema":{"example":{"ids":["c7d8e9f0-1a2b-4c3d-9e4f-5a6b7c8d9e0f","0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"]},"properties":{"ids":{"description":"Ids of the campaign runs (1 to 100).","items":{"format":"uuid","type":"string"},"maxItems":100,"minItems":1,"type":"array"}},"required":["ids"],"type":"object","title":"CampaignRunSelectionRequest"}}},"required":true}}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"204":{"description":"Deleted, with their attack runs."},"400":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Bad Request"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this (for example a run token outside its own run, or a caller without an organization), or the installation is read-only because its license is not valid (`code: license_read_only`)."},"404":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Not Found"},"409":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Conflict"},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      
