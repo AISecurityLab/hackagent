@@ -2818,19 +2818,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/apilogs?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/apilogs?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -2853,19 +2853,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/agent?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/agent?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -2888,19 +2888,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/attack?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/attack?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -2923,19 +2923,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/campaign?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/campaign?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -2958,19 +2958,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/organization?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/organization?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -2993,19 +2993,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/result?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/result?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -3028,19 +3028,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/run?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/run?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -3063,19 +3063,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/secret?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/secret?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -3098,19 +3098,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/key?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/key?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -3133,19 +3133,19 @@
         "properties": {
           "count": {
             "description": "Total number of items across all pages.",
-            "example": 123,
+            "example": 42,
             "type": "integer"
           },
           "next": {
             "description": "URL of the next page, or null on the last page.",
-            "example": "http://api.example.org/accounts/?page=4",
+            "example": "https://api.hackagent.dev/user?page=3",
             "format": "uri",
             "nullable": true,
             "type": "string"
           },
           "previous": {
             "description": "URL of the previous page, or null on the first page.",
-            "example": "http://api.example.org/accounts/?page=2",
+            "example": "https://api.hackagent.dev/user?page=1",
             "format": "uri",
             "nullable": true,
             "type": "string"
@@ -5951,9 +5951,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "List gateway usage logs",
@@ -6032,9 +6029,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Retrieve a gateway usage log",
@@ -6140,9 +6134,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Summarize gateway usage by day",
@@ -7451,11 +7442,11 @@
                     }
                   },
                   "SpecNoLongerValid": {
-                    "description": "The saved spec fails validation with this API's SDK version.",
+                    "description": "The saved spec fails validation with this API's SDK version, here a parameter the PAIR technique does not take (`n_iterations`).",
                     "summary": "Spec no longer valid",
                     "value": {
                       "spec": {
-                        "attacks.1.parameters.iterations": "Extra inputs are not permitted"
+                        "attacks.1.parameters.n_iterations": "Extra inputs are not permitted"
                       }
                     }
                   }
@@ -7594,11 +7585,11 @@
               "application/json": {
                 "examples": {
                   "SpecNoLongerValid": {
-                    "description": "The saved spec fails validation with this API's SDK version.",
+                    "description": "The saved spec fails validation with this API's SDK version, here a parameter the PAIR technique does not take (`n_iterations`).",
                     "summary": "Spec no longer valid",
                     "value": {
                       "spec": {
-                        "attacks.1.parameters.iterations": "Extra inputs are not permitted"
+                        "attacks.1.parameters.n_iterations": "Extra inputs are not permitted"
                       }
                     }
                   }
@@ -8302,9 +8293,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "List API keys",
@@ -8409,9 +8397,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Create an API key",
@@ -8490,9 +8475,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Retrieve an API key",
@@ -8562,9 +8544,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Delete an API key",
@@ -8878,9 +8857,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "List organizations",
@@ -8966,9 +8942,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Create an organization",
@@ -9048,9 +9021,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Retrieve an organization",
@@ -9158,9 +9128,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Replace an organization",
@@ -9267,9 +9234,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Update an organization",
@@ -9340,9 +9304,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Delete an organization",
@@ -9516,46 +9477,39 @@
                   "ResultsOfAnAttackRun": {
                     "summary": "GET /result?run=<id>&include_traces=false",
                     "value": {
-                      "count": 123,
-                      "next": "http://api.example.org/accounts/?page=4",
-                      "previous": "http://api.example.org/accounts/?page=2",
+                      "count": 42,
+                      "next": "https://api.hackagent.dev/result?page=3",
+                      "previous": "https://api.hackagent.dev/result?page=1",
                       "results": [
                         {
-                          "count": 1,
-                          "next": null,
-                          "previous": null,
-                          "results": [
-                            {
-                              "agent_specific_data": {
-                                "attack_type": "pair",
-                                "iteration": 2
-                              },
-                              "detected_tool_calls": null,
-                              "evaluation_metrics": {
-                                "score": 1
-                              },
-                              "evaluation_notes": "The agent refused.",
-                              "evaluation_status": "FAILED_JAILBREAK",
-                              "goal": "<goal from the dataset>",
-                              "goal_index": 7,
-                              "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
-                              "latency_ms": 1840,
-                              "request_payload": {
-                                "messages": [
-                                  {
-                                    "content": "<adversarial prompt>",
-                                    "role": "user"
-                                  }
-                                ]
-                              },
-                              "response_body": "I can't help with that.",
-                              "response_headers": null,
-                              "response_status_code": 200,
-                              "run": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f70",
-                              "run_id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f70",
-                              "timestamp": "2026-11-02T09:52:13Z"
-                            }
-                          ]
+                          "agent_specific_data": {
+                            "attack_type": "pair",
+                            "iteration": 2
+                          },
+                          "detected_tool_calls": null,
+                          "evaluation_metrics": {
+                            "score": 1
+                          },
+                          "evaluation_notes": "The agent refused.",
+                          "evaluation_status": "FAILED_JAILBREAK",
+                          "goal": "<goal from the dataset>",
+                          "goal_index": 7,
+                          "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+                          "latency_ms": 1840,
+                          "request_payload": {
+                            "messages": [
+                              {
+                                "content": "<adversarial prompt>",
+                                "role": "user"
+                              }
+                            ]
+                          },
+                          "response_body": "I can't help with that.",
+                          "response_headers": null,
+                          "response_status_code": 200,
+                          "run": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f70",
+                          "run_id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f70",
+                          "timestamp": "2026-11-02T09:52:13Z"
                         }
                       ]
                     }
@@ -13020,9 +12974,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "List user profiles",
@@ -13107,9 +13058,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Create a user profile",
@@ -13189,9 +13137,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Retrieve a user profile",
@@ -13298,9 +13243,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Replace a user profile",
@@ -13407,9 +13349,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Update a user profile",
@@ -13480,9 +13419,6 @@
         "security": [
           {
             "Auth0JWTAccessToken": []
-          },
-          {
-            "APIKeyAuth": []
           }
         ],
         "summary": "Delete a user profile",
@@ -13795,21 +13731,35 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenerateErrorResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/GenerateErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorDetail"
+                    }
+                  ]
                 }
               }
             },
-            "description": "The caller has no organization to charge (`ORG_CONTEXT_MISSING`), or the credential may not call the gateway."
+            "description": "The caller has no organization to charge (gateway shape, `code: ORG_CONTEXT_MISSING`), or the API refused the call before the gateway (`{\"detail\": ...}`): the credential may not call it, or the installation is read-only (`code: license_read_only`)."
           },
           "429": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenerateErrorResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/GenerateErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorDetail"
+                    }
+                  ]
                 }
               }
             },
-            "description": "The model provider is busy (`PROVIDER_RATE_LIMITED`), or the caller is rate limited; retry after `Retry-After` seconds."
+            "description": "Retry after `Retry-After` seconds: the model provider is busy (gateway shape, `code: PROVIDER_RATE_LIMITED`), or the caller exceeded the API's rate limit (`{\"detail\": ...}`)."
           },
           "500": {
             "content": {
@@ -13970,7 +13920,7 @@
     {
       "description": "Runs: a campaign run (a parent run) and its attack runs (child runs). Read their status and results, cancel and delete them, read the campaign run reports the dashboard shows (summary, goals, matrix, attempts, costs, comparison) and, for executors, the claim, heartbeat, report and finish protocol.",
       "name": "run",
-      "x-displayName": "Runs"
+      "x-displayName": "Runs and reports"
     },
     {
       "description": "Results: one attempt of an attack against a goal, with the request sent to the agent, its response, the judges' evaluation and the trace of steps.",
@@ -14005,12 +13955,12 @@
     {
       "description": "The caller's organization, including its credit balance. Everything in HackAgent belongs to an organization.",
       "name": "organization",
-      "x-displayName": "Organizations"
+      "x-displayName": "Organization"
     },
     {
       "description": "The caller's user profile: name, email and preferences.",
       "name": "user",
-      "x-displayName": "Users"
+      "x-displayName": "User profile"
     },
     {
       "description": "Ask the HackAgent team for more credits.",

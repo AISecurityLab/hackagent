@@ -136,7 +136,7 @@ const sidebar: SidebarsConfig = {
     },
     {
       type: "category",
-      label: "Runs",
+      label: "Runs and reports",
       link: {
         type: "doc",
         id: "api/reference/run",
@@ -494,7 +494,7 @@ const sidebar: SidebarsConfig = {
     },
     {
       type: "category",
-      label: "Organizations",
+      label: "Organization",
       link: {
         type: "doc",
         id: "api/reference/organization",
@@ -546,7 +546,7 @@ const sidebar: SidebarsConfig = {
     },
     {
       type: "category",
-      label: "Users",
+      label: "User profile",
       link: {
         type: "doc",
         id: "api/reference/user",
