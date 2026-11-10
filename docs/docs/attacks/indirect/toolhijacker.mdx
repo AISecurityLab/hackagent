@@ -25,7 +25,7 @@ server), without touching the agent or the user's request.
 
 | Type | Helper models | Turns | Calls per goal | Good for |
 |---|---|---|---|---|
-| Indirect | `attacker` and `embedder` (both optional) | One target call per task phrasing per candidate description, each in a fresh chat | Up to 9 target calls with the defaults (3 phrasings × 3 candidates); no panel calls | Agents that choose from a tool library others can add to |
+| Indirect | `attacker` and `embedder` (both optional) | 1 (system + task), fresh chat per phrasing | Up to 9 target calls with the defaults (3 phrasings × 3 candidates); no panel calls | Agents that choose from a tool library others can add to |
 
 ## Research
 
@@ -40,7 +40,7 @@ Both are optimized against shadow task descriptions, a shadow retriever and a
 shadow LLM, either without gradients (an LLM writes R; a tree-of-attacks search
 refines S) or with them. Against GPT-4o, the gradient-free attack reached 96.7%
 success on MetaTool and 88.2% on ToolBench, where the best baseline reached
-39.3%. The defences tested (StruQ, SecAlign, perplexity-based detection) did not
+39.3% and 58.3%. The defences tested (StruQ, SecAlign, perplexity-based detection) did not
 stop it.
 
 HackAgent's version is a bounded, gradient-free variant:
@@ -62,13 +62,16 @@ HackAgent's version is a bounded, gradient-free variant:
 
 1. **Phrase the task.** The goal is a benign task. HackAgent tests it together
    with `paraphrases`, or with two templated rephrasings if you give none.
-   Duplicates are dropped.
+   Duplicates are dropped. `paraphrases` is shared by every goal, so give it
+   only for a one-goal dataset; leave it empty to get per-goal templated
+   rephrasings.
 2. **Write a candidate.** The first candidate uses the first built-in selection
    instruction. Each later one comes from the `attacker`, which sees the task,
    the phrasings, the tool name, the best description so far, its metrics and
    its per-phrasing outcomes. Without an attacker the next built-in instruction
    is used, and the search stops after three. At most `max_attempts`
-   candidates are tried.
+   candidates are tried. If an attacker call fails or returns an empty
+   description, the goal ends with an error and no verdict.
 3. **Poison the tool.** The injected description is `malicious_tool`'s
    description, then every task phrasing, then the instruction. Its name and
    parameters never change.
@@ -201,9 +204,15 @@ Each goal is a task the injected `support_helper` tries to take over. With no
 models the three built-in instructions are tried with the token retriever.
 With five tools and `top_k: 3`, retrieval is part of the test.
 
-Semantic retrieval and a refining attacker:
+Semantic retrieval and a refining attacker, on one task:
 
 ```yaml
+dataset:
+  source:
+    type: inline
+    goals:
+      - What is the weather forecast for Rome?
+
 attacks:
   - name: toolhijacker
     parameters:

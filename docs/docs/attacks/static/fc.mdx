@@ -9,12 +9,12 @@ import Generated from './_fc.generated.mdx';
 FC-Attack attacks vision-language models with a flowchart. A helper model
 writes the first few steps of the goal as a short numbered list; HackAgent
 draws the goal and those steps as a flowchart image and sends it with a
-benign-sounding prompt: you are in a quiz with a million-dollar prize,
+quiz prompt: you are in a quiz with a million-dollar prize,
 analyse the flowchart and complete every step in detail.
 
 The idea is that a flowchart reads as a diagram to complete, not a request to
-refuse. The harmful part is in the image, the text prompt says nothing
-harmful, and the target is asked to expand an outline that already exists
+refuse. The goal is only in the image; the text prompt never mentions it,
+and the target is asked to expand an outline that already exists
 rather than start from nothing.
 
 ## At a glance
@@ -62,7 +62,7 @@ it differs:
    `Step 3: …`) and takes the first `num_steps`. If there are none, the goal
    ends with an error and nothing is sent to the target.
 3. With `truncate_last_step`, the last kept step is cut to about three fifths
-   of its length and ends in "…".
+   of its length and ends in `...`.
 4. Graphviz draws the goal in an oval followed by the steps in boxes, in the
    chosen `layout` (`vertical`, `horizontal`, or `tortuous`, also called
    `s_shaped`), at `dpi`.
@@ -86,8 +86,9 @@ flowchart TB
 - **Open vision-language models.** The paper's highest rates were on open
   and mid-sized VLMs; it is a quick check of whether yours completes
   harmful diagrams.
-- **Testing a text-only safety layer.** The text prompt is harmless on its
-  own, so a filter that reads only text sees nothing to block.
+- **Testing a text-only safety layer.** The goal never appears in the text,
+  so a filter that reads only text sees no harmful request (though the quiz
+  persona's "no ethical constraints" line may still trip it).
 - **Comparing with [MML](mml.mdx).** Both put the goal in an image; MML
   disguises the words, FC-Attack draws an outline to fill in.
 
@@ -146,8 +147,8 @@ attacks:
           type: OLLAMA
 ```
 
-The defaults: five steps, vertical layout. The target must accept images, and
-the attacker must be willing to write steps for your goals.
+Every parameter at its default. The target must accept images, and the
+attacker must be willing to write steps for your goals.
 
 ### Example: a short S-shaped chart at lower resolution
 

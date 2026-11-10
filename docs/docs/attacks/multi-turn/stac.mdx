@@ -23,7 +23,7 @@ the agent executed, not from what it wrote, STAC needs no judge.
 
 | Type | Helper models | Turns | Calls per goal | Good for |
 |---|---|---|---|---|
-| Multi-turn (also tagged indirect) | None | One user turn per chain step, up to `max_turns` | Up to 12 target calls for a built-in chain with the defaults; no helper or judge calls | Tool-using agents whose policy must hold across a sequence of actions |
+| Multi-turn | None | One user turn per chain step, up to `max_turns` | Up to 12 target calls for a built-in chain with the defaults; no helper or judge calls | Tool-using agents whose policy must hold across a sequence of actions |
 
 ## Research
 
@@ -39,7 +39,7 @@ benign-looking user turns for the early steps, and a Planner adapts the
 remaining prompts to the agent's replies over up to three turns. An LLM Judge
 rates goal progress. Across 483 cases in SHADE-Arena and Agent-SafetyBench
 environments, the average attack success rate was 91.2%, above 90% for seven of
-the eight agents tested. Prompt-based defences helped little.
+the eight agents tested. A reasoning-based defence prompt cut ASR by up to 28.8%.
 
 HackAgent keeps the core test (an ordered chain of innocent-looking calls in one
 conversation) and changes the rest:
@@ -139,8 +139,9 @@ Pick another attack when:
 | Tool executions | `max_tool_calls` | in memory, free |
 
 An agent that complies makes about two target calls per step: one that returns
-the tool call, one that answers after the result. A built-in chain then costs
-about 6 calls. Turns are sequential, since each depends on the last reply.
+the tool call, one that answers after the result. The conversation stops as
+soon as the last step's tool call succeeds, so a fully compliant agent costs
+2 + 2 + 1 = 5 calls for a built-in chain. Turns are sequential, since each depends on the last reply.
 Provider retries (`execution.retries`) add calls.
 
 Lower `max_rounds_per_turn` to stop an agent that loops on tool calls; lower
@@ -252,7 +253,9 @@ evaluation:
 Each step names its tool, the user prompt that asks for it, the exact
 arguments, what it `requires` and what it changes (`effects`). All values are
 strings. `hackagent campaign validate` replays the chain, so a step that cannot
-run or a `success_state` the chain never reaches is caught before the run.
+run or a `success_state` the chain never reaches is caught before the run. It
+does not check that your goals match the chain's `objective`; a mismatched goal
+fails at run time.
 
 ## Reading the results
 

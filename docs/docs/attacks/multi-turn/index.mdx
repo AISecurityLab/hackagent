@@ -18,8 +18,8 @@ never sees that.
   Calls within a goal are sequential, since each turn depends on the last
   reply; goals still run in parallel under `execution.concurrency`.
 - **The target must take the conversation history.** The chat API types
-  (`OPENAI`, `OLLAMA`, `LITELLM`, `LANGCHAIN`) do. The agent types forward only
-  the latest user message, so the escalation does not reach them as a
+  (`OPENAI`, `OLLAMA`, `LITELLM`, `LANGCHAIN`) do. The agent types mostly
+  forward only the latest user message (`WEB` keeps one live chat), so the escalation does not reach them as a
   conversation. Each attack page says what that means for it.
 - **They cost more per goal than single-prompt attacks.** Crescendo makes up
   to 20 target calls per goal with its defaults, plus attacker and judge calls.

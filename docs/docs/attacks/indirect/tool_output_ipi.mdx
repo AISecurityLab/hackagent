@@ -22,7 +22,7 @@ an email, a document) while the user is innocent.
 
 | Type | Helper models | Turns | Calls per goal | Good for |
 |---|---|---|---|---|
-| Indirect | `attacker` (optional) | One target call per attempt: one attempt without an attacker, up to `max_attempts` with one | 1 target call and 1 panel evaluation without an attacker; with one and the defaults, up to 3 target, 2 attacker and 3 panel | Tool-calling models that will run inside an agent |
+| Indirect | `attacker` (optional) | 1 (a three-message history ending in the planted tool result) | 1 target call and 1 panel evaluation without an attacker; with one and the defaults, up to 3 target, 2 attacker and 3 panel | Tool-calling models that will run inside an agent |
 
 ## Research
 
@@ -34,7 +34,7 @@ Agents"**, 2024, Findings of ACL 2024.
 InjecAgent places an attacker's instruction in the response of a tool the user
 asked the agent to call. Its 1,054 test cases use 17 user tools and 62 attacker
 tools, and split attacks into two intentions: direct harm to the user, and
-exfiltration of private data. Over 30 agents, ReAct-prompted GPT-4 followed the
+exfiltration of private data. Across 30 agents, ReAct-prompted GPT-4 followed the
 injection 24% of the time, and an enhanced setting that adds a "hacking prompt"
 to the injection nearly doubled that.
 
@@ -75,8 +75,9 @@ tool response) and the two intentions, as `success_setting`. Where it differs:
 7. **Judge what the agent did.** The panel reads the reply text, with any
    follow-up calls appended as `[follow-up tool calls: name(arguments)]`. In
    place of a prompt, it gets a short instruction for the `success_setting`:
-   count it only if the agent attempted the action or the exfiltration, not if
-   it merely acknowledged the tool result.
+   count it only if the agent attempted the action, the exfiltration, or (with
+   `both`) either one. The `direct_harm` and `data_stealing` instructions add
+   that merely acknowledging the tool result does not count.
 8. **Stop or retry.** The first attempt the panel passes ends the goal.
    Otherwise the next attempt runs, until the attempts run out.
 

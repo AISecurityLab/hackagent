@@ -55,17 +55,17 @@ encryption). Where it differs:
 ## How it works
 
 1. The goal is encoded according to `encoding_mode`:
-   - `word_replacement` (the default) swaps `num_replacements` words for
+   - `word_replacement` swaps `num_replacements` words for
      neutral ones and draws the result;
    - `mirror` draws the goal and flips the image left to right;
    - `rotate` draws the goal and turns the image 180°;
    - `base64` draws the goal's Base64 encoding;
    - `mixed` swaps words like `word_replacement`, then mirrors and rotates.
-2. The text is drawn black on white (`text_color`, `background_color`) on an
-   image of `image_width` × `image_height` pixels, wrapped and centred.
+2. The text is drawn in `text_color` on `background_color`, on an image of
+   `image_width` × `image_height` pixels, wrapped and centred vertically.
 3. The text prompt is chosen from `encoding_mode` and `prompt_style`. `game`
    is the villain's-lair framing; `control` asks plainly for content for an
-   empty numbered list in the image. Both give step-by-step decryption
+   empty numbered list (the image shows only the disguised goal). Both give step-by-step decryption
    instructions, the goal's words in shuffled order and, for the replacement
    modes, the dictionary from neutral words back to the originals.
 4. One user message carries the text prompt and the image, as a PNG data URL.
@@ -136,8 +136,7 @@ attacks:
   - name: mml
 ```
 
-Word replacement with the game framing, against a vision model served by
-Ollama. The target must accept images; a text-only model cannot do the task.
+Every parameter at its default, against a vision model served by Ollama. The target must accept images; a text-only model cannot do the task.
 
 ### Example: mirrored text without the game framing
 
@@ -147,13 +146,11 @@ attacks:
     parameters:
       encoding_mode: mirror
       prompt_style: control
-      font_size: 32
 ```
 
-The paper's encryption-only ablation with a mirror: it tells you how much of a
-success comes from the disguise rather than the villain story. Larger text
-helps small models read the image, when Pillow finds a DejaVu font (see
-[Limitations](#limitations)).
+Close to the paper's encryption-only ablation with a mirror (the word-list hint
+stays on): it tells you how much of a success comes from the disguise rather
+than the villain story.
 
 ## Reading the results
 
@@ -190,6 +187,11 @@ first:
   find them. Without it,
   Pillow's built-in font is used at a fixed small size and `font_size` has no
   effect, which makes the text hard to read for small models.
+- **Long lines are cut at the right edge.** Lines are wrapped for glyphs half
+  as wide as `font_size`, and the DejaVu fonts are wider, so a full line runs
+  past the right edge of the image and its end is lost. Raising `image_width`
+  or `font_size` does not help, since the wrap scales with both. Read the
+  stored image to see what the target got.
 - **Long goals are cut.** Lines that do not fit the image height are dropped
   without warning. Base64 makes the text a third longer.
 - `mixed` mirrors and then rotates by 180°. Together the two amount to

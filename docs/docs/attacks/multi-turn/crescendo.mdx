@@ -23,7 +23,7 @@ across many turns, which a single-prompt test never exercises.
 
 | Type | Helper models | Turns | Calls per goal | Good for |
 |---|---|---|---|---|
-| Multi-turn | `attacker` (required), `refusal` (optional) | Up to `max_turns` kept turns, plus up to `max_backtracks` rephrased ones | Up to 20 target calls with the defaults | Chat assistants that refuse a direct request but keep answering follow-ups |
+| Multi-turn | `attacker` (required), `refusal` (optional) | Up to `max_turns` user turns in the conversation | Up to 20 target calls with the defaults | Chat assistants that refuse a direct request but keep answering follow-ups |
 
 ## Research
 
@@ -65,7 +65,7 @@ shared by the whole goal. Where HackAgent differs:
 3. HackAgent appends the question to the conversation and sends the whole
    conversation to the target.
 4. If the target gives no usable reply (a provider error, a guardrail block or
-   an empty reply), the turn is skipped: it counts toward `max_turns`, nothing
+   an empty reply), the turn is skipped: it counts toward `max_turns`, no attempt
    is recorded for it, and the attacker is asked to rephrase.
 5. The Refusal Judge (the `refusal` role, or the attacker model when you leave
    it out) reads the goal and the reply. Under the strict rubric, anything short

@@ -48,7 +48,7 @@ the fine-tuned generator, one layout per attack entry, and the optional
 2. HackAgent keeps the lines that look like steps and takes the first
    `num_steps`. If there are none, the goal ends with an error and nothing is
    sent to the target. With `truncate_last_step`, the last step is cut to
-   about three fifths of its length.
+   about three fifths of its length and ends in `...`.
 3. The goal and the steps are written as a flowchart in `text_format`
    (`dot`, `mermaid`, `tikz`, `plantuml` or `ascii`), shaped by `layout`
    (`vertical`, `horizontal`, or `tortuous`, also called `s_shaped`).
@@ -123,8 +123,8 @@ attacks:
           type: OLLAMA
 ```
 
-Five steps as a top-down Mermaid chart, a format most chat models have seen
-often. A good first run on a text-only target.
+A Mermaid chart with the default steps and layout, a format most chat models
+have seen often. A good first run on a text-only target.
 
 ### Example: a three-step ASCII drawing
 
@@ -154,8 +154,8 @@ prompt and the generator's reply), `target` (whose request shows the
 flowchart code) and `panel`. The dashboard's cost view counts one attacker
 call per goal for tFC-Attack.
 
-Read the flowchart in the target request first, since it shows exactly what
-the generator wrote:
+Read the `attacker` reply first: it shows what the generator wrote. The target
+request shows the steps the flowchart kept:
 
 - **No usable steps:** the attempt has the error "the step-description
   generator wrote no numbered steps". Pick a different `attacker`.

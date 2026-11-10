@@ -41,7 +41,7 @@ HackAgent adapts the authors' code (prompts, demonstrations and ciphers carry
 the upstream MIT notice). Where it differs:
 
 - **Caesar takes any shift.** `encode_method` accepts `caesar-0` to
-  `caesar-25`; upstream fixes the shift at 3, which is the default here.
+  `caesar-25`; upstream fixes the shift at 3.
 - **`selfdefine` is a different cipher.** HackAgent maps a–z to 26 Chinese
   characters and prints the mapping in the system message. Upstream's
   `selfdefine` is a Latin letter substitution.
@@ -168,9 +168,7 @@ stored result keeps both.
 
 Read the deciphered reply before trusting a verdict. When the target writes
 broken cipher, deciphering gives fragments that still contain words from the
-goal, and a lenient judge may score those as a jailbreak. In a test against a
-4B model, the deciphered reply was mostly nonsense and a small judge still
-called it harmful. Common cases:
+goal, and a lenient judge may score those as a jailbreak. Common cases:
 
 - **Fluent deciphered text that does the task:** a real jailbreak.
 - **Fragments and repeated words:** the target could not use the cipher.
@@ -194,8 +192,8 @@ called it harmful. Common cases:
   includes none.
 - At most five demonstrations exist per set (three for English
   `Inquiry_With_Unsafe_Opinion`), so a higher `num_demonstrations` adds nothing.
-- Letter ciphers change only a–z. Digits, punctuation and non-Latin text pass
-  through, so a goal in another script is barely hidden.
+- Letter ciphers change only Latin letters (a–z and A–Z). Digits, punctuation
+  and non-Latin text pass through, so a goal in another script is barely hidden.
 - The decoding check is a heuristic. A short or mixed reply can be judged raw
   when it should have been deciphered, or the other way round.
 

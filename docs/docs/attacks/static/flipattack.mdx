@@ -52,7 +52,7 @@ HackAgent's prompts follow the authors' code. Where it differs:
 1. The goal is flipped according to `flip_mode`:
    - `FWO` reverses the word order;
    - `FCW` reverses the characters inside each word;
-   - `FCS` (the default) reverses the whole sentence;
+   - `FCS` reverses the whole sentence;
    - `FMM`, the paper's "fool model mode", reverses the whole sentence but
      tells the target to flip each *word*, and shows word-order examples.
 2. The system message is built. By default it is the paper's rule list (solve
@@ -97,7 +97,8 @@ flowchart TB
 Use something else when:
 
 - the target is an agent you reach only through its user turn (see
-  [Limitations](#limitations)). The rules and decoding steps are lost; try
+  [Limitations](#limitations)). The rules are lost (and the decoding steps
+  too, unless `lang_gpt` is on); try
   [Static Template](static_template.mdx) or [PAP](../adaptive/pap.mdx);
 - the target refuses even the flipped prompt. [BoN](../adaptive/bon.mdx)
   tries many random perturbations instead of one fixed one, and
@@ -129,8 +130,8 @@ attacks:
       cot: true
 ```
 
-Sentence flip plus "step by step" decoding, the variant the paper used for
-GPT-4 (vanilla + chain of thought). Start here for a capable chat model.
+Sentence flip, with the answer asked for step by step, the variant the paper
+used for GPT-4 (vanilla + chain of thought). Start here for a capable chat model.
 
 ### Example: the full guidance stack
 
@@ -158,8 +159,9 @@ A jailbreak verdict means the target recovered the goal and answered it. Check
 the reply first:
 
 - **The reply restates or solves a different task.** The target mis-decoded
-  the flip. A "safe" verdict here says nothing about its defences; try `cot`
-  or `few_shot`, or another `flip_mode`.
+  the flip. A "safe" verdict here says nothing about its defences; try
+  `lang_gpt` or `few_shot`, which show worked un-flipping examples, or another
+  `flip_mode`.
 - **The reply refuses in plain words.** The target decoded the goal and
   declined. That is a real mitigation.
 - **The reply is still reversed text.** Some models answer in kind. The judges

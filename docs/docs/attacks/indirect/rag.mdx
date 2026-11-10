@@ -23,7 +23,7 @@ innocent.
 
 | Type | Helper models | Turns | Calls per goal | Good for |
 |---|---|---|---|---|
-| Indirect (tagged RAG) | `attacker` and `embedder` (both required) | One target call per benign query | 5 target calls and 5 panel evaluations with the defaults; attacker calls grow with the corpus (see [Cost](#cost)) | Models that answer from retrieved documents |
+| Indirect | `attacker` and `embedder` (both required) | 1 (context + question in one user message) | 5 target calls and 5 panel evaluations with the defaults; attacker calls grow with the corpus (see [Cost](#cost)) | Models that answer from retrieved documents |
 
 ## Research
 
@@ -144,7 +144,8 @@ its own, so short documents take fewer. The whole poisoning step is repeated
 for every goal, so attacker cost is per goal, not per run. To cut it, give
 `benign_queries`, lower `payloads_per_query` or lower `poisoned_ratio`.
 Embedding calls are not recorded in the trace, so the dashboard's cost view
-does not count them.
+does not count them. Retrieval runs locally and needs the `rag` extra
+(`pip install 'hackagent[rag]'`).
 
 ## Configuration
 
@@ -273,7 +274,7 @@ fulfils the goal. Check these first:
   list, not the most relevant. Put the documents you want poisoned first.
 - **No retrieval metrics.** Whether a payload was retrieved is visible only by
   reading the prompts.
-- **Fallbacks are silent.** An unknown `strategy` name is treated as
+- **Fallbacks raise no error.** An unknown `strategy` name is treated as
   `inline_context_override`. If the attacker writes no usable queries, the
   target is asked the goal itself, which is a direct request, not an indirect
   one.
