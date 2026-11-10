@@ -24,7 +24,8 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, model_validato
 from hackagent.attacks.techniques.registry import ATTACKS
 from hackagent.core.contracts import NORMALIZED_SCORE_MAX
 from hackagent.datasets.calibration import CalibrationSpec
-from hackagent.datasets.config import DatasetSpec
+from hackagent.datasets.config import DatasetSpec, IntentsSource
+from hackagent.datasets.intents import intent_catalog
 from hackagent.datasets.labelling import BATCH_SIZE
 from hackagent.evaluation.audit import RobustnessSpec
 from hackagent.evaluation.judges import EVALUATOR_MAP
@@ -193,14 +194,18 @@ class CampaignDatasetSpec(DatasetSpec):
         default=None,
         description=(
             "A model that labels each goal with the risk taxonomy. Only needed when"
-            " ``selection.filters.categories`` is set. Off by default."
+            " ``selection.filters.categories`` is set for an unlabelled source. Bundled intents need no classifier. Off by default."
         ),
     )
 
     @model_validator(mode="after")
     def validate_category_filter(self) -> "CampaignDatasetSpec":
-        """Require ``dataset.classifier`` when the selection filters by category."""
-        if self.selection.filters.categories and self.classifier is None:
+        """Require a classifier for label filters on unlabelled sources."""
+        if (
+            self.selection.filters.categories
+            and self.classifier is None
+            and not isinstance(self.source, IntentsSource)
+        ):
             raise ValueError(
                 "selection.filters.categories matches the taxonomy labels goals "
                 "get from 'dataset.classifier'; configure one."
@@ -557,6 +562,7 @@ def campaign_json_schema() -> dict[str, Any]:
     """
     schema = CampaignSpec.model_json_schema()
     schema["title"] = "HackAgent campaign"
+    schema["x-hackagent-intent-categories"] = intent_catalog()
     return {"$schema": "https://json-schema.org/draft/2020-12/schema", **schema}
 
 

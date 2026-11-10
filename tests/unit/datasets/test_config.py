@@ -156,3 +156,88 @@ def test_category_filter_precedes_range():
     )
     assert [goal.text for goal in selected] == ["3", "5"]
     assert [goal.index for goal in selected] == [0, 1]
+
+
+def test_bundled_intents_load_without_dataset_provider(monkeypatch):
+    from hackagent.datasets.intents import intent_catalog, intents_of
+
+    def unavailable(*args, **kwargs):
+        raise AssertionError("A bundled source must not load an external provider")
+
+    monkeypatch.setattr(
+        "hackagent.datasets.config.load_goals_and_extra_fields_from_config", unavailable
+    )
+    spec = DatasetSpec.model_validate(
+        {
+            "source": {
+                "type": "intents",
+                "selections": [
+                    {
+                        "category": "Cybersecurity Threats",
+                        "subcategories": ["E2"],
+                        "samples_per_subcategory": 3,
+                    },
+                    {"category": "B", "subcategories": ["B1"]},
+                ],
+            },
+            "selection": {"start": 1, "end": 4, "shuffle": True, "seed": 2},
+        }
+    )
+    goals = load_goals(spec)
+    assert len(goals) == 3
+    assert [goal.index for goal in goals] == [0, 1, 2]
+    for goal in goals:
+        code = goal.labels["subcategory"].split(".")[0]
+        assert goal.text in intents_of(code)
+    assert {goal.labels["subcategory"].split(".")[0] for goal in goals} == {"E2", "B1"}
+    catalog = intent_catalog()
+    assert len(catalog) == 10
+    assert all(
+        sub["count"] == len(intents_of(sub["code"])) > 0
+        for category in catalog
+        for sub in category["subcategories"]
+    )
+
+
+def test_bundled_intents_category_defaults_and_label_filter():
+    from hackagent.datasets.config import select_goals
+    from hackagent.datasets import taxonomy
+    from hackagent.orchestrator.campaign.spec import (
+        CampaignDatasetSpec,
+        campaign_json_schema,
+    )
+
+    spec = CampaignDatasetSpec.model_validate(
+        {
+            "source": {"selections": [{"category": "A"}]},
+            "selection": {"filters": {"categories": ["A2"]}},
+        }
+    )
+    assert spec.classifier is None
+    assert len(load_goals(spec)) == len(taxonomy.subcategories("A"))
+    goals = select_goals(load_goals(spec), spec.selection)
+    assert len(goals) == 1
+    assert goals[0].labels == taxonomy.labels("A2")
+    assert campaign_json_schema()["x-hackagent-intent-categories"][0]["code"] == "A"
+
+
+@pytest.mark.parametrize(
+    "selections",
+    [
+        [],
+        [{"category": "unknown"}],
+        [{"category": "A", "subcategories": []}],
+        [{"category": "A", "subcategories": ["B1"]}],
+        [{"category": "A", "subcategories": ["A1", "Bias and Discrimination"]}],
+        [{"category": "A"}, {"category": "Ethical and Social Risks"}],
+    ]
+    + [
+        [{"category": "A", "samples_per_subcategory": count}]
+        for count in [0, -1, 1.5, True]
+    ],
+)
+def test_invalid_bundled_intent_selections(selections):
+    with pytest.raises(ValueError):
+        DatasetSpec.model_validate(
+            {"source": {"type": "intents", "selections": selections}}
+        )

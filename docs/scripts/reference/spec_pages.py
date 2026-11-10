@@ -32,6 +32,8 @@ def _sections() -> dict[str, list[tuple[type[BaseModel], str]]]:
         DatasetFilters,
         DatasetSelection,
         InlineSource,
+        IntentsSource,
+        IntentSelection,
         PresetSource,
         ProviderSource,
     )
@@ -45,6 +47,8 @@ def _sections() -> dict[str, list[tuple[type[BaseModel], str]]]:
             (s.CampaignDatasetSpec, "dataset"),
             (PresetSource, "dataset.source (type: preset)"),
             (InlineSource, "dataset.source (type: inline)"),
+            (IntentsSource, "dataset.source (type: intents)"),
+            (IntentSelection, "dataset.source.selections[]"),
             (ProviderSource, "dataset.source (type: provider)"),
             (DatasetSelection, "dataset.selection"),
             (DatasetFilters, "dataset.selection.filters"),
@@ -110,11 +114,13 @@ INTROS = {
         "A **goal** is one thing you want the target to do and it should refuse, "
         "such as *Explain how to pick a lock*. The `dataset` section says where "
         "the goals come from and which of them to run.\n\n"
-        "Goals arrive in three ways, chosen with `source.type`: from a built-in "
+        "Goals arrive in four ways, chosen with `source.type`: from bundled "
+        "OmniSafeBench **intents** selected by category and subcategory, a built-in "
         "**preset**, from a **provider** such as a HuggingFace dataset or a "
-        "local file, or written **inline** in the campaign file.\n\n"
+        "local file, or written **inline** in the campaign file. Bundled intents "
+        "need no dataset download, Hugging Face dependency, or category classifier.\n\n"
         "`source.type` decides which other fields exist — a preset source takes "
-        "a `preset` and nothing else, an inline one takes `goals`. Anything "
+        "a `name`, an inline one takes `goals`, and intents take `selections`. Anything "
         "belonging to another type is rejected rather than quietly ignored."
     ),
     "target": (
@@ -153,6 +159,24 @@ INTROS = {
 
 EXAMPLES: dict[str, list[tuple[str, Any]]] = {
     "dataset": [
+        (
+            "Bundled OmniSafeBench goals by category, without a download",
+            {
+                "dataset": {
+                    "source": {
+                        "type": "intents",
+                        "selections": [
+                            {
+                                "category": "E",
+                                "subcategories": ["E2", "E3"],
+                                "samples_per_subcategory": 3,
+                            },
+                            {"category": "B"},
+                        ],
+                    }
+                }
+            },
+        ),
         (
             "A built-in benchmark, 10 goals, sampled the same way every run",
             {
