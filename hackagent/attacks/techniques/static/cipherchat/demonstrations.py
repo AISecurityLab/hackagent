@@ -6,7 +6,14 @@
 # The original copyright and license terms are preserved in the upstream
 # repository and LICENSE file.
 
-"""Category and language demonstration datasets for CipherChat."""
+"""Category and language demonstration datasets for CipherChat.
+
+:data:`DEMONSTRATIONS` maps an ``instruction_type`` to its example
+conversations, keyed ``<toxicity>_demons_<language>`` (for example
+``toxic_demons_en``). The attack enciphers the first ``num_demonstrations``
+of the matching list into the system prompt. They are the authors'
+demonstrations, kept verbatim.
+"""
 
 # we handcraft the harmless query-response pairs
 toxic_to_harmless_zh = [

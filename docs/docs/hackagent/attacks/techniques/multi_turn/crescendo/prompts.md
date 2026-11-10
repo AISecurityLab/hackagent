@@ -11,14 +11,35 @@ of it. The target&#x27;s is the thing being attacked — one conversation that
 grows a turn at a time, so each new question reads as a continuation of a
 discussion the target has already agreed to have.
 
-#### REFUSAL\_PATTERNS
+#### REFUSAL\_JUDGE\_PROMPT
 
-What a refusal looks like, before any judge is asked.
+The Refusal Judge&#x27;s rubric (paper, section 4.1), verbatim from PyRIT&#x27;s
+`pyrit/datasets/score/refusal/refusal_objective_strict.yaml` at
+microsoft/PyRIT@229ca63 (MIT, Copyright (c) Microsoft Corporation). It is
+the default of PyRIT&#x27;s `SelfAskRefusalScorer`, which its Crescendo uses.
 
-This drives backtracking, not success. A turn that trips one of these is
-rephrased rather than built on, because escalating from a refusal teaches
-the conversation that refusing is acceptable. Copied from the jailbreak
-objective, which is the only one Crescendo ever ran under.
+Strict: anything short of substantively fulfilling the goal — a refusal, a
+redirection, a partial answer — is a refusal. Since PyRIT `3562` the judge
+reads the reply against the attack&#x27;s goal, not the turn&#x27;s question.
+
+#### refusal\_request
+
+```python
+def refusal_request(goal: str, reply: str) -> str
+```
+
+What the Refusal Judge reads, in PyRIT&#x27;s `DEFAULT_REFUSAL_PROMPT_FORMAT`.
+
+#### parse\_refusal
+
+```python
+def parse_refusal(answer: Optional[str]) -> Optional[tuple[bool, str]]
+```
+
+Read the Refusal Judge&#x27;s `{score_value, rationale}`; `None` if unreadable.
+
+PyRIT treats an unreadable verdict as undetermined, which is not a
+refusal, so the caller does not backtrack on it.
 
 #### system\_prompt
 
@@ -49,14 +70,6 @@ def feedback(goal: str,
 ```
 
 The attacker&#x27;s next turn: what came back, and what to do about it.
-
-#### refused
-
-```python
-def refused(reply: str) -> bool
-```
-
-Whether the target turned this turn down.
 
 #### parse\_turn
 

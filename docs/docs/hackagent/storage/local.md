@@ -43,6 +43,24 @@ def flush() -> None
 
 No-op: local writes are synchronous (mirrors RemoteBackend.flush).
 
+#### link\_campaign\_run
+
+```python
+def link_campaign_run(campaign_run_id: UUID, campaign_id: UUID) -> None
+```
+
+Record that the dashboard launched a campaign run, and from which
+saved campaign. The launch stays recorded if the campaign is deleted.
+
+#### delete\_campaign
+
+```python
+def delete_campaign(campaign_id: UUID) -> None
+```
+
+Delete a saved campaign; the runs launched from it are kept, and
+their reports, which name the campaign, change.
+
 #### count\_result\_buckets
 
 ```python
@@ -50,6 +68,70 @@ def count_result_buckets() -> dict
 ```
 
 Return \{total, jailbreaks, mitigated, error, pending\} via SQL.
+
+#### report\_campaign\_runs
+
+```python
+def report_campaign_runs(*,
+                         campaign: Optional[str] = None,
+                         agent: Optional[str] = None,
+                         status: Optional[str] = None,
+                         page: int = 1,
+                         page_size: int = 100) -> PaginatedResult[CampaignRun]
+```
+
+Campaign runs, newest first (`created_at` desc, then `id`).
+
+#### report\_previous\_candidates
+
+```python
+def report_previous_candidates(current: CampaignRun) -> List[CampaignRun]
+```
+
+The completed runs of `current`&#x27;s campaign created up to it, newest
+first: a superset of its `previous` that the reporting rule narrows.
+
+#### report\_revisions
+
+```python
+def report_revisions(campaign_run_ids: List[str]) -> Dict[str, int]
+```
+
+The current revision of each campaign run that exists.
+
+#### report\_attack\_runs
+
+```python
+def report_attack_runs(campaign_run_ids: List[str],
+                       *,
+                       full: bool = False) -> List[AttackRun]
+```
+
+The attack runs of campaign runs. Without `full` only id, parent,
+status and creation are read. With it, `attack_configuration` is the
+attack&#x27;s stored configuration, unredacted, and `family` is unset:
+the caller completes both.
+
+#### report\_attempts
+
+```python
+def report_attempts(
+        run_ids: List[str], goal_index: int, *, page: int,
+        page_size: int) -> Tuple[List[Attempt], int, Optional[FirstSuccess]]
+```
+
+One page of a goal&#x27;s attempts in `created_at`, `id` order, their
+count, and the first jailbreak with its position.
+
+#### report\_structure
+
+```python
+def report_structure(
+        run_id: str,
+        goal_index: int) -> Tuple[List[StructureResult], List[StructureTrace]]
+```
+
+Every attempt of a goal in one attack run, in full, and their traces.
 
 #### save\_builder\_draft
 

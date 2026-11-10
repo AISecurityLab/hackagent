@@ -28,7 +28,6 @@ _STATIC = (
     "static_template",
     "flipattack",
     "cipherchat",
-    "h4rm3l",
     "mml",
     "fc",
     "tfc",
@@ -37,6 +36,7 @@ _STATIC = (
 _ADAPTIVE = (
     "pair",
     "tap",
+    "h4rm3l",
     "pap",
     "bon",
     "advprefix",

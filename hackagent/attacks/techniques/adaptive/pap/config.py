@@ -23,12 +23,18 @@ class PAPParams(AttackParams):
 
     techniques: Union[str, List[str]] = Field(
         default="top5",
-        description='``"top5"``, ``"all"``, or explicit technique names, tried in order.',
+        description=(
+            '``"top5"`` (the paper\'s five most effective), ``"all"`` (all 40), or '
+            "a list of taxonomy technique names, tried in order."
+        ),
     )
     max_techniques: int = Field(
         default=0,
         ge=0,
-        description="Upper bound on techniques tried per goal; 0 tries all of them.",
+        description=(
+            "Upper bound on techniques tried per goal; 0 tries every selected "
+            "technique."
+        ),
     )
     attacker: Optional[Completion] = Field(
         default=None,
@@ -43,6 +49,7 @@ class PAPParams(AttackParams):
     @field_validator("techniques")
     @classmethod
     def validate_techniques(cls, value: Union[str, List[str]]) -> Union[str, List[str]]:
+        """Reject a selection :func:`~.taxonomy.resolve_techniques` cannot resolve."""
         resolve_techniques(value)
         return value
 

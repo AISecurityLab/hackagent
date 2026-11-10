@@ -1,0 +1,70 @@
+---
+id: apilogs-list
+title: "List gateway usage logs"
+description: "Returns the organization's LLM gateway calls, newest first, 10 per page (`page`): who made each call, the model, its tokens and the credits it cost. Calls of cloud runs are included. Login tokens only: API keys get 401."
+sidebar_label: "List gateway usage logs"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"List gateway usage logs"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/apilogs"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the organization's LLM gateway calls, newest first, 10 per page (`page`): who made each call, the model, its tokens and the credits it cost. Calls of cloud runs are included. Login tokens only: API keys get 401.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A page number within the paginated result set.","in":"query","name":"page","required":false,"schema":{"type":"integer"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"count":{"description":"Total number of items across all pages.","example":42,"type":"integer"},"next":{"description":"URL of the next page, or null on the last page.","example":"https://api.hackagent.dev/apilogs?page=3","format":"uri","nullable":true,"type":"string"},"previous":{"description":"URL of the previous page, or null on the first page.","example":"https://api.hackagent.dev/apilogs?page=1","format":"uri","nullable":true,"type":"string"},"results":{"description":"The items of this page.","items":{"description":"Serializer for APITokenLog model, providing read-only access to log entries.","properties":{"id":{"description":"Unique identifier of the log entry.","readOnly":true,"type":"integer"},"timestamp":{"description":"When the call was made.","format":"date-time","readOnly":true,"type":"string"},"api_key_prefix":{"description":"Prefix of the API key that made the call; null for calls made with a login token or by a cloud run.","nullable":true,"readOnly":true,"type":"string"},"user_username":{"description":"Username of the user the call was made for.","nullable":true,"readOnly":true,"type":"string"},"organization_name":{"description":"Name of the organization charged for the call.","nullable":true,"readOnly":true,"type":"string"},"model_id_used":{"description":"The HackAgent model the call was made to.","readOnly":true,"type":"string"},"api_endpoint":{"description":"The role of the model called: `generator` for `hackagent/attacker-v1`, `judge` for `hackagent/judge-v1`.","readOnly":true,"type":"string"},"input_tokens":{"description":"Prompt tokens of the call.","readOnly":true,"type":"integer"},"output_tokens":{"description":"Completion tokens of the call.","readOnly":true,"type":"integer"},"credits_deducted":{"description":"Credits (US dollars) charged for the call.","format":"decimal","pattern":"^-?\\d{0,4}(?:\\.\\d{0,6})?$","readOnly":true,"type":"string"},"request_payload_preview":{"description":"The first characters of the request body.","nullable":true,"readOnly":true,"title":"Request Preview","type":"string"},"response_payload_preview":{"description":"The first characters of the response body.","nullable":true,"readOnly":true,"title":"Response Preview","type":"string"}},"required":["api_endpoint","api_key_prefix","credits_deducted","id","input_tokens","model_id_used","organization_name","output_tokens","request_payload_preview","response_payload_preview","timestamp","user_username"],"type":"object","title":"APITokenLog"},"type":"array"}},"required":["count","results"],"type":"object","title":"PaginatedAPITokenLogList"}}},"description":"OK"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

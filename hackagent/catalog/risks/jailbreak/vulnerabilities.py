@@ -9,7 +9,15 @@ from hackagent.catalog.risks.jailbreak.types import JailbreakType, JAILBREAK_TYP
 
 
 class Jailbreak(BaseVulnerability):
-    """Jailbreak."""
+    """The Jailbreak vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"roleplay"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``JailbreakType``.
+    """
 
     name = "Jailbreak"
     description = (

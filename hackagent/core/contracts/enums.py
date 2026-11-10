@@ -122,6 +122,8 @@ class StepKind(str, Enum):
     OTHER = "OTHER"
     MCP_STEP = "MCP_STEP"
     A2_A_COMM = "A2A_COMM"
+    #: One exchange with the target, recorded after an attempt's other steps.
+    INTERACTION = "interaction"
 
 
 class EvalStatus(str, Enum):

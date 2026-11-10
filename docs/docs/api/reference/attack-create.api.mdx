@@ -1,0 +1,69 @@
+---
+id: attack-create
+title: "Create an attack configuration"
+description: "Records an attack configuration in the caller's organization, owned by the caller. The SDK records one for each attack of a campaign before it creates the attack's run (`POST /run/{id}/children`). A cloud run's token may create configurations for its run's agent only. 403 when the caller has no organization."
+sidebar_label: "Create an attack configuration"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Create an attack configuration"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/attack"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Records an attack configuration in the caller's organization, owned by the caller. The SDK records one for each attack of a campaign before it creates the attack's run (`POST /run/{id}/children`). A cloud run's token may create configurations for its run's agent only. 403 when the caller has no organization.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+  body={{"content":{"application/json":{"schema":{"description":"Serializer for the Attack model, which represents an Attack configuration.\n\nHandles the conversion of Attack configuration instances to JSON (and vice-versa)\nfor API requests and responses. It includes read-only fields for related\nobject names (like agent_name, owner_username) for convenience in API outputs.","properties":{"type":{"description":"The attack technique, as the SDK names it (e.g. `pair`, `baseline`, `tap`; see `GET /campaign/techniques`).","maxLength":100,"minLength":1,"title":"Attack Type","type":"string"},"agent":{"description":"Id of the target agent.","format":"uuid","title":"Target Agent","type":"string"},"configuration":{"description":"The technique's parameters and settings, as the client recorded them (free-form JSON).","title":"Attack Configuration"}},"required":["agent","configuration","type"],"type":"object","title":"AttackRequest"}}},"required":true}}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"201":{"content":{"application/json":{"schema":{"description":"Serializer for the Attack model, which represents an Attack configuration.\n\nHandles the conversion of Attack configuration instances to JSON (and vice-versa)\nfor API requests and responses. It includes read-only fields for related\nobject names (like agent_name, owner_username) for convenience in API outputs.","properties":{"id":{"description":"Unique identifier of the attack configuration.","format":"uuid","readOnly":true,"type":"string"},"type":{"description":"The attack technique, as the SDK names it (e.g. `pair`, `baseline`, `tap`; see `GET /campaign/techniques`).","maxLength":100,"title":"Attack Type","type":"string"},"agent":{"description":"Id of the target agent.","format":"uuid","title":"Target Agent","type":"string"},"agent_name":{"description":"Name of the target agent.","readOnly":true,"type":"string"},"owner":{"description":"Id of the user who created the configuration.","nullable":true,"readOnly":true,"title":"Defined By","type":"integer"},"owner_username":{"description":"Username of the user who created the configuration.","readOnly":true,"type":"string"},"organization":{"description":"Id of the organization.","format":"uuid","readOnly":true,"type":"string"},"organization_name":{"description":"Name of the organization.","readOnly":true,"type":"string"},"configuration":{"description":"The technique's parameters and settings, as the client recorded them (free-form JSON).","title":"Attack Configuration"},"created_at":{"description":"When the configuration was created.","format":"date-time","readOnly":true,"type":"string"},"updated_at":{"description":"When the configuration was last changed.","format":"date-time","readOnly":true,"type":"string"}},"required":["agent","agent_name","configuration","created_at","id","organization","organization_name","owner","owner_username","type","updated_at"],"type":"object","title":"Attack"}}},"description":"Created"},"400":{"content":{"application/json":{"schema":{"additionalProperties":{},"description":"The request did not validate. Each invalid field maps to its list of\nmessages (``{\"name\": [\"This field is required.\"]}``); errors inside a\nJSON field are keyed by their dotted path\n(``{\"config\": {\"connection.api_key\": \"...\"}}``).","properties":{"non_field_errors":{"description":"Errors that are not about a single field.","items":{"type":"string"},"type":"array"}},"type":"object","title":"ValidationError"}}},"description":"Validation error: the request is invalid and nothing was changed."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this (for example a run token outside its own run, or a caller without an organization), or the installation is read-only because its license is not valid (`code: license_read_only`)."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

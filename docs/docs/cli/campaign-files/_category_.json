@@ -1,0 +1,8 @@
+{
+  "label": "Campaign files",
+  "position": 20,
+  "link": {
+    "type": "doc",
+    "id": "cli/campaign-files/index"
+  }
+}

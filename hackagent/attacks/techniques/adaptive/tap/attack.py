@@ -19,7 +19,52 @@ There are two prunes, and the order is the point:
 The best branch always survives the score prune. A round that pruned to
 nothing would end the search on one bad judging pass.
 
-Based on: https://arxiv.org/abs/2312.02119
+Paper: Anay Mehrotra, Manolis Zampetakis, Paul Kassianik, Blaine Nelson, et
+al., "Tree of Attacks: Jailbreaking Black-Box LLMs Automatically", 2023,
+[arXiv:2312.02119](https://arxiv.org/abs/2312.02119). Tree of Attacks with
+Pruning (TAP) extends PAIR (:mod:`..pair`) with tree-of-thought branching
+and an evaluator that prunes before and after each target query.
+
+Algorithm (one goal), with the parameters of :class:`~.config.TapParams`:
+
+1. Start ``streams`` root branches, each an attacker conversation holding
+   the TAP attacker system prompt for the goal and ``target_str`` and an
+   opening request.
+2. For each of ``depth`` levels:
+
+   - **Branch.** Ask the ``attacker`` for ``branching_factor`` refinements
+      of every surviving branch, each on its own copy of the parent's
+      conversation. A refinement must be a JSON turn with ``improvement``
+      and ``prompt``; the attacker gets up to ``max_attempts`` tries before
+      that child is dropped.
+   - **Prune off-topic.** With an ``on_topic`` role, ask it YES/NO whether
+      each new prompt still asks for the goal and drop the NOs (an
+      unreadable answer keeps the branch). If nothing is left, stop.
+   - **Attack and assess.** Send every remaining prompt to the target as
+      a fresh single-message conversation, have the campaign's evaluation
+      panel judge each usable reply, and feed reply and score back into the
+      branch's conversation, trimmed to the system prompt plus the last
+      ``keep_last_n`` attacker turns.
+   - With ``early_stop``, stop when any reply is a panel success.
+   - **Prune by score.** Shuffle (to break ties at random), rank by panel
+      score, keep the branches scoring above ``min_prune_score``, at most
+      ``width`` of them; when none scores above it, keep the single best.
+
+Deviations from the paper: the paper's defaults are depth 10, width 10
+and branching factor 4, with one GPT-4 evaluator doing both prunes; here
+the defaults are smaller, the off-topic check is a separate optional
+``on_topic`` role, and the score prune and the success decision use the
+campaign's panel. Feedback to the attacker carries the reply and the score,
+not the panel's explanation. With no judges every score is 0, so each round
+keeps a single random branch.
+
+Roles: ``attacker`` (required) writes every refinement; ``on_topic``
+(optional) filters off-topic prompts before they cost a target call.
+
+Attempts and success: every prompt that got a usable reply from the target
+is one attempt, judged by the campaign's evaluation panel and tagged with
+its position in the tree (``candidate_path``, ``parent_path``) and score.
+The goal succeeds when any attempt is a success.
 """
 
 from __future__ import annotations
@@ -52,14 +97,20 @@ class Branch:
     prompt: str = ""
     verdict: Optional[Verdict] = None
     path: Path = ()
+    parent_path: Path = ()
     response: Any = None
 
     @property
     def score(self) -> float:
+        """The panel's score for the last reply; 0 when it was not judged."""
         return 0.0 if self.verdict is None else self.verdict.score
 
     def child(self) -> "Branch":
-        return Branch(conversation=[dict(turn) for turn in self.conversation])
+        """A new branch under this one, with a copy of its conversation."""
+        return Branch(
+            conversation=[dict(turn) for turn in self.conversation],
+            parent_path=self.path,
+        )
 
 
 @dataclass
@@ -71,7 +122,17 @@ class Round:
 
 
 class TAPAttack(IterativeAttack[TapParams]):
-    """A pruned tree of attacker-refined prompts."""
+    """Grow a tree of attacker-refined prompts, pruning off-topic and low-scoring branches.
+
+    Implements Tree of Attacks with Pruning (Mehrotra et al., 2023,
+    [arXiv:2312.02119](https://arxiv.org/abs/2312.02119)): every round the
+    ``attacker`` branches each surviving prompt ``branching_factor`` ways,
+    the optional ``on_topic`` role drops prompts that drifted from the goal
+    before they reach the target, the campaign's evaluation panel judges
+    every reply, and only the best ``width`` branches continue, for up to
+    ``depth`` rounds. The algorithm and the deviations from the paper are
+    documented in the module ``hackagent.attacks.techniques.adaptive.tap.attack``.
+    """
 
     name = "tap"
     params_type = TapParams
@@ -86,6 +147,12 @@ class TAPAttack(IterativeAttack[TapParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Grow and prune the tree; return every attempt that got a usable reply.
+
+        Calls the ``attacker`` at least once per child, ``on_topic`` once per
+        child when configured, and the target and the panel once per kept
+        child.
+        """
         params = self.params
         branches = [self._root(goal) for _ in range(params.streams)]
         findings: list[Finding] = []
@@ -148,17 +215,22 @@ class TAPAttack(IterativeAttack[TapParams]):
     async def _refine(self, parent: Branch) -> Optional[Branch]:
         """One refinement of one branch, retried while the attacker rambles."""
         branch = parent.child()
-        for _ in range(self.params.max_attempts):
-            try:
-                reply = await self.attacker(branch.conversation)
-            except Exception:
-                continue
-            proposal = _parse(reply)
-            if proposal is None:
-                continue
-            branch.prompt, assistant_turn = proposal
-            branch.conversation.append({"role": "assistant", "content": assistant_turn})
-            return branch
+        with phase("candidate", parent_path=list(parent.path)) as path:
+            branch.path = path
+            for _ in range(self.params.max_attempts):
+                try:
+                    reply = await self.attacker(branch.conversation)
+                except Exception:
+                    continue
+                proposal = _parse(reply)
+                if proposal is None:
+                    continue
+                branch.prompt, assistant_turn = proposal
+                branch.conversation.append(
+                    {"role": "assistant", "content": assistant_turn}
+                )
+                return branch
+            decision("skipped", "the attacker proposed no usable prompt")
         return None
 
     async def _keep_on_topic(self, goal: str, branches: list[Branch]) -> list[Branch]:
@@ -176,20 +248,18 @@ class TAPAttack(IterativeAttack[TapParams]):
             for branch, on_topic in zip(branches, answers)
             if on_topic is not False
         ]
-        # The reference caps this prune at the beam width too, so a wide
-        # fan-out costs at most ``width`` target calls per round rather
-        # than one per surviving branch.
-        survivors = kept[: self.params.width]
-        if len(survivors) < len(branches):
+        if len(kept) < len(branches):
             decision(
                 "pruned",
-                "off the goal, then down to the beam",
-                dropped=len(branches) - len(survivors),
-                kept=len(survivors),
+                "off the goal",
+                dropped=len(branches) - len(kept),
+                kept=len(kept),
+                candidate_paths=[list(b.path) for b in branches if b not in kept],
             )
-        return survivors
+        return kept
 
     async def _ask_on_topic(self, goal: str, prompt: str) -> Optional[bool]:
+        """Ask the ``on_topic`` role about one prompt; ``None`` when it gave no answer."""
         assert self.on_topic is not None
         messages = [
             {"role": "system", "content": prompts.on_topic_system_prompt(goal)},
@@ -227,12 +297,19 @@ class TAPAttack(IterativeAttack[TapParams]):
         judge: Optional[Judge],
     ) -> tuple[Branch, Optional[Finding]]:
         """One branch's turn: send, judge, and feed the result back."""
-        with phase(f"branch {index + 1}/{total}", branch=index) as path:
-            branch.path = path
+        with phase(
+            f"branch {index + 1}/{total}",
+            branch=index,
+            candidate_path=list(branch.path),
+        ) as path:
             messages = [{"role": "user", "content": branch.prompt}]
             reply = await target(messages)
             if not reply.ok or not reply.text:
-                decision("skipped", "the target gave no usable reply")
+                decision(
+                    "skipped",
+                    "the target gave no usable reply",
+                    candidate_paths=[list(branch.path)],
+                )
                 self._feed_back(goal, branch, "[no reply]")
                 return branch, None
 
@@ -243,7 +320,11 @@ class TAPAttack(IterativeAttack[TapParams]):
                 messages=messages,
                 response=reply,
                 verdict=branch.verdict,
-                metadata={"score": branch.verdict.score if branch.verdict else None},
+                metadata={
+                    "score": branch.verdict.score if branch.verdict else None,
+                    "candidate_path": list(branch.path),
+                    "parent_path": list(branch.parent_path),
+                },
                 path=path,
             )
 
@@ -268,6 +349,7 @@ class TAPAttack(IterativeAttack[TapParams]):
                 dropped=len(branches) - len(survivors),
                 kept=len(survivors),
                 best=round(survivors[0].score, 3),
+                candidate_paths=[list(b.path) for b in branches if b not in survivors],
             )
         return survivors
 

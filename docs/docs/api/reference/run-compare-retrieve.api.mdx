@@ -1,0 +1,70 @@
+---
+id: run-compare-retrieve
+title: "Compare a campaign run with a baseline run"
+description: "Compares the goal verdicts of this campaign run with those of another visible campaign run (`baseline`, required), matching goals by their text: each goal is `regressed` (now jailbroken), `fixed`, `unchanged`, `new` or `dropped`, with the totals. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed."
+sidebar_label: "Compare a campaign run with a baseline run"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Compare a campaign run with a baseline run"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/run/{id}/compare"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Compares the goal verdicts of this campaign run with those of another visible campaign run (`baseline`, required), matching goals by their text: each goal is `regressed` (now jailbroken), `fixed`, `unchanged`, `new` or `dropped`, with the totals. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"The ETag of a previous response: 304 while it still holds.","in":"header","name":"If-None-Match","schema":{"type":"string"}},{"description":"Another visible campaign run to compare with (required).","in":"query","name":"baseline","required":true,"schema":{"format":"uuid","type":"string"}},{"description":"A UUID string identifying this Run.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"current":{"allOf":[{"properties":{"id":{"description":"Id of the campaign run.","format":"uuid","type":"string"},"name":{"description":"The campaign's name.","type":"string"},"created_at":{"description":"When the run was created.","format":"date-time","type":"string"}},"required":["created_at","id","name"],"type":"object","title":"ComparedRun"}],"description":"This campaign run."},"baseline":{"allOf":[{"properties":{"id":{"description":"Id of the campaign run.","format":"uuid","type":"string"},"name":{"description":"The campaign's name.","type":"string"},"created_at":{"description":"When the run was created.","format":"date-time","type":"string"}},"required":["created_at","id","name"],"type":"object","title":"ComparedRun"}],"description":"The baseline campaign run."},"counts":{"allOf":[{"properties":{"regressed":{"description":"Goals jailbroken now but not in the baseline.","type":"integer"},"fixed":{"description":"Goals jailbroken in the baseline but not now.","type":"integer"},"unchanged":{"description":"Goals whose jailbroken-or-not outcome did not change.","type":"integer"},"new":{"description":"Goals only in this run.","type":"integer"},"dropped":{"description":"Goals only in the baseline.","type":"integer"}},"required":["dropped","fixed","new","regressed","unchanged"],"type":"object","title":"ChangeCounts"}],"description":"How many goals changed, by kind."},"goals":{"description":"The goals, regressions first.","items":{"properties":{"goal":{"description":"The goal text, by which goals are matched.","type":"string"},"category":{"description":"The goal's category.","type":"string"},"subcategory":{"description":"The goal's subcategory; empty when none.","type":"string"},"current":{"description":"Its verdict in this run; null when absent.\n\n* `jailbroken` - jailbroken\n* `mitigated` - mitigated\n* `unresolved` - unresolved","nullable":true,"oneOf":[{"description":"* `jailbroken` - jailbroken\n* `mitigated` - mitigated\n* `unresolved` - unresolved","enum":["jailbroken","mitigated","unresolved"],"type":"string","title":"GoalVerdictEnum"},{"enum":[null],"title":"NullEnum"}]},"baseline":{"description":"Its verdict in the baseline run; null when absent.\n\n* `jailbroken` - jailbroken\n* `mitigated` - mitigated\n* `unresolved` - unresolved","nullable":true,"oneOf":[{"description":"* `jailbroken` - jailbroken\n* `mitigated` - mitigated\n* `unresolved` - unresolved","enum":["jailbroken","mitigated","unresolved"],"type":"string","title":"GoalVerdictEnum"},{"enum":[null],"title":"NullEnum"}]},"change":{"allOf":[{"description":"* `regressed` - regressed\n* `fixed` - fixed\n* `unchanged` - unchanged\n* `new` - new\n* `dropped` - dropped","enum":["regressed","fixed","unchanged","new","dropped"],"type":"string","title":"ChangeEnum"}],"description":"How the outcome changed.\n\n* `regressed` - regressed\n* `fixed` - fixed\n* `unchanged` - unchanged\n* `new` - new\n* `dropped` - dropped"}},"required":["baseline","category","change","current","goal","subcategory"],"type":"object","title":"ComparedGoal"},"type":"array"}},"required":["baseline","counts","current","goals"],"type":"object","title":"RunComparison"}}},"description":"OK"},"304":{"description":"The If-None-Match ETag still holds."},"400":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Invalid query parameter."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"404":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Not a visible campaign run."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

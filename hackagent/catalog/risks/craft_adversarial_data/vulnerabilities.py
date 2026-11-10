@@ -12,7 +12,15 @@ from hackagent.catalog.risks.craft_adversarial_data.types import (
 
 
 class CraftAdversarialData(BaseVulnerability):
-    """Craft Adversarial Data."""
+    """The Craft Adversarial Data vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"perturbation_attacks"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``CraftAdversarialDataType``.
+    """
 
     name = "Craft Adversarial Data"
     description = (

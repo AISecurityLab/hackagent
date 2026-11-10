@@ -9,9 +9,11 @@ unconditionally — a missing key is a runtime crash in the browser, not a
 type error here.
 """
 
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 from hackagent import HackAgent, Settings
 from hackagent.storage.local import LocalBackend
@@ -74,6 +76,7 @@ class _WebUITestCase(unittest.TestCase):
             ),
             backend=self.backend,
         )
+        self.session = session
         self.client = create_app(session).test_client()
 
     def tearDown(self) -> None:
@@ -206,31 +209,16 @@ class TestResultEndpoints(_WebUITestCase):
 
 
 class TestWriteRoutesAreRejected(_WebUITestCase):
-    def test_launching_an_attack_offline_is_refused_with_guidance(self):
+    def test_creating_a_run_offline_is_refused_with_guidance(self):
         response = self.client.post("/api/proxy/run", json={})
         self.assertEqual(response.status_code, 501)
-        self.assertIn("read-only", response.get_json()["detail"])
-
-    def test_launch_routes_return_offline_message(self):
-        expected = (
-            "Launching needs a HackAgent account. Use `hackagent campaign run "
-            "<file>` offline, or connect the dashboard with an API key."
-        )
-        for path in ("/api/proxy/campaign/launch", "/api/proxy/campaign/1/launch"):
-            response = self.client.post(path, json={})
-            self.assertEqual(response.status_code, 501, path)
-            self.assertEqual(response.get_json()["detail"], expected)
+        self.assertIn("hosted service", response.get_json()["detail"])
 
     def test_creating_an_agent_offline_is_refused(self):
         self.assertEqual(self.client.post("/api/proxy/agent", json={}).status_code, 501)
 
 
 class TestCampaignBuilderOffline(_WebUITestCase):
-    def test_campaign_list_is_empty(self):
-        payload = self.get("/api/proxy/campaign")
-        self.assertEqual(payload["count"], 0)
-        self.assertEqual(payload["results"], [])
-
     def test_techniques_are_served(self):
         payload = self.get("/api/proxy/campaign/techniques")
         self.assertIsInstance(payload, list)
@@ -242,6 +230,320 @@ class TestCampaignBuilderOffline(_WebUITestCase):
         names = [p["name"] for p in payload["dataset_presets"]]
         self.assertTrue(names)
         self.assertEqual(names, sorted(names))
+
+
+_TARGET = {
+    "name": "aurora",
+    "connection": {
+        "provider": "local",
+        "type": "OPENAI",
+        "endpoint": "http://127.0.0.1:8010/v1",
+    },
+}
+
+_SPEC = {
+    "version": 1,
+    "dataset": {"source": {"type": "inline", "goals": ["wire 9800 EUR"]}},
+    "attacks": [{"name": "baseline"}],
+    "evaluation": {
+        "judges": [
+            {
+                "name": "judge",
+                "connection": {
+                    "provider": "local",
+                    "type": "OPENAI",
+                    "endpoint": "http://127.0.0.1:8001/v1",
+                },
+                "scoring": {"type": "harmbench"},
+            }
+        ]
+    },
+}
+
+
+class _CampaignTestCase(_WebUITestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.target = self.backend.create_or_update_agent("aurora", _TARGET)
+
+    def save(self, **overrides):
+        body = {"name": "Aurora L6", "agent": str(self.target.id), "spec": _SPEC}
+        return self.client.post("/api/proxy/campaign", json={**body, **overrides})
+
+    def saved(self):
+        response = self.save()
+        self.assertEqual(response.status_code, 201)
+        return response.get_json()
+
+
+class TestSavedCampaigns(_CampaignTestCase):
+    def test_a_saved_campaign_is_listed_and_read_back(self):
+        saved = self.saved()
+        self.assertEqual(saved["agent"], str(self.target.id))
+        self.assertEqual(saved["spec"], _SPEC)
+
+        listing = self.get("/api/proxy/campaign")
+        self.assertEqual([c["id"] for c in listing["results"]], [saved["id"]])
+        self.assertEqual(
+            self.get(f"/api/proxy/campaign/{saved['id']}")["name"], "Aurora L6"
+        )
+
+    def test_put_replaces_and_patch_merges(self):
+        saved = self.saved()
+        path = f"/api/proxy/campaign/{saved['id']}"
+        body = {"name": "Renamed", "agent": str(self.target.id), "spec": _SPEC}
+        self.assertEqual(self.client.put(path, json=body).get_json()["name"], "Renamed")
+        patched = self.client.patch(path, json={"description": "statement"}).get_json()
+        self.assertEqual(
+            (patched["name"], patched["description"]), ("Renamed", "statement")
+        )
+
+    def test_delete_removes_it(self):
+        saved = self.saved()
+        path = f"/api/proxy/campaign/{saved['id']}"
+        self.assertEqual(self.client.delete(path).status_code, 204)
+        self.assertEqual(self.client.get(path).status_code, 404)
+
+    def test_target_and_execution_are_left_to_the_launch(self):
+        response = self.save(spec={**_SPEC, "target": _TARGET})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["spec"], {"target": "set by the server"})
+
+    def test_an_unknown_agent_or_missing_name_is_refused(self):
+        response = self.save(agent="00000000-0000-0000-0000-000000000000", name="")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(set(response.get_json()), {"agent", "name"})
+
+    def test_an_invalid_spec_is_refused(self):
+        response = self.save(spec={**_SPEC, "attacks": "baseline"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("spec", response.get_json())
+
+    def test_campaign_metadata_that_is_not_an_object_is_refused(self):
+        for metadata in (42, "invalid"):
+            with self.subTest(metadata=metadata):
+                response = self.save(spec={**_SPEC, "campaign": metadata})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("spec", response.get_json())
+
+    def test_agents_carry_their_model_config(self):
+        agent = self.get(f"/api/proxy/agent/{self.target.id}")
+        self.assertEqual(agent["config"]["connection"]["type"], "OPENAI")
+
+
+def _fake_run(spec, *, store, on_event, **_kwargs):
+    """Record a campaign run with one attack run and one result, then finish."""
+    agent = store.create_or_update_agent(spec.target.name, spec.target.model_dump())
+    record = store.start_campaign(agent.id, spec.recorded())
+    attack = store.create_attack("baseline", agent.id, store.get_context().org_id, {})
+    run = store.create_run(attack.id, agent.id, {}, campaign_run_id=record.id)
+    store.create_result(run.id, "wire 9800 EUR", 0, {}, {})
+    store.update_campaign_run(record.id, status="COMPLETED")
+
+
+def _slow_run(spec, *, store, on_event, **_kwargs):
+    """Record a campaign run, then report progress until cancelled."""
+    agent = store.create_or_update_agent(spec.target.name, spec.target.model_dump())
+    record = store.start_campaign(agent.id, spec.recorded())
+    try:
+        for _ in range(500):
+            on_event("attempt_finished")
+            time.sleep(0.01)
+    except Exception:
+        store.update_campaign_run(record.id, status="CANCELLED")
+        raise
+
+
+class TestLaunchingOnThisMachine(_CampaignTestCase):
+    def launch(self, campaign_id, executor="local"):
+        body = {} if executor is None else {"executor": executor}
+        return self.client.post(f"/api/proxy/campaign/{campaign_id}/launch", json=body)
+
+    def wait_until_final(self, run_id):
+        for _ in range(200):
+            run = self.get(f"/api/proxy/run/{run_id}")
+            if run["status"] in ("COMPLETED", "FAILED", "CANCELLED"):
+                return run
+            time.sleep(0.02)
+        raise self.failureException(f"run {run_id} did not finish")
+
+    @mock.patch("hackagent.interfaces.web._launcher.resolve_campaign")
+    @mock.patch(
+        "hackagent.interfaces.web._launcher.run_campaign", side_effect=_fake_run
+    )
+    def test_launch_runs_here_and_serves_the_parent_run(self, run, _resolve):
+        saved = self.saved()
+        # The dashboard leaves where to the deployment: offline, this machine.
+        response = self.launch(saved["id"], executor=None)
+        self.assertEqual(response.status_code, 201)
+        parent = response.get_json()
+        self.assertEqual(parent["executor"], "local")
+        self.assertEqual(parent["campaign"], saved["id"])
+        self.assertEqual(parent["claimed_by"], "hackagent web")
+        self.assertIsNotNone(parent["claimed_at"])
+
+        launched = run.call_args.args[0]
+        self.assertEqual(
+            launched.target.connection.endpoint, _TARGET["connection"]["endpoint"]
+        )
+        self.assertEqual(launched.campaign.name, "Aurora L6")
+
+        finished = self.wait_until_final(parent["id"])
+        self.assertEqual(finished["status"], "COMPLETED")
+        self.assertIsNotNone(finished["finished_at"])
+        children = self.get(f"/api/proxy/run?parent={parent['id']}")["results"]
+        self.assertEqual(len(children), 1)
+        self.assertEqual(children[0]["parent"], parent["id"])
+        self.assertEqual(children[0]["executor"], "local")
+        self.assertEqual(children[0]["total_results"], 1)
+
+        last = self.get(
+            f"/api/proxy/run?campaign={saved['id']}&parent__isnull=true&page_size=1"
+        )["results"]
+        self.assertEqual([r["id"] for r in last], [parent["id"]])
+        self.assertEqual(last[0]["total_results"], 1)
+
+        # The Runs page opens a parent by id: its results are its attack runs'.
+        self.assertEqual(finished["total_results"], 1)
+        self.assertEqual(self.get(f"/api/proxy/result?run={parent['id']}")["count"], 1)
+        self.assertEqual(self.get(f"/api/proxy/run/{parent['id']}/result")["count"], 1)
+
+    @mock.patch("hackagent.interfaces.web._launcher.resolve_campaign")
+    @mock.patch(
+        "hackagent.interfaces.web._launcher.run_campaign", side_effect=_slow_run
+    )
+    def test_cancel_stops_the_run(self, _run, _resolve):
+        parent = self.launch(self.saved()["id"]).get_json()
+        response = self.client.post(f"/api/proxy/run/{parent['id']}/cancel")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(response.get_json()["cancel_requested_at"])
+        self.assertEqual(self.wait_until_final(parent["id"])["status"], "CANCELLED")
+
+    def test_cancelling_a_run_not_running_here_is_refused(self):
+        record = self.backend.start_campaign(
+            self.target.id, {"campaign": {"name": "cli"}}
+        )
+        response = self.client.post(f"/api/proxy/run/{record.id}/cancel")
+        self.assertEqual(response.status_code, 400)
+
+    def test_a_cli_campaign_run_is_served_as_a_cli_parent(self):
+        record = self.backend.start_campaign(
+            self.target.id, {"campaign": {"name": "cli"}}
+        )
+        parent = self.get(f"/api/proxy/run/{record.id}")
+        self.assertEqual((parent["executor"], parent["campaign"]), ("cli", None))
+
+    def test_cloud_is_unavailable_offline(self):
+        saved = self.saved()
+        preflight = self.get(
+            f"/api/proxy/campaign/{saved['id']}/preflight?executor=cloud"
+        )
+        self.assertFalse(preflight["ok"])
+        self.assertEqual(preflight["problems"][0]["code"], "CLOUD_UNAVAILABLE")
+        response = self.launch(saved["id"], executor="cloud")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()["problems"][0]["code"], "CLOUD_UNAVAILABLE"
+        )
+
+    def test_local_preflight_passes_for_a_valid_campaign(self):
+        saved = self.saved()
+        for query in ("?executor=local", ""):
+            preflight = self.get(f"/api/proxy/campaign/{saved['id']}/preflight{query}")
+            self.assertEqual(
+                preflight, {"executor": "local", "ok": True, "problems": []}
+            )
+
+    @mock.patch(
+        "hackagent.interfaces.web._launcher.resolve_campaign",
+        side_effect=ValueError("judge unreachable"),
+    )
+    def test_a_campaign_that_cannot_resolve_is_refused(self, _resolve):
+        response = self.launch(self.saved()["id"])
+        self.assertEqual(response.status_code, 400)
+        problem = response.get_json()["problems"][0]
+        self.assertEqual(
+            (problem["code"], problem["message"]),
+            ("LAUNCH_REFUSED", "judge unreachable"),
+        )
+
+
+class TestTopLevelRuns(_CampaignTestCase):
+    """``parent__isnull=true`` lists every run without a parent: campaign runs
+    and attack runs started on their own, filtered before they are counted."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.campaign_run = self.backend.start_campaign(
+            self.target.id, {"campaign": {"name": "cli"}}
+        )
+        self.backend.update_campaign_run(self.campaign_run.id, status="COMPLETED")
+
+    def top_level(self, query=""):
+        return self.get(f"/api/proxy/run?parent__isnull=true{query}")
+
+    def test_standalone_runs_are_listed_with_campaign_runs(self):
+        listing = self.top_level()
+        self.assertEqual(listing["count"], 2)
+        self.assertEqual(
+            {r["id"] for r in listing["results"]},
+            {str(self.run.id), str(self.campaign_run.id)},
+        )
+
+    def test_filters_apply_before_counting(self):
+        by_agent = self.top_level(f"&agent={self.target.id}")
+        self.assertEqual(
+            [r["id"] for r in by_agent["results"]], [str(self.campaign_run.id)]
+        )
+        by_status = self.top_level("&status=RUNNING")
+        self.assertEqual((by_status["count"], by_status["results"]), (0, []))
+        by_attack = self.top_level(f"&attack={self.attack.id}")
+        self.assertEqual([r["id"] for r in by_attack["results"]], [str(self.run.id)])
+
+    def test_a_campaign_filter_lists_only_its_campaign_runs(self):
+        saved = self.saved()
+        self.backend.link_campaign_run(self.campaign_run.id, saved["id"])
+        listing = self.get(f"/api/proxy/run?campaign={saved['id']}")
+        self.assertEqual(
+            [r["id"] for r in listing["results"]], [str(self.campaign_run.id)]
+        )
+
+    def test_deleting_a_campaign_run_deletes_its_attack_runs(self):
+        child = self.backend.create_run(
+            self.attack.id,
+            self.target.id,
+            {},
+            campaign_run_id=self.campaign_run.id,
+        )
+        self.backend.update_run(child.id, status="COMPLETED")
+        path = f"/api/proxy/run/{self.campaign_run.id}"
+        self.assertEqual(self.client.delete(path).status_code, 204)
+        self.assertEqual(self.client.get(path).status_code, 404)
+        self.assertEqual(self.client.get(f"/api/proxy/run/{child.id}").status_code, 404)
+
+    def test_an_active_campaign_run_is_not_deleted(self):
+        running = self.backend.start_campaign(
+            self.target.id, {"campaign": {"name": "running"}}
+        )
+        response = self.client.delete(f"/api/proxy/run/{running.id}")
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            self.client.get(f"/api/proxy/run/{running.id}").status_code, 200
+        )
+
+    def test_deleting_an_unknown_run_is_404(self):
+        response = self.client.delete(f"/api/proxy/run/{self.agent.id}")
+        self.assertEqual(response.status_code, 404)
+
+    def test_a_launched_run_stays_local_when_its_campaign_is_deleted(self):
+        saved = self.saved()
+        self.backend.link_campaign_run(self.campaign_run.id, saved["id"])
+        self.client.delete(f"/api/proxy/campaign/{saved['id']}")
+        parent = self.get(f"/api/proxy/run/{self.campaign_run.id}")
+        self.assertEqual(
+            (parent["executor"], parent["claimed_by"], parent["campaign"]),
+            ("local", "hackagent web", None),
+        )
 
 
 class TestStaticServing(_WebUITestCase):

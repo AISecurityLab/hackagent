@@ -69,6 +69,7 @@ class AdoptedRunStore(RemoteBackend):
         )
 
     def get_context(self) -> OrganizationContext:
+        """Return the organization and owner of the claimed run; nothing is fetched."""
         return self._adopted_context
 
     def create_or_update_agent(self, name: str, config: Dict[str, Any]) -> AgentRecord:

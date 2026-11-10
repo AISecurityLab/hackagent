@@ -1,0 +1,223 @@
+---
+title: "Shared settings"
+description: "Settings that work the same way for every attack."
+sidebar_position: 100
+---
+
+Every attack is configured the same way in a campaign file, and the same
+campaign settings decide which goals it sees, how its replies are judged and
+how fast it runs. This page covers what they have in common. Each attack's own
+page lists its parameters and helper models; the
+[campaign-file reference](../cli/campaign-files/index.md) lists every field.
+
+## An entry in `attacks`
+
+Each entry in the `attacks` list has three fields, documented in
+[`attacks[]`](../cli/campaign-files/attacks.md#attackspec):
+
+- `name` picks the attack.
+- `parameters` tunes it. Anything you leave out keeps its default.
+- `roles` gives it the helper models it drives, keyed by role name.
+
+```yaml
+attacks:
+  - name: tap
+    parameters:
+      width: 3
+      depth: 2
+    roles:
+      attacker:
+        name: qwen3:8b
+        connection:
+          provider: ollama
+          type: OLLAMA
+      on_topic:
+        name: llama3.2:latest
+        connection:
+          provider: ollama
+          type: OLLAMA
+```
+
+`hackagent campaign validate` checks each entry against the attack before
+anything is sent, and stops on any of these:
+
+- a parameter the attack does not have, such as a typo in its name;
+- a role name the attack does not take, or a role written under `parameters`;
+- a required role left out.
+
+## Roles
+
+A role is a model the attack uses besides the target: it writes prompts,
+filters them, or embeds text for retrieval. The judges are not roles; they
+belong to the whole campaign. Every role is a
+[ModelConfig](../cli/campaign-files/target.md#modelconfig), written exactly
+like the target: `name`, `connection`, and optional `generation` and `options`.
+
+| Role | Taken by | What it does |
+|---|---|---|
+| `attacker` | Most adaptive attacks, Crescendo, FC, tFC, RAG poisoning; optional for Tool-output IPI and ToolHijacker | Writes the adversarial text: prompts, questions, prefixes, payloads or flowchart steps |
+| `on_topic` | TAP | Answers yes or no to whether a branch still pursues the goal, so drifted branches are dropped before they cost a target call |
+| `scorer` | PAIR | Rates every reply from 1 to 10, so the panel only judges the best attempt |
+| `refusal` | Crescendo | Decides whether a reply refuses, which triggers a rephrase. Without it, the `attacker` model decides |
+| `synthesizer` | h4rm3l | Writes new decorator programs. Without it, h4rm3l runs the program you named, with no search |
+| `decorator` | h4rm3l | Runs the decorators that need a model, such as translation |
+| `summarizer` | AutoDAN-Turbo | Turns an exchange that worked into a reusable strategy |
+| `embedder` | AutoDAN-Turbo, RAG poisoning; optional for ToolHijacker | An embedding model, called on the embeddings endpoint, not a chat model |
+
+Which roles each attack requires is generated from the code and shown on its
+page and in the [catalog](./index.mdx#all-attacks). One model can fill several
+roles, and the same model can be the target and a judge, though a
+separate judge is more trustworthy.
+
+### Generation settings
+
+A role's `generation` block applies to every call that role makes, and only to
+it. Use it to give the attacker room to write (`max_tokens`), more variety
+(`temperature`), or a thinking mode (`thinking`). The target's and judges'
+settings are separate. The fields are listed under
+[GenerationSpec](../cli/campaign-files/target.md#generationspec).
+
+```yaml
+roles:
+  attacker:
+    name: qwen3:8b
+    connection:
+      provider: ollama
+      type: OLLAMA
+    generation:
+      temperature: 1.0
+      max_tokens: 1024
+```
+
+### The HackAgent gateway or your own model
+
+HackAgent's [LLM gateway](../api/llm-gateway.mdx) serves two models:
+`hackagent/attacker-v1` for attack roles and `hackagent/judge-v1` for judges.
+Use them when you have no model of your own to spare, or want one chosen for
+the job. Calls are paid from your organization's
+credits and authenticated with your HackAgent API key.
+
+```yaml
+roles:
+  attacker:
+    name: hackagent/attacker-v1
+    connection:
+      provider: hackagent
+      type: OPENAI
+      endpoint: https://api.hackagent.dev/v1
+      api_key: ${HACKAGENT_API_KEY}
+```
+
+Use your own model when the run must stay on your machine, when you want to
+control cost or rate limits, or when you have measured a better attacker for
+your target. [Choosing an attacker model](../concepts/choosing-an-attacker.mdx)
+compares several. The gateway serves chat models only, so an `embedder` role
+always needs your own embedding model.
+
+## Judges and the attack's own checks
+
+The [judge panel](../concepts/judges.md) set under
+[`evaluation`](../cli/campaign-files/evaluation.md) is shared by every attack.
+How an attack uses it depends on its type:
+
+- A **static** attack sends all its prompts, and the panel judges each reply
+  once.
+- Every **other** attack asks the panel about each reply while it searches,
+  and most stop at the first reply the panel passes. That verdict is the one
+  recorded, so no exchange is judged twice. The panel's `aggregation` and
+  `threshold` therefore also decide when a search stops.
+
+Some attacks add checks of their own around the panel. Most only steer the
+search; Crescendo, BoN and PAIR with a `scorer` also change what is recorded, as
+the table says:
+
+| Attack | Its own check |
+|---|---|
+| TAP | The `on_topic` role drops drifted branches before they reach the target |
+| PAIR | With a `scorer` role, the scorer rates every reply and decides when to stop; the panel then judges only the best attempt, so only that attempt carries a verdict |
+| Crescendo | The `refusal` role decides when to rephrase. A rephrased turn is not judged and is recorded as a failure |
+| BoN | A reply barely longer than the request is not judged, and a short reply the panel passes is not counted |
+| AutoDAN-Turbo | Stops when the panel's 0 to 10 score reaches its `break_score` |
+| AdvPrefix | Ranks its prefixes by the share of their replies the panel passed |
+
+Two attacks do not use the panel at all. STAC passes a goal only when the
+target ran the full tool chain and left the sandbox in the target state;
+ToolHijacker passes it only when the target called the injected tool for
+enough task phrasings.
+
+With no judges configured, replies are recorded but not scored. Searches then
+have nothing to stop on and run to their configured end, except PAIR with a
+`scorer`, which still stops on `jailbreak_threshold`. h4rm3l's program
+search has no signal either, so do not give it a `synthesizer` without judges.
+
+## Stopping early
+
+Three settings stop work before an attack has tried everything:
+
+- **Inside one attack.** Most attacks stop a goal at the first jailbreak.
+  PAIR, TAP and Crescendo make this a parameter, `early_stop`; turn it off to
+  keep searching and see how many routes succeed.
+- **Across attacks.** [`execution.escalate`](../cli/campaign-files/execution.md#executionspec)
+  drops a goal once any attack jailbreaks it, so later attacks only face the
+  goals still standing, and stops the run once every goal has fallen. List
+  cheap attacks first. Later attacks then see fewer goals, so their ASR is not
+  comparable with the earlier ones.
+- **On time or failure.** `execution.per_attack_timeout` stops an attack that
+  runs too long and marks it failed. The clock times the goals only: a
+  run-wide preparation, such as AutoDAN-Turbo's warm-up or h4rm3l's program
+  search, runs before it starts. `execution.on_error: stop` skips the
+  remaining attacks after one fails; it has no effect in `mode: parallel`.
+
+```yaml
+attacks:
+  - name: flipattack
+  - name: pap
+    roles:
+      attacker: &attacker
+        name: qwen3:8b
+        connection:
+          provider: ollama
+          type: OLLAMA
+  - name: tap
+    roles:
+      attacker: *attacker
+
+execution:
+  escalate: true
+```
+
+## Which goals an attack sees
+
+Every attack gets every goal the [dataset](../cli/campaign-files/dataset.md)
+selects, unless escalation dropped it. To try attacks on a sample before a full
+run, set `dataset.selection.limit` with `shuffle` and a `seed`, so each run
+draws the same goals.
+
+Two attacks do run-scoped work before the first goal: h4rm3l's program search
+(with a `synthesizer`) and AutoDAN-Turbo's warm-up. Both use the goals that
+attack faces, and both finish before any goal is attacked.
+
+Some attacks expect goals of their own kind:
+
+- **STAC** needs each goal to match its chain's objective exactly. Any other
+  goal is recorded as an error, so give it its own campaign with inline goals.
+- **ToolHijacker** treats each goal as a benign task the agent should pick a
+  tool for, not a harmful request.
+
+## Running faster
+
+These [`execution`](../cli/campaign-files/execution.md) settings apply to every
+attack in the campaign:
+
+- `mode: parallel` runs the attacks at the same time instead of one after
+  another. `escalate` always runs them in order.
+- [`concurrency`](../cli/campaign-files/execution.md#concurrencyspec) caps how
+  many goals are attacked at once (`attack`), how many requests wait on the
+  target (`target`) and how many replies are judged at once (`judge`). Many
+  attacks send several requests per goal at once (PAIR's streams, TAP's
+  branches, BoN's candidates), so `target` is usually the one to raise.
+- [`retries.roles`](../cli/campaign-files/execution.md#retryspec) retries a
+  failed call to a helper model (not to an embedder), as `retries.target` and `retries.judges` do
+  for the target and the judges.
+- `preflight`, on by default, checks every role model, embedders included,
+  before the first attack starts.

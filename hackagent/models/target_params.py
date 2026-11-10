@@ -1,12 +1,10 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Target generation parameters (moved out of attack configs).
+"""Default generation parameters for the target (victim) model.
 
-Preferred runtime source remains ``Target(..., target_config=...)`` on the facade.
-This typed model is the home for those knobs once technique configs stop
-inheriting them from
-the target model.
+:class:`TargetParams` types the sampling and request knobs a target is
+called with, and their defaults; technique configs do not carry them.
 """
 
 from __future__ import annotations

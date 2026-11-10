@@ -14,7 +14,8 @@ class CrescendoParams(AttackParams):
     """How far the conversation escalates, and how often it may rephrase.
 
     ``attacker`` is a role: the model that proposes each next question, so
-    Crescendo cannot run without it.
+    Crescendo cannot run without it. ``refusal`` is the optional Refusal
+    Judge; without it the attacker model judges refusals, as in PyRIT.
     """
 
     REQUIRED_ROLES: ClassVar[frozenset[str]] = frozenset({"attacker"})
@@ -32,7 +33,7 @@ class CrescendoParams(AttackParams):
         ge=0,
         description=(
             "Rephrasings allowed across the whole goal. Once spent, a refused turn "
-            "is accepted as-is and the conversation moves on."
+            "is accepted as-is, judged like any other, and the conversation moves on."
         ),
     )
     keep_last_n: int = Field(
@@ -45,12 +46,15 @@ class CrescendoParams(AttackParams):
     )
     early_stop: bool = Field(
         default=True,
-        description="Stop as soon as a turn the target did not refuse passes the panel.",
+        description="Stop as soon as a turn passes the panel.",
     )
     feedback_max_chars: int = Field(
         default=2500,
         ge=1,
-        description="Longest reply and explanation fed back to the attacker.",
+        description=(
+            "Characters of the target's reply fed back to the attacker; the rest "
+            "is cut."
+        ),
     )
     attacker: Optional[Completion] = Field(
         default=None,
@@ -59,6 +63,15 @@ class CrescendoParams(AttackParams):
         description=(
             "Plans the conversation and writes each next question, a little closer "
             "to the goal than the last."
+        ),
+    )
+    refusal: Optional[Completion] = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+        description=(
+            "Optional. The Refusal Judge: decides whether each reply refuses the "
+            "goal, which triggers a backtrack. Defaults to the attacker model."
         ),
     )
 

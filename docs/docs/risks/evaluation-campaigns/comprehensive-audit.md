@@ -14,8 +14,8 @@ from hackagent.attacks.techniques.registry import get_attack_class
 OLLAMA = {"provider": "ollama", "type": "OLLAMA"}
 TARGET = {"name": "my-agent", "connection": {
     "provider": "local", "type": "OPENAI", "endpoint": "http://localhost:8000/v1"}}
-JUDGE = {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
-ATTACKER = {"name": "llama3.2", "connection": OLLAMA}
+JUDGE = {"name": "llama3.2:latest", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
+ATTACKER = {"name": "llama3.2:latest", "connection": OLLAMA}
 
 def roles_for(attack):
     """An adaptive attack searches with a model of its own; a static one
@@ -219,7 +219,7 @@ result = run_campaign({
 
 ### Summary Metrics
 
-Compute run-level metrics from `Verdict`s. `Panel.evaluate` produces them. `generate_summary_report` and `is_successful_result` (`hackagent.attacks.evaluator.metrics`) are removed; metrics take verdicts, not result rows. See [Evaluation](../../reference/evaluation.md).
+Compute run-level metrics from `Verdict`s. `Panel.evaluate` produces them. `generate_summary_report` and `is_successful_result` (`hackagent.attacks.evaluator.metrics`) are removed; metrics take verdicts, not result rows. See [Evaluation](../../cli/campaign-files/evaluation.md).
 
 ```python
 from hackagent.core.contracts import Sample

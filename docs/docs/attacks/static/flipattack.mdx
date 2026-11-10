@@ -1,0 +1,196 @@
+---
+title: "FlipAttack"
+description: "Prompt obfuscation via character/word flipping modes."
+sidebar_position: 3
+---
+
+import Generated from './_flipattack.generated.mdx';
+
+FlipAttack reverses the goal, word by word or character by character, and asks
+the target to flip it back and carry it out. A system prompt tells the target
+to read the reversed task silently, never repeat it, never refuse, and answer
+in detail. The target gets one request per goal.
+
+It works because a reversed sentence looks like noise to a filter that reads
+text left to right, while a capable model can still recover it when told how.
+The harmful request is never written out in plain form, so input classifiers
+and the model's own refusal training have less to react to.
+
+## At a glance
+
+| Type | Helper models | Turns | Calls per goal | Good for |
+|---|---|---|---|---|
+| Static | None | 1 (system + user message) | 1 target + 1 per judge | A cheap one-query jailbreak, testing input guardrails against obfuscated text |
+
+## Research
+
+*FlipAttack: Jailbreak LLMs via Flipping*, by Yue Liu, Xiaoxin He, Miao Xiong,
+Jinlan Fu, Shumin Deng, Yingwei Ma, Jiaheng Zhang and Bryan Hooi, ICML 2025
+([arXiv:2410.02832](https://arxiv.org/abs/2410.02832), code at
+[yueliu1999/FlipAttack](https://github.com/yueliu1999/FlipAttack)).
+
+The paper builds "left-side noise" from the prompt itself in four flipping
+modes, and adds guidance that helps the model denoise and execute it. It
+reports about 98% attack success on GPT-4o with a single query, and about 98%
+average bypass across five guardrail models (OpenAI's moderation endpoint,
+three Llama Guard versions and WildGuard).
+
+HackAgent's prompts follow the authors' code. Where it differs:
+
+- **Guidance options are independent.** The paper's four variants are
+  cumulative: vanilla, then adding chain of thought, then LangGPT, then
+  few-shot examples. In HackAgent `cot`, `lang_gpt` and `few_shot` are
+  separate switches you can combine in any way.
+- **One configuration per attack entry.** The paper picks a mode and variant
+  per target model (its appendix lists them). HackAgent uses the one you
+  configure for every goal; to compare modes, run separate campaigns.
+- **No decoding of the reply.** The judges read the reply as the target wrote
+  it, against the original goal.
+
+## How it works
+
+1. The goal is flipped according to `flip_mode`:
+   - `FWO` reverses the word order;
+   - `FCW` reverses the characters inside each word;
+   - `FCS` reverses the whole sentence;
+   - `FMM`, the paper's "fool model mode", reverses the whole sentence but
+     tells the target to flip each *word*, and shows word-order examples.
+2. The system message is built. By default it is the paper's rule list (solve
+   the task, never refuse, never use words such as "sorry" or "cannot") and two
+   steps: read the task by flipping it back, then finish it in detail. `cot`
+   adds "step by step" to the second step.
+3. With `lang_gpt`, the system message is instead a structured role prompt
+   (Role, Profile, Rules, Target), and the two steps move into the user
+   message with a worked example of un-flipping "give me an apple" (replaced
+   by the few-shot examples when `few_shot` is on).
+4. With `few_shot`, the goal is split into two halves, and each half is shown
+   flipped and un-flipped, around a fixed "Follow my instruction" example.
+   The examples go in the system message, or in the user message when
+   `lang_gpt` is on. `few_shot` needs a goal of at least two words.
+5. The user message is `TASK is '…'` with the flipped goal.
+6. The target replies; the panel judges the reply against the original goal.
+
+```mermaid
+flowchart TB
+  G["goal"] --> F["flip<br/><small>flip_mode</small>"]
+  F --> U["user message<br/><small>TASK is '…'</small>"]
+  R["rules + decode steps<br/><small>cot · lang_gpt · few_shot</small>"] --> S["system message"]
+  S --> T["target"]
+  U --> T
+  T --> J["judge panel"]
+  J --> V["verdict"]
+```
+
+## When to use it
+
+- **A first real jailbreak attempt.** It costs the same as
+  [Baseline](baseline.mdx) and is often much stronger, so it is a good
+  second rung on an escalation ladder.
+- **Input guardrails.** A classifier in front of the target sees reversed
+  text. Put FlipAttack behind your
+  [guardrails](../../cli/campaign-files/guardrails.md) to see whether they
+  catch it.
+- **Capable chat models.** Recovering a reversed sentence takes a strong
+  model. Large instruction-tuned models decode it reliably; small ones often
+  answer gibberish, which is neither a refusal nor a jailbreak.
+
+Use something else when:
+
+- the target is an agent you reach only through its user turn (see
+  [Limitations](#limitations)). The rules are lost (and the decoding steps
+  too, unless `lang_gpt` is on); try
+  [Static Template](static_template.mdx) or [PAP](../adaptive/pap.mdx);
+- the target refuses even the flipped prompt. [BoN](../adaptive/bon.mdx)
+  tries many random perturbations instead of one fixed one, and
+  [TAP](../adaptive/tap.mdx) rewrites the prompt from the replies.
+
+## Cost
+
+Per goal, with `J` judges:
+
+| Calls to | Count |
+|---|---|
+| Target | 1 |
+| Helper models | 0 |
+| Judges | `J` (one panel evaluation) |
+
+No parameter changes the number of calls. `lang_gpt` and `few_shot` make the
+request longer, so they cost more input tokens on the target, not more calls.
+
+## Configuration
+
+<Generated />
+
+### Example: the default, with chain of thought
+
+```yaml
+attacks:
+  - name: flipattack
+    parameters:
+      cot: true
+```
+
+Sentence flip, with the answer asked for step by step, the variant the paper
+used for GPT-4 (vanilla + chain of thought). Start here for a capable chat model.
+
+### Example: the full guidance stack
+
+```yaml
+attacks:
+  - name: flipattack
+    parameters:
+      flip_mode: FCS
+      cot: true
+      lang_gpt: true
+      few_shot: true
+```
+
+Every guidance option on, the paper's variant D, which it used for GPT-4o
+and Mixtral 8x22B. Use it against a target that resists the plain prompt. Its few-shot examples spell out both
+halves of the goal in plain text, so it hides less from an input filter.
+
+## Reading the results
+
+One goal gives one attempt. Its trace holds a `target` call, whose request
+shows the system message and the flipped `TASK`, and a `panel` call with the
+votes. In the dashboard's conversation view it is a single exchange.
+
+A jailbreak verdict means the target recovered the goal and answered it. Check
+the reply first:
+
+- **The reply restates or solves a different task.** The target mis-decoded
+  the flip. A "safe" verdict here says nothing about its defences; try
+  `lang_gpt` or `few_shot`, which show worked un-flipping examples, or another
+  `flip_mode`.
+- **The reply refuses in plain words.** The target decoded the goal and
+  declined. That is a real mitigation.
+- **The reply is still reversed text.** Some models answer in kind. The judges
+  read it as written, so they may miss a harmful answer.
+
+## Limitations
+
+- **It needs the system message.** Chat-model targets (`OPENAI`, `OLLAMA`,
+  `LITELLM`, `LANGCHAIN`) receive the whole request. Agent targets reached
+  through `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES` or `WEB` receive only
+  the text of the last user message, so the rules and decoding steps are
+  dropped (unless `lang_gpt` moves the steps into the user message).
+- It models an attacker who controls the system prompt, as when calling a
+  model API directly. A deployed assistant with its own system prompt is a
+  harder setting than the paper's.
+- Weak models cannot decode the flip, so a low success rate on a small target
+  may reflect capability, not safety.
+- `few_shot` writes both halves of the goal in plain text, as the paper notes,
+  which undoes part of the obfuscation.
+- One fixed prompt per goal: there is no retry with another mode.
+
+## Related
+
+- [CipherChat](cipherchat.mdx): obfuscation by cipher instead of reversal.
+- [BoN](../adaptive/bon.mdx): random character-level perturbations, many per
+  goal.
+- [h4rm3l](../adaptive/h4rm3l.mdx): composable text transformations, with an
+  optional search.
+- [Baseline](baseline.mdx): the control rate to compare against.
+- [Guardrails](../../cli/campaign-files/guardrails.md): put a classifier in
+  front of the target and test it with this attack.
+- [Jailbreak](../../risks/vulnerabilities/jailbreak.md): the risk it measures.

@@ -155,17 +155,13 @@ jobs:
           flags: unit
           fail_ci_if_error: true
 
-  # ── Integration (offline) ─────────────────────────────────────────────────
-  # Covers tests/integration/tui/ — mock-based TUI integration tests
-  # that exercise widget composition + lifecycle without external
-  # services. (The former tests/integration/storage/ moved to
-  # tests/unit/server/storage/ since it only exercised the in-memory
-  # local backend.)
+  # Deterministic integrations use local HTTP fixtures and SQLite; no secrets
+  # or downloaded models. They protect every PR before it reaches stage.
   integration-offline:
     name: Integration Tests (Offline)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     steps:
       - uses: actions/checkout@v7
 
@@ -187,13 +183,22 @@ jobs:
         run: >
           uv run pytest
           tests/integration/tui/
-          --run-integration
+          tests/integration/offline/
+          --fail-on-skip
+          --junitxml=reports/integration.xml
           -n auto
           --dist=loadfile
           -m "not slow"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
+
+      - name: Upload integration results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-integration-offline
+          path: reports/integration.xml
 
       - name: Upload offline-integration coverage artifact
         uses: actions/upload-artifact@v7
@@ -228,6 +233,8 @@ jobs:
       HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OLLAMA_MODEL: tinyllama
+      # Pinned so the cached install matches; bump to upgrade.
+      OLLAMA_RELEASE: "0.40.15"
       # Let Ollama serve concurrent requests from pytest-xdist workers.
       OLLAMA_NUM_PARALLEL: "4"
       TEST_MAX_TOKENS_FAST: "15"
@@ -247,11 +254,60 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Ollama
+      - name: Cache Ollama
+        id: ollama-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/ollama
+          key: ollama-${{ env.OLLAMA_RELEASE }}-cpu-${{ runner.os }}
+
+      - name: Download Ollama
+        if: steps.ollama-cache.outputs.cache-hit != 'true'
+        # The release archive is ~1.5 GB, almost all of it CUDA libraries a
+        # CPU runner never loads, and streaming it into tar (as ollama.com's
+        # install script does) fails whenever the connection drops. Download
+        # it to a file so retries resume, keep only the binary and the CPU
+        # libraries (~75 MB), and let the cache serve later runs without any
+        # download.
         run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-          ollama serve &
-          sleep 5
+          archive="$RUNNER_TEMP/ollama.tar.zst"
+          downloaded=""
+          for url in \
+            "https://github.com/ollama/ollama/releases/download/v${OLLAMA_RELEASE}/ollama-linux-amd64.tar.zst" \
+            "https://ollama.com/download/ollama-linux-amd64.tar.zst?version=${OLLAMA_RELEASE}"; do
+            rm -f "$archive"
+            # curl's own --retry rewinds to the offset it started from, so each
+            # attempt is a new curl that resumes from the partial file.
+            for attempt in 1 2 3 4 5 6 7 8; do
+              if curl -fL --connect-timeout 30 -C - -o "$archive" "$url"; then
+                downloaded=yes
+                break 2
+              fi
+              sleep 10
+            done
+          done
+          if [ -z "$downloaded" ]; then
+            echo "::error::Could not download Ollama ${OLLAMA_RELEASE}"
+            exit 1
+          fi
+          mkdir -p ~/ollama
+          zstd -dc "$archive" | tar -xf - -C ~/ollama \
+            --exclude='lib/ollama/cuda_*' --exclude='lib/ollama/rocm*' \
+            --exclude='lib/ollama/vulkan*' --exclude='lib/ollama/mlx*'
+          rm -f "$archive"
+
+      - name: Start Ollama
+        run: |
+          echo "$HOME/ollama/bin" >> "$GITHUB_PATH"
+          "$HOME/ollama/bin/ollama" serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          # At most 30 s in all, and 2 s per probe: a server that accepts the
+          # connection but never answers must not hold the job until it times out.
+          if ! timeout 30 sh -c \
+               'until curl -fsS -m 2 http://127.0.0.1:11434/api/version; do sleep 1; done'; then
+            echo "::error::Ollama did not answer within 30 s"
+            cat "$RUNNER_TEMP/ollama.log"
+            exit 1
+          fi
 
       - name: Cache Ollama models
         uses: actions/cache@v6
@@ -281,12 +337,24 @@ jobs:
           tests/integration/models/
           tests/integration/attacks/
           --run-integration
+          --fail-on-skip
+          --junitxml=reports/integration-ollama.xml
           -n auto
           --dist=loadfile
           -m "${{ matrix.shard == 'slow' && 'slow' || 'not slow' }}"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
+
+      - name: Upload ADK diagnostics and test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-integration-ollama-${{ matrix.shard }}
+          path: |
+            reports/adk-server-*.log
+            reports/integration-ollama.xml
+          retention-days: 7
 
       - name: Upload Ollama-integration coverage artifact
         uses: actions/upload-artifact@v7
@@ -297,19 +365,16 @@ jobs:
           retention-days: 1
 
   # ── E2E tests ─────────────────────────────────────────────────────────────
-  # Requires OPENROUTER_API_KEY (and optionally HACKAGENT_API_KEY).
-  # Skips gracefully when secrets are absent.
+  # Real CLI processes and local providers; all cases must execute.
   test-e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     env:
-      HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      TEST_MAX_TOKENS_FAST: "15"
-      TEST_MAX_TOKENS_MEDIUM: "25"
-      TEST_MAX_TOKENS_SLOW: "40"
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
+      HF_HUB_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
     steps:
       - uses: actions/checkout@v7
 
@@ -331,10 +396,18 @@ jobs:
         run: >
           uv run pytest
           tests/e2e/
-          --ignore=tests/e2e/attacks
+          --fail-on-skip
+          --junitxml=reports/e2e.xml
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
+
+      - name: Upload e2e results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-e2e
+          path: reports/e2e.xml
 
       - name: Upload e2e coverage artifact
         uses: actions/upload-artifact@v7
@@ -343,6 +416,43 @@ jobs:
           path: reports/.coverage
           include-hidden-files: true
           retention-days: 1
+
+  # ── Dashboard smoke ───────────────────────────────────────────────────────
+  # `hackagent web` driven by a real browser: every page renders and no API
+  # call fails (tests/smoke). It uses the newest hackagent-webui pre-release,
+  # which hackagent-webapp publishes from its stage branch: the dashboard this
+  # branch's offline API is developed against. `--no-sync` keeps uv from
+  # reinstalling the locked release over it.
+  dashboard-smoke:
+    name: Dashboard Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: uv sync --group dev --extra web
+
+      - name: Install the stage dashboard bundle
+        run: uv pip install --prerelease allow --upgrade "hackagent-webui<1.0"
+
+      - name: Install Chromium
+        run: uv run --no-sync playwright install --with-deps chromium
+
+      - name: Run the dashboard smoke check
+        run: uv run --no-sync pytest tests/smoke/ --fail-on-skip -v --tb=short
 
   # ── Coverage merge & upload ───────────────────────────────────────────────
   # Downloads all per-job .coverage files, combines them into one, generates

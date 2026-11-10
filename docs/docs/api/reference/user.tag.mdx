@@ -1,0 +1,20 @@
+---
+id: user
+title: "User profile"
+description: "User profile"
+custom_edit_url: null
+---
+
+
+
+The caller's user profile: name, email and preferences.
+
+
+
+```mdx-code-block
+import DocCardList from '@theme/DocCardList';
+import {useCurrentSidebarCategory} from '@docusaurus/theme-common';
+
+<DocCardList items={useCurrentSidebarCategory().items}/>
+```
+      

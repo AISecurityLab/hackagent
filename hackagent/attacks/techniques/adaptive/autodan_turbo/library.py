@@ -51,9 +51,11 @@ class StrategyLibrary:
         record["Embeddings"].append(list(vector) if vector is not None else None)
 
     def size(self) -> int:
+        """Number of distinct strategy names."""
         return len(self.strategies)
 
     def all(self) -> dict[str, dict[str, Any]]:
+        """Every strategy by name, as stored (the library's own dict, not a copy)."""
         return self.strategies
 
     def retrieve(

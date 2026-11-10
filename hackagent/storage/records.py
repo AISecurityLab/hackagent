@@ -33,6 +33,13 @@ class OrganizationContext(BaseModel):
 
 
 class AgentRecord(BaseModel):
+    """A target agent that runs are attached to.
+
+    ``metadata`` is the agent's model config (a dumped ``ModelConfig``);
+    ``agent_type`` and ``endpoint`` are copied from its connection. ``owner`` is
+    ``"local"`` in local storage.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     id: UUID
@@ -67,6 +74,13 @@ def canonical_attack_type(value: str) -> str:
 
 
 class AttackRecord(BaseModel):
+    """An attack configuration recorded against an agent.
+
+    ``type`` is normalised to the canonical attack id on load, so records
+    written by earlier releases (``"PAIR"``, ``"AdvPrefix"``) read as
+    ``"pair"``, ``"advprefix"``.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     id: UUID
@@ -100,9 +114,37 @@ class CampaignRunRecord(BaseModel):
     run_notes: Optional[str]
     created_at: datetime
     updated_at: datetime
+    #: The saved campaign it was launched from, when the dashboard launched it.
+    campaign_id: Optional[UUID] = None
+    #: The dashboard launched it, in the ``hackagent web`` process. Kept when
+    #: the saved campaign is deleted and ``campaign_id`` cleared.
+    launched: bool = False
+
+
+class CampaignRecord(BaseModel):
+    """A campaign saved from the dashboard: a spec without target and execution.
+
+    The target comes from the agent's config when the campaign is launched.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    name: str
+    description: str
+    agent_id: UUID
+    spec: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
 
 
 class RunRecord(BaseModel):
+    """One attack run: a single technique executed against an agent.
+
+    ``campaign_run_id`` links it to the campaign run it belongs to. ``status``
+    is a ``RunStatus`` value.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     id: UUID
@@ -117,6 +159,12 @@ class RunRecord(BaseModel):
 
 
 class ResultRecord(BaseModel):
+    """One attempt at one goal within a run, with its evaluation.
+
+    ``evaluation_status`` is an ``EvalStatus`` value, ``NOT_EVALUATED`` until
+    the judges have scored the attempt.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     id: UUID
@@ -132,6 +180,8 @@ class ResultRecord(BaseModel):
 
 
 class TraceRecord(BaseModel):
+    """One step of a result's trace, ordered within the result by ``sequence``."""
+
     model_config = ConfigDict(frozen=True)
 
     id: UUID
@@ -143,6 +193,8 @@ class TraceRecord(BaseModel):
 
 
 class PaginatedResult(BaseModel, Generic[T]):
+    """One page of records and the total number of records across all pages."""
+
     model_config = ConfigDict(frozen=True)
 
     items: List[T]

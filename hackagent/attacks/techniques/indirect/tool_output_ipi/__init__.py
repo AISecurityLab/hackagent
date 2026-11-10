@@ -3,7 +3,9 @@
 
 """Tool-output indirect prompt injection: poison what a tool returns.
 
-Based on InjecAgent: https://arxiv.org/abs/2403.02691
+Follows Zhan et al., "InjecAgent: Benchmarking Indirect Prompt Injections
+in Tool-Integrated Large Language Model Agents" (2024, arXiv:2403.02691).
+See :mod:`.attack` for the algorithm.
 """
 
 from .attack import ToolOutputIPIAttack

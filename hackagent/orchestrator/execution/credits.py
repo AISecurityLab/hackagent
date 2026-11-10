@@ -45,6 +45,7 @@ class CreditGuard:
         self.on_trip: Optional[Callable[[], None]] = None
 
     def is_gateway(self, config: ModelConfig) -> bool:
+        """Return whether ``config`` calls this gateway with the gateway key."""
         connection = config.connection
         return (
             connection.endpoint == self.endpoint
@@ -69,6 +70,11 @@ class CreditGuard:
         return guarded_build
 
     def check(self, response: ModelResponse) -> ModelResponse:
+        """Pass ``response`` through, tripping the guard on a 402.
+
+        Raises:
+            OutOfCredits: When the response is a 402 from the gateway.
+        """
         error = response.error
         if error is not None and error.status_code == PAYMENT_REQUIRED:
             self.trip()
@@ -76,10 +82,16 @@ class CreditGuard:
         return response
 
     def refuse_if_tripped(self) -> None:
+        """Raise if the guard has tripped, so no further gateway call is sent.
+
+        Raises:
+            OutOfCredits: When the guard has tripped.
+        """
         if self.tripped.is_set():
             raise OutOfCredits()
 
     def trip(self) -> None:
+        """Set the guard and run ``on_trip``; a call once it is set does nothing."""
         if self.tripped.is_set():
             return
         self.tripped.set()

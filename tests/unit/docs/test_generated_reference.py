@@ -3,12 +3,12 @@
 
 """The generated reference pages must match the code they are generated from.
 
-The docs site's reference section is written by
-``docs/scripts/generate_reference.py``. If someone changes a field, an attack
-parameter or a CLI option without regenerating, these tests fail and say so,
-which is the whole point: generated docs cannot drift.
+The campaign-file pages, the command list and the attack partials are
+written by ``docs/scripts/generate_reference.py``. If someone changes a
+field, an attack parameter or a CLI option without regenerating, these tests
+fail and say so, which is the whole point: generated docs cannot drift.
 
-They also check the YAML examples in those pages, so a snippet a reader copies
+They also check the YAML examples in those files, so a snippet a reader copies
 is one the campaign format actually accepts.
 """
 
@@ -23,7 +23,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPTS = ROOT / "docs" / "scripts"
-REFERENCE = ROOT / "docs" / "docs" / "reference"
+DOCS = ROOT / "docs" / "docs"
+CAMPAIGN_FILES = DOCS / "cli" / "campaign-files"
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -53,30 +54,33 @@ def test_the_committed_pages_match_the_code(generated):
     )
 
 
-def test_no_stale_pages_are_left_behind(generated):
-    on_disk = {path for path in REFERENCE.rglob("*.md")}
-    assert on_disk - set(generated) == set()
+def test_no_stale_files_are_left_behind(generated):
+    import generate_reference
+
+    assert generate_reference.owned() - set(generated) == set()
 
 
 def test_every_section_of_the_campaign_format_has_a_page(generated):
     from hackagent.orchestrator.campaign.spec import CampaignSpec
 
-    # A section is documented either as `<name>.md` or as `<name>/index.md`.
-    pages = {path.stem for path in generated if path.suffix == ".md"}
-    pages |= {path.parent.name for path in generated if path.name == "index.md"}
+    pages = {path.stem for path in generated if path.parent == CAMPAIGN_FILES}
     missing = [
         name
         for name in CampaignSpec.model_fields
         if name not in pages and name != "version"
     ]
-    assert missing == [], f"no reference page documents: {missing}"
+    assert missing == [], f"no campaign-files page documents: {missing}"
 
 
-def test_every_attack_has_a_page(generated):
+def test_every_attack_has_a_partial(generated):
     from hackagent.attacks.techniques.registry import ATTACKS
 
-    pages = {path.stem for path in generated if path.parent.name == "attacks"}
-    assert set(ATTACKS) - pages == set()
+    partials = {
+        path.name[1 : -len(".generated.mdx")]
+        for path in generated
+        if path.name.endswith(".generated.mdx")
+    }
+    assert set(ATTACKS) - partials == set()
 
 
 def _yaml_blocks(text: str) -> list[str]:
@@ -84,9 +88,10 @@ def _yaml_blocks(text: str) -> list[str]:
 
 
 def _example_pages() -> list[tuple[str, str]]:
+    pages = [*CAMPAIGN_FILES.rglob("*.md"), *DOCS.glob("attacks/**/_*.generated.mdx")]
     return [
-        (str(path.relative_to(REFERENCE)), path.read_text(encoding="utf-8"))
-        for path in sorted(REFERENCE.rglob("*.md"))
+        (str(path.relative_to(DOCS)), path.read_text(encoding="utf-8"))
+        for path in sorted(pages)
     ]
 
 
@@ -108,7 +113,7 @@ def test_the_complete_example_is_a_valid_campaign():
     """The campaign on the landing page must resolve, not merely parse."""
     from hackagent.orchestrator.campaign.spec import CampaignSpec
 
-    blocks = _yaml_blocks((REFERENCE / "index.md").read_text(encoding="utf-8"))
+    blocks = _yaml_blocks((CAMPAIGN_FILES / "index.md").read_text(encoding="utf-8"))
     full = [block for block in blocks if "version:" in block and "attacks:" in block]
     assert full, "the landing page should show one complete campaign"
     for block in full:
@@ -138,7 +143,10 @@ _PRIVATE = ("hackagent/storage/_http", "hackagent/attacks/_lib/legacy_seams")
 #: its private helpers under public names.
 _RENAMED = {
     "interfaces/web/__init__": "interfaces/web/index",
+    "interfaces/web/_launcher": "interfaces/web/launcher",
     "interfaces/web/_local_api": "interfaces/web/local_api",
+    "interfaces/web/_remote_launcher": "interfaces/web/remote_launcher",
+    "interfaces/web/_run_reports": "interfaces/web/run_reports",
     "interfaces/web/_proxy": "interfaces/web/proxy",
     "interfaces/web/_serializers": "interfaces/web/serializers",
     "interfaces/web/_static": "interfaces/web/static",

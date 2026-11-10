@@ -1,49 +1,90 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Configuration for the image (FC) and text (tFC) flowchart attacks."""
+"""Configuration for the image (FC) and text (tFC) flowchart attacks.
 
-from typing import Literal
+Both draw the steps a *step-description generator* writes for the goal
+(Zhang et al., FC-Attack, EMNLP 2025 Findings). The generator is the
+``attacker`` role. The authors' generator is Mistral-7B-Instruct-v0.1,
+LoRA-fine-tuned on benign how-to steps; its weights are not released, so
+any model that answers in the same numbered format can stand in.
+"""
+
+from typing import ClassVar, Literal, Optional
 
 from pydantic import Field
 
-from ..base import AttackParams
+from ..base import AttackParams, Completion
 
 Layout = Literal["vertical", "horizontal", "tortuous", "s_shaped"]
 TextFormat = Literal["dot", "mermaid", "tikz", "plantuml", "ascii"]
 
 
 class FCParams(AttackParams):
-    """How the goal is drawn as a flowchart image."""
+    """How the goal is drawn as a flowchart image.
+
+    ``attacker`` writes the steps; ``num_steps`` and ``truncate_last_step``
+    decide how many are shown and whether the last is cut short; ``layout``
+    and ``dpi`` control the Graphviz rendering.
+    """
+
+    REQUIRED_ROLES: ClassVar[frozenset[str]] = frozenset({"attacker"})
 
     layout: Layout = Field(
         default="vertical",
-        description="Shape of the flowchart: vertical, horizontal, tortuous or s_shaped.",
+        description=(
+            "Shape of the flowchart: vertical, horizontal, or tortuous (s_shaped is"
+            " an alias), a snake of three-node rows."
+        ),
     )
     dpi: int = Field(
         default=600,
         ge=72,
         le=1200,
-        description="Resolution of the rendered flowchart image.",
+        description="Resolution of the rendered flowchart image, in dots per inch.",
     )
     num_steps: int = Field(
-        default=6, ge=2, le=15, description="How many steps the goal is split into."
+        default=5,
+        ge=1,
+        le=10,
+        description=(
+            "How many of the generated steps the flowchart shows, from the first. "
+            "The paper compares 1, 3, 5 and all (at most 10)."
+        ),
     )
     truncate_last_step: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "Cut the last step off mid-sentence, so the target is invited to "
-            "complete it."
+            "Cut the last step off mid-sentence. Not part of FC-Attack, whose "
+            "flowcharts keep every step whole."
+        ),
+    )
+    attacker: Optional[Completion] = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+        description=(
+            "Step-description generator: writes the numbered steps for the goal "
+            "that the flowchart shows."
         ),
     )
 
 
 class tFCParams(AttackParams):
-    """How the goal is written as a textual flowchart."""
+    """How the goal is written as a textual flowchart.
+
+    The same step options as :class:`FCParams`, with ``text_format`` (the
+    diagram language) in place of the image resolution.
+    """
+
+    REQUIRED_ROLES: ClassVar[frozenset[str]] = frozenset({"attacker"})
 
     layout: Layout = Field(
         default="vertical",
-        description="Shape of the flowchart: vertical, horizontal, tortuous or s_shaped.",
+        description=(
+            "Shape of the flowchart: vertical, horizontal, or tortuous (s_shaped is"
+            " an alias), a snake of three-node rows."
+        ),
     )
     text_format: TextFormat = Field(
         default="dot",
@@ -53,12 +94,27 @@ class tFCParams(AttackParams):
         ),
     )
     num_steps: int = Field(
-        default=6, ge=2, le=15, description="How many steps the goal is split into."
+        default=5,
+        ge=1,
+        le=10,
+        description=(
+            "How many of the generated steps the flowchart shows, from the first. "
+            "The paper compares 1, 3, 5 and all (at most 10)."
+        ),
     )
     truncate_last_step: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "Cut the last step off mid-sentence, so the target is invited to "
-            "complete it."
+            "Cut the last step off mid-sentence. Not part of FC-Attack, whose "
+            "flowcharts keep every step whole."
+        ),
+    )
+    attacker: Optional[Completion] = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+        description=(
+            "Step-description generator: writes the numbered steps for the goal "
+            "that the flowchart shows."
         ),
     )

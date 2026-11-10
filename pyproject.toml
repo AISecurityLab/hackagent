@@ -134,7 +134,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["hackagent"]
 # `artifacts` re-includes paths that .gitignore excludes. The web UI bundle is
-# a build output (scripts/build_webui.sh) but must ship in the wheel, otherwise
+# a build output (deploy/web/build_webui.sh) but must ship in the wheel, otherwise
 # `hackagent web` has nothing to serve.
 artifacts = [
     "hackagent/examples/**",
@@ -148,6 +148,7 @@ include = [
 ]
 
 [tool.coverage.run]
+branch = true
 data_file = "reports/.coverage"
 source = ["hackagent"]
 omit = [
@@ -171,7 +172,7 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/integration", "tests/e2e", "tests/live"]
+testpaths = ["tests/unit", "tests/integration", "tests/e2e", "tests/smoke", "tests/live"]
 addopts = "--timeout=120"
 markers = [
     "live: sends real requests to a local Ollama (use --run-live to enable)",
@@ -180,7 +181,7 @@ markers = [
     "openai_sdk: marks tests that require OpenAI/OpenRouter API key",
     "google_adk: marks tests that require a live Google ADK server (use --run-google-adk to enable)",
     "litellm: marks tests that require a LiteLLM-compatible backend",
-    "e2e: marks end-to-end tests that require external services",
+    "e2e: deterministic end-to-end tests using controlled local services",
     "hackagent_backend: marks tests that require the HackAgent backend API",
     "slow: marks slow-running tests (excluded from CI, run nightly)",
 ]
@@ -212,13 +213,39 @@ extend-exclude = ["*.md"]
 [tool.ruff.lint]
 # Ruff 0.16 widened its implicit default rule selection. Pin the rule set the
 # codebase was linted against so version bumps do not silently add new rules.
-select = ["E4", "E7", "E9", "F"]
+#
+# D100-D104 and D106 require a docstring on every public module, package,
+# class, method and function. Only the missing-docstring rules are selected,
+# not pydocstyle's formatting rules; magic methods (D105) and __init__ (D107)
+# are exempt. Google style is the convention: see CONTRIBUTING.md.
+select = ["E4", "E7", "E9", "F", "D100", "D101", "D102", "D103", "D104", "D106"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Packages not yet documented to the D1 standard. They are removed package
+# by package: delete an entry, document what `ruff check` then reports, and
+# commit both together so the rule covers the package from then on.
+"hackagent/attacks/**" = ["D1"]
+"hackagent/evaluation/**" = ["D1"]
+"hackagent/interfaces/**" = ["D1"]
+"hackagent/examples/**" = ["D1"]
+# Generated from the API's OpenAPI schema by its scripts/generate.py, which
+# would discard hand-written docstrings; private to storage.remote.
+"hackagent/storage/_http/**" = ["D1"]
+# Not part of the SDK's API.
+"tests/**" = ["D1"]
+"docs/**" = ["D1"]
+"scripts/**" = ["D1"]
+"tools/**" = ["D1"]
+"deploy/**" = ["D1"]
 
 [tool.importlinter]
 root_packages = ["hackagent"]
 include_external_packages = true
 contract_types = [
-    "logging_handlers: lint.import_contracts.LoggingHandlersContract",
+    "logging_handlers: tools.lint.import_contracts.LoggingHandlersContract",
 ]
 
 [[tool.importlinter.contracts]]
@@ -230,6 +257,9 @@ layers = [
     "hackagent.orchestrator",
     # Depth 0. Pipes mean these siblings may not import each other.
     "hackagent.catalog | hackagent.attacks | hackagent.models | hackagent.storage | hackagent.evaluation | hackagent.datasets | hackagent.tracking",
+    # Pure reporting rules: storage keeps its tallies with them, and the
+    # platform API imports them, so they depend on nothing else.
+    "hackagent.reporting",
     "hackagent.core",
 ]
 ignore_imports = [

@@ -402,4 +402,4 @@ If your custom vulnerability addresses a common threat, consider contributing it
 ## Learn More
 
 - **[Vulnerabilities](./vulnerabilities)** — Study the 13 built-in vulnerability implementations and their threat profiles
-- **[Campaign reference](../reference/index.md)** — every field of the campaign format
+- **[Campaign files](../cli/campaign-files/index.md)** — every field of the campaign format

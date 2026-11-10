@@ -104,6 +104,12 @@ class AttackOutcome:
 
 @dataclass(frozen=True)
 class CampaignResult:
+    """The outcome of one campaign run: every attack's attempts and the files written.
+
+    A dry run has no attacks and no ``campaign_run_id``. Pass it to
+    :func:`summary` for a short machine-readable report.
+    """
+
     campaign_name: str
     run_id: str
     dry_run: bool
@@ -172,7 +178,19 @@ def trace_payload(node: TraceNode, output: OutputSpec) -> dict[str, Any]:
         payload["label"] = node.label
     data = dict(node.data)
     if node.node == "call":
-        if not output.save_prompts:
+        if isinstance(data.get("request"), dict) and (
+            data.get("role") == "panel" or "response" in data["request"]
+        ):
+            request = dict(data["request"])
+            if not output.save_prompts:
+                request.pop("prompt", None)
+            if not output.save_responses:
+                request.pop("response", None)
+            if request:
+                data["request"] = request
+            else:
+                data.pop("request", None)
+        elif not output.save_prompts:
             data.pop("request", None)
         if not output.save_responses:
             data.pop("response", None)
@@ -204,9 +222,10 @@ def write_outputs(
 
     ``campaign.yaml`` is the campaign that ran, so the run can be reproduced
     even when it was never saved as a file. ``results.json`` and/or
-    ``results.jsonl`` hold one row per attempt. Search traces of iterative
-    attacks go to ``traces.jsonl``, one line per attempt, so the result rows
-    stay readable, and a judge audit goes to ``audit.json``.
+    ``results.jsonl`` hold one row per attempt. Traces (an iterative attack's
+    search, a static attack's target and panel calls) go to ``traces.jsonl``,
+    one line per attempt, so the result rows stay readable, and a judge audit
+    goes to ``audit.json``.
     """
     directory = Path(output.directory).expanduser() / result.run_id
     directory.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,180 @@
+---
+title: "Configuration"
+description: "How Settings resolves the store, server and key, how API keys are passed from Python, and how to keep tests isolated."
+sidebar_position: 30
+---
+
+`Settings` is the one place HackAgent reads its configuration: which store to
+use, which server, which platform key, and where the local database lives.
+`HackAgent` and `run_campaign` both take one. When you pass none, each
+resolves its own from the environment and the config file.
+
+## How a value is chosen
+
+Each setting comes from the first source that has it:
+
+```text
+explicit argument  >  environment variable  >  config file  >  default
+```
+
+| `Settings.resolve` argument | Environment variable | Default |
+|---|---|---|
+| `backend` | `HACKAGENT_BACKEND` | `local` |
+| `db_path` | `HACKAGENT_DB_PATH` | `~/.local/share/hackagent/hackagent.db` |
+| `base_url` | `HACKAGENT_BASE_URL` | `https://api.hackagent.dev` |
+| `api_key` | `HACKAGENT_API_KEY` | none |
+| `ca_bundle` | `REQUESTS_CA_BUNDLE`, then `SSL_CERT_FILE` | the system trust store |
+
+An empty environment variable counts as unset. [API connection settings](../../cli/configuration.md)
+covers the base URL, CA bundles and proxies in full; they behave the same
+from Python and from the CLI.
+
+Every value records where it came from, which helps when a run goes somewhere
+you did not expect:
+
+```python
+from hackagent import Settings
+
+settings = Settings.resolve()
+print(settings.backend.value, settings.backend_source.value)
+print(settings.db_path, settings.db_path_source.value)
+print(settings.base_url, settings.base_url_source.value)
+print("API key set:", settings.api_key is not None, settings.api_key_source.value)
+print(settings)  # the key is left out of repr
+```
+
+```text
+local default
+/home/you/.local/share/hackagent/hackagent.db default
+https://api.hackagent.dev default
+API key set: False default
+```
+
+`Settings` is frozen: build a new one with `Settings.resolve(...)` to change a
+value. Nothing is read at import time, only when you call `resolve`.
+
+## The config file
+
+`~/.config/hackagent/config.json` holds saved choices. `hackagent init` and
+`hackagent config set` write it; you can also write it yourself, as JSON or
+YAML. It may set `backend`, `db_path`, `base_url`, `ca_bundle` and `api_key`.
+An `api_key` there must be a `${VARIABLE}` reference; a literal key is
+refused with a `CredentialError`.
+
+```json title="config_file.json"
+{
+  "backend": "local",
+  "db_path": "./team.db",
+  "api_key": "${HACKAGENT_API_KEY}"
+}
+```
+
+```python
+from hackagent import Settings
+
+settings = Settings.resolve(config_path="config_file.json")
+print(settings.db_path, settings.db_path_source.value)              # team.db config file
+print(settings.api_key is not None, settings.api_key_source.value)  # True config file
+```
+
+The file names `HACKAGENT_API_KEY`, so that variable must be set: a
+reference to an unset variable raises `CredentialError`. A missing file is an
+empty config, not an error. A relative `db_path` is relative to the directory
+you run from.
+
+## Keep tests and CI isolated
+
+A test should not read your personal config or write to your personal
+database. Pass `env` (used instead of `os.environ`) and a `config_path` that
+does not exist:
+
+```python
+from hackagent import Settings
+
+settings = Settings.resolve(
+    env={"HACKAGENT_DB_PATH": "/tmp/ci.db", "HACKAGENT_BACKEND": "local"},
+    config_path="ci-config.json",  # a missing file is an empty config
+)
+print(settings.db_path, settings.db_path_source)  # /tmp/ci.db Source.ENV
+```
+
+Then hand the same settings to everything that needs them:
+`run_campaign(..., settings=settings)` and `HackAgent(settings)`. With
+`db_path=":memory:"` the store lives in memory and disappears with the
+process.
+
+## API keys
+
+There are two kinds of key, set in different places.
+
+**The platform key** authenticates you to the HackAgent platform: remote
+storage and the LLM gateway. `Settings` reads `HACKAGENT_API_KEY` when you do
+not pass `api_key`. In Python, pass the value itself:
+
+```python
+import os
+
+from hackagent import Settings
+
+settings = Settings.resolve(api_key=os.environ["HACKAGENT_API_KEY"])
+```
+
+The key is held in memory only. It is left out of `repr(settings)` and never
+written to the store or to a run's files.
+
+**Model keys** belong to the models a campaign calls: a hosted target, an
+attacker or judge on a provider. Each sits in its model's `connection.api_key`
+in the campaign. How you may write it depends on where the campaign comes
+from:
+
+| Campaign from | `api_key` may be | What is recorded with the run |
+|---|---|---|
+| A YAML file | A `${VARIABLE}` reference only | The reference |
+| A Python dict | A reference, or the value | The reference, or nothing for a value |
+
+```python
+import os
+
+from hackagent.orchestrator.campaign import load_campaign
+
+target = {"name": "gpt-4o-mini", "connection": {
+    "provider": "openai", "type": "OPENAI", "endpoint": "https://api.openai.com/v1",
+    "api_key": "${OPENAI_API_KEY}",           # recorded as the reference
+    # "api_key": os.environ["OPENAI_API_KEY"],  # used, but never recorded
+}}
+spec = load_campaign({
+    "version": 1,
+    "campaign": {"name": "Hosted target"},
+    "dataset": {"source": {"type": "inline", "goals": ["A goal"]}},
+    "target": target,
+    "attacks": [{"name": "baseline"}],
+})
+print(spec.recorded()["target"]["connection"]["api_key"])  # ${OPENAI_API_KEY}
+```
+
+Prefer the reference: the recorded campaign then names the variable it needs,
+so it can be run again elsewhere. A reference whose variable is unset or empty
+raises `CredentialError` when the campaign is loaded. HackAgent never guesses
+a variable name: a model with no `api_key` gets none, except a HackAgent
+gateway model, which gets the platform key (see
+[The HackAgent platform](./platform.mdx)).
+
+## Local Ollama
+
+An `OLLAMA` model with no `endpoint` goes to the first of `OLLAMA_BASE_URL`,
+`OLLAMA_API_BASE` and `OLLAMA_HOST` that is set, else
+`http://localhost:11434`. `settings.ollama_base_url` shows the result. Write
+an `endpoint` in the campaign to pin one.
+
+## Logging
+
+Importing `hackagent` installs no logging handler, so the library is quiet
+until you configure `logging`. Its loggers are named after its modules, under
+`hackagent`:
+
+```python
+import logging
+
+logging.basicConfig(format="%(asctime)s %(name)s %(message)s")
+logging.getLogger("hackagent").setLevel(logging.INFO)
+```

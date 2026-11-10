@@ -1,0 +1,70 @@
+---
+id: run-summary-list
+title: "List campaign runs with their verdicts"
+description: "Returns the caller's campaign runs (parent runs only), newest first, each with its goal verdicts over all its attack runs: how many goals were jailbroken, mitigated or are unresolved. Filter by `campaign`, `agent` or `status`; a malformed id matches nothing. Paginated with `page` and `page_size` (at most 100). This is the dashboard's run list. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed."
+sidebar_label: "List campaign runs with their verdicts"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"List campaign runs with their verdicts"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/run/summary"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the caller's campaign runs (parent runs only), newest first, each with its goal verdicts over all its attack runs: how many goals were jailbroken, mitigated or are unresolved. Filter by `campaign`, `agent` or `status`; a malformed id matches nothing. Paginated with `page` and `page_size` (at most 100). This is the dashboard's run list. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"The ETag of a previous response: 304 while it still holds.","in":"header","name":"If-None-Match","schema":{"type":"string"}},{"description":"Runs on this agent.","in":"query","name":"agent","schema":{"format":"uuid","type":"string"}},{"description":"Runs of this saved campaign.","in":"query","name":"campaign","schema":{"format":"uuid","type":"string"}},{"description":"1-based page; invalid values are 1.","in":"query","name":"page","schema":{"type":"integer"}},{"description":"Page size, clamped to the route's maximum.","in":"query","name":"page_size","schema":{"type":"integer"}},{"description":"Runs in this status.","in":"query","name":"status","schema":{"enum":["CANCELLED","COMPLETED","FAILED","PENDING","RUNNING"],"type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"count":{"description":"Total number of items across all pages.","type":"integer"},"next":{"description":"URL of the next page, or null on the last page.","nullable":true,"type":"string"},"previous":{"description":"URL of the previous page, or null on the first page.","nullable":true,"type":"string"},"results":{"description":"The campaign runs of this page.","items":{"description":"A campaign run and its goal verdicts over every attack run.","properties":{"recorded_goals":{"description":"Goals with at least one recorded attempt.","type":"integer"},"jailbroken":{"description":"Goals with at least one successful jailbreak.","type":"integer"},"mitigated":{"description":"Goals every attempt of which was mitigated, once the scope is complete.","type":"integer"},"unresolved":{"description":"Goals neither jailbroken nor (yet) mitigated: still running, pending evaluation or errored.","type":"integer"},"id":{"description":"Id of the campaign run.","format":"uuid","type":"string"},"name":{"description":"The campaign's name.","type":"string"},"campaign":{"description":"Id of the saved campaign it was launched from, if any.","format":"uuid","nullable":true,"type":"string"},"agent":{"description":"Id of the agent.","format":"uuid","type":"string"},"target":{"description":"The agent's name.","type":"string"},"status":{"allOf":[{"description":"* `PENDING` - Pending\n* `RUNNING` - Running\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `CANCELLED` - Cancelled","enum":["PENDING","RUNNING","COMPLETED","FAILED","CANCELLED"],"type":"string","title":"StatusEnum"}],"description":"The run's status.\n\n* `PENDING` - Pending\n* `RUNNING` - Running\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `CANCELLED` - Cancelled"},"executor":{"allOf":[{"description":"* `cloud` - HackAgent cloud\n* `local` - Local machine\n* `cli` - Command line","enum":["cloud","local","cli"],"type":"string","title":"RunExecutorEnum"}],"description":"Who executes the run.\n\n* `cloud` - HackAgent cloud\n* `local` - Local machine\n* `cli` - Command line"},"created_at":{"description":"When the run was created.","format":"date-time","type":"string"},"updated_at":{"description":"When the run's reports last changed.","format":"date-time","type":"string"},"finished_at":{"description":"When the run finished; null while it is active.","format":"date-time","nullable":true,"type":"string"},"attack_runs":{"description":"Number of attack runs.","type":"integer"},"attempts":{"description":"Attempts recorded across all attack runs.","type":"integer"},"revision":{"description":"Goes up with every write that changes this campaign run's reports: poll the summary and refetch the rest when it moves.","type":"integer"}},"required":["agent","attack_runs","attempts","campaign","created_at","executor","finished_at","id","jailbroken","mitigated","name","recorded_goals","revision","status","target","unresolved","updated_at"],"type":"object","title":"CampaignRunSummary"},"type":"array"}},"required":["count","next","previous","results"],"type":"object","title":"CampaignRunSummaryPage"}}},"description":"OK"},"304":{"description":"The If-None-Match ETag still holds."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

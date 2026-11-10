@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
 from .markup import cell, clean, code, table
+from .paths import relative
 
 BASIC_TYPES = {str: "string", int: "integer", float: "number", bool: "boolean"}
 
@@ -31,7 +32,11 @@ def anchor(model: type) -> str:
 
 
 class Links:
-    """Resolves a nested model to a link, relative to the page that links to it."""
+    """Resolves a nested model to a link, relative to the page that links to it.
+
+    ``homes`` and ``from_page`` are page keys relative to ``docs/docs``, such
+    as ``cli/campaign-files/target``.
+    """
 
     def __init__(self, homes: Mapping[type, str]) -> None:
         self._homes = dict(homes)
@@ -44,9 +49,7 @@ class Links:
         label = target.__name__
         if issubclass(target, enum.Enum):
             label = "agent type"
-        # Attack pages live one folder deeper than the spec section pages.
-        prefix = "../" if "/" in from_page else ""
-        path = "" if home == from_page else f"{prefix}{home}.md"
+        path = "" if home == from_page else relative(from_page, f"{home}.md")
         slug = "agent-types" if issubclass(target, enum.Enum) else anchor(target)
         return f"[{label}]({path}#{slug})"
 

@@ -1,0 +1,71 @@
+---
+id: result-trace-create
+title: "Add a trace step to a result"
+description: "Appends a step (`sequence`, `step_type`, `content`) to the result's trace; `sequence` numbers the steps and is unique per result. A cloud run's token may write traces of its own run tree only."
+sidebar_label: "Add a trace step to a result"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Add a trace step to a result"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/result/{id}/trace"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Appends a step (`sequence`, `step_type`, `content`) to the result's trace; `sequence` numbers the steps and is unique per result. A cloud run's token may write traces of its own run tree only.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A UUID string identifying this Result.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+  body={{"content":{"application/json":{"schema":{"description":"Serializer for the Trace model.","properties":{"sequence":{"description":"Position of the step in the result's trace, from 0; unique per result.","format":"int64","maximum":9223372036854776000,"minimum":0,"type":"integer"},"step_type":{"allOf":[{"description":"* `TOOL_CALL` - Tool Call\n* `TOOL_RESPONSE` - Tool Response\n* `AGENT_THOUGHT` - Agent Thought/Reasoning\n* `AGENT_RESPONSE_CHUNK` - Agent Response Chunk\n* `OTHER` - Other\n* `MCP_STEP` - Multi-Context Prompting Step\n* `A2A_COMM` - Agent-to-Agent Communication\n* `interaction` - Target Interaction","enum":["TOOL_CALL","TOOL_RESPONSE","AGENT_THOUGHT","AGENT_RESPONSE_CHUNK","OTHER","MCP_STEP","A2A_COMM","interaction"],"type":"string","title":"StepTypeEnum"}],"description":"Kind of step; `interaction` is one exchange with the target, as the SDK records it.\n\n* `TOOL_CALL` - Tool Call\n* `TOOL_RESPONSE` - Tool Response\n* `AGENT_THOUGHT` - Agent Thought/Reasoning\n* `AGENT_RESPONSE_CHUNK` - Agent Response Chunk\n* `OTHER` - Other\n* `MCP_STEP` - Multi-Context Prompting Step\n* `A2A_COMM` - Agent-to-Agent Communication\n* `interaction` - Target Interaction"},"content":{"description":"The step's data (free-form JSON, depends on `step_type`).","nullable":true}},"required":["sequence"],"type":"object","title":"TraceRequest"}}},"required":true}}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"201":{"content":{"application/json":{"schema":{"description":"Serializer for the Trace model.","properties":{"id":{"description":"Unique identifier of the trace step.","readOnly":true,"type":"integer"},"result":{"description":"Id of the result the step belongs to.","format":"uuid","readOnly":true,"type":"string"},"sequence":{"description":"Position of the step in the result's trace, from 0; unique per result.","format":"int64","maximum":9223372036854776000,"minimum":0,"type":"integer"},"step_type":{"allOf":[{"description":"* `TOOL_CALL` - Tool Call\n* `TOOL_RESPONSE` - Tool Response\n* `AGENT_THOUGHT` - Agent Thought/Reasoning\n* `AGENT_RESPONSE_CHUNK` - Agent Response Chunk\n* `OTHER` - Other\n* `MCP_STEP` - Multi-Context Prompting Step\n* `A2A_COMM` - Agent-to-Agent Communication\n* `interaction` - Target Interaction","enum":["TOOL_CALL","TOOL_RESPONSE","AGENT_THOUGHT","AGENT_RESPONSE_CHUNK","OTHER","MCP_STEP","A2A_COMM","interaction"],"type":"string","title":"StepTypeEnum"}],"description":"Kind of step; `interaction` is one exchange with the target, as the SDK records it.\n\n* `TOOL_CALL` - Tool Call\n* `TOOL_RESPONSE` - Tool Response\n* `AGENT_THOUGHT` - Agent Thought/Reasoning\n* `AGENT_RESPONSE_CHUNK` - Agent Response Chunk\n* `OTHER` - Other\n* `MCP_STEP` - Multi-Context Prompting Step\n* `A2A_COMM` - Agent-to-Agent Communication\n* `interaction` - Target Interaction"},"timestamp":{"description":"When the step was recorded.","format":"date-time","readOnly":true,"type":"string"},"content":{"description":"The step's data (free-form JSON, depends on `step_type`).","nullable":true}},"required":["id","result","sequence","timestamp"],"type":"object","title":"Trace"}}},"description":"Created"},"400":{"content":{"application/json":{"schema":{"additionalProperties":{},"description":"The request did not validate. Each invalid field maps to its list of\nmessages (``{\"name\": [\"This field is required.\"]}``); errors inside a\nJSON field are keyed by their dotted path\n(``{\"config\": {\"connection.api_key\": \"...\"}}``).","properties":{"non_field_errors":{"description":"Errors that are not about a single field.","items":{"type":"string"},"type":"array"}},"type":"object","title":"ValidationError"}}},"description":"Validation error: the request is invalid and nothing was changed."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this (for example a run token outside its own run, or a caller without an organization), or the installation is read-only because its license is not valid (`code: license_read_only`)."},"404":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Not found: no such object in the caller's organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

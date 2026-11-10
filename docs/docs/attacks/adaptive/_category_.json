@@ -1,0 +1,8 @@
+{
+  "label": "Adaptive attacks",
+  "position": 2,
+  "link": {
+    "type": "doc",
+    "id": "attacks/adaptive/index"
+  }
+}

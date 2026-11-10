@@ -1,0 +1,19 @@
+{
+  "count": 2,
+  "first_success": {
+    "id": "f0000000-0000-4000-8000-000000000009",
+    "page": 2
+  },
+  "next": "?goal_index=0&run_id=e0000000-0000-4000-8000-000000000003&page_size=1&page=2",
+  "previous": null,
+  "results": [
+    {
+      "bucket": "mitigated",
+      "created_at": "2026-01-12T09:10:00+00:00",
+      "id": "f0000000-0000-4000-8000-000000000008",
+      "notes": null,
+      "ordinal": 1,
+      "run_id": "e0000000-0000-4000-8000-000000000003"
+    }
+  ]
+}

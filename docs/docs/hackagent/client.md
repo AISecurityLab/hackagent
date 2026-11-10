@@ -82,6 +82,17 @@ Command lists and TUI forms are generated from this. It covers both
 halves of the migration — what the legacy pipeline still runs and what
 the campaign runner has taken over — because `hack` runs either.
 
+#### technique\_catalog
+
+```python
+def technique_catalog() -> List[Dict[str, Any]]
+```
+
+Every technique with its parameter schema and auxiliary-model roles.
+
+Consumers build attack forms from this instead of hardcoding them. The
+result is a fresh copy, so callers may mutate it freely.
+
 #### grouped\_catalog
 
 ```python
@@ -105,16 +116,6 @@ def web_target(url: str, **kwargs: Any) -> tuple[str, Dict[str, Any]]
 ```
 
 Build the `("web", operational_config)` pair for a live-browser chatbot.
-
-#### result\_bucket
-
-```python
-def result_bucket(status: Optional[str], notes: Optional[str] = None) -> str
-```
-
-Classify a result the same way the store does.
-
-Interfaces use this instead of importing storage bucket constants.
 
 #### ensure\_graphviz
 
@@ -164,6 +165,52 @@ def delete_run(run_id: Any) -> None
 ```
 
 Delete one run. This is a write; reads never call it.
+
+#### delete\_campaign\_run
+
+```python
+def delete_campaign_run(campaign_run_id: Any) -> None
+```
+
+Delete a completed local campaign execution and its recorded child data.
+
+#### delete\_campaign\_runs
+
+```python
+def delete_campaign_runs(campaign_run_ids: List[Any]) -> None
+```
+
+Atomically delete selected local executions and their recorded child data.
+
+#### report\_campaign\_runs
+
+```python
+def report_campaign_runs(**filters: Any) -> Any
+```
+
+A page of campaign runs, newest first (`campaign`, `agent`,
+`status`, `page`, `page_size`).
+
+#### report\_campaign\_run
+
+```python
+def report_campaign_run(campaign_run_id: str) -> Any
+```
+
+One campaign run, or None.
+
+#### save\_campaign
+
+```python
+def save_campaign(*,
+                  name: str,
+                  description: str,
+                  agent_id: Any,
+                  spec: Dict[str, Any],
+                  campaign_id: Any = None) -> Any
+```
+
+Create a saved campaign, or replace the one `campaign_id` names.
 
 #### check\_connection
 

@@ -1,0 +1,300 @@
+---
+id: hackagent-api
+title: "HackAgent API"
+description: "The HackAgent API stores the agents you red-team, the campaigns you run"
+sidebar_label: Introduction
+sidebar_position: 0
+hide_title: true
+custom_edit_url: null
+---
+
+import ApiLogo from "@theme/ApiLogo";
+import Heading from "@theme/Heading";
+import SchemaTabs from "@theme/SchemaTabs";
+import TabItem from "@theme/TabItem";
+import Export from "@theme/ApiExplorer/Export";
+
+<span
+  className={"theme-doc-version-badge badge badge--secondary"}
+  children={"Version: 0.1.0"}
+>
+</span>
+
+<Export
+  url={"/openapi/hackagent-api.json"}
+>
+  
+</Export>
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"HackAgent API"}
+>
+</Heading>
+
+
+
+The HackAgent API stores the agents you red-team, the campaigns you run
+against them and everything those runs record (results, traces, reports). It
+also serves the HackAgent LLM gateway, the attacker and judge models that
+campaigns use. The `hackagent` SDK and CLI and the HackAgent dashboard are
+built on it.
+
+## Base URL
+
+The hosted service is at `https://api.hackagent.dev`; paths in this reference
+are relative to it (for example `https://api.hackagent.dev/agent`). A
+self-hosted installation serves the same paths under its own address, usually
+behind `/api`.
+
+## Authentication
+
+Every endpoint needs a bearer token in the `Authorization` header:
+
+```
+Authorization: Bearer <your HackAgent API key>
+```
+
+- **API keys** are created in the dashboard (or with `POST /key`) and shown
+  once. They act as the user who created them, within that user's
+  organization. Use them for the SDK, the CLI and scripts.
+- **Login tokens** (Auth0 on the hosted service, Keycloak on self-hosted
+  installations) are what the dashboard sends. A few account endpoints accept
+  only login tokens: API keys cannot create other keys, read usage logs or
+  manage the account, and get `401` there.
+- **Run tokens** (`hart_<prefix>.<secret>`) are issued to a cloud run when it
+  is claimed and expire when it finishes. They can only report on that run
+  and call the LLM gateway.
+- The **worker token** is the cloud worker's service credential; it can only
+  claim cloud runs.
+
+A missing, malformed, expired or revoked credential gets `401`.
+
+## Organizations
+
+Everything belongs to an organization. Each user belongs to one, and the API
+only shows and changes objects of the caller's organization: objects of other
+organizations answer `404`. Staff accounts of an installation also see the
+agents, attacks, runs and results of every organization.
+
+## Pagination
+
+List endpoints return a page:
+`{"count": 42, "next": "<url>", "previous": null, "results": [...]}`. Ask for
+another page with `page` (1-based). Endpoints that accept `page_size` say so,
+with their maximum; the default page size is 10. `next` and `previous` are
+ready-to-use URLs, or `null` at either end.
+
+## Errors
+
+Errors are JSON. Validation failures (`400`) map each invalid field to a list
+of messages, for example `{"name": ["This field is required."]}`; errors that
+are not about one field use `non_field_errors`, and nested configuration
+errors are keyed by their dotted path (`"connection.api_key"`). Other errors
+carry a human-readable `detail`, and often a machine-readable `code`:
+
+| Status | Meaning |
+| --- | --- |
+| `400` | The request is invalid; nothing was changed. |
+| `401` | Missing or invalid credential, or a credential type the endpoint refuses. |
+| `402` | Not enough credits for an LLM gateway call. |
+| `403` | The credential may not do this, or the installation is read-only because its license is not valid (`code: license_read_only`). |
+| `404` | No such object in the caller's organization. |
+| `409` | The run is not in a state that allows the call (already claimed, finished, still active). |
+| `429` | Rate limited; retry after the seconds in the `Retry-After` header. |
+
+The LLM gateway (`/v1/...`) answers errors in its own shape,
+`{"error": "...", "code": "..."}`, as OpenAI-compatible clients expect.
+
+## Credits
+
+Each organization has a balance of credits, in US dollars (see
+`GET /organization/me`). Calls to the LLM gateway, made by you or by a cloud
+run on your behalf, are charged to it: before a call, its maximum cost is
+checked against the balance (`402` if the balance cannot cover it), and its
+actual cost is deducted afterwards. A cloud launch needs a
+minimum balance. Ask for more with `POST /credits/request`.
+
+## Rate limits
+
+Requests are rate limited per user (by default 1,000 an hour); cloud runs have
+their own, larger budget per run token, and the campaign run report reads
+another one per user. A limited request gets
+`429` with a `Retry-After` header.
+
+<div
+  style={{"marginBottom":"2rem"}}
+>
+  <Heading
+    id={"authentication"}
+    as={"h2"}
+    className={"openapi-tabs__heading"}
+    children={"Authentication"}
+  >
+  </Heading><SchemaTabs
+    className={"openapi-tabs__security-schemes"}
+  >
+    <TabItem
+      label={"HTTP: Bearer Auth"}
+      value={"APIKeyAuth"}
+    >
+      
+      
+      
+      
+      <div>
+        <table>
+          <tbody>
+            <tr>
+              <th>
+                Security Scheme Type:
+              </th><td>
+                http
+              </td>
+            </tr><tr>
+              <th>
+                HTTP Authorization Scheme:
+              </th><td>
+                bearer
+              </td>
+            </tr><tr>
+              <th>
+                Bearer format:
+              </th><td>
+                API-Key
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </TabItem><TabItem
+      label={"HTTP: Bearer Auth"}
+      value={"Auth0JWTAccessToken"}
+    >
+      
+      
+      
+      
+      <div>
+        <table>
+          <tbody>
+            <tr>
+              <th>
+                Security Scheme Type:
+              </th><td>
+                http
+              </td>
+            </tr><tr>
+              <th>
+                HTTP Authorization Scheme:
+              </th><td>
+                bearer
+              </td>
+            </tr><tr>
+              <th>
+                Bearer format:
+              </th><td>
+                JWT
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </TabItem><TabItem
+      label={"HTTP: Bearer Auth"}
+      value={"RunTokenAuth"}
+    >
+      
+      
+      
+      
+      <div>
+        <table>
+          <tbody>
+            <tr>
+              <th>
+                Security Scheme Type:
+              </th><td>
+                http
+              </td>
+            </tr><tr>
+              <th>
+                HTTP Authorization Scheme:
+              </th><td>
+                bearer
+              </td>
+            </tr><tr>
+              <th>
+                Bearer format:
+              </th><td>
+                Run-Token
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </TabItem><TabItem
+      label={"HTTP: Bearer Auth"}
+      value={"WorkerTokenAuth"}
+    >
+      
+      
+      
+      
+      <div>
+        <table>
+          <tbody>
+            <tr>
+              <th>
+                Security Scheme Type:
+              </th><td>
+                http
+              </td>
+            </tr><tr>
+              <th>
+                HTTP Authorization Scheme:
+              </th><td>
+                bearer
+              </td>
+            </tr><tr>
+              <th>
+                Bearer format:
+              </th><td>
+                Worker-Token
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </TabItem><TabItem
+      label={"API Key: cookieAuth"}
+      value={"cookieAuth"}
+    >
+      
+      
+      
+      
+      <div>
+        <table>
+          <tbody>
+            <tr>
+              <th>
+                Security Scheme Type:
+              </th><td>
+                apiKey
+              </td>
+            </tr><tr>
+              <th>
+                Cookie parameter name:
+              </th><td>
+                sessionid
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </TabItem>
+  </SchemaTabs>
+</div>
+      

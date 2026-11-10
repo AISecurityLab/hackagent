@@ -6,12 +6,12 @@
 import os
 import sqlite3
 import tempfile
-import threading
 import unittest
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from hackagent.storage.local import LocalBackend
+from hackagent.reporting import AttackRun, campaign_run_costs
+from hackagent.storage.local import LocalBackend, _row_to_outcome, _row_to_usage
 from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
@@ -23,9 +23,44 @@ from hackagent.storage.records import (
     TraceRecord,
 )
 
+from .threads import run_concurrently
+
 
 def _make_backend(tmp_dir: str) -> LocalBackend:
     return LocalBackend(db_path=os.path.join(tmp_dir, "test.db"))
+
+
+def _tallies(backend: LocalBackend, run_id) -> tuple[list, list]:
+    conn = backend._conn
+    outcomes = conn.execute(
+        "SELECT * FROM goal_outcomes WHERE run_id=? ORDER BY goal_index",
+        (str(run_id),),
+    ).fetchall()
+    usage = conn.execute(
+        "SELECT * FROM goal_usage WHERE run_id=? ORDER BY goal_index, label",
+        (str(run_id),),
+    ).fetchall()
+    return [_row_to_outcome(row) for row in outcomes], [
+        _row_to_usage(row) for row in usage
+    ]
+
+
+def _run_costs(backend: LocalBackend, run_id) -> dict:
+    """A run's costs from its stored tallies, which must equal the tallies a
+    full recomputation gives: the write path keeps them incrementally."""
+    kept = _tallies(backend, run_id)
+    backend._rebuild_tallies()
+    assert _tallies(backend, run_id) == kept
+    run = AttackRun(
+        id=str(run_id),
+        campaign_run="",
+        status="COMPLETED",
+        created_at=datetime(2026, 1, 1),
+    )
+    [cost] = campaign_run_costs([run], *kept, backend.report_latencies([str(run_id)]))[
+        "runs"
+    ]
+    return cost
 
 
 class TestLocalBackendInit(unittest.TestCase):
@@ -75,6 +110,43 @@ class TestLocalBackendInit(unittest.TestCase):
                     ).fetchall()
                 }
                 self.assertIn("campaign_run_id", columns)
+            finally:
+                backend.close()
+
+    def test_existing_database_records_which_campaign_runs_the_dashboard_launched(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "test.db")
+            backend = LocalBackend(db_path=path)
+            agent = backend.create_or_update_agent("a", {})
+            campaign = backend.create_campaign("c", "", agent.id, {})
+            launched = backend.start_campaign(agent.id, {})
+            backend.link_campaign_run(launched.id, campaign.id)
+            cli = backend.start_campaign(agent.id, {})
+            # A database from before the column: only a launch set campaign_id.
+            backend._conn.execute("ALTER TABLE campaign_runs DROP COLUMN launched")
+            backend._conn.commit()
+            backend.close()
+
+            backend = LocalBackend(db_path=path)
+            try:
+                self.assertTrue(backend.get_campaign_run(launched.id).launched)
+                self.assertFalse(backend.get_campaign_run(cli.id).launched)
+            finally:
+                backend.close()
+
+    def test_a_launch_stays_recorded_when_its_campaign_is_deleted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            backend = _make_backend(tmp)
+            try:
+                agent = backend.create_or_update_agent("a", {})
+                campaign = backend.create_campaign("c", "", agent.id, {})
+                record = backend.start_campaign(agent.id, {})
+                backend.link_campaign_run(record.id, campaign.id)
+                backend.delete_campaign(campaign.id)
+                kept = backend.get_campaign_run(record.id)
+                self.assertEqual((kept.campaign_id, kept.launched), (None, True))
             finally:
                 backend.close()
 
@@ -425,10 +497,314 @@ class TestLocalBackendResult(unittest.TestCase):
         self.assertEqual(rec.evaluation_status, "NOT_EVALUATED")
         self.assertIsNone(rec.evaluation_notes)
 
+    def test_cost_samples_aggregate_real_goals_without_double_counting_traces(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        second = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        untraced = self.backend.create_result(self.run.id, "other", 1, {}, {})
+        for result in (first, second):
+            self.backend.create_trace(
+                result.id,
+                0,
+                "interaction",
+                {"response": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}}},
+            )
+            self.backend.create_trace(
+                result.id,
+                1,
+                "OTHER",
+                {
+                    "node": "call",
+                    "label": "target",
+                    "data": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}},
+                },
+            )
+            self.backend.create_trace(
+                result.id, 2, "OTHER", {"node": "call", "label": "attacker"}
+            )
+            self.backend.create_trace(
+                result.id, 3, "OTHER", {"node": "call", "label": "panel"}
+            )
+        self.backend.create_trace(untraced.id, 0, "interaction", {})
+        self.backend._conn.execute(
+            "UPDATE results SET created_at = ?, updated_at = ? WHERE id IN (?, ?)",
+            (
+                "2026-01-01T00:00:00+00:00",
+                "2026-01-01T00:00:10+00:00",
+                str(first.id),
+                str(second.id),
+            ),
+        )
+        self.backend._conn.commit()
+        self.backend._rebuild_tallies()
+        cost = _run_costs(self.backend, self.run.id)
+        samples = {sample["goal_index"]: sample for sample in cost["goal_samples"]}
+        self.assertEqual(
+            samples[0],
+            {
+                "goal_index": 0,
+                "attempts": 2,
+                "calls": 6,
+                "target_tokens": 24,
+                "elapsed_s": 10.0,
+                "first_jailbreak_attempt": None,
+                "first_jailbreak_elapsed_s": None,
+            },
+        )
+        self.assertEqual(samples[1]["attempts"], 1)
+        self.assertIsNone(samples[1]["calls"])
+        self.assertIsNone(samples[1]["target_tokens"])
+        # Goal 1 recorded only an interaction: its target call counts, and its
+        # attacker and judge calls, so the run's, are unknown.
+        self.assertEqual(cost["calls"], {"target": 3, "attacker": None, "judge": None})
+        self.assertFalse(cost["calls_traced"])
+
+    def test_first_success_uses_conversation_order_and_earliest_response_clock(self):
+        results = [
+            self.backend.create_result(self.run.id, "goal", 0, {}, {}) for _ in range(4)
+        ]
+        results.sort(key=lambda result: str(result.id))
+        for index, result in enumerate(results):
+            self.backend.update_result(
+                result.id,
+                evaluation_status="SUCCESSFUL_JAILBREAK"
+                if index in (1, 2)
+                else "FAILED_JAILBREAK",
+                agent_specific_data={
+                    "attack_metadata": {
+                        "goal_active_target_elapsed_s": [0, 9, 3, 20][index]
+                    }
+                },
+            )
+            self.backend._conn.execute(
+                "UPDATE results SET created_at = ?, updated_at = ? WHERE id = ?",
+                (
+                    "2026-01-01T00:00:00+00:00",
+                    "2026-01-01T00:00:30+00:00",
+                    str(result.id),
+                ),
+            )
+        self.backend._conn.commit()
+        self.backend._rebuild_tallies()
+        sample = _run_costs(self.backend, self.run.id)["goal_samples"][0]
+        self.assertEqual(sample["attempts"], 4)
+        self.assertEqual(sample["first_jailbreak_attempt"], 2)
+        self.assertEqual(sample["first_jailbreak_elapsed_s"], 3)
+
+    def test_tokens_are_unknown_when_one_call_has_no_usage(self):
+        for index, usage in enumerate(
+            ({"prompt_tokens": 10, "completion_tokens": 2}, {})
+        ):
+            result = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+            self.backend.create_trace(
+                result.id,
+                0,
+                "OTHER",
+                {"node": "call", "label": "target", "data": {"usage": usage}},
+            )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertIsNone(cost["target_tokens"])
+        self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
+
+    def test_tokens_require_target_coverage_for_every_attempt(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        second = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_trace(
+            first.id,
+            0,
+            "OTHER",
+            {
+                "node": "call",
+                "label": "target",
+                "data": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}},
+            },
+        )
+        self.backend.create_trace(
+            second.id, 0, "OTHER", {"node": "call", "label": "panel"}
+        )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertIsNone(cost["target_tokens"])
+        self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
+
+    def test_legacy_and_shared_batch_usage_remain_measurable(self):
+        for shared in (False, True):
+            with self.subTest(shared=shared):
+                goal_index = int(shared)
+                first = self.backend.create_result(
+                    self.run.id, "goal", goal_index, {}, {}
+                )
+                second = self.backend.create_result(
+                    self.run.id, "goal", goal_index, {}, {}
+                )
+                for index, result in enumerate((first, second)):
+                    usage = {"prompt_tokens": 0, "completion_tokens": 0}
+                    content = (
+                        {
+                            "node": "call",
+                            "label": "target",
+                            "scope": "goal",
+                            "data": {"usage": usage},
+                        }
+                        if shared
+                        else {"response": {"usage": usage}}
+                    )
+                    self.backend.create_trace(
+                        first.id if shared else result.id,
+                        index,
+                        "OTHER" if shared else "interaction",
+                        content,
+                    )
+                cost = _run_costs(self.backend, self.run.id)
+                sample = next(
+                    s for s in cost["goal_samples"] if s["goal_index"] == goal_index
+                )
+                self.assertEqual(sample["target_tokens"], 0)
+                self.assertEqual(cost["target_tokens"], {"prompt": 0, "completion": 0})
+
+    def test_run_tokens_are_unknown_when_another_goal_is_untraced(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "other goal", 1, {}, {})
+        self.backend.create_trace(
+            first.id,
+            0,
+            "interaction",
+            {"response": {"usage": {"prompt_tokens": 10, "completion_tokens": 2}}},
+        )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertIsNone(cost["target_tokens"])
+
+    def test_run_tokens_sum_legacy_and_current_goals_without_double_counting(self):
+        for index in (0, 1):
+            result = self.backend.create_result(self.run.id, "goal", index, {}, {})
+            usage = {"prompt_tokens": 10, "completion_tokens": 2}
+            self.backend.create_trace(
+                result.id, 0, "interaction", {"response": {"usage": usage}}
+            )
+            if index:
+                self.backend.create_trace(
+                    result.id,
+                    1,
+                    "OTHER",
+                    {"node": "call", "label": "target", "data": {"usage": usage}},
+                )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertEqual(cost["target_tokens"], {"prompt": 20, "completion": 4})
+        self.assertEqual([s["target_tokens"] for s in cost["goal_samples"]], [12, 12])
+
+    def test_missing_completion_usage_is_not_assumed_to_be_zero(self):
+        result = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_trace(
+            result.id,
+            0,
+            "interaction",
+            {"response": {"usage": {"prompt_tokens": 10}}},
+        )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertIsNone(cost["target_tokens"])
+        self.assertIsNone(cost["goal_samples"][0]["target_tokens"])
+
+    def test_first_success_keeps_missing_timing_null_and_zero_measurable(self):
+        for index, status, timing in (
+            (0, "SUCCESSFUL_JAILBREAK", None),
+            (1, "SUCCESSFUL_JAILBREAK", 0),
+            (2, "FAILED_JAILBREAK", 5),
+            (3, "ERROR_AGENT_RESPONSE", 5),
+            (4, "NOT_EVALUATED", 5),
+        ):
+            result = self.backend.create_result(self.run.id, "goal", index, {}, {})
+            self.backend.update_result(
+                result.id,
+                evaluation_status=status,
+                agent_specific_data={
+                    "attack_metadata": {"goal_active_target_elapsed_s": timing}
+                },
+            )
+        samples = {
+            sample["goal_index"]: sample
+            for sample in _run_costs(self.backend, self.run.id)["goal_samples"]
+        }
+        self.assertEqual(samples[0]["first_jailbreak_attempt"], 1)
+        self.assertIsNone(samples[0]["first_jailbreak_elapsed_s"])
+        self.assertEqual(samples[1]["first_jailbreak_elapsed_s"], 0)
+        for index in (2, 3, 4):
+            self.assertIsNone(samples[index]["first_jailbreak_attempt"])
+            self.assertIsNone(samples[index]["first_jailbreak_elapsed_s"])
+        later = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.update_result(
+            later.id,
+            evaluation_status="SUCCESSFUL_JAILBREAK",
+            agent_specific_data={
+                "attack_metadata": {"goal_active_target_elapsed_s": 10}
+            },
+        )
+        sample = _run_costs(self.backend, self.run.id)["goal_samples"][0]
+        self.assertIsNone(sample["first_jailbreak_elapsed_s"])
+
+    def test_first_success_does_not_substitute_legacy_queue_inclusive_clock(self):
+        result = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.update_result(
+            result.id,
+            evaluation_status="SUCCESSFUL_JAILBREAK",
+            agent_specific_data={"attack_metadata": {"goal_target_elapsed_s": 1063}},
+        )
+        sample = _run_costs(self.backend, self.run.id)["goal_samples"][0]
+        self.assertEqual(sample["first_jailbreak_attempt"], 1)
+        self.assertIsNone(sample["first_jailbreak_elapsed_s"])
+
+    def test_cost_samples_accept_shared_goal_scoped_batch_traces(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        for sequence, label in enumerate(
+            ("attacker", "target", "panel", "target", "panel")
+        ):
+            self.backend.create_trace(
+                first.id,
+                sequence,
+                "OTHER",
+                {"node": "call", "scope": "goal", "label": label},
+            )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertEqual(cost["goal_samples"][0]["calls"], 5)
+        self.assertEqual(cost["goal_samples"][0]["attempts"], 2)
+
+    def test_cost_samples_reject_incomplete_goal_scoped_batch_traces(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        for sequence, label in enumerate(("attacker", "target", "panel")):
+            self.backend.create_trace(
+                first.id,
+                sequence,
+                "OTHER",
+                {"node": "call", "scope": "goal", "label": label},
+            )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertIsNone(cost["goal_samples"][0]["calls"])
+
+    def test_cost_samples_do_not_infer_coverage_from_unscoped_calls(self):
+        first = self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        self.backend.create_result(self.run.id, "goal", 0, {}, {})
+        for sequence in range(2):
+            self.backend.create_trace(
+                first.id, sequence, "OTHER", {"node": "call", "label": "target"}
+            )
+        cost = _run_costs(self.backend, self.run.id)
+        self.assertIsNone(cost["goal_samples"][0]["calls"])
+
     def test_create_result_unique_ids(self):
         r1 = self.backend.create_result(self.run.id, "g1", 0, {}, {})
         r2 = self.backend.create_result(self.run.id, "g2", 1, {}, {})
         self.assertNotEqual(r1.id, r2.id)
+
+    def test_request_payload_survives_evaluation_metadata_updates(self):
+        payload = {"messages": [{"role": "user", "content": "Recorded prompt"}]}
+        result = self.backend.create_result(self.run.id, "goal", 0, payload, {})
+        self.assertEqual(result.metadata["request_payload"], payload)
+        updated = self.backend.update_result(
+            result.id, agent_specific_data={"response": "Recorded reply"}
+        )
+        self.assertEqual(updated.metadata["request_payload"], payload)
+        fetched = self.backend.get_result(result.id)
+        self.assertEqual(fetched.metadata["request_payload"], payload)
+        self.assertEqual(fetched.metadata["response"], "Recorded reply")
 
     def test_update_result_evaluation_status(self):
         rec = self.backend.create_result(self.run.id, "goal", 0, {}, {})
@@ -706,13 +1082,7 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
                     except Exception as e:
                         errors.append(e)
 
-                threads = [
-                    threading.Thread(target=create, args=(i,)) for i in range(10)
-                ]
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
+                run_concurrently(create, range(10))
 
                 self.assertEqual(errors, [], f"Thread errors: {errors}")
                 result = backend.list_agents()
@@ -739,13 +1109,7 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
                     except Exception as e:
                         errors.append(e)
 
-                threads = [
-                    threading.Thread(target=create_result, args=(i,)) for i in range(20)
-                ]
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
+                run_concurrently(create_result, range(20))
 
                 self.assertEqual(errors, [])
                 result = backend.list_results(run_id=run.id)

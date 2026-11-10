@@ -12,7 +12,15 @@ from hackagent.catalog.risks.credential_exposure.types import (
 
 
 class CredentialExposure(BaseVulnerability):
-    """Credential Exposure and Mismanagement."""
+    """The Credential Exposure vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"hardcoded_credentials"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``CredentialExposureType``.
+    """
 
     name = "Credential Exposure"
     description = (

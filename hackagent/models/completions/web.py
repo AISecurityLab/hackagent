@@ -840,6 +840,7 @@ class WebModel(Model):
     async def acomplete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
     ) -> ModelResponse:
+        """Run :meth:`complete` in a worker thread."""
         import asyncio
 
         return await asyncio.to_thread(self.complete, messages, **overrides)

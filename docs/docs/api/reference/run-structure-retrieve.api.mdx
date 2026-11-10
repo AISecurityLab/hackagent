@@ -1,0 +1,70 @@
+---
+id: run-structure-retrieve
+title: "Get a goal's attack structure"
+description: "Returns the whole recorded search of one attack run on one goal: its attempts with their metadata, their trace steps and their results, to draw how the attack progressed. Both `goal_index` and `run_id` are required. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed."
+sidebar_label: "Get a goal's attack structure"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get a goal's attack structure"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/run/{id}/structure"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the whole recorded search of one attack run on one goal: its attempts with their metadata, their trace steps and their results, to draw how the attack progressed. Both `goal_index` and `run_id` are required. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"The ETag of a previous response: 304 while it still holds.","in":"header","name":"If-None-Match","schema":{"type":"string"}},{"description":"The goal (required, non-negative).","in":"query","name":"goal_index","required":true,"schema":{"type":"integer"}},{"description":"A UUID string identifying this Run.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}},{"description":"The attack run (required; 404 when not of this campaign run).","in":"query","name":"run_id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"attempts":{"description":"The goal's attempts in the attack run, in order.","items":{"properties":{"id":{"description":"Id of the attempt's result.","format":"uuid","type":"string"},"run_id":{"description":"The attack run that made it.","format":"uuid","type":"string"},"ordinal":{"description":"Position of the attempt among the goal's attempts, from 1.","type":"integer"},"bucket":{"allOf":[{"description":"* `jailbreak` - jailbreak\n* `mitigated` - mitigated\n* `error` - error\n* `pending` - pending","enum":["jailbreak","mitigated","error","pending"],"type":"string","title":"BucketEnum"}],"description":"How the attempt was judged: `jailbreak`, `mitigated`, `error` or `pending` (not evaluated yet).\n\n* `jailbreak` - jailbreak\n* `mitigated` - mitigated\n* `error` - error\n* `pending` - pending"},"notes":{"description":"The judges' notes, if any.","nullable":true,"type":"string"},"created_at":{"description":"When the attempt was recorded.","format":"date-time","type":"string"},"metadata":{"additionalProperties":{},"description":"The attempt's attack_metadata.","type":"object"}},"required":["bucket","created_at","id","metadata","notes","ordinal","run_id"],"type":"object","title":"StructureAttempt"},"type":"array"},"traces":{"description":"Their trace steps.","items":{"properties":{"id":{"description":"Id of the trace step.","type":"string"},"result":{"description":"Id of the attempt (result) it belongs to.","format":"uuid","type":"string"},"sequence":{"description":"Position of the step in its attempt's trace.","type":"integer"},"step_type":{"description":"Kind of step.","type":"string"},"timestamp":{"description":"When the step was recorded.","format":"date-time","type":"string"},"content":{"description":"The step's data.","nullable":true}},"required":["content","id","result","sequence","step_type","timestamp"],"type":"object","title":"StructureTrace"},"type":"array"},"results":{"description":"Their results.","items":{"properties":{"id":{"description":"Id of the result.","format":"uuid","type":"string"},"request_payload":{"description":"What was sent to the agent.","nullable":true},"agent_specific_data":{"description":"Attack metadata the SDK recorded.","nullable":true},"evaluation_notes":{"description":"The judges' notes, if any.","nullable":true,"type":"string"}},"required":["agent_specific_data","evaluation_notes","id","request_payload"],"type":"object","title":"StructureResult"},"type":"array"}},"required":["attempts","results","traces"],"type":"object","title":"AttackStructure"}}},"description":"OK"},"304":{"description":"The If-None-Match ETag still holds."},"400":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Invalid query parameter."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"404":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Not a visible campaign run."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

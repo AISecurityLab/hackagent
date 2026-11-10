@@ -3,8 +3,8 @@
 
 """Chunking and cosine retrieval over the vectors an embedder returns.
 
-Kept apart from the attack so the numeric parts — chunk offsets, FAISS,
-cosine — stay testable without a model, and so the attack reads as the
+Kept apart from the attack so the numeric parts — chunk offsets and
+cosine similarity — stay testable without a model, and so the attack reads as the
 algorithm rather than the linear algebra.
 """
 
@@ -14,7 +14,10 @@ from typing import Sequence
 
 
 def chunk(text: str, size: int, overlap: int) -> list[str]:
-    """Split ``text`` into overlapping chunks."""
+    """Split ``text`` into ``size``-character chunks; each starts ``size - overlap`` after the last.
+
+    Whitespace-only chunks are dropped.
+    """
     step = max(1, size - overlap)
     chunks: list[str] = []
     start = 0

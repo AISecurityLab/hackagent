@@ -10,6 +10,9 @@
 #
 # Or `hackagent examples ollama`, which checks Ollama is up and pulls the
 # model for you first.
+#
+# h4rm3l-synth-demo.yaml is the same attack with its search switched on: it
+# writes its own programs instead of running the one named below.
 version: 1
 
 campaign:

@@ -12,7 +12,15 @@ from hackagent.catalog.risks.system_prompt_leakage.types import (
 
 
 class SystemPromptLeakage(BaseVulnerability):
-    """System Prompt Leakage."""
+    """The System Prompt Leakage vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"secrets_and_credentials"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``SystemPromptLeakageType``.
+    """
 
     name = "System Prompt Leakage"
     description = (

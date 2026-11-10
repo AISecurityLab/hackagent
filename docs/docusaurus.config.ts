@@ -1,77 +1,77 @@
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import type * as OpenApiPlugin from 'docusaurus-plugin-openapi-docs';
 
 // API pages that moved when their modules moved: new path -> old paths.
 // core/contracts was one page; its old URL opens the first topic page.
 // Pages that moved when the docs followed the campaign workflow, and older
 // moves, mapped to where their content lives now.
 const PAGE_REDIRECTS: Record<string, string> = {
-  '/agents': '/reference/target#agent-types',
-  '/agents/claude-code': '/reference/target#agent-types',
-  '/agents/codex': '/reference/target#agent-types',
-  '/agents/google-adk': '/reference/target#agent-types',
-  '/agents/hermes': '/reference/target#agent-types',
-  '/agents/ollama': '/reference/target#agent-types',
-  '/agents/openai': '/reference/target#agent-types',
-  '/agents/openai-sdk': '/reference/target#agent-types',
-  '/agents/web': '/reference/target#agent-types',
-  '/agents/guardrails': '/reference/guardrails',
+  '/agents': '/cli/campaign-files/target#agent-types',
+  '/agents/claude-code': '/cli/campaign-files/target#agent-types',
+  '/agents/codex': '/cli/campaign-files/target#agent-types',
+  '/agents/google-adk': '/cli/campaign-files/target#agent-types',
+  '/agents/hermes': '/cli/campaign-files/target#agent-types',
+  '/agents/ollama': '/cli/campaign-files/target#agent-types',
+  '/agents/openai': '/cli/campaign-files/target#agent-types',
+  '/agents/openai-sdk': '/cli/campaign-files/target#agent-types',
+  '/agents/web': '/cli/campaign-files/target#agent-types',
+  '/agents/guardrails': '/cli/campaign-files/guardrails',
   '/architecture/system-overview': '/concepts/code-map',
-  '/attacks': '/reference/attacks',
-  '/attacks/advprefix': '/reference/attacks/advprefix',
-  '/attacks/autodan_turbo': '/reference/attacks/autodan_turbo',
-  '/attacks/baseline': '/reference/attacks/baseline',
-  '/attacks/bon': '/reference/attacks/bon',
-  '/attacks/cipherchat': '/reference/attacks/cipherchat',
-  '/attacks/crescendo': '/reference/attacks/crescendo',
-  '/attacks/fc': '/reference/attacks/fc',
-  '/attacks/flipattack': '/reference/attacks/flipattack',
-  '/attacks/h4rm3l': '/reference/attacks/h4rm3l',
-  '/attacks/mml': '/reference/attacks/mml',
-  '/attacks/pair': '/reference/attacks/pair',
-  '/attacks/pap': '/reference/attacks/pap',
-  '/attacks/rag': '/reference/attacks/rag',
-  '/attacks/tap': '/reference/attacks/tap',
-  '/attacks/tfc': '/reference/attacks/tfc',
-  '/attacks/tool_output_ipi': '/reference/attacks/tool_output_ipi',
-  '/attacks/static-template': '/reference/attacks/static_template',
+  '/attacks/advprefix': '/attacks/adaptive/advprefix',
+  '/attacks/autodan_turbo': '/attacks/adaptive/autodan_turbo',
+  '/attacks/baseline': '/attacks/static/baseline',
+  '/attacks/bon': '/attacks/adaptive/bon',
+  '/attacks/cipherchat': '/attacks/static/cipherchat',
+  '/attacks/crescendo': '/attacks/multi-turn/crescendo',
+  '/attacks/fc': '/attacks/static/fc',
+  '/attacks/flipattack': '/attacks/static/flipattack',
+  '/attacks/h4rm3l': '/attacks/adaptive/h4rm3l',
+  '/attacks/h4rm3l_synth': '/attacks/adaptive/h4rm3l',
+  '/attacks/mml': '/attacks/static/mml',
+  '/attacks/pair': '/attacks/adaptive/pair',
+  '/attacks/pap': '/attacks/adaptive/pap',
+  '/attacks/rag': '/attacks/indirect/rag',
+  '/attacks/tap': '/attacks/adaptive/tap',
+  '/attacks/tfc': '/attacks/static/tfc',
+  '/attacks/tool_output_ipi': '/attacks/indirect/tool_output_ipi',
+  '/attacks/static-template': '/attacks/static/static_template',
   '/attacks/seam': '/concepts/code-map',
-  '/attacks/shared-args': '/reference/campaign',
-  '/attacks/taxonomy': '/reference/attacks',
-  '/cli/overview': '/reference/cli',
-  '/cli/agent': '/reference/cli#hackagent-agent',
-  '/cli/config': '/reference/cli#hackagent-config',
-  '/cli/datasets': '/reference/cli#hackagent-datasets',
-  '/cli/eval': '/reference/cli#hackagent-campaign',
-  '/cli/attack': '/reference/cli#hackagent-campaign',
-  '/cli/initialization': '/reference/cli#hackagent-init',
-  '/cli/results': '/reference/cli#hackagent-results',
-  '/cli/scan': '/reference/cli',
+  '/attacks/shared-args': '/attacks/shared-settings',
+  '/attacks/taxonomy': '/attacks',
+  '/cli/overview': '/cli',
+  '/cli/config': '/cli/commands#hackagent-config',
+  '/cli/datasets': '/cli/commands#hackagent-datasets',
+  '/cli/eval': '/cli/commands#hackagent-campaign',
+  '/cli/attack': '/cli/commands#hackagent-campaign',
+  '/cli/initialization': '/cli/commands#hackagent-init',
+  '/cli/results': '/cli/commands#hackagent-results',
+  '/cli/scan': '/cli/commands',
   '/cli/web': '/getting-started/dashboard',
   '/client': '/hackagent/client',
-  '/datasets': '/reference/dataset',
-  '/datasets/custom-providers': '/reference/dataset',
-  '/datasets/file': '/reference/dataset',
-  '/datasets/huggingface': '/reference/dataset',
-  '/datasets/omnisafebench': '/reference/dataset',
-  '/datasets/troubleshooting': '/reference/dataset',
-  '/datasets/url-json': '/reference/dataset',
-  '/datasets/selecting-intent-categories': '/reference/dataset',
-  '/datasets/presets': '/reference/dataset#presets',
-  '/getting-started/datasets-tutorial': '/reference/dataset',
+  '/datasets': '/cli/campaign-files/dataset',
+  '/datasets/custom-providers': '/cli/campaign-files/dataset',
+  '/datasets/file': '/cli/campaign-files/dataset',
+  '/datasets/huggingface': '/cli/campaign-files/dataset',
+  '/datasets/omnisafebench': '/cli/campaign-files/dataset',
+  '/datasets/troubleshooting': '/cli/campaign-files/dataset',
+  '/datasets/url-json': '/cli/campaign-files/dataset',
+  '/datasets/selecting-intent-categories': '/cli/campaign-files/dataset',
+  '/datasets/presets': '/cli/campaign-files/dataset#presets',
+  '/getting-started/datasets-tutorial': '/cli/campaign-files/dataset',
   '/evaluation': '/concepts/judges',
   '/getting-started/quick-start': '/getting-started/first-campaign',
   '/getting-started/attack-tutorial': '/getting-started/first-campaign',
   '/getting-started/quick-security-scan': '/risks/evaluation-campaigns/quick-scan',
   '/orchestrator': '/concepts/code-map',
   '/tracking': '/concepts/how-a-run-works',
-  '/sdk/python-quickstart': '/api-index',
+  '/sdk/python-quickstart': '/sdk/guides/quickstart',
   '/guides/overview': '/',
   '/guides/choose-an-interface': '/',
-  '/hackagent/attacks/_lib/objectives/base': '/reference/attacks',
-  '/hackagent/attacks/orchestrator': '/reference',
-  '/hackagent/attacks/registry': '/reference/attacks',
+  '/hackagent/attacks/_lib/objectives/base': '/attacks',
+  '/hackagent/attacks/orchestrator': '/cli/campaign-files',
+  '/hackagent/attacks/registry': '/attacks',
   '/hackagent/router/discovery/scanner': '/hackagent/orchestrator/planning/planner',
   '/hackagent/agent': '/hackagent/client',
 };
@@ -144,6 +144,8 @@ const config: Config = {
   },
   themes: [
     '@docusaurus/theme-mermaid',
+    // Renders the HTTP API reference pages generated by the plugin below.
+    'docusaurus-theme-openapi-docs',
     // Offline search: builds a Lucene index at build time and ships it with the
     // site. No external service and no API keys, so it works on any host.
     [
@@ -173,6 +175,9 @@ const config: Config = {
           // generated `hackagent/attacks/_lib` pages are published. Files
           // named `_*.md` (partials, `_version.md`) stay excluded.
           exclude: ['**/_*.{js,jsx,ts,tsx,md,mdx}'],
+          // Renders the generated HTTP API pages (front matter `api`); every
+          // other page falls through to the default doc layout.
+          docItemComponent: '@theme/ApiItem',
         },
         blog: false,
         theme: {
@@ -187,6 +192,30 @@ const config: Config = {
   ],
 
   plugins: [
+    [
+      // The HTTP API reference: `docs/api/reference/` is generated from the
+      // committed schema snapshot `static/openapi/hackagent-api.json` by
+      // `docs/scripts/update_api_schema.py`, which also refreshes the snapshot.
+      'docusaurus-plugin-openapi-docs',
+      {
+        id: 'openapi',
+        docsPluginId: 'classic',
+        config: {
+          hackagent: {
+            specPath: 'static/openapi/hackagent-api.json',
+            outputDir: 'docs/api/reference',
+            downloadUrl: '/openapi/hackagent-api.json',
+            // Requests go to the production API with the reader's own key;
+            // the pages show code samples to copy instead.
+            hideSendButton: true,
+            sidebarOptions: {
+              groupPathsBy: 'tag',
+              categoryLinkSource: 'tag',
+            },
+          } satisfies OpenApiPlugin.Options,
+        },
+      },
+    ],
     [
       '@docusaurus/plugin-client-redirects',
       {
@@ -224,31 +253,31 @@ const config: Config = {
               '/hackagent/attacks/evaluator/evaluation_step',
               '/hackagent/attacks/evaluator/sync',
             ],
-            to: '/reference/evaluation',
+            to: '/cli/campaign-files/evaluation',
           },
           {
             from: '/hackagent/attacks/evaluator/inline_step_judge',
-            to: '/reference/evaluation',
+            to: '/cli/campaign-files/evaluation',
           },
           {
             from: '/hackagent/router/tracking/tracker',
-            to: '/api-index',
+            to: '/sdk',
           },
           {
             from: '/hackagent/router/tracking/coordinator',
-            to: '/api-index',
+            to: '/sdk',
           },
           {
             from: '/hackagent/router/tracking/context',
-            to: '/api-index',
+            to: '/sdk',
           },
           {
             from: '/hackagent/router/tracking/step',
-            to: '/api-index',
+            to: '/sdk',
           },
           {
             from: '/hackagent/router/tracking/decorators',
-            to: '/api-index',
+            to: '/sdk',
           },
           {
             from: '/hackagent/router/tracking/utils',
@@ -256,16 +285,16 @@ const config: Config = {
           },
           {
             from: '/hackagent/router/tracking/audit',
-            to: '/api-index',
+            to: '/sdk',
           },
           {
             from: '/hackagent/router/tracking/category_classifier',
-            to: '/reference/execution',
+            to: '/cli/campaign-files/execution',
           },
-          // The six HTTP API pages became sections of /api.
-          ...['first-request', 'authentication', 'runs', 'results', 'errors'].map(
-            (page) => ({from: `/api/${page}`, to: `/api#${page}`}),
-          ),
+          // Old HTTP API pages whose content now lives in the API guides.
+          {from: '/api/runs', to: '/api/campaign-lifecycle#6-follow-the-run'},
+          {from: '/api/results', to: '/api/campaign-lifecycle#7-read-the-results'},
+          {from: '/api/errors', to: '/api/errors-and-limits'},
           ...Object.entries(PAGE_REDIRECTS).map(([from, to]) => ({from, to})),
         ],
       },
@@ -319,15 +348,15 @@ const config: Config = {
         },
         {
           type: 'docSidebar',
-          sidebarId: 'referenceSidebar',
-          position: 'left',
-          label: 'Reference',
-        },
-        {
-          type: 'docSidebar',
           sidebarId: 'sdkSidebar',
           position: 'left',
           label: 'SDK',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'cliSidebar',
+          position: 'left',
+          label: 'CLI',
         },
         {
           type: 'docSidebar',
@@ -379,6 +408,17 @@ const config: Config = {
       ],
       copyright: `Copyright © ${new Date().getFullYear()} <a href="https://ai4i.it">AI4I</a>.`,
     },
+    // Code samples on the HTTP API reference pages.
+    languageTabs: [
+      {highlight: 'bash', language: 'curl', logoClass: 'curl', variant: 'curl', variants: ['curl']},
+      {
+        highlight: 'python',
+        language: 'python',
+        logoClass: 'python',
+        variant: 'requests',
+        variants: ['requests'],
+      },
+    ],
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,

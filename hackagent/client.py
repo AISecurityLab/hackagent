@@ -113,11 +113,10 @@ def primary_dataset() -> Optional[str]:
 
 
 def primary_attacks() -> List[str]:
-    """Jailbreak campaign technique ids ``hack`` can execute, in order.
+    """Return the jailbreak profile's primary technique ids, in profile order.
 
-    Both halves count: a migrated technique runs on the campaign runner and
-    the rest on the legacy pipeline. A technique neither can run is dropped,
-    so a chain built from this never fails on its first step.
+    Only techniques registered with the campaign runner are kept, so a chain
+    built from this never fails on its first step.
     """
     from hackagent.attacks.techniques.registry import ATTACKS
 
@@ -243,11 +242,12 @@ def form_fields(attack_id: str) -> List[Dict[str, Any]]:
 
 @lru_cache(maxsize=1)
 def catalog_entries() -> List[Dict[str, Any]]:
-    """Registered techniques, in registry order, with form fields.
+    """Return every registered technique, sorted by id, with its form fields.
 
-    Command lists and TUI forms are generated from this. It covers both
-    halves of the migration — what the legacy pipeline still runs and what
-    the campaign runner has taken over — because ``hack`` runs either.
+    Command lists and TUI forms are generated from this. Each entry carries
+    the technique's label, description, taxonomy category and tags, its
+    position in the jailbreak profile (``primary_order``) and its
+    :func:`form_fields`. Cached: the same list is returned on every call.
     """
     from hackagent.attacks.techniques.registry import ATTACKS
     from hackagent.catalog.attacks import ATTACK_CATALOG
@@ -255,8 +255,6 @@ def catalog_entries() -> List[Dict[str, Any]]:
 
     primary = _primary_orders()
     entries: List[Dict[str, Any]] = []
-    # Legacy ids keep their registry order; migrated ones follow, so a
-    # technique stays selectable for the whole of its migration.
     for attack_id in sorted(ATTACKS):
         meta = ATTACK_CATALOG.get(attack_id, {})
         taxonomy = get_attack_taxonomy(attack_id)
@@ -308,6 +306,7 @@ def technique_catalog() -> List[Dict[str, Any]]:
 
 
 def catalog_by_id() -> Dict[str, Dict[str, Any]]:
+    """Return :func:`catalog_entries` keyed by technique id."""
     return {entry["attack_type"]: entry for entry in catalog_entries()}
 
 
@@ -340,16 +339,6 @@ def web_target(url: str, **kwargs: Any) -> tuple[str, Dict[str, Any]]:
     from hackagent.orchestrator.planning import build_web_target
 
     return build_web_target(url, **kwargs)
-
-
-def result_bucket(status: Optional[str], notes: Optional[str] = None) -> str:
-    """Classify a result the same way the store does.
-
-    Interfaces use this instead of importing storage bucket constants.
-    """
-    from hackagent.storage.buckets import result_bucket as _bucket
-
-    return _bucket(status, notes)
 
 
 def ensure_graphviz(*, allow_download: bool = False) -> Optional[str]:
@@ -462,7 +451,49 @@ class DoctorReport:
 
 
 class HackAgent:
-    """Session over settings and a store. Bind a victim with :meth:`target`."""
+    """Session over resolved settings and a store, for reading what runs recorded.
+
+    The store is opened from ``settings``: SQLite in local mode, the platform
+    API in remote mode. Runs themselves are started with
+    :func:`~hackagent.orchestrator.campaign.run_campaign`. In local mode, pass
+    it this session's ``settings`` and ``backend`` to record into the same
+    database. In remote mode, set the campaign's ``execution.storage.backend``
+    to ``remote`` and pass only ``settings``: a ``store`` argument would skip
+    the remote run's heartbeat and server-side cancellation. Call
+    :meth:`close` when done (a remote store flushes its queued writes then).
+
+    Args:
+        settings: Resolved settings; :meth:`Settings.resolve` is called when
+            omitted.
+        backend: A store object to use instead of the one ``settings`` selects,
+            e.g. a ``LocalBackend`` on a temporary database. It is not a
+            backend name: choose ``"local"``/``"remote"`` through ``settings``.
+        timeout: HTTP timeout in seconds for the remote store.
+        raise_on_unexpected_status: Make the remote store's HTTP client raise
+            ``UnexpectedStatus`` on undocumented response codes.
+
+    Raises:
+        CredentialError: In remote mode without a platform API key.
+
+    Example:
+        Run a campaign into a local database, then read back its results:
+
+        ```python
+        from hackagent import HackAgent, Settings
+        from hackagent.orchestrator.campaign import run_campaign
+
+        session = HackAgent(Settings.resolve(db_path="./runs.db"))
+        try:
+            result = run_campaign(
+                "campaign.yaml", settings=session.settings, store=session.backend
+            )
+            for outcome in result.attacks:
+                for record in session.results(run_id=outcome.run_id).items:
+                    print(record.goal, record.evaluation_status)
+        finally:
+            session.close()
+        ```
+    """
 
     def __init__(
         self,
@@ -481,6 +512,7 @@ class HackAgent:
         )
 
     def close(self) -> None:
+        """Close the store, releasing its connection and flushing queued writes."""
         closer = getattr(self.backend, "close", None)
         if callable(closer):
             closer()
@@ -488,15 +520,23 @@ class HackAgent:
     # -- reads ----------------------------------------------------------------
 
     def context(self) -> Any:
+        """Return the organization and user the store records under."""
         return self.backend.get_context()
 
     def agents(self, *, page: int = 1, page_size: int = 100) -> Any:
+        """Return one page of recorded target agents."""
         return self.backend.list_agents(page=page, page_size=page_size)
 
     def agent(self, agent_id: Any) -> Any:
+        """Return one agent by id (a UUID or its string form).
+
+        Raises:
+            RuntimeError: When no such agent exists.
+        """
         return self.backend.get_agent(_as_uuid(agent_id))
 
     def attacks(self, *, page: int = 1, page_size: int = 100) -> Any:
+        """Return one page of recorded attack configurations."""
         return self.backend.list_attacks(page=page, page_size=page_size)
 
     def runs(
@@ -506,6 +546,7 @@ class HackAgent:
         page: int = 1,
         page_size: int = 100,
     ) -> Any:
+        """Return one page of attack runs, optionally only those of ``attack_id``."""
         return self.backend.list_runs(
             attack_id=_as_uuid(attack_id) if attack_id else None,
             page=page,
@@ -523,6 +564,11 @@ class HackAgent:
         return self.backend.get_campaign_run(_as_uuid(campaign_run_id))
 
     def run(self, run_id: Any) -> Any:
+        """Return one attack run by id.
+
+        Raises:
+            RuntimeError: When no such run exists.
+        """
         return self.backend.get_run(_as_uuid(run_id))
 
     def results(
@@ -532,6 +578,7 @@ class HackAgent:
         page: int = 1,
         page_size: int = 100,
     ) -> Any:
+        """Return one page of results, optionally only those of ``run_id``."""
         return self.backend.list_results(
             run_id=_as_uuid(run_id) if run_id else None,
             page=page,
@@ -539,27 +586,193 @@ class HackAgent:
         )
 
     def result(self, result_id: Any) -> Any:
+        """Return one result by id.
+
+        Raises:
+            RuntimeError: When no such result exists.
+        """
         return self.backend.get_result(_as_uuid(result_id))
 
     def traces(self, result_id: Any) -> List[Any]:
+        """Return a result's trace steps, ordered by sequence."""
         return self.backend.list_traces(_as_uuid(result_id))
 
     def delete_run(self, run_id: Any) -> None:
         """Delete one run. This is a write; reads never call it."""
         self.backend.delete_run(_as_uuid(run_id))
 
+    def delete_campaign_run(self, campaign_run_id: Any) -> None:
+        """Delete a completed local campaign execution and its recorded child data."""
+        delete = getattr(self.backend, "delete_campaign_run", None)
+        if not callable(delete):
+            raise NotImplementedError(
+                "Campaign execution deletion requires local storage."
+            )
+        delete(_as_uuid(campaign_run_id))
+
+    def delete_campaign_runs(self, campaign_run_ids: List[Any]) -> None:
+        """Atomically delete selected local executions and their recorded child data."""
+        delete = getattr(self.backend, "delete_campaign_runs", None)
+        if not callable(delete):
+            raise NotImplementedError(
+                "Campaign execution deletion requires local storage."
+            )
+        delete([_as_uuid(ident) for ident in campaign_run_ids])
+
+    # -- campaign run reports (local store) ----------------------------------
+
+    # The rows hackagent.reporting builds the dashboard's campaign run routes
+    # from. Only the local store has them: the platform API serves those routes
+    # itself, so remote mode forwards the dashboard's requests instead.
+
+    def _reports(self) -> Any:
+        if not callable(getattr(self.backend, "report_campaign_runs", None)):
+            raise NotImplementedError("Campaign run reports require local storage.")
+        return self.backend
+
+    def report_campaign_runs(self, **filters: Any) -> Any:
+        """A page of campaign runs, newest first (``campaign``, ``agent``,
+        ``status``, ``page``, ``page_size``)."""
+        return self._reports().report_campaign_runs(**filters)
+
+    def report_campaign_run(self, campaign_run_id: str) -> Any:
+        """One campaign run, or None."""
+        return self._reports().report_campaign_run(campaign_run_id)
+
+    def report_previous_candidates(self, current: Any) -> List[Any]:
+        """Return the earlier completed runs of ``current``'s campaign, newest first.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_previous_candidates(current)
+
+    def report_revisions(self, campaign_run_ids: List[str]) -> Dict[str, int]:
+        """Return the current report revision of each existing campaign run.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_revisions(campaign_run_ids)
+
+    def report_attack_runs(
+        self, campaign_run_ids: List[str], *, full: bool = False
+    ) -> List[Any]:
+        """Return the attack runs of campaign runs; ``full`` adds configurations.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_attack_runs(campaign_run_ids, full=full)
+
+    def report_goal_totals(self, campaign_run_ids: List[str]) -> List[Any]:
+        """Return each goal's attempt and bucket totals per campaign run.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_goal_totals(campaign_run_ids)
+
+    def report_goal_outcomes(self, campaign_run_id: str) -> List[Any]:
+        """Return the per-goal outcome tallies of a campaign run's attack runs.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_goal_outcomes(campaign_run_id)
+
+    def report_goal_usage(self, campaign_run_id: str) -> List[Any]:
+        """Return the per-goal call and token tallies of a campaign run.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_goal_usage(campaign_run_id)
+
+    def report_latencies(self, run_ids: List[str]) -> List[Any]:
+        """Return the distinct target latencies (ms) recorded per run, with counts.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_latencies(run_ids)
+
+    def report_attempts(
+        self, run_ids: List[str], goal_index: int, *, page: int, page_size: int
+    ) -> Any:
+        """Return one page of a goal's attempts, their count and the first jailbreak.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_attempts(
+            run_ids, goal_index, page=page, page_size=page_size
+        )
+
+    def report_structure(self, run_id: str, goal_index: int) -> Any:
+        """Return every attempt of a goal in one attack run with its traces.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_structure(run_id, goal_index)
+
+    # -- saved campaigns (local store) -------------------------------------------
+
+    def campaigns(self, *, page: int = 1, page_size: int = 100) -> Any:
+        """Return one page of campaigns saved from the dashboard (local storage)."""
+        return self.backend.list_campaigns(page=page, page_size=page_size)
+
+    def campaign(self, campaign_id: Any) -> Any:
+        """Return one saved campaign by id (local storage).
+
+        Raises:
+            RuntimeError: When no such campaign exists.
+        """
+        return self.backend.get_campaign(_as_uuid(campaign_id))
+
+    def save_campaign(
+        self,
+        *,
+        name: str,
+        description: str,
+        agent_id: Any,
+        spec: Dict[str, Any],
+        campaign_id: Any = None,
+    ) -> Any:
+        """Create a saved campaign, or replace the one ``campaign_id`` names."""
+        if campaign_id is None:
+            return self.backend.create_campaign(
+                name, description, _as_uuid(agent_id), spec
+            )
+        return self.backend.update_campaign(
+            _as_uuid(campaign_id), name, description, _as_uuid(agent_id), spec
+        )
+
+    def delete_campaign(self, campaign_id: Any) -> None:
+        """Delete a saved campaign; the runs launched from it are kept (local storage).
+
+        Raises:
+            RuntimeError: When no such campaign exists.
+        """
+        self.backend.delete_campaign(_as_uuid(campaign_id))
+
     # -- discovery -------------------------------------------------------------
 
     def catalog(self) -> List[Dict[str, Any]]:
+        """Return every registered attack technique; see :func:`catalog_entries`."""
         return catalog_entries()
 
     def presets(self) -> Dict[str, Dict[str, Any]]:
+        """Return the built-in dataset presets, keyed by name."""
         return presets()
 
     def load_goals(self, **kwargs: Any) -> List[Any]:
+        """Load goals with :func:`hackagent.datasets.load_goals`'s arguments."""
         return load_goals(**kwargs)
 
     def plan_attack(self, target: Dict[str, Any], **kwargs: Any) -> Any:
+        """Let the LLM planner choose a technique, goals and parameters."""
         return plan_attack(target, **kwargs)
 
     def check_connection(self) -> int:
@@ -570,6 +783,7 @@ class HackAgent:
         return int(probe())
 
     def ensure_graphviz(self, *, allow_download: bool = False) -> Optional[str]:
+        """Locate (or download) the Graphviz ``dot`` binary FC-Attack needs."""
         return ensure_graphviz(allow_download=allow_download)
 
     def doctor(self) -> DoctorReport:
@@ -621,6 +835,5 @@ __all__ = [
     "presets",
     "primary_attacks",
     "primary_dataset",
-    "result_bucket",
     "web_target",
 ]
