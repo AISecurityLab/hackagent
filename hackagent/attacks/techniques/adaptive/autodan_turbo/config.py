@@ -37,8 +37,8 @@ class AutoDANTurboParams(AttackParams):
         ge=0.0,
         le=10.0,
         description=(
-            "Score (0-10) at which a goal is considered jailbroken and the search "
-            "for it stops."
+            "Panel score (0-10) at which the search for a goal stops. Whether the "
+            "goal counts as jailbroken is still the panel's verdict."
         ),
     )
     warmup_iterations: int = Field(

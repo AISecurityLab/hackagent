@@ -40,8 +40,8 @@ Algorithm (one goal), with the parameters of :class:`~.config.PairParams`:
 4. With a ``scorer``, put only the best-scoring attempt to the panel at the
    end; its verdict is the one the run reports for that attempt.
 
-Deviations from the paper: the paper runs 20 streams of depth 3 with a
-GPT-4 judge; the defaults here are 5 by 5, and the judge is either the
+Deviations from the paper: the paper runs 30 streams of depth 3 (N = 30,
+K = 3) with a GPT-4 judge; the defaults here are 5 by 5, and the judge is either the
 optional ``scorer`` or the campaign's panel. The rater's explanation is fed
 back alongside the score, and long replies are truncated in the feedback.
 A malformed attacker turn is skipped rather than regenerated.

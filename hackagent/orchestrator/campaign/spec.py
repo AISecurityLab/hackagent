@@ -100,9 +100,9 @@ class AttackSpec(_Spec):
     roles: dict[str, ModelConfig] = Field(
         default_factory=dict,
         description=(
-            "The helper models an adaptive attack uses, keyed by role name (for "
-            "example ``attacker``). Static attacks need none. Each attack's page "
-            "lists the roles it requires."
+            "The helper models an attack uses, keyed by role name (for example "
+            "``attacker``). Most static attacks need none; FC and tFC need an "
+            "``attacker``. Each attack's page lists the roles it requires."
         ),
     )
 

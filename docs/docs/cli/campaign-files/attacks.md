@@ -19,7 +19,7 @@ and which helper models it drives.
 |---|---|---|---|
 | `name` | string | **required** | The technique to run, e.g. `flipattack` or `tap`. It must be one of the registered attacks. |
 | `parameters` | map of string to any | empty | The technique's own settings. Valid keys differ per attack; anything you leave out keeps its default. Each attack's page lists its parameters. |
-| `roles` | map of string to [ModelConfig](target.md#modelconfig) | empty | The helper models an adaptive attack uses, keyed by role name (for example `attacker`). Static attacks need none. Each attack's page lists the roles it requires. |
+| `roles` | map of string to [ModelConfig](target.md#modelconfig) | empty | The helper models an attack uses, keyed by role name (for example `attacker`). Most static attacks need none; FC and tFC need an `attacker`. Each attack's page lists the roles it requires. |
 
 ## Attack names {#attack-names}
 

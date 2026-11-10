@@ -53,7 +53,8 @@ class MMLParams(AttackParams):
         ge=1,
         description=(
             "For word_replacement and mixed: how many words of the goal are "
-            "swapped for decoy words in the image."
+            "swapped for decoy words in the image; the text lists each decoy with "
+            "the word it replaces."
         ),
     )
     prompt_style: PromptStyle = Field(

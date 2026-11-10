@@ -67,8 +67,9 @@ Deviations from the paper: synthesis runs inside the campaign against the
 campaign's own target, scored by its evaluation panel on a few randomly
 drawn goals of the same run, rather than as a separate offline study over
 a fixed benchmark.
-``TransformFxDecorator``, which executes Python, is accepted only in a
-program the user wrote, never in one the synthesizer proposed. Some presets
+``TransformFxDecorator``, which executes Python, is accepted only when no
+synthesizer is configured: with one, it is rejected even in the user's own
+program. Some presets
 are HackAgent's own measurements, marked in :mod:`.programs`.
 
 Roles: ``synthesizer`` (optional) proposes programs during synthesis;

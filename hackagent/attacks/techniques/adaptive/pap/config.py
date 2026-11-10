@@ -31,7 +31,10 @@ class PAPParams(AttackParams):
     max_techniques: int = Field(
         default=0,
         ge=0,
-        description="Upper bound on techniques tried per goal; 0 tries all of them.",
+        description=(
+            "Upper bound on techniques tried per goal; 0 tries every selected "
+            "technique."
+        ),
     )
     attacker: Optional[Completion] = Field(
         default=None,
