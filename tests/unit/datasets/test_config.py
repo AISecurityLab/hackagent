@@ -94,3 +94,65 @@ def test_a_source_without_a_tag_is_read_rather_than_refused():
         ).__name__
         == "ProviderSource"
     )
+
+
+def test_range_is_exclusive_and_precedes_shuffle_and_limit():
+    goals = load_goals(
+        _inline(
+            [str(n) for n in range(10)], start=3, end=7, shuffle=True, seed=2, limit=2
+        )
+    )
+    assert len(goals) == 2
+    assert {g.text for g in goals} <= {"3", "4", "5", "6"}
+    assert [g.index for g in goals] == [0, 1]
+
+
+@pytest.mark.parametrize(
+    "selection", [{"start": -1}, {"start": 3, "end": 3}, {"start": 4, "end": 2}]
+)
+def test_invalid_ranges_are_rejected(selection):
+    with pytest.raises(ValueError):
+        _inline(["a", "b"], **selection)
+
+
+def test_range_past_the_dataset_is_an_empty_selection():
+    with pytest.raises(ValueError, match="no goals"):
+        load_goals(_inline(["a"], start=2))
+
+
+def test_provider_range_keeps_metadata_aligned(monkeypatch):
+    import hackagent.datasets.config as config
+
+    calls = []
+
+    def load(provider_config):
+        calls.append(provider_config)
+        return ["a", "b", "c", "d"], {i: {"row": i} for i in range(4)}
+
+    monkeypatch.setattr(config, "load_goals_and_extra_fields_from_config", load)
+    spec = DatasetSpec.model_validate(
+        {
+            "source": {"type": "preset", "name": "harmbench"},
+            "selection": {"start": 1, "end": 3, "limit": 1},
+        }
+    )
+    goals = load_goals(spec)
+    assert calls == [{"preset": "harmbench"}]
+    assert [(goal.text, goal.index, goal.extra) for goal in goals] == [
+        ("b", 0, {"row": 1})
+    ]
+
+
+def test_category_filter_precedes_range():
+    from hackagent.core.contracts import Goal
+    from hackagent.datasets.config import DatasetSelection, select_goals
+
+    goals = [
+        Goal(text=str(i), index=i, labels={"category": "E" if i % 2 else "A"})
+        for i in range(6)
+    ]
+    selected = select_goals(
+        goals, DatasetSelection(start=1, end=3, filters={"categories": ["E"]})
+    )
+    assert [goal.text for goal in selected] == ["3", "5"]
+    assert [goal.index for goal in selected] == [0, 1]
