@@ -40,6 +40,7 @@ NAMED = {
     "OLLAMA": MODEL["connection"],
     "GEMMA": MODEL,
     "GATEWAY": {"provider": "hackagent", "type": "OPENAI"},
+    "gateway": {"provider": "hackagent", "type": "OPENAI"},
 }
 HOLE = "__HOLE__"
 
@@ -147,4 +148,8 @@ def test_the_documented_campaign_is_one_the_code_accepts(page, snippet, monkeypa
             {**a, "name": "baseline"} if a.get("name") == "harmbench" else a
             for a in values["attacks"]
         ]
+    # A campaign sent to the HTTP API leaves the target out: the server sets it
+    # from the campaign's agent.
+    if page.startswith("api/"):
+        values.setdefault("target", TARGET)
     CampaignSpec.model_validate(values)

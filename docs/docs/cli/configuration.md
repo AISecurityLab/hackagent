@@ -246,7 +246,7 @@ Campaign files follow the same rule: `execution.storage.api_key` and each
 model's `api_key` are `${VARIABLE}` references.
 
 The platform key is also the key for the
-[LLM gateway](../api/index.mdx#llm-gateway): a campaign model that uses the
+[LLM gateway](../api/llm-gateway.mdx): a campaign model that uses the
 gateway is called with it, at the base URL plus `/v1`.
 
 ## Base URL
