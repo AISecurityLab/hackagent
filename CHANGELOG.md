@@ -1,3 +1,50 @@
+## v0.18.0 (2026-11-10)
+
+### Feat
+
+- **storage**: send interaction trace steps to the platform as interaction
+- **reporting**: ship a conformance sample and the responses it must get
+- **web**: serve campaign run reports under /run from stored tallies
+- **gateway**: name gateway models hackagent/attacker-v1 and hackagent/judge-v1
+- **evaluation**: rate judges on balanced accuracy and Youden's J
+- **attacks**: h4rm3l is one attack, and its search is optional
+- **attacks**: search the h4rm3l language instead of writing a program
+- **h4rm3l**: add the dan_refusal_suppression preset
+- **web**: expose local campaign investigation and cost summaries
+- **web**: run the campaigns the dashboard launches on this machine
+- **web**: launch offline on this machine when the dashboard does not say where
+- **web**: save and launch campaigns from the offline dashboard
+- **campaign**: name gateway models hackagent-attacker or hackagent-judge
+
+### Fix
+
+- **reporting**: follow review of the campaign run report routes
+- address review findings on the stage-to-main promotion
+- **web**: list, filter and delete runs as the dashboard shows them
+- **web**: serve only this machine's names and same-origin writes
+- **evaluation**: preserve audit thresholds and handle abstentions
+- **datasets**: classify goals with taxonomy codes and preserve partial labels
+- **attacks**: restrict synthesized transforms and honor trace retention
+- **storage**: give a campaign run an attack the server will accept
+- **scripts**: compare agent types by member, not by value
+- **dashboard**: report evaluated goal outcomes and active jailbreak timing
+- **dashboard**: honor refusal retention and complete token coverage
+- **attacks**: FC and tFC draw steps from a step-description generator, as the paper does
+- **campaign**: static attacks trace their target and panel calls
+- **attacks**: Crescendo detects refusals with an LLM Refusal Judge, as PyRIT does
+- **attacks**: BoN judges every candidate and filters false positives as the reference does
+- **attacks**: TAP records which branch each candidate came from
+- **attacks**: AdvPrefix judges the prefilled opening once
+- **attacks**: AdvPrefix prefills an opening, not a drafted answer
+- **execution**: end a claimed run whose gateway marker cannot be bound
+- record AdvPrefix response metadata
+- prune TAP branches after target scoring
+- bound AdvPrefix prefixes and record metadata
+
+### Refactor
+
+- **reporting**: move result buckets into hackagent.reporting
+
 ## v0.17.0 (2026-11-02)
 
 ### Feat
