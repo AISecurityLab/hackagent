@@ -125,7 +125,7 @@ Every run is recorded twice:
 
 - **In the local database**, `~/.local/share/hackagent/hackagent.db` unless
   you set another. `result.campaign_run_id` is its id there. `hackagent web`
-  and `hackagent results list` show it, and
+  and `hackagent results summary` show it, and
   [Results and storage](./results-and-storage.mdx) reads it from Python.
 - **As files** under `./logs/runs/<run_id>/`: the campaign that ran
   (`campaign.yaml`), one row per attempt (`results.json`) and every model call

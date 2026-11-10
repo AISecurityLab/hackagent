@@ -40,7 +40,6 @@ const PAGE_REDIRECTS: Record<string, string> = {
   '/attacks/shared-args': '/attacks/shared-settings',
   '/attacks/taxonomy': '/attacks',
   '/cli/overview': '/cli',
-  '/cli/agent': '/cli/commands#hackagent-agent',
   '/cli/config': '/cli/commands#hackagent-config',
   '/cli/datasets': '/cli/commands#hackagent-datasets',
   '/cli/eval': '/cli/commands#hackagent-campaign',

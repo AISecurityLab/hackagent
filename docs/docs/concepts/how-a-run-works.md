@@ -41,11 +41,15 @@ flowchart TB
 Guardrails are optional and off by default; without them the prompt goes
 straight to the target.
 
-## Static and adaptive attacks differ here
+## The attack type decides this step
 
-A **static** attack decides its prompts up front. An **adaptive** one searches:
-it reads each reply and writes the next prompt, which is why it needs an
-attacker model of its own.
+There are four types of attack. A **static** attack decides its prompts up
+front. An **adaptive** one searches: it reads each reply and writes the next
+prompt, usually with an attacker model of its own. A **multi-turn** attack
+builds one conversation, turn by turn. An **indirect** attack hides its
+instructions where the target only reads, such as a tool result or a retrieved
+document. The [Attacks overview](../attacks/index.mdx) covers all four; the
+first two look like this:
 
 ```mermaid
 flowchart LR
