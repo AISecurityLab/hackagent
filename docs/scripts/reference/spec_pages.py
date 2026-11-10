@@ -20,7 +20,7 @@ from .paths import CAMPAIGN_FILES
 # A small local model stands in for every chat role in the examples, so a
 # reader can copy a snippet and run it against Ollama without editing it.
 CHAT_MODEL: dict[str, Any] = {
-    "name": "llama3.2",
+    "name": "llama3.2:latest",
     "connection": {"provider": "ollama", "type": "OLLAMA"},
 }
 
@@ -197,7 +197,7 @@ EXAMPLES: dict[str, list[tuple[str, Any]]] = {
             "A model served by Ollama on this machine",
             {
                 "target": {
-                    "name": "llama3.2",
+                    "name": "llama3.2:latest",
                     "connection": {
                         "provider": "ollama",
                         "type": "OLLAMA",

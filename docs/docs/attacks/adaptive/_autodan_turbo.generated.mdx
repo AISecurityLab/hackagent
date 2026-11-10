@@ -29,17 +29,17 @@ attacks:
 - name: autodan_turbo
   roles:
     attacker:
-      name: llama3.2
+      name: llama3.2:latest
       connection:
         provider: ollama
         type: OLLAMA
     embedder:
-      name: nomic-embed-text
+      name: nomic-embed-text:latest
       connection:
         provider: ollama
         type: OLLAMA
     summarizer:
-      name: llama3.2
+      name: llama3.2:latest
       connection:
         provider: ollama
         type: OLLAMA

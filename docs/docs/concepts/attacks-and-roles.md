@@ -54,7 +54,7 @@ attacks:
   - name: tap
     roles:
       attacker:
-        name: llama3.2
+        name: llama3.2:latest
         connection:
           provider: ollama
           type: OLLAMA

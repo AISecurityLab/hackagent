@@ -45,10 +45,10 @@ result = run_campaign({
     "version": 1,
     "campaign": {"name": "Goals from goals.txt"},
     "dataset": {"source": {"type": "inline", "goals": goals}},
-    "target": {"name": "llama3.2", "connection": OLLAMA},
+    "target": {"name": "llama3.2:latest", "connection": OLLAMA},
     "attacks": [{"name": "baseline"}, {"name": "flipattack"}],
     "evaluation": {"judges": [
-        {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}},
+        {"name": "llama3.2:latest", "connection": OLLAMA, "scoring": {"type": "harmbench"}},
     ]},
 })
 ```

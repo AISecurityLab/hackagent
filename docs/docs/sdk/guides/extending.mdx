@@ -55,7 +55,7 @@ result = run_campaign(
         "target": {"name": "support-bot", "connection": {"provider": "local", "type": "OPENAI"}},
         "attacks": [{"name": "baseline"}, {"name": "flipattack"}],
         "evaluation": {"judges": [
-            {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}},
+            {"name": "llama3.2:latest", "connection": OLLAMA, "scoring": {"type": "harmbench"}},
         ]},
     },
     build=build,

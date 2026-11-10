@@ -25,11 +25,11 @@ from .markup import admonition, clean, partial, table, yaml_block
 from .paths import attack_page, attack_type, relative, type_label
 
 CHAT_MODEL: dict[str, Any] = {
-    "name": "llama3.2",
+    "name": "llama3.2:latest",
     "connection": {"provider": "ollama", "type": "OLLAMA"},
 }
 EMBED_MODEL: dict[str, Any] = {
-    "name": "nomic-embed-text",
+    "name": "nomic-embed-text:latest",
     "connection": {"provider": "ollama", "type": "OLLAMA"},
 }
 

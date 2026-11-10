@@ -68,12 +68,12 @@ attacks:
     depth: 3
   roles:
     attacker:
-      name: llama3.2
+      name: llama3.2:latest
       connection:
         provider: ollama
         type: OLLAMA
     on_topic:
-      name: llama3.2
+      name: llama3.2:latest
       connection:
         provider: ollama
         type: OLLAMA

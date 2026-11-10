@@ -16,7 +16,11 @@ the risk itself.
 ## What they have in common
 
 - **The user's request is benign.** The goal travels in the content, not in the
-  user message, so a check on user input sees nothing unusual.
+  user's own words. For Tool-output IPI and ToolHijacker it never reaches the
+  user message, so a check on user input sees nothing unusual. RAG poisoning
+  sends the retrieved context and the question together in one user message,
+  so a `before` guardrail does see the payload there: a RAG guardrail result
+  measures whether the guardrail catches it.
 - **HackAgent builds the channel itself.** It writes the tool exchange, ranks the
   tool library, or runs the retrieval, then calls the target directly. The
   result describes how the model handles untrusted content. It does not test

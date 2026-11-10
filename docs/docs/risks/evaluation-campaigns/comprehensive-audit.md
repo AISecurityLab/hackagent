@@ -14,8 +14,8 @@ from hackagent.attacks.techniques.registry import get_attack_class
 OLLAMA = {"provider": "ollama", "type": "OLLAMA"}
 TARGET = {"name": "my-agent", "connection": {
     "provider": "local", "type": "OPENAI", "endpoint": "http://localhost:8000/v1"}}
-JUDGE = {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
-ATTACKER = {"name": "llama3.2", "connection": OLLAMA}
+JUDGE = {"name": "llama3.2:latest", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
+ATTACKER = {"name": "llama3.2:latest", "connection": OLLAMA}
 
 def roles_for(attack):
     """An adaptive attack searches with a model of its own; a static one

@@ -112,7 +112,7 @@ defect. That is what makes it worth gating on.
 ```yaml
 evaluation:
   judges:
-  - name: llama3.2
+  - name: llama3.2:latest
     connection:
       provider: ollama
       type: OLLAMA
@@ -125,19 +125,19 @@ evaluation:
 ```yaml
 evaluation:
   judges:
-  - name: llama3.2
+  - name: llama3.2:latest
     connection:
       provider: ollama
       type: OLLAMA
     scoring:
       type: harmbench
-  - name: llama3.2
+  - name: llama3.2:latest
     connection:
       provider: ollama
       type: OLLAMA
     scoring:
       type: nuanced
-  - name: llama3.2
+  - name: llama3.2:latest
     connection:
       provider: ollama
       type: OLLAMA

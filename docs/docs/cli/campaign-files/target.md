@@ -86,7 +86,7 @@ anything left unset uses the provider's own default.
 
 ```yaml
 target:
-  name: llama3.2
+  name: llama3.2:latest
   connection:
     provider: ollama
     type: OLLAMA
