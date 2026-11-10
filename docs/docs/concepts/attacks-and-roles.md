@@ -76,7 +76,8 @@ goals × attacks × prompts per goal
 
 For a static attack, "prompts per goal" is a small fixed number. For the others
 it is set by their parameters, and each prompt usually also costs a call to the
-**attacker** model and one to each **judge**. The
+**attacker** model and one to each **judge**. A few attacks also do work once
+per run, on top of this: AutoDAN-Turbo's warm-up and h4rm3l's program search. The
 [comparison table](../attacks/index.mdx#how-the-attacks-compare) gives the
 figure for every attack.
 [`execution.escalate`](../cli/campaign-files/execution.md#executionspec) and

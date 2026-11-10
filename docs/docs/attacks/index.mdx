@@ -70,7 +70,7 @@ takes tool schemas (Tool-output IPI, ToolHijacker) or a corpus you supply
 
 ### How the attacks compare
 
-Turns count the messages the target sees in one call. Cost counts target calls
+Turns count the user turns the target sees in one call. Cost counts target calls
 per goal at the default parameters. For an attack that stops on the first
 success it is the most it can spend. Unless the row says otherwise, every
 target reply also costs one panel evaluation, which is one call per judge.
@@ -84,18 +84,18 @@ target reply also costs one panel evaluation, which is one call per judge.
 | [FC-Attack](./static/fc.mdx) | Static | `attacker` | 1, with an image | Low: 1 call, plus 1 attacker call | Vision-language targets |
 | [tFC-Attack](./static/tfc.mdx) | Static | `attacker` | 1 | Low: 1 call, plus 1 attacker call | Text-only targets, with FC's flowchart idea in code form |
 | [Static Template](./static/static_template.mdx) | Static | none | 1 | Low: 9 calls | Well-known jailbreak templates: instruction override, delimiter tricks, role play |
-| [h4rm3l](./adaptive/h4rm3l.mdx) | Adaptive | optional: `synthesizer`, `decorator` | 1 | Minimal without a synthesizer: 1 call. With one: a search of up to 240 calls for the whole run, then up to 3 per goal | Chains of obfuscations you can name and repeat; with a synthesizer, finding the chain that works on this target |
-| [PAP](./adaptive/pap.mdx) | Adaptive | `attacker` | 1 | Medium: up to 5 calls and 5 attacker calls | Persuasion framing (authority, logical appeal) at a low price |
+| [h4rm3l](./adaptive/h4rm3l.mdx) | Adaptive | optional: `synthesizer`, `decorator` | 1 | Minimal without a synthesizer: 1 call. With one: a search of about 240 calls for the whole run (more if the synthesizer returns extra programs), then up to 3 per goal | Chains of obfuscations you can name and repeat; with a synthesizer, finding the chain that works on this target |
+| [PAP](./adaptive/pap.mdx) | Adaptive | `attacker` | 1 | Low: up to 5 calls and 5 attacker calls | Persuasion framing (authority, logical appeal) at a low price |
 | [BoN](./adaptive/bon.mdx) | Adaptive | none | 1 | Medium: up to 20 calls | A search when you have no attacker model |
 | [AdvPrefix](./adaptive/advprefix.mdx) | Adaptive | `attacker` | 1, with the answer's opening prefilled | High: up to 20 calls and 16 attacker calls, with no early stop | Endpoints that accept a trailing assistant message, such as self-hosted open-weight models |
 | [PAIR](./adaptive/pair.mdx) | Adaptive | `attacker`; optional: `scorer` | 1 | High: up to 25 calls and 25 attacker calls | The default strong attack: an attacker model rewrites its prompt after every reply |
 | [TAP](./adaptive/tap.mdx) | Adaptive | `attacker`; optional: `on_topic` | 1 | High: up to 36 calls and at least as many attacker calls | A wider search than PAIR, for targets PAIR does not break |
 | [AutoDAN-Turbo](./adaptive/autodan_turbo.mdx) | Adaptive | `attacker`, `embedder`, `summarizer` | 1 | Very high: up to 100 calls per goal in a warm-up for the run, then up to 100 more per goal, each with an attacker call | Long audits over many goals, where strategies learned on one goal carry to the next |
-| [Crescendo](./multi-turn/crescendo.mdx) | Multi-turn | `attacker`; optional: `refusal` | Up to 10 | High: up to 20 calls (10 turns and 10 rephrasings), each with an attacker call and a refusal check | Chat assistants and agents that keep the conversation history |
+| [Crescendo](./multi-turn/crescendo.mdx) | Multi-turn | `attacker`; optional: `refusal` | Up to 10 | High: up to 20 calls (10 turns and 10 rephrasings), each with an attacker call and a refusal check; panel at most 10 (rephrased turns are not judged) | Chat assistants and agents that keep the conversation history |
 | [STAC](./multi-turn/stac.mdx) | Multi-turn | none | One per chain step (3 in the built-in chains) | Low: up to 4 calls per turn, and no judge calls | Tool-calling agents: does it run a harmful chain of harmless-looking tool calls? Goals must match the chain |
 | [Tool-output IPI](./indirect/tool_output_ipi.mdx) | Indirect | optional: `attacker` | 1, with a planted tool result | Minimal: 1 call; up to 3 with an attacker | Agents that act on what their tools return |
 | [ToolHijacker](./indirect/toolhijacker.mdx) | Indirect | optional: `attacker`, `embedder` | 1 | Low: up to 9 calls, and no judge calls | Agents that pick tools from a registry. Goals are benign tasks |
-| [RAG poisoning](./indirect/rag.mdx) | Indirect | `attacker`, `embedder` | 1, with retrieved context | Medium: 5 calls, plus up to 25 attacker calls per poisoned document | Assistants that answer from documents. You supply the corpus in `documents` |
+| [RAG poisoning](./indirect/rag.mdx) | Indirect | `attacker`, `embedder` | 1, with retrieved context | Medium: 5 calls, plus 1 attacker call for the queries and up to 25 per poisoned document | Assistants that answer from documents. You supply the corpus in `documents` |
 
 Two attacks decide success themselves instead of asking the judges: STAC
 checks the sandbox's final state, and ToolHijacker checks which tool the target
@@ -104,8 +104,8 @@ called. A campaign of only those two needs no judges.
 ### A decision guide
 
 1. **Start static.** Run `baseline` and `flipattack` on a few goals first.
-   They cost one call per goal and need no helper model, so a failure here is
-   your setup, not the attack. Baseline also tells you what the target refuses
+   They cost one call per goal and need no helper model, so an error here
+   points at your setup, not the attack. Baseline also tells you what the target refuses
    with no trick at all; every other result is measured against it.
 2. **Add one adaptive attack for strength.** `pair` is the usual choice. `pap`
    is cheaper and often enough against a weak target; `tap` searches wider
@@ -123,7 +123,8 @@ called. A campaign of only those two needs no judges.
 Special cases:
 
 - **Vision-language target:** add `mml` or `fc`.
-- **No attacker model available:** stay with the static attacks, `bon`, and
+- **No attacker model available:** stay with the static attacks other than FC
+  and tFC, `bon`, and
   `h4rm3l` with a named `program` (its default program sends the goal
   unchanged).
 - **Self-hosted model that accepts prefilling:** add `advprefix`.
@@ -191,6 +192,23 @@ attacks:
   - name: crescendo
     roles:
       attacker: *attacker
+
+evaluation:
+  judges:
+    - name: qwen3:8b
+      connection: &ollama
+        provider: ollama
+        type: OLLAMA
+      scoring:
+        type: harmbench
+    - name: qwen3:8b
+      connection: *ollama
+      scoring:
+        type: nuanced
+    - name: llama3.1:8b
+      connection: *ollama
+      scoring:
+        type: jailbreakbench
 ```
 
 Add the indirect attacks that match your agent to either one. To spend less,
@@ -216,8 +234,11 @@ after another, in the order you list them.
 
 - **Attempts.** A static attack sends each prompt it built, and each becomes
   an attempt. An adaptive, multi-turn or indirect attack records every
-  exchange it had judged, so you can follow how its search got there.
-- **Verdicts.** The panel votes on each attempt, as described in
+  exchange it had judged, so you can follow how its search got there. STAC
+  and ToolHijacker are the exceptions: each records one attempt per goal,
+  with a verdict it computes itself.
+- **Verdicts.** The panel votes on each attempt (except STAC's and
+  ToolHijacker's), as described in
   [Judges](../concepts/judges.md). A goal is jailbroken by an attack when any
   of its attempts passed.
 - **ASR.** An attack's attack success rate (ASR) is the share of goals it

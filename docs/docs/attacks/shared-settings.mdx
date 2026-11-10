@@ -128,12 +128,13 @@ How an attack uses it depends on its type:
   `threshold` therefore also decide when a search stops.
 
 Some attacks add checks of their own around the panel. Most only steer the
-search; Crescendo and BoN also change what is recorded, as the table says:
+search; Crescendo, BoN and PAIR with a `scorer` also change what is recorded, as
+the table says:
 
 | Attack | Its own check |
 |---|---|
 | TAP | The `on_topic` role drops drifted branches before they reach the target |
-| PAIR | With a `scorer` role, the scorer rates every reply and decides when to stop; the panel then judges only the best attempt |
+| PAIR | With a `scorer` role, the scorer rates every reply and decides when to stop; the panel then judges only the best attempt, so only that attempt carries a verdict |
 | Crescendo | The `refusal` role decides when to rephrase. A rephrased turn is not judged and is recorded as a failure |
 | BoN | A reply barely longer than the request is not judged, and a short reply the panel passes is not counted |
 | AutoDAN-Turbo | Stops when the panel's 0 to 10 score reaches its `break_score` |
@@ -145,7 +146,8 @@ ToolHijacker passes it only when the target called the injected tool for
 enough task phrasings.
 
 With no judges configured, replies are recorded but not scored. Searches then
-have nothing to stop on and run to their configured end. h4rm3l's program
+have nothing to stop on and run to their configured end, except PAIR with a
+`scorer`, which still stops on `jailbreak_threshold`. h4rm3l's program
 search has no signal either, so do not give it a `synthesizer` without judges.
 
 ## Stopping early
@@ -161,8 +163,10 @@ Three settings stop work before an attack has tried everything:
   cheap attacks first. Later attacks then see fewer goals, so their ASR is not
   comparable with the earlier ones.
 - **On time or failure.** `execution.per_attack_timeout` stops an attack that
-  runs too long and marks it failed; `execution.on_error: stop` skips the
-  remaining attacks after one fails.
+  runs too long and marks it failed. The clock times the goals only: a
+  run-wide preparation, such as AutoDAN-Turbo's warm-up or h4rm3l's program
+  search, runs before it starts. `execution.on_error: stop` skips the
+  remaining attacks after one fails; it has no effect in `mode: parallel`.
 
 ```yaml
 attacks:
@@ -213,7 +217,7 @@ attack in the campaign:
   attacks send several requests per goal at once (PAIR's streams, TAP's
   branches, BoN's candidates), so `target` is usually the one to raise.
 - [`retries.roles`](../cli/campaign-files/execution.md#retryspec) retries a
-  failed call to a helper model, as `retries.target` and `retries.judges` do
+  failed call to a helper model (not to an embedder), as `retries.target` and `retries.judges` do
   for the target and the judges.
 - `preflight`, on by default, checks every role model, embedders included,
   before the first attack starts.

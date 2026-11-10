@@ -18,8 +18,9 @@ import TabItem from '@theme/TabItem';
 # Choosing an attacker model
 
 The `attacker` role is the model that writes the adversarial prompts. PAIR,
-TAP, PAP, AdvPrefix, AutoDAN-Turbo and Crescendo cannot run without one, and
-several other attacks can use one (see
+TAP, PAP, AdvPrefix, AutoDAN-Turbo, Crescendo, FC-Attack, tFC-Attack and RAG
+poisoning cannot run without one, and Tool-output IPI and ToolHijacker can use
+one (see
 [Shared settings](../attacks/shared-settings.mdx#roles)). Which model fills it
 is the biggest lever on how many jailbreaks you find, how long each goal takes
 and how much GPU you need.
@@ -41,8 +42,9 @@ These numbers come from a single benchmark campaign (OmniSafeBench goal set,
 10 goals per subcategory from categories A-F) against **target `qwen3.8:27b`**,
 judged by **`qwen3.5:9b`**. The target, goals and judge were kept constant, so
 use the plots to compare attackers with each other, not as absolute scores for
-other targets. The relative rankings and the thinking and serving effects
-transfer; the percentages do not.
+other targets. The percentages will not carry over to another target. The
+rankings and the thinking and serving effects may, but one target cannot show
+that.
 
 :::
 
@@ -62,7 +64,7 @@ transfer; the percentages do not.
 
 The main trade-off view: **attack success against mean minutes per goal**
 (log time axis). Top-left is better; the green quadrant is above-median ASR
-*and* below-median time. 
+*and* below-median time.
 
 <iframe
   src="/attackers/frontier_asr_vs_time.html"
@@ -92,7 +94,8 @@ lift in percentage points and the change in minutes per goal when thinking was e
 </TabItem>
 <TabItem value="size" label="Size (total params)">
 
-ASR against **total parameters**. To convey how the no. of params affects ASR, all models are with thinking enabled.
+ASR against **total parameters**. To show how parameter count affects ASR,
+every model in this view has thinking enabled.
 
 <iframe
   src="/attackers/scaling_asr_vs_size.html"
@@ -143,8 +146,8 @@ retries.
 ## What to take from it
 
 - **Turn thinking on** (`generation.thinking: true` on the role). All three
-  ON/OFF pairs improved with reasoning enabled: Qwen-3.8 BF16 **+26.5 pp** (and *halved* time per goal, the
-  attacker stops earlier due to success), Deepseek +14.0 pp, GLM-5.3 +4.1 pp. Cost is
+  ON/OFF pairs improved with reasoning enabled: Qwen-3.8 BF16 **+26.4 pp** (and *halved* time per goal, the
+  attacker stops earlier due to success), Deepseek +13.9 pp, GLM-5.3 +4.1 pp. Cost is
   essentially zero on the two that were already fast.
 - **ASR scales with size, but not always.** The 4B floor is weak (6.8%), but
   in the 27–31B band ASR spans 18–54% at identical size, and the 300B+ MoE
