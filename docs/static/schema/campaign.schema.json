@@ -373,6 +373,27 @@
       "additionalProperties": false,
       "description": "Which of the loaded goals to run, and in what order.",
       "properties": {
+        "start": {
+          "default": 0,
+          "description": "Zero-based start of the goal range, inclusive. Applied after category filters and before shuffle and limit.",
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Zero-based end of the goal range, exclusive. Leave unset to include the remaining goals.",
+          "title": "End"
+        },
         "limit": {
           "anyOf": [
             {
@@ -1098,6 +1119,15 @@
         "type": {
           "default": "harmbench",
           "description": "Which judge prompt and parser to use. See the judge scoring types for the full list (``harmbench``, ``nuanced``, ``jailbreakbench``, \u2026).",
+          "enum": [
+            "harmbench",
+            "harmbench_variant",
+            "jailbreakbench",
+            "nuanced",
+            "on_topic",
+            "rag_outcome",
+            "scorer"
+          ],
           "title": "Type",
           "type": "string"
         },

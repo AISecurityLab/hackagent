@@ -57,6 +57,7 @@ class ScoringSpec(_Spec):
 
     type: str = Field(
         default="harmbench",
+        json_schema_extra={"enum": sorted(EVALUATOR_MAP)},
         description=(
             "Which judge prompt and parser to use. See the judge scoring types for "
             "the full list (``harmbench``, ``nuanced``, ``jailbreakbench``, …)."

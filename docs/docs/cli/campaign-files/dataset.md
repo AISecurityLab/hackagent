@@ -63,6 +63,8 @@ Which of the loaded goals to run, and in what order.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
+| `start` | integer (>= 0) | `0` | Zero-based start of the goal range, inclusive. Applied after category filters and before shuffle and limit. |
+| `end` | integer (>= 1) | unset | Zero-based end of the goal range, exclusive. Leave unset to include the remaining goals. |
 | `limit` | integer (>= 1) | unset | Run at most this many goals. Leave unset to run them all. |
 | `shuffle` | boolean | `false` | Shuffle the goals before applying `limit`, so a limited run is a random sample instead of the first goals in the file. |
 | `seed` | integer | unset | Random seed for `shuffle`, so the same sample is drawn every run. |

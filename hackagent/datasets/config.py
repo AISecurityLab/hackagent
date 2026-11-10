@@ -142,6 +142,24 @@ class DatasetFilters(DatasetModel):
 class DatasetSelection(DatasetModel):
     """Which of the loaded goals to run, and in what order."""
 
+    start: int = Field(
+        default=0,
+        ge=0,
+        description="Zero-based start of the goal range, inclusive. Applied after category filters and before shuffle and limit.",
+    )
+    end: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Zero-based end of the goal range, exclusive. Leave unset to include the remaining goals.",
+    )
+
+    @model_validator(mode="after")
+    def validate_range(self) -> "DatasetSelection":
+        """Reject reversed or empty ranges."""
+        if self.end is not None and self.end <= self.start:
+            raise ValueError("end must be greater than start")
+        return self
+
     limit: Optional[int] = Field(
         default=None,
         ge=1,
@@ -230,7 +248,11 @@ class DatasetSpec(DatasetModel):
         from the matches by :func:`select_goals`.
         """
         config: dict[str, Any] = {}
-        if not self.selection.filters.categories:
+        if (
+            not self.selection.filters.categories
+            and self.selection.start == 0
+            and self.selection.end is None
+        ):
             config.update(
                 limit=self.selection.limit,
                 shuffle=self.selection.shuffle,
@@ -261,6 +283,7 @@ def load_goals(spec: DatasetSpec) -> list[Goal]:
         selection = spec.selection
         # A category filter needs labels, applied later; shuffle/limit here.
         if not selection.filters.categories:
+            texts = texts[selection.start : selection.end]
             if selection.shuffle:
                 random.Random(selection.seed).shuffle(texts)
             if selection.limit:
@@ -269,6 +292,19 @@ def load_goals(spec: DatasetSpec) -> list[Goal]:
         texts, extra_by_index = load_goals_and_extra_fields_from_config(
             spec.to_provider_config()
         )
+        selection = spec.selection
+        if not selection.filters.categories and (
+            selection.start != 0 or selection.end is not None
+        ):
+            indices = list(range(len(texts)))[selection.start : selection.end]
+            if selection.shuffle:
+                random.Random(selection.seed).shuffle(indices)
+            indices = indices[: selection.limit]
+            texts = [texts[index] for index in indices]
+            extra_by_index = {
+                new: dict(extra_by_index.get(old, {}))
+                for new, old in enumerate(indices)
+            }
     if not texts:
         raise ValueError("The dataset selection produced no goals.")
     return [
@@ -307,6 +343,7 @@ def select_goals(goals: Sequence[Goal], selection: DatasetSelection) -> list[Goa
     """
     wanted = set(selection.filters.categories)
     kept = [goal for goal in goals if wanted & _codes(goal)]
+    kept = kept[selection.start : selection.end]
     if selection.shuffle:
         random.Random(selection.seed).shuffle(kept)
     kept = kept[: selection.limit]
