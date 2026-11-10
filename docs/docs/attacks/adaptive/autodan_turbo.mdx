@@ -160,7 +160,8 @@ few calls, and a goal it never gives up costs the full budget.
 Warm-up runs once for the whole run, goal after goal, before the first goal is
 reported, so a campaign with many goals spends a long time in warm-up before the
 first result appears. With `execution.escalate`, it covers only the goals still
-standing.
+standing. `execution.per_attack_timeout` does not count the warm-up: the clock
+starts after it, with the reported goals.
 
 To spend less, lower `epochs` first: it bounds both phases. `skip_warmup`
 removes the warm-up half, but the library then starts empty. Raising
@@ -268,8 +269,8 @@ any attempt, so the dashboard's per-goal cost does not include it.
 
 In the [dashboard](../../getting-started/dashboard.mdx), the conversation view
 shows every lifelong prompt and reply, in order. They are separate requests, not
-a conversation. **Attack branches** shows the recorded execution tree, one node
-per round.
+a conversation. The dashboard draws no branch view for AutoDAN-Turbo; read the
+attempts in order.
 
 What to check:
 

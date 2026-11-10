@@ -23,7 +23,7 @@ tricks, and one who tunes the combination against your model.
 
 | Type | Helper models | Turns | Calls per goal | Good for |
 |---|---|---|---|---|
-| Adaptive | `decorator`, `synthesizer` (both optional) | 1 | 1 target and 1 panel call without a synthesizer; with one, up to 3 each, after a one-off search of up to 240 | Repeatable obfuscation baselines, and searching for the combination a target misses |
+| Adaptive | `decorator`, `synthesizer` (both optional) | 1 | 1 target and 1 panel call without a synthesizer; with one, up to 3 each, after a one-off search of about 240 (more if the synthesizer returns extra programs) | Repeatable obfuscation baselines, and searching for the combination a target misses |
 
 ## Research
 
@@ -154,8 +154,8 @@ With a synthesizer, the search runs once per run, before any goal:
 | Calls to | Count | Default |
 |---|---|---|
 | `synthesizer` | one per round | 10 |
-| target | about `iterations` × `proposals` × `scoring_goals` | up to 240 |
-| panel | one evaluation per scored reply | up to 240 |
+| target | about `iterations` × `proposals` × `scoring_goals` | about 240 |
+| panel | one evaluation per scored reply | about 240 |
 | `decorator` | one per model-backed decorator, per scored reply | depends on the programs |
 
 Then each goal costs up to `programs_per_goal` target and panel calls, 3 by
@@ -165,7 +165,8 @@ The search figure is approximate. Proposals already in the pool, or that do not
 compile, cost no target calls; a synthesizer that replies with more programs
 than asked gets them all scored; and a run with fewer goals than `scoring_goals`
 scores each proposal on all of them. Lower `iterations`, `proposals` or
-`scoring_goals` to shrink it.
+`scoring_goals` to shrink it. `execution.per_attack_timeout` does not count the
+search: the clock starts after it, with the goals.
 
 ## Configuration
 
@@ -258,8 +259,8 @@ What to check first:
   you nothing about programs you did not try.
 - The search scores programs on the same goals the run reports, so the best
   program is partly tuned to them. Its ASR on new goals may be lower.
-- A search needs judges. With no panel, no proposal can score above zero and
-  nothing is kept.
+- A search needs judges. With no panel, the search is skipped entirely and the
+  seed programs are used, with no synthesizer calls.
 - Scoring on 3 goals per proposal gives a noisy ASR, and keeping anything above
   the pool's mean lets lucky programs in.
 - `TransformFxDecorator` cannot be used with a synthesizer, even in your own

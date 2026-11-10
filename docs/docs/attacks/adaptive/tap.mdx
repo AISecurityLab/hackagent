@@ -37,7 +37,7 @@ refinements and pruning twice per round (off-topic prompts before the target is
 queried, low scorers after) jailbreaks GPT-4-Turbo and GPT-4o for more than 80%
 of its prompts, and works against targets behind guardrails such as LlamaGuard.
 On GPT-4 it reports 90% success with 28.8 queries on average, against 60% with
-37.7 queries for PAIR. Its experiments use branching factor 4, width 10 and
+39.6 queries for PAIR. Its experiments use branching factor 4, width 10 and
 depth 10, and one evaluator model (GPT-4) for both the off-topic check and the
 1 to 10 score.
 
@@ -48,8 +48,8 @@ HackAgent follows the paper's algorithm and prompts, with these differences:
   ranks branches is the campaign's [judge panel](../../concepts/judges.md) score
   on its 0 to 10 scale, and the panel's verdict decides success. TAP has no
   judge of its own.
-- **A smaller tree.** The defaults are 4 streams, branching factor 3, width 4
-  and depth 3, for at most 36 target calls per goal.
+- **A smaller tree.** The default `streams`, `branching_factor`, `width` and
+  `depth` build a far smaller tree than the paper's; see [Cost](#cost).
 - **The prune never empties the tree.** A branch survives the score prune only
   if its score is above `min_prune_score`, but the best branch always survives,
   so one bad judging pass cannot end the search. Ties are broken at random.
@@ -241,13 +241,16 @@ per surviving candidate holds its target and panel calls. Decisions say what
 happened to the rest: `pruned` with the reason "off the goal" or "below the
 beam" and the candidates it dropped, `skipped` when the attacker gave no usable
 prompt or the target no usable reply, and `stopped` when a branch succeeded or
-every branch drifted. Calls made outside any branch, such as the attacker's, are
+no candidate was left to send. That last one reads "every branch drifted off
+the goal" whether the candidates were pruned as off topic or none parsed at
+all. Calls made outside any branch, such as the attacker's, are
 filed with the goal's first attempt.
 
 In the [dashboard](../../getting-started/dashboard.mdx), the conversation view
 lists every candidate's prompt and reply. **Attack branches** draws the
 candidate tree: each node is a candidate linked to the one it was refined from,
-marked as a jailbreak, mitigated, pruned or skipped, with its score, and the
+marked as a jailbreak, mitigated, pruned or skipped (the detailed view adds
+its score), and the
 paths that led to a jailbreak are outlined. Select a node to jump to its
 conversation.
 
@@ -260,9 +263,10 @@ What to check:
   to a graded judge if you want the beam to work.
 - **Many off-topic prunes** can mean the attacker drifts, or that the `on_topic`
   model is too strict. Read a few pruned prompts before you blame either.
-- **An error attempt** saying the attacker proposed no usable prompt means no
-  candidate parsed, even after retries. Check the attacker calls: the model is
-  refusing or ignoring the JSON format.
+- **An error attempt** saying "every branch drifted off the goal", in a
+  campaign without `on_topic`, means no candidate parsed, even after retries.
+  Check the attacker calls: the model is refusing or ignoring the JSON format.
+  With `on_topic`, read the `on topic` calls too.
 
 ## Limitations
 

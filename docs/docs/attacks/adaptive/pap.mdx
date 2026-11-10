@@ -88,7 +88,8 @@ flowchart TD
 <summary>The 40 technique names</summary>
 
 Write them exactly as below in a `techniques` list; an unknown name fails
-validation.
+validation. The source of truth is
+`hackagent/attacks/techniques/adaptive/pap/taxonomy.py`.
 
 Evidence-based Persuasion, Logical Appeal, Expert Endorsement, Non-expert
 Testimonial, Authority Endorsement, Social Proof, Injunctive Norm,
@@ -210,8 +211,8 @@ decision marks the success that ended the search.
 
 In the [dashboard](../../getting-started/dashboard.mdx), the conversation view
 shows each rewrite and reply. They are independent requests, one per technique,
-not a conversation. **Attack branches** shows the recorded execution tree, one
-node per technique.
+not a conversation. The dashboard draws no branch view for PAP; read the
+attempts in order.
 
 What to check:
 

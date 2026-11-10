@@ -25,9 +25,9 @@ who keeps retrying with typos.
 
 ## Research
 
-John Hughes, Sara Price, Aengus Lynch, Rylan Schaeffer, Fazl Barez, Sanmi
-Koyejo, Henry Sleight, Erik Jones, Ethan Perez, Mrinank Sharma and others,
-*Best-of-N Jailbreaking*, NeurIPS 2025.
+John Hughes, Sara Price, Aengus Lynch, Rylan Schaeffer, Fazl Barez, Arushi
+Somani, Sanmi Koyejo, Henry Sleight, Erik Jones, Ethan Perez, Mrinank Sharma
+and others, *Best-of-N Jailbreaking*, NeurIPS 2025.
 [arXiv:2412.03556](https://arxiv.org/abs/2412.03556) (December 2024).
 
 The paper samples augmented copies of a request until one draws a harmful reply.
@@ -41,9 +41,9 @@ attack raised success by up to 35%.
 HackAgent ports the text augmentations and the reference's guards against
 grader false positives from the authors' code. It differs in these ways:
 
-- **A small budget.** The default is 4 steps of 5 candidates, 20 samples at
-  most, against the paper's thousands. Raise `steps` and `candidates` to move up
-  the scaling curve.
+- **A small budget.** The default `steps` and `candidates` allow tens of
+  samples, against the paper's thousands. Raise them to move up the scaling
+  curve.
 - **Text only.** There are no image or audio augmentations.
 - **Your judges.** The campaign's panel decides what counts, not the paper's
   grader. The guards run around it (see [How it works](#how-it-works)).
@@ -64,8 +64,8 @@ grader false positives from the authors' code. It differs in these ways:
 
    At `sigma` 0.4 that scrambles about 63% of the longer words, flips the case
    of about 63% of letters and shifts about 6% of characters.
-2. **Send.** All candidates of a step go to the target concurrently, each as a
-   single user message.
+2. **Send.** All candidates of a step go to the target concurrently (up to
+   `execution.concurrency.target` at once), each as a single user message.
 3. **Screen.** A reply fewer than `min_extra_words` words longer than the goal
    mostly restates it, so it is marked "not graded" without calling the panel.
 4. **Judge.** Every other reply goes to the panel. A reply the panel passes still
@@ -99,7 +99,7 @@ including agents reached through an adapter. It is a good probe of input
 filters and guardrails, which can miss text they were not trained on, and of how
 brittle a model's refusals are.
 
-Its strength is scale. With the default 20 samples a well-aligned model usually
+Its strength is scale. With the default budget a well-aligned model usually
 holds; the paper's results need thousands. If you cannot afford that many target
 calls, an attack that reasons about the replies, such as [PAIR](./pair.mdx) or
 [TAP](./tap.mdx), finds more per call. For a cheap fixed obfuscation, try
@@ -121,7 +121,8 @@ budget. All candidates of a step are sent and judged even when the first one
 succeeds, so the last step is always paid in full.
 
 `steps` × `candidates` is the budget. More candidates per step finish sooner,
-since each step runs concurrently; more steps waste less after an early success.
+since a step's candidates run concurrently (up to `execution.concurrency.target`
+at once); more steps waste less after an early success.
 
 ## Configuration
 
@@ -137,7 +138,8 @@ attacks:
       candidates: 10
 ```
 
-Up to 200 target and panel calls per goal, ten at a time. Use it against a
+Up to 200 target and panel calls per goal, ten per step; raise
+`execution.concurrency.target` to send them in parallel. Use it against a
 cheap or local target when you want to see how far success climbs with more
 samples.
 
@@ -165,7 +167,7 @@ jailbroken if one attempt passed.
 Each attempt's metadata records its `step`, `candidate` and `seed`, and its
 prompt is the augmented text exactly as sent. The trace has one
 `step s/S, candidate c/C` phase per attempt with its target and panel calls, a
-`stopped` decision on the attempt that ended the search, and a `skipped`
+`stopped` decision on every attempt of the final step that passed, and a `skipped`
 decision for a step where no candidate got a usable reply.
 
 The verdict's explanation says when a guard decided:

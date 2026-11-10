@@ -138,7 +138,8 @@ passes or none does.
 `samples_per_candidate` multiplies target and panel calls; `samples_per_prefix`
 and the number of openings set the writer calls; `candidates_per_goal` caps how
 many prefixes are tried. Writer calls run concurrently; each prefix's samples run
-concurrently, one prefix after another.
+concurrently (up to `execution.concurrency.target` at once), one prefix after
+another.
 
 ## Configuration
 
@@ -237,8 +238,10 @@ What to check first:
 - **`selected` does not mean it worked.** When nothing passed, the first
   candidate is still marked. Look at its verdicts.
 - **Fewer attempts than expected.** A blocked or empty reply is not an attempt.
-  If every reply was unusable, the goal gets one error attempt with the reason,
-  such as "no candidate survived the filters".
+  If every reply was unusable, the goal gets one error attempt with the reason
+  "the target returned no usable continuation". The reason "no candidate
+  survived the filters" means sifting dropped every prefix before any target
+  call.
 - **Every reply a refusal.** The target may be starting a new turn instead of
   continuing the prefix; see [When to use it](#when-to-use-it).
 

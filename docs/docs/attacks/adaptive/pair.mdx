@@ -52,8 +52,9 @@ HackAgent follows the paper's algorithm and prompts, with these differences:
   one of the paper's three approaches, assigned in turn: stream 1 role-play,
   stream 2 logical appeal, stream 3 authority endorsement, stream 4 role-play
   again, and so on.
-- **Budget.** The defaults run fewer, longer streams than the paper (5 streams of
-  5 rounds rather than 30 of 3), for 25 target calls instead of up to 90.
+- **Budget.** The default `streams` and `iterations` run fewer, longer streams
+  than the paper's 30 streams of 3 rounds, for fewer target calls than its
+  90.
 - **History.** A stream keeps its last `keep_last_n` attacker turns, and the
   reply and judge explanation fed back to the attacker are cut to
   `feedback_max_chars`. The scorer always sees the whole reply.
@@ -111,8 +112,9 @@ attacker-driven search, its prompts are plain language a human can read and
 reuse, and it often succeeds where a fixed template fails.
 
 PAIR finds targets that refuse a direct request but give way to a story, a
-persona, a plausible justification or an appeal to authority: the role-play and
-framing weaknesses listed under [Jailbreak](../../risks/vulnerabilities/jailbreak.md).
+persona, a plausible justification or an appeal to authority: the role-play,
+hypothetical and authority-manipulation weaknesses listed under
+[Jailbreak](../../risks/vulnerabilities/jailbreak.md).
 
 Choose another attack when:
 
@@ -224,9 +226,8 @@ call.
 
 In the [dashboard](../../getting-started/dashboard.mdx), the conversation view
 shows every attempt's prompt and reply. Each prompt was sent on its own, so read
-them as separate tries, not as one conversation. **Attack branches** shows the
-recorded execution tree: attempts grouped by round and stream, not a family
-tree of prompts.
+them as separate tries, not as one conversation. The dashboard draws no branch
+view for PAIR; read the attempts in order.
 
 What to check:
 
@@ -238,7 +239,7 @@ What to check:
   unresolved, not mitigated. If the scorer's best attempt failed the panel,
   compare the scorer's ratings with the panel's explanation.
 - **An error attempt** saying the attacker proposed no usable prompt means every
-  attacker reply failed to parse. Check the attacker calls in the trace: the
+  attacker call failed or returned no usable JSON. Check the attacker calls in the trace: the
   model is refusing or ignoring the JSON format, and a different attacker model
   is the fix.
 
