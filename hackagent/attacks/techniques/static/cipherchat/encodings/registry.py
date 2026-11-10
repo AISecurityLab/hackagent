@@ -37,6 +37,11 @@ SUPPORTED_ENCODINGS = frozenset(
 def create_encode_expert(
     encode_method: str,
 ) -> EncodeExpert:
+    """Build the cipher named ``encode_method``; ``caesar-N`` shifts by ``N``.
+
+    Raises:
+        ValueError: ``encode_method`` is not in :data:`SUPPORTED_ENCODINGS`.
+    """
     if encode_method not in SUPPORTED_ENCODINGS:
         supported = ", ".join(sorted(SUPPORTED_ENCODINGS))
         raise ValueError(

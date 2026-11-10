@@ -12,7 +12,15 @@ from hackagent.catalog.risks.model_evasion.types import (
 
 
 class ModelEvasion(BaseVulnerability):
-    """Model Evasion."""
+    """The Model Evasion vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"adversarial_examples"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``ModelEvasionType``.
+    """
 
     name = "Model Evasion"
     description = (

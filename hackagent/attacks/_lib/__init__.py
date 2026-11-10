@@ -4,9 +4,16 @@
 """Shared attack helpers.
 
 Depth-0 techniques import only ``hackagent.core`` and this package — not
-other depth-0 packages or sibling techniques. What remains here is the live
-set: response extraction (shared with the model layer), prompt parsing,
-templating transforms, and the graphviz helper.
+other depth-0 packages or sibling techniques. What is here:
+
+- :mod:`.response`: response text and guardrail extraction, shared with the
+  model layer;
+- :mod:`.prompt_parser`: reading the JSON ``improvement``/``prompt`` turns
+  PAIR's and TAP's attackers write;
+- :mod:`.graphviz`: the Graphviz bootstrap FC-Attack renders with;
+- :mod:`.templates` and :mod:`.transforms`: a template library and text
+  transforms that no technique currently imports (static_template keeps its
+  own templates).
 """
 
 from hackagent.attacks._lib.response import (

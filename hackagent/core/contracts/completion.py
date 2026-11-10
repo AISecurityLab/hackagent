@@ -14,6 +14,8 @@ from hackagent.core.contracts.messages import ToolCall
 
 
 class Usage(BaseModel):
+    """Token counts a provider reported for one call; None when it reported none."""
+
     model_config = FROZEN
 
     prompt_tokens: Optional[int] = None

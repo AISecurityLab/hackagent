@@ -399,6 +399,13 @@ class ADKModel(Model):
     def complete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
     ) -> ModelResponse:
+        """Send ``messages`` to the ADK agent through LiteLLM's custom provider.
+
+        Only the ``session_id`` (or legacy ``adk_session_id``) and
+        ``initial_session_state`` overrides are used. The ADK events and session
+        id the agent produced are added to the response metadata. Failures are
+        returned as an error response.
+        """
         litellm = _litellm()
         if litellm is None:
             return ModelResponse.failed(RuntimeError("litellm is not installed"))
@@ -432,6 +439,7 @@ class ADKModel(Model):
     async def acomplete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
     ) -> ModelResponse:
+        """Run :meth:`complete` in a worker thread."""
         import asyncio
 
         return await asyncio.to_thread(self.complete, messages, **overrides)

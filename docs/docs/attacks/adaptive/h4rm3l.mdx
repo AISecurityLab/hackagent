@@ -1,0 +1,280 @@
+---
+title: "h4rm3l"
+description: "Composable decorator-program attack chaining multiple obfuscations, with an optional search for the program that works best."
+sidebar_position: 7
+---
+
+import Generated from './_h4rm3l.generated.mdx';
+
+h4rm3l rewrites the goal with a **program**: a chain of small prompt
+transformations called decorators. One encodes the text in Base64, one wraps it
+in a role-play persona, one forbids the words a refusal uses, one asks for the
+answer in a given style. Each is a known jailbreak trick; chained, they attack
+several weak points of a model's safety training at once.
+
+It works two ways from one configuration. Give it a program and it sends the
+goal rewritten by that program, once per goal: a fixed, repeatable attack like a
+static one. Add a `synthesizer` role and it first **searches** the decorator
+language for programs that work against this target, then attacks each goal
+with the best ones it found. It models an attacker who combines published
+tricks, and one who tunes the combination against your model.
+
+## At a glance
+
+| Type | Helper models | Turns | Calls per goal | Good for |
+|---|---|---|---|---|
+| Adaptive | `decorator`, `synthesizer` (both optional) | 1 | 1 target and 1 panel call without a synthesizer; with one, up to 3 each, after a one-off search of about 240 (more if the synthesizer returns extra programs) | Repeatable obfuscation baselines, and searching for the combination a target misses |
+
+## Research
+
+Moussa Koulako Bala Doumbouya, Ananjan Nandi, Gabriel Poesia, Davide Ghilardi,
+Anna Goldie, Federico Bianchi, Dan Jurafsky and Christopher D. Manning,
+*h4rm3l: A language for Composable Jailbreak Attack Synthesis*, ICLR 2025.
+[arXiv:2408.04811](https://arxiv.org/abs/2408.04811) (August 2024).
+
+The paper expresses jailbreaks as programs in a small language embedded in
+Python: compositions of parameterised string transformations, chained with
+`.then()`. A synthesizer model proposes new programs, shown a few earlier ones
+as examples; the examples are picked by bandit methods that favour programs
+with a high attack success rate (ASR). Each round, every valid proposal is
+scored on a handful of harmful requests, and the ones above the pool's average
+join the pool. Against six models it produced 2,656 successful attacks out of
+15,891 novel ones, beat the best existing attack on each model by 10 to 50
+points, and reached up to 94% on GPT-4o. ASR tended to rise with the number of
+decorators a program composed.
+
+HackAgent's version differs in these ways:
+
+- **One bandit.** It implements the ASR-rewarded selection: each example is drawn
+  from a Beta distribution centred on its ASR, tightening as rounds go on. The
+  paper also compares random and offspring-rewarded selection.
+- **Smaller rounds.** The defaults show 10 examples, ask for 8 proposals and
+  score each on 3 goals, where the paper used 15, 20 and 5.
+- **Scored on your goals.** Proposals are scored on goals drawn from the run
+  itself, not on a separate set, and judged by your panel, not the paper's
+  classifier.
+- **No code execution in the search.** The paper's generic
+  `TransformFxDecorator` runs arbitrary Python. HackAgent never offers it to the
+  synthesizer and rejects it in any program once a synthesizer is configured.
+- **Presets as seeds.** The search starts from your program plus 18 preset
+  programs, taken from the paper or measured in HackAgent
+  (`dan_refusal_suppression` is one of the latter).
+
+## How it works
+
+Without a `synthesizer`:
+
+1. **Compile.** `program` is a preset name or a program. With `syntax_version` 2
+   it is one expression, decorators chained with `.then()`; with 1 it is one
+   decorator per statement, applied in order. The compiler accepts only registered
+   decorators with literal arguments. It runs when the campaign is built, so a
+   bad program fails `hackagent campaign validate`, not the first goal.
+2. **Rewrite.** For each goal the program rewrites the goal text. A decorator
+   that rewrites with a model, such as `TranslateDecorator` or `PAPDecorator`,
+   calls the `decorator` role.
+3. **Send and judge.** The result goes to the target as one user message, and
+   the reply goes to the panel.
+
+With a `synthesizer`, a search runs once, before any goal is attacked:
+
+1. **Seed.** The pool starts with your program and the presets, unscored.
+2. **Show examples.** Each of `iterations` rounds draws `examples` programs from
+   the pool, favouring high ASR. Selection is loose in early rounds and
+   narrows onto the best programs as rounds pass, at a rate set by
+   `concentration`. An unscored program is drawn uniformly, so it competes
+   with proven ones.
+3. **Propose.** The synthesizer gets the list of decorators with their
+   parameters, the examples with their ASR, and a request for `proposals` new
+   programs, one per line. Model-backed decorators are listed only when a
+   `decorator` role is configured.
+4. **Validate.** Every new line that compiles is a candidate. One that does not
+   is recorded with the compiler's reason and dropped.
+5. **Score.** Each candidate is applied to `scoring_goals` goals, drawn at random
+   from the run's goals for that candidate. Its ASR is the share of replies the
+   panel passed.
+6. **Keep.** A candidate stays in the pool only if its ASR beats the pool's mean
+   at the start of the round.
+7. **Attack.** Each goal is then sent through the `programs_per_goal` programs
+   with the highest ASR, best first, stopping at the first one the panel passes.
+
+```mermaid
+flowchart TB
+  subgraph search["Search, once per run · only with a synthesizer"]
+    direction TB
+    POOL["pool: your program + presets"] --> EX["draw examples<br/><small>Beta around each ASR</small>"]
+    EX --> SYN["synthesizer proposes programs"]
+    SYN --> C{"compiles?"}
+    C -->|no| DROP["dropped, reason traced"]
+    C -->|yes| SC["score on scoring_goals<br/>random goals"]
+    SC --> K{"ASR above<br/>pool mean?"}
+    K -->|yes| POOL
+    K -->|no| DROP
+  end
+  subgraph goal["Per goal"]
+    direction TB
+    G["goal"] --> P["apply a program<br/><small>yours, or the best from the pool</small>"]
+    P --> T["target"]
+    T --> J["panel"]
+    J -->|"not passed, programs left"| P
+    J -->|"passed, or none left"| V["verdict"]
+  end
+  search -.->|"best programs_per_goal"| P
+```
+
+## When to use it
+
+Use h4rm3l without a synthesizer as a cheap, repeatable baseline. It costs what
+a static attack costs, sends the same rewritten prompt every run (unless the
+program uses a model-backed decorator), and lets you compare targets, or one target before and after a change, on exactly the same
+input. `hackagent examples copy h4rm3l-demo` writes a runnable campaign.
+
+Add a synthesizer when the presets stop working and you want to know whether
+some other combination of known tricks still gets through. The search costs
+hundreds of calls before the first goal, so it pays off over many goals, not a
+handful. `hackagent examples copy h4rm3l-synth-demo` writes a small one.
+
+h4rm3l sends one plain user message per try, so it works against agents as well
+as chat models. For an attack that reasons about the target's replies instead of
+choosing among fixed transformations, use [PAIR](./pair.mdx) or
+[TAP](./tap.mdx). For random rather than designed obfuscation, use
+[BoN](./bon.mdx).
+
+## Cost
+
+Without a synthesizer, per goal:
+
+| Calls to | Count |
+|---|---|
+| target | 1 |
+| panel | 1 evaluation, each calling every judge |
+| `decorator` | one per model-backed decorator in the program, 0 for most presets |
+
+With a synthesizer, the search runs once per run, before any goal:
+
+| Calls to | Count | Default |
+|---|---|---|
+| `synthesizer` | one per round | 10 |
+| target | about `iterations` × `proposals` × `scoring_goals` | about 240 |
+| panel | one evaluation per scored reply | about 240 |
+| `decorator` | one per model-backed decorator, per scored reply | depends on the programs |
+
+Then each goal costs up to `programs_per_goal` target and panel calls, 3 by
+default, and fewer when an early program passes.
+
+The search figure is approximate. Proposals already in the pool, or that do not
+compile, cost no target calls; a synthesizer that replies with more programs
+than asked gets them all scored; and a run with fewer goals than `scoring_goals`
+scores each proposal on all of them. Lower `iterations`, `proposals` or
+`scoring_goals` to shrink it. `execution.per_attack_timeout` does not count the
+search: the clock starts after it, with the goals.
+
+## Configuration
+
+<Generated />
+
+### A fixed program
+
+```yaml
+attacks:
+  - name: h4rm3l
+    parameters:
+      program: Base64Decorator().then(RefusalSuppressionDecorator()).then(StyleInjectionShortDecorator())
+```
+
+Encodes the goal in Base64, puts rules against refusal phrasing in front of
+it, then adds style rules for the reply (no punctuation, no long words). One
+target call per goal and no helper model, so every run sends identical prompts.
+
+### A search, seeded with a preset
+
+```yaml
+attacks:
+  - name: h4rm3l
+    parameters:
+      program: refusal_suppression
+      iterations: 5
+      proposals: 6
+      scoring_goals: 3
+      programs_per_goal: 3
+      seed: 7
+    roles:
+      synthesizer:
+        name: qwen2.5:14b
+        connection:
+          provider: ollama
+          type: OLLAMA
+        generation:
+          max_tokens: 800
+      decorator:
+        name: llama3.2:latest
+        connection:
+          provider: ollama
+          type: OLLAMA
+```
+
+Searches for about 90 target calls before the goals, then tries the three best
+programs on each goal. The `decorator` role lets the synthesizer use the
+model-backed decorators, such as translation and persuasion, and `seed` makes
+the goal draws and example sampling repeatable. A larger synthesizer writes
+more valid programs; a small one often declines or writes calls the compiler
+rejects.
+
+## Reading the results
+
+One **attempt** is one program applied to one goal. Without a synthesizer
+there is one attempt per goal; with one, up to `programs_per_goal`.
+
+Each attempt's metadata records the `program` as compiled (a preset is
+expanded), its `program_index` in the goal's list, and `program_asr`, the ASR it
+earned in the search. That is 0 without a synthesizer, and 0 for a seed program,
+since seeds are never scored themselves. The prompt is the rewritten goal as
+sent. The trace has a `program i/N` phase per program with its `decorator`,
+target and panel calls, a `skipped` decision when a program failed to compile,
+raised, or got no usable reply, and a `stopped` decision when the panel passed
+one.
+
+The search belongs to no goal. Its rounds, proposals, compile errors and
+scoring calls are written to `traces.jsonl` in the run folder as a separate
+record with `"scope": "run"` and no goal index. Each round ends with a `kept`
+decision: how many proposals beat the pool mean, how many did not compile, and
+the pool's size and mean ASR. These calls are not attached to any attempt, so
+per-goal call counts leave them out.
+
+What to check first:
+
+- **Every proposal rejected.** The `kept` decisions show `invalid` proposals and
+  the `skipped` decisions show the compiler's reason. The synthesizer is too
+  weak or is refusing; use a larger or uncensored model.
+- **Nothing kept.** If no proposal ever scored above zero, the goals are
+  attacked with your program and then the first presets in their listed order.
+  The search found nothing better than its seeds.
+- **A high ASR from few trials.** A program kept after scoring well on 3 goals
+  may be lucky. Its scoring calls are in the search record.
+- **A reply in another language or encoding.** The panel judges the reply as
+  written. A harmful answer in Base64 or Zulu can be missed.
+
+## Limitations
+
+- Without a synthesizer it is only as good as the program you pick, and it tells
+  you nothing about programs you did not try.
+- The search scores programs on the same goals the run reports, so the best
+  program is partly tuned to them. Its ASR on new goals may be lower.
+- A search needs judges. With no panel, the search is skipped entirely and the
+  seed programs are used, with no synthesizer calls.
+- Scoring on 3 goals per proposal gives a noisy ASR, and keeping anything above
+  the pool's mean lets lucky programs in.
+- `TransformFxDecorator` cannot be used with a synthesizer, even in your own
+  program, because it executes Python.
+- Model-backed decorators fail unless the `decorator` role is configured. A
+  decorator model that refuses sends its refusal on as the rewritten prompt, so
+  use one that will rewrite the goal.
+- The search is not in the dashboard's per-goal costs; read `traces.jsonl` for it.
+
+## Related
+
+- [BoN](./bon.mdx): random obfuscation instead of designed transformations.
+- [PAP](./pap.mdx): persuasion techniques, also available here as `PAPDecorator`.
+- [FlipAttack](../static/flipattack.mdx) and [CipherChat](../static/cipherchat.mdx): single fixed obfuscations.
+- [Attacks and roles](../../concepts/attacks-and-roles.md): why h4rm3l sits between static and adaptive.
+- [Judges](../../concepts/judges.md): what scores both the search and the attack.
+- [Jailbreak](../../risks/vulnerabilities/jailbreak.md): the risk this attack tests.

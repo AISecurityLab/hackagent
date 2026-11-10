@@ -23,7 +23,7 @@ Tests whether the LLM performs actions or grants permissions exceeding its inten
 ### Attack Techniques
 
 **Primary**
-- **[Static Template](../../reference/attacks/static_template.md)**: Template-based prompt construction
+- **[Static Template](../../attacks/static/static_template.mdx)**: Template-based prompt construction
 
 ### Metrics
 

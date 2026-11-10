@@ -28,7 +28,10 @@ class TapParams(AttackParams):
     depth: int = Field(
         default=3,
         ge=1,
-        description="Refinement rounds. Every surviving branch is expanded once per round.",
+        description=(
+            "Refinement rounds: the tree's maximum depth. Every surviving branch "
+            "is expanded once per round."
+        ),
     )
     width: int = Field(
         default=4,
@@ -41,20 +44,29 @@ class TapParams(AttackParams):
         description="Refinements the attacker writes per branch per round.",
     )
     streams: int = Field(
-        default=4, ge=1, description="Independent conversations the tree starts from."
+        default=4,
+        ge=1,
+        description="Root branches: independent attacker conversations the tree starts from.",
     )
     keep_last_n: int = Field(
         default=6,
         ge=1,
-        description="Attacker turns a branch keeps before its history is trimmed.",
+        description=(
+            "Recent attacker turns, each with its feedback, a branch keeps; older "
+            "ones are dropped and the system prompt always stays."
+        ),
     )
     max_attempts: int = Field(
         default=3,
         ge=1,
-        description="Retries when the attacker's reply is not a usable prompt.",
+        description=(
+            "Tries the attacker gets to produce a usable JSON prompt for one "
+            "child before that child is dropped."
+        ),
     )
     early_stop: bool = Field(
-        default=True, description="Stop the whole search once any branch succeeds."
+        default=True,
+        description="Stop after the round in which the panel passes any reply.",
     )
     min_prune_score: float = Field(
         default=0.0,

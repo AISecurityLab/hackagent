@@ -1,0 +1,60 @@
+---
+id: campaign-schema-retrieve
+title: "Get the campaign spec schema"
+description: "The JSON Schema campaign specs are validated against (for the SDK version this API runs), and the built-in goal datasets a spec can name as `dataset.source` with `type: preset`."
+sidebar_label: "Get the campaign spec schema"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get the campaign spec schema"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/campaign/schema"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+The JSON Schema campaign specs are validated against (for the SDK version this API runs), and the built-in goal datasets a spec can name as `dataset.source` with `type: preset`.
+
+<ParamsDetails>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"schema":{"additionalProperties":{},"description":"JSON Schema of a campaign spec.","type":"object"},"dataset_presets":{"description":"The built-in datasets, by name.","items":{"description":"A built-in goal dataset.","properties":{"name":{"description":"The preset's name, for `dataset.source.name` (with `type: preset`).","type":"string"},"description":{"description":"What the dataset contains.","type":"string"}},"required":["description","name"],"type":"object","title":"DatasetPreset"},"type":"array"}},"required":["dataset_presets","schema"],"type":"object","title":"CampaignSchema"}}},"description":"OK"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

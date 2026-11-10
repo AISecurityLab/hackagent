@@ -1,0 +1,70 @@
+---
+id: attack-destroy
+title: "Delete an attack configuration"
+description: "Deletes the attack configuration. Its runs are kept, with `attack` set to null."
+sidebar_label: "Delete an attack configuration"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "delete api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Delete an attack configuration"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"delete"}
+  path={"/attack/{id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Deletes the attack configuration. Its runs are kept, with `attack` set to null.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"A UUID string identifying this Attack Configuration.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"204":{"description":"No response body"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this (for example a run token outside its own run, or a caller without an organization), or the installation is read-only because its license is not valid (`code: license_read_only`)."},"404":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Not found: no such object in the caller's organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

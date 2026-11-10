@@ -6,8 +6,8 @@
 The pages are prose, so nothing compiles them. A field renamed in the spec
 leaves them describing something that no longer validates, and the reader
 finds out by running it. Each `{"version": 1, ...}` literal in a Python
-block is parsed, its variables filled with something the slot accepts, and
-handed to `CampaignSpec`.
+block, in a `.md` or `.mdx` page, is parsed, its variables filled with
+something the slot accepts, and handed to `CampaignSpec`.
 
 What this cannot check is whether the *values* are sensible — only that the
 shape is one the loader takes.
@@ -38,6 +38,9 @@ NAMED = {
     "JUDGE_MODEL": MODEL,
     "ATTACKER": MODEL,
     "OLLAMA": MODEL["connection"],
+    "GEMMA": MODEL,
+    "GATEWAY": {"provider": "hackagent", "type": "OPENAI"},
+    "gateway": {"provider": "hackagent", "type": "OPENAI"},
 }
 HOLE = "__HOLE__"
 
@@ -113,7 +116,8 @@ DOCS = Path(__file__).resolve().parents[3] / "docs" / "docs"
 
 def documented_campaigns():
     """Every campaign literal in the docs, with the page it came from."""
-    for path in sorted(DOCS.rglob("*.md")):
+    pages = [*DOCS.rglob("*.md"), *DOCS.rglob("*.mdx")]
+    for path in sorted(pages):
         for block in re.findall(
             r"```python\n(.*?)```", path.read_text(encoding="utf-8"), re.S
         ):
@@ -132,7 +136,10 @@ def test_the_docs_teach_campaigns_at_all():
 @pytest.mark.parametrize(
     ("page", "snippet"), FOUND, ids=[f"{p}#{n}" for n, (p, _) in enumerate(FOUND)]
 )
-def test_the_documented_campaign_is_one_the_code_accepts(page, snippet):
+def test_the_documented_campaign_is_one_the_code_accepts(page, snippet, monkeypatch):
+    # A page may reference a key by environment variable; the reader sets it.
+    for name in set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", snippet)):
+        monkeypatch.setenv(name, "set-by-the-reader")
     tree = Stub().visit(ast.parse(snippet, mode="eval"))
     values = fill(ast.literal_eval(ast.fix_missing_locations(tree)))
     # `attack.technique` stubs to a string that is not a registered attack.
@@ -141,4 +148,8 @@ def test_the_documented_campaign_is_one_the_code_accepts(page, snippet):
             {**a, "name": "baseline"} if a.get("name") == "harmbench" else a
             for a in values["attacks"]
         ]
+    # A campaign sent to the HTTP API leaves the target out: the server sets it
+    # from the campaign's agent.
+    if page.startswith("api/"):
+        values.setdefault("target", TARGET)
     CampaignSpec.model_validate(values)

@@ -1,0 +1,70 @@
+---
+id: apilogs-summary-retrieve
+title: "Summarize gateway usage by day"
+description: "Totals the organization's LLM gateway calls per day between `start_date` and `end_date` (inclusive, at most 92 days apart), with days counted in the time zone `tz`. Only days with calls are listed. With `by_key=true`, each day is also broken down by API key. 400 for a missing or invalid date, range or time zone. Login tokens only: API keys get 401."
+sidebar_label: "Summarize gateway usage by day"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Summarize gateway usage by day"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/apilogs/summary"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Totals the organization's LLM gateway calls per day between `start_date` and `end_date` (inclusive, at most 92 days apart), with days counted in the time zone `tz`. Only days with calls are listed. With `by_key=true`, each day is also broken down by API key. 400 for a missing or invalid date, range or time zone. Login tokens only: API keys get 401.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"If true, include per-key daily breakdown","in":"query","name":"by_key","schema":{"type":"boolean"}},{"description":"End date (inclusive), format YYYY-MM-DD","in":"query","name":"end_date","required":true,"schema":{"format":"date","type":"string"}},{"description":"Start date (inclusive), format YYYY-MM-DD","in":"query","name":"start_date","required":true,"schema":{"format":"date","type":"string"}},{"description":"IANA timezone for day bucketing, e.g. UTC or Europe/Rome","in":"query","name":"tz","schema":{"type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"description":"Daily gateway usage of the organization over a date range.","properties":{"start_date":{"description":"First day of the range.","format":"date","type":"string"},"end_date":{"description":"Last day of the range (inclusive).","format":"date","type":"string"},"timezone":{"description":"The time zone days are counted in.","type":"string"},"days":{"description":"Days with at least one call, in order.","items":{"description":"The organization's gateway usage on one day.","properties":{"date":{"description":"The day, in the requested time zone.","format":"date","type":"string"},"requests":{"description":"Gateway calls that day.","type":"integer"},"input_tokens":{"description":"Prompt tokens that day.","type":"integer"},"output_tokens":{"description":"Completion tokens that day.","type":"integer"},"credits_deducted":{"description":"Credits (US dollars) charged that day, as a decimal string.","type":"string"},"by_key":{"description":"With `by_key=true`: the same figures per API key.","items":{"description":"One API key's gateway usage on a day.","properties":{"api_key_prefix":{"description":"Prefix of the API key; null for calls made with a login token or by a cloud run.","nullable":true,"type":"string"},"requests":{"description":"Gateway calls made with it.","type":"integer"},"input_tokens":{"description":"Prompt tokens.","type":"integer"},"output_tokens":{"description":"Completion tokens.","type":"integer"},"credits_deducted":{"description":"Credits (US dollars) charged, as a decimal string.","type":"string"}},"required":["api_key_prefix","credits_deducted","input_tokens","output_tokens","requests"],"type":"object","title":"UsageSummaryKey"},"type":"array"}},"required":["credits_deducted","date","input_tokens","output_tokens","requests"],"type":"object","title":"UsageSummaryDay"},"type":"array"}},"required":["days","end_date","start_date","timezone"],"type":"object","title":"UsageSummary"}}},"description":"OK"},"400":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing or invalid `start_date`/`end_date`, a range over 92 days, or an unknown time zone."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

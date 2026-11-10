@@ -126,7 +126,7 @@ hackagent web --local            # read local runs
 hackagent web --no-browser       # skip opening a browser tab
 ```
 
-Every option is in the [CLI reference](../reference/cli.md#hackagent-web).
+Every option is in the [command reference](../cli/commands.md#hackagent-web).
 
 :::warning Binding beyond localhost
 `--host 0.0.0.0` exposes the dashboard, and in remote mode anyone who can reach
@@ -468,11 +468,11 @@ which dashboard bundle is in use — the first things to include in a bug report
 |---|---|
 | "No web UI bundle found …" | Nothing supplied a dashboard: `pip install 'hackagent[web]'`, or use a release binary |
 | "Port 7860 is already in use by another process" | An unrelated process holds the port — a previous HackAgent dashboard is reclaimed automatically, anything else never is. Use `--port` |
-| Every panel is empty (local mode) | No runs recorded in that database yet, or they went to another one. Check `hackagent results list` |
+| Every panel is empty (local mode) | No runs recorded in that database yet, or they went to another one. Check `hackagent results summary` |
 | Creating an agent returns 501 (local mode) | Agents are registered by running a campaign against them — see above |
 | 401s from the dashboard (remote mode) | API key missing, expired or revoked. Check `HACKAGENT_API_KEY` and `hackagent config show` |
 
 ## See also
 
-- [`hackagent results`](../reference/cli.md#hackagent-results): the same data from the command line.
-- [`hackagent config`](../reference/cli.md#hackagent-config): switch between local and remote mode.
+- [`hackagent results`](../cli/commands.md#hackagent-results): the same data from the command line.
+- [`hackagent config`](../cli/commands.md#hackagent-config): switch between local and remote mode.

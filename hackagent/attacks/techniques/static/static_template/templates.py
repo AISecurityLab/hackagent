@@ -1,7 +1,13 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Prompt templates for the static-template attack."""
+"""Prompt templates for the static-template attack.
+
+:data:`TEMPLATES` maps each family name to its templates, in a fixed order;
+the attack takes the first ``templates_per_category`` of each selected family. Templates are
+:meth:`str.format` strings over the placeholders described in
+:mod:`.attack`.
+"""
 
 from __future__ import annotations
 

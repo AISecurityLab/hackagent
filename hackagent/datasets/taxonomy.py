@@ -73,6 +73,11 @@ def subcategories(category: str | None = None) -> dict[str, str]:
 
 
 def category_of(subcategory: str) -> str:
+    """Return the category code of a subcategory code, e.g. ``E`` for ``E2``.
+
+    Raises:
+        KeyError: When ``subcategory`` is not a subcategory code.
+    """
     return _tables()[2][subcategory]
 
 

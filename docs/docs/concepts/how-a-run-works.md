@@ -5,7 +5,7 @@ sidebar_position: 1
 ---
 
 A campaign turns **goals** into **verdicts**. This page follows one goal all the
-way through, so the words in the [reference](../reference/index.md) have
+way through, so the words in the [campaign-file pages](../cli/campaign-files/index.md) have
 something concrete behind them.
 
 ## The whole pipeline
@@ -41,11 +41,15 @@ flowchart TB
 Guardrails are optional and off by default; without them the prompt goes
 straight to the target.
 
-## Static and adaptive attacks differ here
+## The attack type decides this step
 
-A **static** attack decides its prompts up front. An **adaptive** one searches:
-it reads each reply and writes the next prompt, which is why it needs an
-attacker model of its own.
+There are four types of attack. A **static** attack decides its prompts up
+front. An **adaptive** one searches: it reads each reply and writes the next
+prompt, usually with an attacker model of its own. A **multi-turn** attack
+builds one conversation, turn by turn. An **indirect** attack hides its
+instructions where the target only reads, such as a tool result or a retrieved
+document. The [Attacks overview](../attacks/index.mdx) covers all four; the
+first two look like this:
 
 ```mermaid
 flowchart LR
@@ -100,7 +104,7 @@ attack.
 | `./logs/runs/<run id>/audit.json` | When the judge audit is on, how the panel measured up. |
 
 The output folder and formats are set under
-[`execution.output`](../reference/execution.md#outputspec).
+[`execution.output`](../cli/campaign-files/execution.md#outputspec).
 
 ## Next
 

@@ -1,0 +1,53 @@
+---
+title: "Multi-turn attacks"
+description: "Attacks that hold one growing conversation with the target and escalate turn by turn."
+---
+
+import AttackList from './_list.generated.mdx';
+
+A multi-turn attack holds one conversation with the target and keeps it
+growing. The target answers every turn with the whole history in front of it,
+so what it already said shapes what it says next. These attacks model a user
+who gets to a forbidden result gradually, over several turns, where each
+message on its own looks reasonable. A test that sends one prompt at a time
+never sees that.
+
+## What they have in common
+
+- **One conversation per goal.** Every request re-sends the turns kept so far.
+  Calls within a goal are sequential, since each turn depends on the last
+  reply; goals still run in parallel under `execution.concurrency`.
+- **The target must take the conversation history.** The chat API types
+  (`OPENAI`, `OLLAMA`, `LITELLM`, `LANGCHAIN`) do. The agent types mostly
+  forward only the latest user message (`WEB` keeps one live chat), so the escalation does not reach them as a
+  conversation. Each attack page says what that means for it.
+- **They cost more per goal than single-prompt attacks.** Crescendo makes up
+  to 20 target calls per goal with its defaults, plus attacker and judge calls.
+  STAC makes up to 12 target calls for a built-in chain, and nothing else.
+- **They differ in what counts as success.** Crescendo asks the judge panel
+  whether a reply delivers the goal. STAC ignores the panel and checks which
+  tool calls the agent executed and the state they left behind.
+
+## The attacks
+
+{/* The table below is generated from the code. Add no prose that restates it. */}
+
+<AttackList />
+
+## Choosing between them
+
+Ask what the harm looks like.
+
+- **Harmful text from a chat assistant**: start with [Crescendo](crescendo.mdx).
+  It needs an `attacker` model, and a judge panel to decide success. Run it
+  after cheaper attacks with `execution.escalate`, so it only spends turns on
+  the goals still standing.
+- **A forbidden action by a tool-using agent**: use [STAC](stac.mdx). It needs
+  no helper model and no judge, but the target must support function calls,
+  and each attack entry tests one declared chain whose objective must be the
+  goal.
+
+If a target falls to a single prompt, a multi-turn attack only adds cost:
+check with a [static](../static/index.mdx) or [adaptive](../adaptive/index.mdx)
+attack first. If the attacker reaches the agent through tool output or the tool
+list rather than the user's messages, see [indirect attacks](../indirect/index.mdx).

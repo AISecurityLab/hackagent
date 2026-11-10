@@ -12,7 +12,15 @@ from hackagent.catalog.risks.sensitive_information_disclosure.types import (
 
 
 class SensitiveInformationDisclosure(BaseVulnerability):
-    """Sensitive Information Disclosure."""
+    """The Sensitive Information Disclosure vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"training_data_extraction"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``SensitiveInformationDisclosureType``.
+    """
 
     name = "Sensitive Information Disclosure"
     description = (

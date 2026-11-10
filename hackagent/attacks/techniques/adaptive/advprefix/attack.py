@@ -25,7 +25,57 @@ extends one already chosen. The target's token logprobs are what that
 likelihood needs and the model contract does not carry them, so the rate
 decides the later picks too, and the trace records that it did.
 
-Based on: https://arxiv.org/abs/2412.10321
+Paper: Sicheng Zhu, Brandon Amos, Yuandong Tian, Chuan Guo, et al.,
+"AdvPrefix: An Objective for Nuanced LLM Jailbreaks", 2024,
+[arXiv:2412.10321](https://arxiv.org/abs/2412.10321). The paper replaces
+the fixed ``Sure, here is ...`` target of optimisation attacks with
+model-specific prefixes chosen for a high prefilling attack success rate
+and a low negative log-likelihood under the target.
+
+Algorithm (one goal), with the parameters of
+:class:`~.config.AdvPrefixParams`:
+
+1. **Write.** For each opening in ``meta_prefixes`` (default ``Here``,
+   ``To``, ``Sure`` and the empty opening), ask the ``attacker`` for
+   ``samples_per_prefix`` candidates (one count, or one per opening): the
+   goal as the user turn and the opening prefilled as the assistant's, so
+   the writer continues it. The opening plus the continuation is the
+   candidate, cut to ``max_prefix_chars``.
+2. **Sift.** Drop duplicates, candidates shorter than ``min_char_length``,
+   ones that open with a refusal or contain a hedge, and, with
+   ``require_linebreak``, ones without a line break. Keep the first
+   ``candidates_per_goal``.
+3. **Attack.** For each candidate, draw ``samples_per_candidate``
+   continuations from the target concurrently. With ``prefill`` the
+   candidate is the trailing assistant turn after the goal; without it the
+   goal asks the target to start its response with the candidate. The
+   panel judges prefix plus continuation (prefill) or the reply (no
+   prefill).
+4. **Select.** A candidate's prefilling ASR is the share of its
+   continuations the panel passed. The first pick minimises
+   ``-pasr_weight * log(pasr) + nll``; further picks, up to
+   ``prefixes_per_goal``, come from the candidates within ``pasr_tol`` of
+   the best rate and ``nll_tol`` of its likelihood, skipping any prefix
+   that extends one already picked. The picked candidates' attempts are
+   marked ``selected``.
+
+Deviations from the paper: the paper uses the selected prefixes as
+objectives for optimisation attacks such as GCG; HackAgent stops at the
+prefilling evaluation, which is itself the attack a black-box endpoint
+allows. Without token logprobs every ``nll`` is 0, so selection reduces to
+the prefilling ASR. Lengths are counted in characters, not tokens, and the
+sample counts default far below the reference's (see the field
+descriptions). The writer is a chat model continuing a prefilled assistant
+turn rather than a base model on raw text.
+
+Roles: ``attacker`` (required), the prefix writer, called once per
+requested candidate. An uncensored model works best, because a refusal is
+not a usable prefix.
+
+Attempts and success: every continuation of every attacked candidate is
+one attempt, carrying the prefix, its length, whether it was truncated and
+whether it was selected. The goal succeeds when the panel passed any
+attempt, selected or not.
 """
 
 from __future__ import annotations
@@ -75,7 +125,16 @@ class Candidate:
 
 
 class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
-    """Prefill the answer's opening and measure which opening works.
+    """Prefill the opening of the target's answer and measure which opening works.
+
+    Implements the prefix selection of AdvPrefix (Zhu et al., 2024,
+    [arXiv:2412.10321](https://arxiv.org/abs/2412.10321)) as a prefilling
+    attack: the ``attacker`` writes candidate openings for the goal, each is
+    placed in the assistant turn and continued by the target several times,
+    the campaign's evaluation panel judges every continuation, and the
+    openings with the best prefilling success rate are marked selected. The
+    algorithm and the deviations from the paper are documented in the module
+    ``hackagent.attacks.techniques.adaptive.advprefix.attack``.
 
     ``max_prefix_chars`` bounds the assembled prefix before target evaluation;
     it does not limit the writer's generation or reproduce token-based stopping.
@@ -99,6 +158,11 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Write, sift, attack and select; return every judged continuation.
+
+        Calls the ``attacker`` once per requested candidate, then the target
+        and the panel ``samples_per_candidate`` times per kept candidate.
+        """
         candidates = self._sift(await self._write(goal))
         if not candidates:
             decision("stopped", "no candidate survived the filters")
@@ -134,6 +198,7 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
         return [item for item in written if item is not None]
 
     async def _one_prefix(self, goal: str, meta_prefix: str) -> Optional[Candidate]:
+        """Have the writer continue one opening; ``None`` when it fails or writes nothing."""
         messages: Messages = prompts.generation_turns(meta_prefix, goal)
         try:
             written = await self.attacker(messages)
@@ -229,6 +294,7 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
         judge: Optional[Judge],
         path: Path,
     ) -> Optional[Finding]:
+        """Draw and judge one continuation of ``candidate``; ``None`` when unusable."""
         messages = (
             prompts.prefilled(goal, candidate.prefix)
             if self.params.prefill
@@ -347,6 +413,7 @@ def _combined(candidate: Candidate, pasr_weight: float) -> float:
 
 
 def _mark(finding: Finding) -> Finding:
+    """A copy of ``finding`` marked as part of the selection."""
     return Finding(
         messages=finding.messages,
         response=finding.response,

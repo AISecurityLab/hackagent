@@ -68,6 +68,7 @@ class TraceNode:
 
     @property
     def parent(self) -> Path:
+        """The path of the node this one sits under; ``()`` for a top-level node."""
         return self.path[:-1]
 
     def under(self, path: Path) -> bool:

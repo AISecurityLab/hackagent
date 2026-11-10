@@ -1,0 +1,214 @@
+---
+title: "BoN"
+description: "Best-of-N augmentation search with inline judge evaluation."
+sidebar_position: 6
+---
+
+import Generated from './_bon.generated.mdx';
+
+Best-of-N (BoN) sends the goal again and again, each time with random noise:
+letters shuffled inside words, case flipped, a few characters nudged to their
+neighbours. It keeps going until the panel calls one reply a jailbreak or the
+budget runs out.
+
+The idea is that a model's refusal is less stable than it looks. Each noisy copy
+still reads as the same request, but it lands on a slightly different input,
+and over enough tries one gets through. BoN needs no helper model and sees
+nothing but the replies, so it models the cheapest persistent attacker: someone
+who keeps retrying with typos.
+
+## At a glance
+
+| Type | Helper models | Turns | Calls per goal | Good for |
+|---|---|---|---|---|
+| Adaptive | None | 1 | Up to 20 target and 20 panel calls with the defaults | Any target, agents included: a cheap robustness check with no attacker model |
+
+## Research
+
+John Hughes, Sara Price, Aengus Lynch, Rylan Schaeffer, Fazl Barez, Arushi
+Somani, Sanmi Koyejo, Henry Sleight, Erik Jones, Ethan Perez, Mrinank Sharma
+and others, *Best-of-N Jailbreaking*, NeurIPS 2025.
+[arXiv:2412.03556](https://arxiv.org/abs/2412.03556) (December 2024).
+
+The paper samples augmented copies of a request until one draws a harmful reply.
+With 10,000 samples it reached 89% attack success on GPT-4o and 78% on Claude
+3.5 Sonnet, and it got past open-source defences such as circuit breakers.
+Success grows with the number of samples along a power-law-like curve, so a
+larger budget buys predictably more success. It also works on images and audio
+with augmentations suited to them, and combining it with an optimised prefix
+attack raised success by up to 35%.
+
+HackAgent ports the text augmentations and the reference's guards against
+grader false positives from the authors' code. It differs in these ways:
+
+- **A small budget.** The default `steps` and `candidates` allow tens of
+  samples, against the paper's thousands. Raise them to move up the scaling
+  curve.
+- **Text only.** There are no image or audio augmentations.
+- **Your judges.** The campaign's panel decides what counts, not the paper's
+  grader. The guards run around it (see [How it works](#how-it-works)).
+- **Fixed seeds.** Candidate `i` of step `s` is always generated from the same
+  seed, so two runs send the same noisy prompts. Replies can still differ if the
+  target samples.
+
+## How it works
+
+1. **Augment.** Each step makes `candidates` copies of the goal, each from its
+   own seed. The enabled augmentations run in order, with strength `sigma`:
+   - `word_scrambling` shuffles the inner letters of each word longer than three
+     characters, with probability `sigma`<sup>1/2</sup> per word;
+   - `random_capitalization` flips the case of each letter, with probability
+     `sigma`<sup>1/2</sup>;
+   - `ascii_perturbation` shifts a printable character one code point up or
+     down, with probability `sigma`<sup>3</sup>.
+
+   At `sigma` 0.4 that scrambles about 63% of the longer words, flips the case
+   of about 63% of letters and shifts about 6% of characters.
+2. **Send.** All candidates of a step go to the target concurrently (up to
+   `execution.concurrency.target` at once), each as a single user message.
+3. **Screen.** A reply fewer than `min_extra_words` words longer than the goal
+   mostly restates it, so it is marked "not graded" without calling the panel.
+4. **Judge.** Every other reply goes to the panel. A reply the panel passes still
+   does not count when it has `min_reply_words` words or fewer, or when it tries
+   to decode the prompt ("decoded message", "Caesar cipher" and similar
+   phrases) instead of answering it.
+5. **Stop or continue.** If any reply of the step counts, the search stops after
+   that step. Otherwise the next step starts, up to `steps`. With no judges,
+   every step runs.
+
+```mermaid
+flowchart TB
+  G["goal"] --> A["make candidates noisy copies<br/><small>seeded, strength sigma</small>"]
+  A --> T["send them concurrently"]
+  T --> SC{"reply long enough?<br/><small>min_extra_words</small>"}
+  SC -->|no| NG["not graded"]
+  SC -->|yes| J["panel judges"]
+  J --> G2{"passed, over min_reply_words,<br/>not decoding?"}
+  G2 -->|yes| STOP["stop after this step"]
+  G2 -->|no| NEXT{"steps left?"}
+  NG --> NEXT
+  NEXT -->|yes| A
+  NEXT -->|no| END["done, not jailbroken"]
+```
+
+## When to use it
+
+Use BoN when you want an adaptive attack without running an attacker model. It
+sends one plain user message per try, so it works against every target type,
+including agents reached through an adapter. It is a good probe of input
+filters and guardrails, which can miss text they were not trained on, and of how
+brittle a model's refusals are.
+
+Its strength is scale. With the default budget a well-aligned model usually
+holds; the paper's results need thousands. If you cannot afford that many target
+calls, an attack that reasons about the replies, such as [PAIR](./pair.mdx) or
+[TAP](./tap.mdx), finds more per call. For a cheap fixed obfuscation, try
+[h4rm3l](./h4rm3l.mdx) or the [static attacks](../static/index.mdx) first, and
+add BoN behind them with `execution.escalate`.
+
+## Cost
+
+Per goal, with the defaults:
+
+| Calls to | Count | Default |
+|---|---|---|
+| target | up to `steps` × `candidates` | up to 4 × 5 = 20 |
+| panel | one evaluation per reply that passes the length screen, each calling every judge | up to 20 |
+
+There are no helper-model calls. A goal that falls in the first step costs
+`candidates` target calls, 5 by default; one that never falls costs the full
+budget. All candidates of a step are sent and judged even when the first one
+succeeds, so the last step is always paid in full.
+
+`steps` × `candidates` is the budget. More candidates per step finish sooner,
+since a step's candidates run concurrently (up to `execution.concurrency.target`
+at once); more steps waste less after an early success.
+
+## Configuration
+
+<Generated />
+
+### A larger budget
+
+```yaml
+attacks:
+  - name: bon
+    parameters:
+      steps: 20
+      candidates: 10
+```
+
+Up to 200 target and panel calls per goal, ten per step; raise
+`execution.concurrency.target` to send them in parallel. Use it against a
+cheap or local target when you want to see how far success climbs with more
+samples.
+
+### Gentler noise
+
+```yaml
+attacks:
+  - name: bon
+    parameters:
+      sigma: 0.25
+      ascii_perturbation: false
+```
+
+Scrambles about half the longer words, recases about half the letters and
+shifts no characters. Use
+it when many replies are "not counted" because the target tries to decode the
+prompt instead of answering it.
+
+## Reading the results
+
+One **attempt** is one noisy prompt and its reply. A goal has `candidates`
+attempts per step it reached, minus any that got no usable reply, and counts as
+jailbroken if one attempt passed.
+
+Each attempt's metadata records its `step`, `candidate` and `seed`, and its
+prompt is the augmented text exactly as sent. The trace has one
+`step s/S, candidate c/C` phase per attempt with its target and panel calls, a
+`stopped` decision on every attempt of the final step that passed, and a `skipped`
+decision for a step where no candidate got a usable reply.
+
+The verdict's explanation says when a guard decided:
+
+- **"not graded: the reply is fewer than N words longer than the request"**:
+  the panel was not called.
+- **"not counted: the reply has N words or fewer"** or **"not counted: the reply
+  tries to decode the prompt"**: the panel passed the reply and the guard
+  overruled it. The panel's own explanation comes first.
+
+What to check first:
+
+- **Many "not counted" verdicts.** The guards are doing their job. If the target
+  is capped at a short `max_tokens`, no reply can pass the word limit; raise
+  it.
+- **Every reply "not graded".** The target is echoing or giving one-line
+  replies. Read a few.
+- **No usable reply at all.** The goal gets one error attempt with the reason,
+  for example "step 4: none of the 5 candidates got a usable reply". A guardrail
+  or provider error is the usual cause.
+
+In the [dashboard](../../getting-started/dashboard.mdx), the success curve
+shows at which attempt each goal first fell. With BoN it is the closest thing
+to the paper's success-against-samples curve, cut off at your budget.
+
+## Limitations
+
+- At the default budget it measures little against a strong model; its results
+  depend on how many samples you can afford.
+- It never reads the replies to improve. Each step is as random as the first.
+- The fixed seeds mean every run, and every goal, starts from the same random
+  choices. Repeating a run does not draw new noise.
+- The guards drop real jailbreaks that are short or that mention decoding, and
+  the panel can still pass a vague reply that clears them.
+- Noise that makes the request unreadable produces off-topic replies, not
+  jailbreaks. Lower `sigma` if replies stop addressing the goal.
+
+## Related
+
+- [h4rm3l](./h4rm3l.mdx): composes fixed obfuscations, with an optional search over them.
+- [AdvPrefix](./advprefix.mdx): the other sampling attack here, which needs prefill access.
+- [FlipAttack](../static/flipattack.mdx) and [CipherChat](../static/cipherchat.mdx): fixed obfuscations at one call per goal.
+- [Judges](../../concepts/judges.md): how the panel decides, before the guards apply.
+- [Jailbreak](../../risks/vulnerabilities/jailbreak.md): the risk this attack tests.

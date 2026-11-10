@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Build one reference page per section of the campaign format.
+"""Build one page per section of the campaign format, under the CLI tab.
 
 The pages follow the order a campaign file reads in, which is the order the run
 executes in: dataset, target, guardrails, attacks, evaluation, execution.
@@ -15,11 +15,12 @@ from pydantic import BaseModel
 
 from .fields import Links, model_section
 from .markup import admonition, clean, page, table, yaml_block
+from .paths import CAMPAIGN_FILES
 
 # A small local model stands in for every chat role in the examples, so a
 # reader can copy a snippet and run it against Ollama without editing it.
 CHAT_MODEL: dict[str, Any] = {
-    "name": "llama3.2",
+    "name": "llama3.2:latest",
     "connection": {"provider": "ollama", "type": "OLLAMA"},
 }
 
@@ -84,8 +85,8 @@ def build_links() -> Links:
     homes: dict[type, str] = {}
     for name, entries in _sections().items():
         for model, _path in entries:
-            homes[model] = name
-    homes[AgentType] = "target"
+            homes[model] = f"{CAMPAIGN_FILES}/{name}"
+    homes[AgentType] = f"{CAMPAIGN_FILES}/target"
     return Links(homes)
 
 
@@ -130,9 +131,10 @@ INTROS = {
     ),
     "attacks": (
         "`attacks` lists the techniques to run. Every goal goes through every "
-        "attack, unless [`execution.escalate`](../execution.md#executionspec) "
-        "says otherwise.\n\nEvery technique is listed below, and each has its "
-        "own page giving its parameters and the helper models it drives."
+        "attack, unless [`execution.escalate`](execution.md#executionspec) "
+        "says otherwise.\n\nEvery technique is listed below. Each one has its "
+        "own page under [Attacks](../../attacks/index.mdx), which explains how "
+        "it works and lists its parameters and the helper models it drives."
     ),
     "evaluation": (
         "After the target replies, the judges score it. Each judge votes on "
@@ -195,7 +197,7 @@ EXAMPLES: dict[str, list[tuple[str, Any]]] = {
             "A model served by Ollama on this machine",
             {
                 "target": {
-                    "name": "llama3.2",
+                    "name": "llama3.2:latest",
                     "connection": {
                         "provider": "ollama",
                         "type": "OLLAMA",
@@ -316,6 +318,8 @@ def _examples(name: str) -> str:
 
 def _extra(name: str, links: Links) -> str:
     """Page-specific content that is itself generated from the code."""
+    if name == "attacks":
+        return _attack_names()
     if name == "target":
         return _agent_types()
     if name == "evaluation":
@@ -323,6 +327,21 @@ def _extra(name: str, links: Links) -> str:
     if name == "dataset":
         return _presets()
     return ""
+
+
+def _attack_names() -> str:
+    """The values `attacks[].name` accepts, each linked to its attack page."""
+    from .attack_pages import campaign_table
+
+    return "\n".join(
+        [
+            "## Attack names {#attack-names}",
+            "",
+            "`name` must be one of these.",
+            "",
+            campaign_table(f"{CAMPAIGN_FILES}/attacks"),
+        ]
+    )
 
 
 def _agent_types() -> str:
@@ -430,12 +449,13 @@ def _presets() -> str:
 def build_section(name: str, links: Links, page_key: str | None = None) -> str:
     """The body of one section: its intro, model tables, extras and examples.
 
-    ``page_key`` is where the section will be published, which decides how deep
-    its links to other sections have to reach. It defaults to ``name``.
+    ``page_key`` is where the section will be published, relative to
+    ``docs/docs``, which decides how its links to other pages are written. It
+    defaults to the section's page under the campaign-files folder.
     """
     from hackagent.models.config import ModelConfig
 
-    where = page_key or name
+    where = page_key or f"{CAMPAIGN_FILES}/{name}"
     body = [INTROS[name], ""]
     for model, path in _sections()[name]:
         base = ModelConfig if model is not ModelConfig else None
@@ -447,17 +467,9 @@ def build_section(name: str, links: Links, page_key: str | None = None) -> str:
 
 
 def build_pages(links: Links) -> dict[str, str]:
-    """Every spec section page, keyed by file name.
-
-    ``attacks`` is not here: it is merged into the attack catalog's index, so
-    the section and the catalog are one page instead of two routes.
-    """
-    from hackagent.models.config import ModelConfig  # noqa: F401
-
+    """Every spec section page, keyed by file name."""
     pages: dict[str, str] = {}
-    for position, (name, entries) in enumerate(_sections().items(), start=2):
-        if name == "attacks":
-            continue
+    for position, name in enumerate(_sections(), start=2):
         title, tagline = TITLES[name]
         pages[f"{name}.md"] = page(
             {"title": title, "description": tagline, "sidebar_position": position},

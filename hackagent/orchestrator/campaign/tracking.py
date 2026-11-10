@@ -186,10 +186,12 @@ class RunTracker:
         )
 
     def complete(self) -> None:
+        """Mark the run COMPLETED and flush the store's deferred writes."""
         self.store.update_run(self.run_id, status=RunStatus.COMPLETED.value)
         self.store.flush()
 
     def fail(self, error: BaseException) -> None:
+        """Mark the run FAILED with ``error`` in its notes and flush the store."""
         self.store.update_run(
             self.run_id,
             status=RunStatus.FAILED.value,
@@ -198,6 +200,7 @@ class RunTracker:
         self.store.flush()
 
     def cancel(self) -> None:
+        """Mark the run CANCELLED and flush the store."""
         self.store.update_run(
             self.run_id,
             status=RunStatus.CANCELLED.value,

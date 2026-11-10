@@ -1,7 +1,16 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unified model execution."""
+"""Unified model execution: one interface for every target and role model.
+
+A :class:`ModelConfig` (from a campaign file or the API) is turned into a
+:class:`Model` by :func:`build_model`; every backend (LiteLLM providers,
+Google ADK, CLI agents, live web chatbots) answers ``complete`` /
+``acomplete`` with a :class:`ModelResponse` and returns provider failures as
+values instead of raising. :class:`GuardedModel` and the retry wrapper add
+guardrails and retries around any backend, and :class:`ModelFactory` builds
+role models with the platform gateway's credentials.
+"""
 
 from .build import (
     ModelCallError,

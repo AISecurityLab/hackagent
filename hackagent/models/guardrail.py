@@ -66,7 +66,8 @@ class GuardrailResult:
 class Guardrail(Protocol):
     """Anything that can classify a piece of text."""
 
-    def check(self, text: str) -> GuardrailResult: ...
+    def check(self, text: str) -> GuardrailResult:
+        """Classify ``text`` as safe or unsafe."""
 
 
 class ModelGuardrail:
@@ -157,6 +158,7 @@ class GuardedModel(Model):
         self.after = after
 
     async def is_reachable(self) -> Reachability:
+        """Delegate to the wrapped model; guardrails are not probed."""
         return await self.model.is_reachable()
 
     def _check(
@@ -188,6 +190,13 @@ class GuardedModel(Model):
     def complete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
     ) -> ModelResponse:
+        """Check the prompt, call the model, then check its reply.
+
+        The ``before`` guardrail sees the last user message; when it blocks, the
+        model is not called. The ``after`` guardrail sees the reply text of a
+        successful call. A blocked call returns an empty response whose
+        ``guardrail`` says which side blocked it and why.
+        """
         blocked = self._check(
             "before", last_user_text(list(messages)) or "", ModelResponse(text="")
         )
@@ -201,6 +210,7 @@ class GuardedModel(Model):
     async def acomplete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
     ) -> ModelResponse:
+        """Asynchronous :meth:`complete`; guardrail checks run in a worker thread."""
         blocked = await asyncio.to_thread(
             self._check,
             "before",

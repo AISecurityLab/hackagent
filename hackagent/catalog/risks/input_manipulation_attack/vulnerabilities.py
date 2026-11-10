@@ -12,7 +12,15 @@ from hackagent.catalog.risks.input_manipulation_attack.types import (
 
 
 class InputManipulationAttack(BaseVulnerability):
-    """Input Manipulation Attack."""
+    """The Input Manipulation Attack vulnerability, with the sub-types to test.
+
+    Args:
+        types: Sub-type values to select, e.g. ``"encoding_bypass"``. All
+            sub-types when omitted or empty.
+
+    Raises:
+        ValueError: When a value is not a ``InputManipulationAttackType``.
+    """
 
     name = "Input Manipulation Attack"
     description = (

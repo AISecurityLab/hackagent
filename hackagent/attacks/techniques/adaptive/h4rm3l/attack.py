@@ -21,7 +21,65 @@ on all of them. Compilation is the validity filter: the h4rm3l compiler
 accepts only registered primitives with literal arguments, so a proposal
 that is not a well-formed program is discarded rather than run.
 
-Based on: https://arxiv.org/abs/2408.04811
+Paper: Moussa Koulako Bala Doumbouya, Ananjan Nandi, Gabriel Poesia,
+Davide Ghilardi, et al., "h4rm3l: A language for Composable Jailbreak
+Attack Synthesis", 2024, [arXiv:2408.04811](https://arxiv.org/abs/2408.04811).
+h4rm3l expresses jailbreaks as compositions of parameterised string
+transformations ("decorators": encodings, character noise, role-play
+templates, refusal suppression, model-assisted rewrites) and synthesises
+new compositions with an LLM guided by bandit-style few-shot sampling of
+the programs that score best against the target.
+
+Algorithm, with the parameters of :class:`~.config.H4rm3lParams`:
+
+1. Resolve ``program`` (a preset name from
+   :data:`~.programs.PRESET_PROGRAMS` or a program written in ``syntax_version``
+   1 or 2 syntax) and compile it at construction, so a broken program fails
+   before the run starts.
+2. Synthesis, in :meth:`H4rm3lAttack.prepare`, once per run and only with a
+   ``synthesizer`` role and a configured panel: seed the pool with
+   ``program`` and every preset, then for each of ``iterations`` rounds:
+
+   - draw ``examples`` programs from the pool, each scored by a Beta draw
+      centred on its success rate whose concentration is ``concentration``
+      times the round number (unscored programs draw from a uniform Beta),
+      so early rounds explore and later rounds exploit;
+   - show them, with their success rates and the signatures of every
+      primitive that can be built (model-backed ones only when a
+      ``decorator`` role is configured), to the ``synthesizer``, asking for
+      ``proposals`` new programs, one per line;
+   - compile each new proposal, rejecting anything that is not a chain of
+      registered primitives with literal arguments;
+   - score each valid one on ``scoring_goals`` goals drawn at random from
+      the run's goals (``seed`` makes the draws repeatable): decorate the
+      goal, send it as a single user message, and count panel successes;
+   - keep a program only when its success rate beats the pool's mean at
+      the start of the round.
+
+3. Attack, in :meth:`H4rm3lAttack.search`, per goal: without a synthesizer,
+   the one compiled ``program``; with one, the ``programs_per_goal`` best
+   programs of the pool, best first. Each program decorates the goal (model
+   calls through the ``decorator`` role where a primitive needs one), the
+   result is sent as a single user message, and the panel judges the reply;
+   the goal stops at the first success.
+
+Deviations from the paper: synthesis runs inside the campaign against the
+campaign's own target, scored by its evaluation panel on a few randomly
+drawn goals of the same run, rather than as a separate offline study over
+a fixed benchmark.
+``TransformFxDecorator``, which executes Python, is accepted only when no
+synthesizer is configured: with one, it is rejected even in the user's own
+program. Some presets
+are HackAgent's own measurements, marked in :mod:`.programs`.
+
+Roles: ``synthesizer`` (optional) proposes programs during synthesis;
+``decorator`` (optional, required by any program that uses a model-backed
+primitive such as ``TranslateDecorator``) performs those rewrites.
+
+Attempts and success: synthesis scoring is run-scoped work and produces no
+attempt. Per goal, every program whose decorated prompt got a usable reply
+is one attempt, tagged with the program and its pool success rate; the goal
+succeeds when the panel calls any of them a success.
 """
 
 from __future__ import annotations
@@ -44,7 +102,19 @@ Decorate = Callable[[str], object]
 
 
 class H4rm3lAttack(IterativeAttack[H4rm3lParams]):
-    """A decorator program per goal, found by search when one is configured."""
+    """Rewrite the goal with a composed decorator program, optionally synthesised against the target.
+
+    Implements h4rm3l (Doumbouya et al., 2024,
+    [arXiv:2408.04811](https://arxiv.org/abs/2408.04811)): without a
+    ``synthesizer`` role it applies one program (a preset or a hand-written
+    composition of decorators) to each goal and sends the result once; with
+    one, it first searches for programs that work against this target,
+    scoring each on a few goals with the campaign's evaluation panel, and
+    then attacks every goal with the best ``programs_per_goal`` of them,
+    stopping at the first success. The algorithm and the deviations from the
+    paper are documented in the module
+    ``hackagent.attacks.techniques.adaptive.h4rm3l.attack``.
+    """
 
     name = "h4rm3l"
     params_type = H4rm3lParams
@@ -71,6 +141,11 @@ class H4rm3lAttack(IterativeAttack[H4rm3lParams]):
     # ── compilation ───────────────────────────────────────────────────────────
 
     def _build(self, program: str) -> Decorate:
+        """Compile ``program`` with this run's ``decorator`` model.
+
+        Code-executing primitives are allowed only when no synthesizer is
+        configured, so every program compiled came from the user.
+        """
         return compile_program(
             program,
             self.params.syntax_version,
@@ -251,6 +326,12 @@ class H4rm3lAttack(IterativeAttack[H4rm3lParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Apply the chosen programs to ``goal`` in turn; return every judged attempt.
+
+        Calls the target and the panel once per program that produced a
+        prompt (plus the ``decorator`` role for model-backed primitives),
+        stopping after the first success.
+        """
         findings: list[Finding] = []
         programs = self._programs()
 

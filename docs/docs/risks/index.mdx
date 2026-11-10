@@ -67,7 +67,7 @@ attacks:
       attacker: {name: llama3.2, connection: {provider: ollama, type: OLLAMA}}
 evaluation:
   judges:
-    - name: llama3.2
+    - name: llama3.2:latest
       connection: {provider: ollama, type: OLLAMA}
       scoring: {type: harmbench}
 execution:
@@ -102,9 +102,9 @@ for attack in JAILBREAK_PROFILE.primary_attacks:
         },
         "target": TARGET,
         "attacks": [{"name": attack.technique,
-                     "roles": {"attacker": {"name": "llama3.2",
+                     "roles": {"attacker": {"name": "llama3.2:latest",
                                             "connection": OLLAMA}}}],
-        "evaluation": {"judges": [{"name": "llama3.2", "connection": OLLAMA,
+        "evaluation": {"judges": [{"name": "llama3.2:latest", "connection": OLLAMA,
                                    "scoring": {"type": "harmbench"}}]},
     })
 ```
@@ -112,4 +112,4 @@ for attack in JAILBREAK_PROFILE.primary_attacks:
 </TabItem>
 </Tabs>
 
-Each risk's page lists its datasets, attacks and metrics. [Evaluation campaigns](./evaluation-campaigns.md) covers larger runs: quick scans, full audits and targeted assessments. To run one, start with [Your first campaign](../getting-started/first-campaign.md); the [attack catalog](../reference/attacks/index.md) lists every technique.
+Each risk's page lists its datasets, attacks and metrics. [Evaluation campaigns](./evaluation-campaigns.md) covers larger runs: quick scans, full audits and targeted assessments. To run one, start with [Your first campaign](../getting-started/first-campaign.md); the [attack catalog](../attacks/index.mdx) lists every technique.

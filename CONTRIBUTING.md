@@ -19,6 +19,7 @@ Following these guidelines helps to communicate that you respect the time of the
 *   [Styleguides](#styleguides)
     *   [Git Commit Messages](#git-commit-messages)
     *   [Python Styleguide](#python-styleguide)
+    *   [Docstrings](#docstrings)
 *   [License](#license)
 
 ## Code of Conduct
@@ -161,6 +162,38 @@ When handling an exception in these paths, use one of the following patterns:
 
 Do not add `except Exception: pass`, and do not turn a partially tracked or
 partially evaluated run into a successful "no findings" result.
+
+### Docstrings
+
+The SDK reference on the docs site is generated from docstrings, so they are
+part of the documentation.
+
+* Use [Google style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+  (`Args:`, `Returns:`, `Raises:`, `Example:`); do not use NumPy or Sphinx
+  field lists.
+* Every public module, package, class, method and function (a name not
+  starting with `_`) needs a docstring. A module or package docstring says
+  what it is for and how it fits in the SDK. A class or function docstring
+  starts with a one-line summary in the imperative ("Return the run",
+  not "Returns the run" or "This function..."), followed, only when the
+  summary is not enough, by a short paragraph and the `Args:`, `Returns:`
+  and `Raises:` sections.
+* Document what a reader cannot see from the signature: units, defaults that
+  matter, side effects (writes to storage, network calls), thread-safety and
+  ordering assumptions. Do not restate the name.
+* Public entry points carry an `Example:` with a short snippet that runs
+  against the current signatures, in a fenced ```` ```python ```` block.
+* Keep docstrings true: when you change behaviour, update the docstring in
+  the same commit.
+* Comments explain *why* (a non-obvious decision, a protocol quirk), not what
+  the next line does.
+
+Ruff enforces the missing-docstring rules `D100`-`D104` and `D106` (`D105`
+magic methods and `D107` `__init__` are exempt), run by
+`uv run --frozen ruff check .`. Packages not yet documented are listed under
+`[tool.ruff.lint.per-file-ignores]` in `pyproject.toml`; the exemptions are
+removed package by package: delete a package's entry, document what
+`ruff check` then reports, and commit both together.
 
 ## License
 

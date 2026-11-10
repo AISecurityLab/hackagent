@@ -30,7 +30,14 @@ class ToolDocument(BaseModel):
 
 
 class ToolHijackerParams(AttackParams):
-    """A local tool router and a bounded, gradient-free description search."""
+    """A local tool router and a bounded, gradient-free description search.
+
+    ``tools`` and ``malicious_tool`` make up the shadow tool library;
+    ``paraphrases`` are the task phrasings tested; ``top_k`` sets how many
+    tools the retriever shortlists; ``max_attempts`` and
+    ``success_threshold`` bound the search. Validation rejects duplicate
+    tool names and blank paraphrases.
+    """
 
     tools: tuple[ToolDocument, ...] = Field(
         default=(
@@ -45,7 +52,10 @@ class ToolHijackerParams(AttackParams):
         default=ToolDocument(
             name="task_helper", description="A tool for the requested task."
         ),
-        description="Injected tool. Its name and parameters stay fixed; its description is optimized.",
+        description=(
+            "Injected tool. Its name and parameters stay fixed; its description "
+            "gets the task phrasings and a selection instruction appended."
+        ),
     )
     paraphrases: tuple[str, ...] = Field(
         default=(),
@@ -65,7 +75,10 @@ class ToolHijackerParams(AttackParams):
         default=1.0,
         gt=0,
         le=1,
-        description="End-to-end selection rate across phrasings required to stop searching early.",
+        description=(
+            "Share of phrasings for which the poisoned tool must be retrieved and "
+            "called, with no target errors, to stop early and count as a success."
+        ),
     )
     attacker: Optional[Completion] = Field(
         default=None,
@@ -82,6 +95,7 @@ class ToolHijackerParams(AttackParams):
 
     @model_validator(mode="after")
     def unique_tools(self) -> "ToolHijackerParams":
+        """Reject duplicate tool names, the malicious tool included, and blank paraphrases."""
         names = [tool.name for tool in self.tools] + [self.malicious_tool.name]
         if len(names) != len(set(names)):
             raise ValueError("Tool names, including the malicious tool, must be unique")

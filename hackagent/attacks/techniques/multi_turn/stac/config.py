@@ -12,6 +12,14 @@ from .environment import Scenario, ToolChain
 
 
 class STACParams(AttackParams):
+    """Which chain to run, and the budgets that bound the conversation.
+
+    ``scenario`` picks a built-in fixture and ``chain`` replaces it with a
+    custom one. ``max_turns`` bounds the scripted user turns,
+    ``max_rounds_per_turn`` the target calls within one turn, and
+    ``max_tool_calls`` the tool executions per goal.
+    """
+
     scenario: Scenario = Field(
         default="data_export",
         description="Synthetic fixture: data_export, permission_change, or unreviewed_publish.",

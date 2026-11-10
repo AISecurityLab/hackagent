@@ -71,6 +71,7 @@ class ModelResponse:
 
     @property
     def ok(self) -> bool:
+        """True when the call returned neither an error nor a guardrail block."""
         return self.error is None and self.guardrail is None
 
     @classmethod

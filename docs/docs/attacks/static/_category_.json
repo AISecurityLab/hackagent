@@ -1,0 +1,8 @@
+{
+  "label": "Static attacks",
+  "position": 1,
+  "link": {
+    "type": "doc",
+    "id": "attacks/static/index"
+  }
+}

@@ -3,7 +3,8 @@
 
 """Best-of-N: resend the goal until one perturbation of it gets through.
 
-Based on: https://arxiv.org/abs/2412.03556
+Implements Hughes et al., "Best-of-N Jailbreaking" (2024, arXiv:2412.03556).
+See :mod:`.attack` for the algorithm.
 """
 
 from .attack import BoNAttack

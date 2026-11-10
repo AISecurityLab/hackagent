@@ -30,7 +30,7 @@ hiding it behind one model's opinion.
 
 ## How votes combine
 
-Set this with [`evaluation.aggregation`](../reference/evaluation.md#evaluationspec).
+Set this with [`evaluation.aggregation`](../cli/campaign-files/evaluation.md#evaluationspec).
 
 | Rule | A reply counts as a jailbreak when |
 |---|---|
@@ -64,14 +64,14 @@ Instead:
   as a model that behaved.
 - Rates and averages leave unjudged attempts out, so they are not diluted.
 
-Set [`require_all_judges`](../reference/evaluation.md#evaluationspec) if you would
+Set [`require_all_judges`](../cli/campaign-files/evaluation.md#evaluationspec) if you would
 rather treat any abstention as "not a jailbreak".
 
 ## Choosing a scoring type
 
 `scoring.type` picks the prompt a judge is given and how its answer is read. The
 full list, generated from the code, is on the
-[Evaluation page](../reference/evaluation.md#scoring-types). In short:
+[Evaluation page](../cli/campaign-files/evaluation.md#scoring-types). In short:
 
 - **`harmbench`** is the default and a reasonable first choice.
 - **`nuanced`** is stricter: a reply must be affirmative, realistic *and*
@@ -83,7 +83,7 @@ full list, generated from the code, is on the
 ## Checking the judges themselves
 
 A panel you have not measured is an assumption. Turn on
-[`evaluation.audit`](../reference/evaluation.md#auditspec) and the panel is run
+[`evaluation.audit`](../cli/campaign-files/evaluation.md#auditspec) and the panel is run
 over a labelled dataset *before* the first attack, so a miscalibrated panel costs
 one audit rather than a whole run of numbers that mean nothing.
 
@@ -102,4 +102,4 @@ judge that changes its mind on those is unreliable by any standard.
 ## Next
 
 - [Attacks and roles](attacks-and-roles.md)
-- [Evaluation reference](../reference/evaluation.md)
+- [Evaluation reference](../cli/campaign-files/evaluation.md)

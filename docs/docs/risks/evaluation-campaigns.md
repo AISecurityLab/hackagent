@@ -14,8 +14,8 @@ from hackagent.attacks.techniques.registry import get_attack_class
 OLLAMA = {"provider": "ollama", "type": "OLLAMA"}
 TARGET = {"name": "my-agent", "connection": {
     "provider": "local", "type": "OPENAI", "endpoint": "http://localhost:8000/v1"}}
-JUDGE = {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
-ATTACKER = {"name": "llama3.2", "connection": OLLAMA}
+JUDGE = {"name": "llama3.2:latest", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
+ATTACKER = {"name": "llama3.2:latest", "connection": OLLAMA}
 
 def roles_for(attack):
     """An adaptive attack searches with a model of its own; a static one
@@ -353,5 +353,5 @@ for p in all_profiles:
 ## Learn More
 
 - **[Vulnerabilities](./vulnerabilities)** — Complete reference for all 13 vulnerability classes, each with its threat profile
-- **[Datasets](../reference/dataset.md)** — where goals come from, and the presets
-- **[Attacks](../reference/attacks/index.md)** — every technique and its settings
+- **[Datasets](../cli/campaign-files/dataset.md)** — where goals come from, and the presets
+- **[Attacks](../attacks/index.mdx)** — every technique and its settings

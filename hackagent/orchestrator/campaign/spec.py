@@ -72,6 +72,7 @@ class ScoringSpec(_Spec):
 
     @model_validator(mode="after")
     def validate_type(self) -> "ScoringSpec":
+        """Reject a judge ``type`` that names no registered evaluator."""
         if self.type not in EVALUATOR_MAP:
             known = ", ".join(sorted(EVALUATOR_MAP))
             raise ValueError(f"Unknown judge type {self.type!r}. Available: {known}.")
@@ -99,14 +100,15 @@ class AttackSpec(_Spec):
     roles: dict[str, ModelConfig] = Field(
         default_factory=dict,
         description=(
-            "The helper models an adaptive attack uses, keyed by role name (for "
-            "example ``attacker``). Static attacks need none. Each attack's page "
-            "lists the roles it requires."
+            "The helper models an attack uses, keyed by role name (for example "
+            "``attacker``). Most static attacks need none; FC and tFC need an "
+            "``attacker``. Each attack's page lists the roles it requires."
         ),
     )
 
     @model_validator(mode="after")
     def validate_name(self) -> "AttackSpec":
+        """Reject an attack ``name`` that names no registered attack."""
         if self.name not in ATTACKS:
             known = ", ".join(sorted(ATTACKS))
             raise ValueError(f"Unknown attack {self.name!r}. Available: {known}.")
@@ -196,6 +198,7 @@ class CampaignDatasetSpec(DatasetSpec):
 
     @model_validator(mode="after")
     def validate_category_filter(self) -> "CampaignDatasetSpec":
+        """Require ``dataset.classifier`` when the selection filters by category."""
         if self.selection.filters.categories and self.classifier is None:
             raise ValueError(
                 "selection.filters.categories matches the taxonomy labels goals "
@@ -225,6 +228,7 @@ class GuardrailsSpec(_Spec):
 
     @property
     def active(self) -> bool:
+        """Whether either guardrail is configured."""
         return self.before is not None or self.after is not None
 
 

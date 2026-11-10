@@ -12,8 +12,8 @@ A **quick security scan** focuses on the highest-impact vulnerabilities with fas
 OLLAMA = {"provider": "ollama", "type": "OLLAMA"}
 TARGET = {"name": "my-agent", "connection": {
     "provider": "local", "type": "OPENAI", "endpoint": "http://localhost:8000/v1"}}
-JUDGE = {"name": "llama3.2", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
-ATTACKER = {"name": "llama3.2", "connection": OLLAMA}
+JUDGE = {"name": "llama3.2:latest", "connection": OLLAMA, "scoring": {"type": "harmbench"}}
+ATTACKER = {"name": "llama3.2:latest", "connection": OLLAMA}
 
 def asr(result):
     """Fraction of attempts the judges marked successful."""

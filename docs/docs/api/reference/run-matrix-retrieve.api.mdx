@@ -1,0 +1,70 @@
+---
+id: run-matrix-retrieve
+title: "Get a campaign run's goal matrix"
+description: "Returns every goal's verdict and attempt count in each attack run, as columnar arrays (goals by attack runs) for heat maps. Never paginated. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed."
+sidebar_label: "Get a campaign run's goal matrix"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get a campaign run's goal matrix"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/run/{id}/matrix"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns every goal's verdict and attempt count in each attack run, as columnar arrays (goals by attack runs) for heat maps. Never paginated. Accepts a login token or an API key (not a run token). Every response has a weak `ETag`: send it back as `If-None-Match` to get `304` without a body while nothing changed.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={[{"description":"The ETag of a previous response: 304 while it still holds.","in":"header","name":"If-None-Match","schema":{"type":"string"}},{"description":"A UUID string identifying this Run.","in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}]}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"runs":{"description":"The attack runs: the columns of `cells` and `attempts`.","items":{"format":"uuid","type":"string"},"type":"array"},"goals":{"description":"The goals: the rows of `cells` and `attempts`.","items":{"properties":{"index":{"description":"The goal's index in the dataset.","type":"integer"},"goal":{"description":"The goal text.","type":"string"},"category":{"description":"The goal's category.","type":"string"},"subcategory":{"description":"The goal's subcategory; empty when none.","type":"string"},"verdict":{"allOf":[{"description":"* `jailbroken` - jailbroken\n* `mitigated` - mitigated\n* `unresolved` - unresolved","enum":["jailbroken","mitigated","unresolved"],"type":"string","title":"GoalVerdictEnum"}],"description":"The goal's verdict over all attack runs.\n\n* `jailbroken` - jailbroken\n* `mitigated` - mitigated\n* `unresolved` - unresolved"}},"required":["category","goal","index","subcategory","verdict"],"type":"object","title":"MatrixGoal"},"type":"array"},"cells":{"description":"cells[goal][run]: 0 unresolved, 1 mitigated, 2 error, 3 jailbroken; null when the attack run recorded nothing for the goal.","items":{"items":{"nullable":true,"type":"integer"},"type":"array"},"type":"array"},"attempts":{"description":"attempts[goal][run], null like cells.","items":{"items":{"nullable":true,"type":"integer"},"type":"array"},"type":"array"}},"required":["attempts","cells","goals","runs"],"type":"object","title":"GoalMatrix"}}},"description":"OK"},"304":{"description":"The If-None-Match ETag still holds."},"400":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Invalid query parameter."},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"404":{"content":{"application/json":{"schema":{"description":"An error of a run endpoint.","properties":{"detail":{"description":"What went wrong, for people.","type":"string"}},"required":["detail"],"type":"object","title":"RunDetailError"}}},"description":"Not a visible campaign run."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

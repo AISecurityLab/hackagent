@@ -1,0 +1,60 @@
+---
+id: key-context-retrieve
+title: "Get the caller's identity"
+description: "Returns the caller's user id, username and organization. Accepts an API key or a login token: the SDK calls it to check its key and find its organization. 404 when the caller has no organization."
+sidebar_label: "Get the caller's identity"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: api/reference/hackagent-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get the caller's identity"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/key/context"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the caller's user id, username and organization. Accepts an API key or a login token: the SDK calls it to check its key and find its organization. 404 when the caller has no organization.
+
+<ParamsDetails>
+  
+</ParamsDetails>
+
+<RequestSchema
+  title={"Body"}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  responses={{"200":{"content":{"application/json":{"schema":{"properties":{"user_id":{"description":"Id of the authenticated user.","type":"integer"},"username":{"description":"Username of the authenticated user.","type":"string"},"organization_id":{"description":"Id of the user's organization.","format":"uuid","type":"string"},"organization_name":{"description":"Name of the user's organization.","type":"string"}},"type":"object"}}},"description":"OK"},"401":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Missing, invalid, expired or revoked credential, or a credential this endpoint does not accept."},"403":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The credential may not do this: for example a run token outside its own run, or a caller without an organization."},"404":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"The caller has no organization."},"429":{"content":{"application/json":{"schema":{"description":"An error with a human-readable ``detail``: authentication, permission,\nnot found and rate-limit errors, and the license limits. Some errors add\nother keys (a license error adds ``error``, its verification code).","properties":{"detail":{"description":"What went wrong, for people.","type":"string"},"code":{"description":"Machine-readable cause, when there is one: `license_read_only` (writes refused until a valid license is installed), `license_run_limit` (the monthly runs of the license are used up).","type":"string"}},"required":["detail"],"type":"object","title":"ErrorDetail"}}},"description":"Rate limited: retry after the number of seconds in the `Retry-After` header."}}}
+>
+  
+</StatusCodes>
+
+
+      

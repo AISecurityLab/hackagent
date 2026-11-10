@@ -1,0 +1,62 @@
+---
+title: "Indirect attacks"
+description: "Attacks that hide their instructions in data the target reads, such as documents and tool output."
+---
+
+import AttackList from './_list.generated.mdx';
+
+An indirect attack never asks the target for the goal as the user. It places
+attacker-controlled content where the model will read it as data: a tool
+result, a tool's description, a retrieved document. Then it checks whether the
+model treats that content as instructions. These attacks model an agent whose
+user is innocent, while someone else controls part of what the agent reads.
+See [Indirect prompt injection](../../risks/indirect-prompt-injection.md) for
+the risk itself.
+
+## What they have in common
+
+- **The user's request is benign.** The goal travels in the content, not in the
+  user's own words. For Tool-output IPI and ToolHijacker it never reaches the
+  user message, so a check on user input sees nothing unusual. RAG poisoning
+  sends the retrieved context and the question together in one user message,
+  so a `before` guardrail does see the payload there: a RAG guardrail result
+  measures whether the guardrail catches it.
+- **HackAgent builds the channel itself.** It writes the tool exchange, ranks the
+  tool library, or runs the retrieval, then calls the target directly. The
+  result describes how the model handles untrusted content. It does not test
+  your agent's own retriever, tool router or output filtering.
+- **The target type matters.** Tool-output IPI and ToolHijacker need a chat API
+  type (`OPENAI`, `OLLAMA`, `LITELLM`, `LANGCHAIN`) whose model supports tool
+  calling; the agent types ignore tool schemas. RAG poisoning puts the context
+  inside one user message, so any target that answers text works.
+- **They are cheap on the target, not always on helpers.** Each sends a handful
+  of target calls per goal. RAG poisoning's attacker writes many payloads per
+  goal; the other two need no helper model at all.
+- **Success is measured differently.** Tool-output IPI and RAG poisoning ask the
+  judge panel whether the reply carries out the goal. ToolHijacker ignores the
+  panel and counts whether the injected tool was called.
+
+## The attacks
+
+{/* The table below is generated from the code. Add no prose that restates it. */}
+
+<AttackList />
+
+## Choosing between them
+
+Ask where the attacker's content would reach your agent.
+
+- **In what a tool returns** (a fetched page, an email, a search result): start
+  with [Tool-output IPI](tool_output_ipi.mdx). With no helper model it costs one
+  target call per goal, so it is the cheapest first indirect test.
+- **In the list of tools the agent can pick from** (a plugin store, a shared
+  registry, an MCP server): use [ToolHijacker](toolhijacker.mdx). Its goals are
+  benign tasks, and it needs no judge.
+- **In documents the agent retrieves**: use [RAG poisoning](rag.mdx). It needs
+  an `attacker` and an `embedder`, and the documents to poison, as text.
+
+To see whether an agent carries out a forbidden outcome across several real tool
+calls, use [STAC](../multi-turn/stac.mdx), which executes the calls in a
+sandbox. To test what the user can talk the model into, see the
+[multi-turn](../multi-turn/index.mdx) and [adaptive](../adaptive/index.mdx)
+attacks.

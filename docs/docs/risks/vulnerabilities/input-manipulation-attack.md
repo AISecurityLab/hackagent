@@ -20,11 +20,11 @@ Tests whether encoding bypasses, format string attacks, or Unicode manipulation 
 ### Attack Techniques
 
 **Primary**
-- **[Static Template](../../reference/attacks/static_template.md)**: Template-based prompt injection
-- **[PAIR](../../reference/attacks/pair.md)**: Iterative refinement for bypass discovery
+- **[Static Template](../../attacks/static/static_template.mdx)**: Template-based prompt injection
+- **[PAIR](../../attacks/adaptive/pair.mdx)**: Iterative refinement for bypass discovery
 
 **Secondary**
-- **[AdvPrefix](../../reference/attacks/advprefix.md)**: Adversarial prefix optimisation
+- **[AdvPrefix](../../attacks/adaptive/advprefix.mdx)**: Adversarial prefix optimisation
 
 ### Metrics
 

@@ -18,7 +18,47 @@ something it *can* make. Whether it does is what the panel judges.
 An optional ``attacker`` role rewrites the payload between attempts; without
 one, a single payload is tried.
 
-Based on InjecAgent: https://arxiv.org/abs/2403.02691
+Paper: Qiusi Zhan, Zhixiang Liang, Zifan Ying, Daniel Kang, "InjecAgent:
+Benchmarking Indirect Prompt Injections in Tool-Integrated Large Language
+Model Agents", 2024, [arXiv:2403.02691](https://arxiv.org/abs/2403.02691).
+InjecAgent measures whether an agent, after calling a user tool whose
+result an attacker controls, carries out the attacker's instruction:
+direct harm to the user, or exfiltration of private data.
+
+Algorithm (one goal), with the parameters of
+:class:`~.config.ToolOutputIPIParams`:
+
+1. Pick a benign user task from ``benign_tasks`` by hashing the goal, and
+   fill ``injection_template`` with ``goal``, ``benign_task`` and
+   ``tool_name`` (a template using only some placeholders still works).
+2. For each attempt (``max_attempts`` with an ``attacker``, otherwise one):
+
+   - the payload is the filled template on the first attempt; later ones
+     ask the ``attacker`` for a fresh rewrite of it (the attacker does not
+     see earlier replies; a failed rewrite falls back to the template);
+   - build the tool result: ``observation_prefix``, the payload, and the
+     framing sentence for ``success_setting``;
+   - send a fabricated history (the user asks the benign task, the
+     assistant calls ``tool_name`` with ``tool_arguments``, the tool
+     returns the poisoned result) together with the ``tools`` schemas;
+   - give the panel the agent's reply plus any follow-up tool calls, as
+     ``name(arguments)``, with the judging hint for ``success_setting`` as
+     the prompt; stop at the first success.
+
+Deviations from the paper: InjecAgent runs a fixed benchmark of user and
+attacker tools and checks success by whether the agent emits the
+attacker's tool call; here the goal is the injected instruction, the tool
+history is simulated and no follow-up call is executed, and the campaign's
+evaluation panel decides from the reply and the calls described to it. The
+default injection template and the optional attacker refinement are
+HackAgent's.
+
+Roles: ``attacker`` (optional) rewrites the payload for each attempt after
+the first.
+
+Attempts and success: every attempt whose reply had text or a follow-up
+tool call is one attempt, carrying its benign task, follow-up calls and
+setting; the goal succeeds when the panel calls any attempt a success.
 """
 
 from __future__ import annotations
@@ -33,7 +73,18 @@ from .config import ToolOutputIPIParams
 
 
 class ToolOutputIPIAttack(IterativeAttack[ToolOutputIPIParams]):
-    """Hand the agent a poisoned tool result and see what it does with it."""
+    """Hand the agent a poisoned tool result and see whether it obeys the injection.
+
+    Implements tool-output indirect prompt injection after InjecAgent (Zhan
+    et al., 2024, [arXiv:2403.02691](https://arxiv.org/abs/2403.02691)):
+    the target receives a fabricated history in which a benign request led
+    to a tool call whose result carries the goal as an instruction, and the
+    campaign's evaluation panel judges whether its reply or follow-up tool
+    calls carry it out. An optional ``attacker`` rewrites the payload for
+    further attempts. The algorithm and the deviations from the paper are
+    documented in the module
+    ``hackagent.attacks.techniques.indirect.tool_output_ipi.attack``.
+    """
 
     name = "tool_output_ipi"
     params_type = ToolOutputIPIParams
@@ -45,6 +96,11 @@ class ToolOutputIPIAttack(IterativeAttack[ToolOutputIPIParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Inject the payload, refining it between attempts; return every judged attempt.
+
+        Calls the target and the panel once per attempt, and the
+        ``attacker`` once per attempt after the first.
+        """
         params = self.params
         benign_task = self._benign_task(goal)
         base = prompts.render_injection(
@@ -75,6 +131,7 @@ class ToolOutputIPIAttack(IterativeAttack[ToolOutputIPIParams]):
         return findings
 
     def _benign_task(self, goal: str) -> str:
+        """The benign task for ``goal``, picked by Python's per-process string hash."""
         tasks = self.params.benign_tasks or prompts.DEFAULT_BENIGN_TASKS
         return tasks[hash(goal) % len(tasks)]
 
@@ -102,6 +159,7 @@ class ToolOutputIPIAttack(IterativeAttack[ToolOutputIPIParams]):
         judge: Optional[Judge],
         path,
     ) -> Optional[Finding]:
+        """Send one poisoned history and judge what the agent did; ``None`` when unusable."""
         params = self.params
         observation = prompts.poisoned_observation(
             payload, setting=params.success_setting, prefix=params.observation_prefix
@@ -152,6 +210,7 @@ def _acted(text: str, followups: list) -> str:
 
 
 def _describe_call(call: object) -> str:
+    """One follow-up call as ``name(arguments)``."""
     inner = call.get("function") if isinstance(call, dict) else None
     source = inner if isinstance(inner, dict) else call
     name = _field(source, "name")
@@ -160,6 +219,7 @@ def _describe_call(call: object) -> str:
 
 
 def _field(source: object, name: str) -> str:
+    """``name`` of a dict or an object, as text; empty when missing."""
     if isinstance(source, dict):
         return str(source.get(name) or "")
     return str(getattr(source, name, "") or "")

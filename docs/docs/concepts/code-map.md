@@ -94,8 +94,8 @@ attacks/techniques/adaptive/tap/
 
 `config.py` is the interesting one for documentation: it is a Pydantic model
 whose fields *are* the attack's `parameters` in a campaign file. Each field's
-`description` is what the [attack's reference page](../reference/attacks/index.md)
-shows, so documenting a new knob means writing it next to the knob.
+`description` is what the Configuration section of the
+[attack's page](../attacks/index.mdx) shows, so documenting a new knob means writing it next to the knob.
 
 A role is any field typed as a model callable rather than a value:
 
@@ -113,7 +113,9 @@ cannot disagree.
 
 ## The docs are generated from this
 
-The [reference section](../reference/index.md) is produced by
+The [campaign-file pages](../cli/campaign-files/index.md), the
+[command list](../cli/commands.md) and the parameter tables on each
+[attack page](../attacks/index.mdx) are produced by
 `docs/scripts/generate_reference.py`, which reads the models above. A test fails
 if the committed pages drift from the code, so:
 

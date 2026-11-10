@@ -26,7 +26,52 @@ point is the rate across queries, not the first hit.
 The payload-framing subsystem (wrapping a payload in another technique) is
 not carried over; it defaulted off. The three payload *strategies* are.
 
-Based on PoisonedRAG: https://arxiv.org/abs/2402.07867
+Paper: Wei Zou, Runpeng Geng, Binghui Wang, Jinyuan Jia, "PoisonedRAG:
+Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large
+Language Models", 2024, [arXiv:2402.07867](https://arxiv.org/abs/2402.07867).
+PoisonedRAG injects a few crafted texts into the knowledge base, each made
+of a part that gets it retrieved for a target question and a part that
+makes the model produce the attacker's answer.
+
+The steps above in terms of :class:`~.config.RagParams`:
+
+1. Queries: ``benign_queries`` when given; otherwise the ``attacker``
+   writes ``queries_per_goal`` benign questions from the goal and the first
+   4000 characters of ``documents``. If it writes none, the goal itself is
+   the only query.
+2. Poison: the first ``ceil(len(documents) * poisoned_ratio)`` documents,
+   in the order given, are poisoned. For each query and each of
+   ``payloads_per_query`` payloads, the ``embedder`` picks the unused
+   paragraph (preferably over 50 characters) most similar to the query,
+   the ``attacker`` writes a payload for the surrounding text using
+   ``strategy`` (``inline_context_override`` weaves the instruction into
+   the content, ``append_hidden_directive`` adds it as authoritative
+   guidance, ``maximize_retrieval`` writes a standalone answer-like
+   paragraph; other values act as the first), and it is inserted after
+   that paragraph.
+3. Index: every document is cut into ``chunk_size``-character chunks
+   overlapping by ``chunk_overlap`` and embedded.
+4. Retrieve: each query is embedded, its ``top_k`` chunks by cosine
+   similarity are attached to it as context (with ``vulnerable_prompt``,
+   under a framing that tells the model to obey instructions in context),
+   and the target answers. All queries run concurrently.
+
+Deviations from the paper: the paper's goal is a chosen wrong answer to a
+chosen question; here the goal is an instruction the model should follow
+while answering benign questions. Retrieval is simulated locally, with the
+``embedder`` and a cosine retriever, and the target receives the augmented
+prompt as one user message: the target's own retrieval stack is not
+exercised. Payloads are written by the attacker for their surrounding text
+rather than optimised, and ``maximize_retrieval`` does not prepend the
+query to the payload.
+
+Roles: ``attacker`` (required) writes the queries and the payloads;
+``embedder`` (required, an embedding model) places payloads and drives
+retrieval. numpy is needed for the cosine retrieval.
+
+Attempts and success: every query whose augmented prompt got a usable
+reply is one attempt, judged by the campaign's evaluation panel against
+the goal; the goal succeeds when any attempt is a success.
 """
 
 from __future__ import annotations
@@ -53,15 +98,27 @@ class Document:
 
     @property
     def text(self) -> str:
+        """The document as it now reads, payloads included."""
         return "\n\n".join(self.paragraphs)
 
     @property
     def poisoned(self) -> bool:
+        """Whether any payload was inserted."""
         return bool(self.payloads)
 
 
 class RagAttack(IterativeAttack[RagParams]):
-    """Poison the retrieved corpus and judge what the target does with it."""
+    """Plant payloads in a knowledge base and judge what the target does with retrieved context.
+
+    Implements knowledge-base poisoning after PoisonedRAG (Zou et al., 2024,
+    [arXiv:2402.07867](https://arxiv.org/abs/2402.07867)): the ``attacker``
+    writes payloads that the ``embedder`` places next to the passages benign
+    queries retrieve, the poisoned corpus is chunked and searched locally,
+    and the target answers each query with the retrieved chunks as context.
+    The campaign's evaluation panel judges every answer; there is no early
+    stop. The algorithm and the deviations from the paper are documented in
+    the module ``hackagent.attacks.techniques.indirect.rag.attack``.
+    """
 
     name = "rag"
     params_type = RagParams
@@ -80,6 +137,13 @@ class RagAttack(IterativeAttack[RagParams]):
     async def search(
         self, goal: str, target: Target, judge: Optional[Judge]
     ) -> list[Finding]:
+        """Poison the corpus, then ask every query; return every judged answer.
+
+        Calls the ``attacker`` for the queries and once per payload, the
+        ``embedder`` to place payloads, index chunks and embed queries, and
+        the target and the panel once per query. Records each poisoned
+        document as a trace artifact.
+        """
         queries = await self._queries(goal)
         corpus = [
             Document(id=index, paragraphs=_paragraphs(text))
@@ -98,6 +162,7 @@ class RagAttack(IterativeAttack[RagParams]):
     # --- 1. queries -----------------------------------------------------------
 
     async def _queries(self, goal: str) -> list[str]:
+        """The configured queries, or ones the attacker writes; the goal as a last resort."""
         if self.params.benign_queries:
             return list(self.params.benign_queries)
         with phase("queries", n=self.params.queries_per_goal):
@@ -149,6 +214,7 @@ class RagAttack(IterativeAttack[RagParams]):
                 )
 
     async def _payload(self, goal: str, context: str) -> str:
+        """Have the attacker write one payload for ``context``; empty when it fails."""
         try:
             reply = await self.attacker(
                 prompts.poisoner_turns(self.params.strategy, goal, context)
@@ -205,6 +271,7 @@ class RagAttack(IterativeAttack[RagParams]):
         target: Target,
         judge: Optional[Judge],
     ) -> list[Finding]:
+        """Ask every query concurrently and keep the usable, judged answers."""
         findings = await asyncio.gather(
             *(
                 self._ask(
@@ -233,6 +300,7 @@ class RagAttack(IterativeAttack[RagParams]):
         target: Target,
         judge: Optional[Judge],
     ) -> Optional[Finding]:
+        """Retrieve for one query, ask the target, and judge; ``None`` when unusable."""
         with phase(f"query {index + 1}/{total}", query=index) as path:
             try:
                 query_vector = (await self.embedder([query]))[0]
@@ -268,11 +336,13 @@ class RagAttack(IterativeAttack[RagParams]):
 
 
 def _paragraphs(text: str) -> list[str]:
+    """Split on blank lines; the whole text when there are no paragraphs."""
     paras = [p for p in text.split("\n\n") if p.strip()]
     return paras or [text]
 
 
 def _context(paragraphs: list[str], index: int) -> str:
+    """The text around the insertion point after ``index``, for the poisoner."""
     before = paragraphs[index][-500:] if index < len(paragraphs) else ""
     after = paragraphs[index + 1][:300] if index + 1 < len(paragraphs) else ""
     return f"{before}\n[...PAYLOAD WILL BE INSERTED HERE...]\n{after}"

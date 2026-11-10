@@ -52,7 +52,7 @@ export const TERMS: Record<string, TermEntry> = {
         </CodeBlock>
       </>
     ),
-    href: '/reference/target',
+    href: '/cli/campaign-files/target',
     hrefLabel: 'Target reference',
   },
   goal: {
@@ -73,7 +73,7 @@ export const TERMS: Record<string, TermEntry> = {
         </CodeBlock>
       </>
     ),
-    href: '/reference/dataset',
+    href: '/cli/campaign-files/dataset',
     hrefLabel: 'Dataset reference',
   },
   attack: {
@@ -81,13 +81,14 @@ export const TERMS: Record<string, TermEntry> = {
     summary: 'A technique that turns a goal into adversarial prompts for the target.',
     body: (
       <p>
-        HackAgent ships 17. <strong>Static</strong> attacks apply a fixed transformation, such as a
-        cipher or a flip, and need no model of their own. <strong>Adaptive</strong> and{' '}
-        <strong>multi-turn</strong> attacks, such as TAP, PAIR and Crescendo, read each reply and
-        rewrite the prompt, using an attacker model.
+        HackAgent ships 19, of four types. <strong>Static</strong> attacks apply a fixed
+        transformation, such as a cipher or a flip. <strong>Adaptive</strong> attacks, such as PAIR
+        and TAP, read each reply and rewrite the prompt. <strong>Multi-turn</strong> attacks, such as
+        Crescendo, build up one conversation. <strong>Indirect</strong> attacks hide instructions in
+        tool results, tool descriptions or documents.
       </p>
     ),
-    href: '/reference/attacks/',
+    href: '/attacks',
     hrefLabel: 'Attack catalog',
   },
   attacker: {
@@ -96,9 +97,12 @@ export const TERMS: Record<string, TermEntry> = {
     body: (
       <>
         <p>
-          Each attack declares its roles: <code>attacker</code> for most adaptive attacks,{' '}
-          <code>on_topic</code> for TAP, <code>scorer</code> for PAIR, <code>embedder</code> for RAG
-          and AutoDAN-Turbo. A role is written like a target.
+          Each attack declares its roles: <code>attacker</code> for most adaptive attacks,
+          Crescendo, FC, tFC and RAG poisoning; <code>on_topic</code> for TAP; <code>scorer</code>{' '}
+          for PAIR; <code>refusal</code> for Crescendo; <code>synthesizer</code> and{' '}
+          <code>decorator</code> for h4rm3l; <code>summarizer</code> for AutoDAN-Turbo; and{' '}
+          <code>embedder</code> for AutoDAN-Turbo, RAG poisoning and ToolHijacker. A role is written
+          like a target.
         </p>
         <CodeBlock language="yaml">
           {`attacks:
@@ -154,7 +158,7 @@ export const TERMS: Record<string, TermEntry> = {
     shuffle: true`}
       </CodeBlock>
     ),
-    href: '/reference/dataset',
+    href: '/cli/campaign-files/dataset',
     hrefLabel: 'Dataset reference',
   },
   escalation: {
@@ -166,7 +170,7 @@ export const TERMS: Record<string, TermEntry> = {
   escalate: true`}
       </CodeBlock>
     ),
-    href: '/reference/execution',
+    href: '/cli/campaign-files/execution',
     hrefLabel: 'Execution reference',
   },
   risk: {
@@ -190,7 +194,7 @@ export const TERMS: Record<string, TermEntry> = {
         off unless you configure them.
       </p>
     ),
-    href: '/reference/guardrails',
+    href: '/cli/campaign-files/guardrails',
     hrefLabel: 'Guardrails reference',
   },
   results: {

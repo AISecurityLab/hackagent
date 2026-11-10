@@ -27,6 +27,7 @@ class TranslateDecorator(LLMPromptDecorator):
         self._language = language
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model translate ``prompt`` into ``language``."""
         return await self.prompt_model(
             f"Translate the following text to {self._language}:\n\n{prompt}"
         )
@@ -76,6 +77,7 @@ class PersuasiveDecorator(LLMPromptDecorator):
         self._prompt = persuasion_prompt or self._DEFAULT_PROMPT
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model rewrite ``prompt`` persuasively."""
         return await self.prompt_model(self._prompt + prompt)
 
 
@@ -91,6 +93,7 @@ class SynonymDecorator(LLMPromptDecorator):
         super().__init__(completion, seed=42)
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model replace words in ``prompt`` with synonyms."""
         return await self.prompt_model(self._PROMPT + prompt)
 
 
@@ -107,6 +110,7 @@ class ResearcherDecorator(LLMPromptDecorator):
         super().__init__(completion, seed=42)
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model reframe ``prompt`` as academic research."""
         return await self.prompt_model(self._PROMPT + prompt)
 
 
@@ -123,6 +127,7 @@ class VillainDecorator(LLMPromptDecorator):
         super().__init__(completion, seed=42)
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model reframe ``prompt`` from a villain's perspective."""
         return await self.prompt_model(self._PROMPT + prompt)
 
 
@@ -156,6 +161,7 @@ class PersonaDecorator(LLMPromptDecorator):
         self._prompt = persona_prompt or self._DEFAULT
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model wrap ``prompt`` in a persona scenario."""
         return await self.prompt_model(self._prompt + prompt)
 
 
@@ -215,6 +221,7 @@ class PAPDecorator(LLMPromptDecorator):
         self._example = info[1]
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model rewrite ``prompt`` with the persuasion technique."""
         return await self.prompt_model(
             self._PAP_PROMPT
             % (
@@ -241,6 +248,7 @@ class VisualObfuscationDecorator(LLMPromptDecorator):
         super().__init__(completion, seed=42)
 
     async def decorate(self, prompt: str) -> str:
+        """Have the decorator model rewrite ``prompt`` with look-alike characters."""
         return await self.prompt_model(self._PROMPT + prompt)
 
 
@@ -268,6 +276,10 @@ class TransformFxDecorator(LLMPromptDecorator):
         self._transform_fx = transform_fx
 
     async def decorate(self, prompt: str) -> str:
+        """Run the configured ``transform`` function on ``prompt``.
+
+        Returns an empty string, and logs a warning, when the function raises.
+        """
         ns: dict = {}
         exec(self._transform_fx, ns)
         try:

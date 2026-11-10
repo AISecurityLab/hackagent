@@ -174,6 +174,7 @@ class SubprocessCLIModel(Model):
         return litellm.completion(model=self.litellm_model, messages=messages)
 
     async def is_reachable(self) -> Reachability:
+        """Report reachable without running the agent; only the binary was checked."""
         # A turn is a full agent run, so only the binary (found at
         # construction) is checked; authentication surfaces on first use.
         return Reachability(True, f"{self.binary} found; not called")
@@ -181,6 +182,11 @@ class SubprocessCLIModel(Model):
     def complete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
     ) -> ModelResponse:
+        """Run one agent turn through the CLI and return its reply.
+
+        Overrides are ignored: the CLI takes the conversation only. Failures are
+        returned as an error response.
+        """
         litellm = _litellm()
         if litellm is None:
             return ModelResponse.failed(RuntimeError("litellm is not installed"))
@@ -196,6 +202,7 @@ class SubprocessCLIModel(Model):
     async def acomplete(
         self, messages: Sequence[Mapping[str, Any]], **overrides: Any
     ) -> ModelResponse:
+        """Run :meth:`complete` in a worker thread."""
         return await asyncio.to_thread(self.complete, messages, **overrides)
 
 

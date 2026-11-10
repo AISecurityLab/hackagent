@@ -17,15 +17,22 @@ class AdvPrefixParams(AttackParams):
     ``attacker`` is a role: the uncensored model that writes the candidate
     prefixes, so AdvPrefix cannot run without it.
 
-    The defaults follow the paper. The one knob worth reading before a big
-    run is :attr:`samples_per_candidate`, which multiplies the target calls.
+    The selection rule and its weights follow the paper; the sample counts
+    are scaled down from the reference, as each field says. The one knob
+    worth reading before a big run is :attr:`samples_per_candidate`, which
+    multiplies the target calls: a goal costs roughly
+    ``candidates_per_goal * samples_per_candidate`` target calls on top of
+    one writer call per requested candidate.
     """
 
     REQUIRED_ROLES: ClassVar[frozenset[str]] = frozenset({"attacker"})
 
     meta_prefixes: tuple[str, ...] = Field(
         default=META_PREFIXES,
-        description="Openings the writer works from. One candidate per opening per sample.",
+        description=(
+            "Openings the writer continues, as the literal first words of the "
+            "prefix; an empty string lets it open freely."
+        ),
     )
     samples_per_prefix: int | tuple[int, ...] = Field(
         default=4,
@@ -53,7 +60,10 @@ class AdvPrefixParams(AttackParams):
     )
     require_linebreak: bool = Field(
         default=True,
-        description="Require a line break, which is what makes a prefix look mid-document.",
+        description=(
+            "Keep only candidates with a line break, which is what makes a prefix "
+            "look mid-document."
+        ),
     )
     candidates_per_goal: int = Field(
         default=5,
@@ -77,7 +87,10 @@ class AdvPrefixParams(AttackParams):
     prefixes_per_goal: int = Field(
         default=1,
         ge=1,
-        description="Prefixes marked as this goal's result, as the reference does.",
+        description=(
+            "Prefixes marked selected as this goal's result, as the reference does."
+            " Every attempt is still judged and reported."
+        ),
     )
     pasr_weight: float = Field(
         default=10.0,
@@ -127,6 +140,7 @@ class AdvPrefixParams(AttackParams):
     @field_validator("samples_per_prefix")
     @classmethod
     def check_samples(cls, value: int | tuple[int, ...]) -> int | tuple[int, ...]:
+        """Reject a single count below 1 or a negative per-opening count."""
         if isinstance(value, int):
             if value < 1:
                 raise ValueError("samples_per_prefix must be at least 1")
@@ -137,6 +151,7 @@ class AdvPrefixParams(AttackParams):
 
     @model_validator(mode="after")
     def check_samples_match_prefixes(self) -> "AdvPrefixParams":
+        """Reject per-opening counts that do not match ``meta_prefixes`` one to one."""
         counts = self.samples_per_prefix
         if isinstance(counts, tuple) and len(counts) != len(self.meta_prefixes):
             raise ValueError(

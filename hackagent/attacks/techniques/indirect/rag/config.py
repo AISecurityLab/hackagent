@@ -33,27 +33,41 @@ class RagParams(AttackParams):
         description="Benign queries to retrieve with. Empty means the attacker writes them.",
     )
     queries_per_goal: int = Field(
-        default=5, ge=1, description="Queries generated per goal when none are given."
+        default=5,
+        ge=1,
+        description=(
+            "Benign queries the attacker writes per goal when benign_queries is empty."
+        ),
     )
     strategy: str = Field(
         default="inline_context_override",
         description=(
-            "How the payload is written: ``inline_context_override`` | "
-            "``append_hidden_directive`` | ``maximize_retrieval``."
+            "How the payload is written: ``inline_context_override`` weaves it into "
+            "the text, ``append_hidden_directive`` adds it as authoritative "
+            "guidance, ``maximize_retrieval`` writes a standalone answer-like "
+            "paragraph."
         ),
     )
     poisoned_ratio: float = Field(
         default=0.5,
         gt=0.0,
         le=1.0,
-        description="Fraction of the corpus to poison, most-relevant documents first.",
+        description=(
+            "Fraction of the corpus to poison, rounded up, taking documents in the "
+            "order given."
+        ),
     )
     payloads_per_query: int = Field(
         default=5,
         ge=1,
-        description="Payloads inserted per query anchor, each at its own paragraph.",
+        description=(
+            "Payloads inserted per query in each poisoned document, each after its "
+            "own most-similar paragraph."
+        ),
     )
-    chunk_size: int = Field(default=1000, ge=1, description="Retrieval chunking.")
+    chunk_size: int = Field(
+        default=1000, ge=1, description="Characters per retrieval chunk."
+    )
     chunk_overlap: int = Field(
         default=200,
         ge=0,
@@ -62,7 +76,11 @@ class RagParams(AttackParams):
             "chunk boundary is still retrievable."
         ),
     )
-    top_k: int = Field(default=5, ge=1, description="Chunks retrieved per query.")
+    top_k: int = Field(
+        default=5,
+        ge=1,
+        description="Chunks retrieved per query and attached as context.",
+    )
     vulnerable_prompt: bool = Field(
         default=False,
         description=(

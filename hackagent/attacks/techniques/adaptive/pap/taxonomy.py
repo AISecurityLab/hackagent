@@ -414,7 +414,9 @@ TOP_5_TECHNIQUES: List[str] = [
 def resolve_techniques(selection: Union[str, Sequence[str]]) -> List[str]:
     """Resolve ``"top5"``, ``"all"``, or explicit names to technique names.
 
-    Raises ``ValueError`` for a name the taxonomy does not define.
+    Raises:
+        ValueError: ``selection`` is another string, an empty list, or names
+            a technique the taxonomy does not define.
     """
     if selection == "top5":
         return list(TOP_5_TECHNIQUES)
