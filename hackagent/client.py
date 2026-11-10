@@ -455,8 +455,11 @@ class HackAgent:
 
     The store is opened from ``settings``: SQLite in local mode, the platform
     API in remote mode. Runs themselves are started with
-    :func:`~hackagent.orchestrator.campaign.run_campaign`; pass it this
-    session's ``settings`` and ``backend`` to record into the same store. Call
+    :func:`~hackagent.orchestrator.campaign.run_campaign`. In local mode, pass
+    it this session's ``settings`` and ``backend`` to record into the same
+    database. In remote mode, set the campaign's ``execution.storage.backend``
+    to ``remote`` and pass only ``settings``: a ``store`` argument would skip
+    the remote run's heartbeat and server-side cancellation. Call
     :meth:`close` when done (a remote store flushes its queued writes then).
 
     Args:
