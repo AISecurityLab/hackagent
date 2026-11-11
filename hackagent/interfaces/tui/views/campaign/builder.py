@@ -1005,14 +1005,18 @@ class CampaignBuilder(Container):
             self._log(f"[cyan]▶[/] {attack} · {self._expected} goals")
         elif event_type == "goal_finished":
             self._done += 1
+            # Goals run concurrently and finish in any order, so name the
+            # goal by its index rather than by how many have finished.
+            index = payload.get("goal_index")
+            goal = index + 1 if isinstance(index, int) else self._done
             if payload.get("success"):
-                self._log(f"  [red]✗ goal {self._done}: jailbroken[/]")
+                self._log(f"  [red]✗ goal {goal}: jailbroken[/]")
             for message in payload.get("errors") or ():
                 key = (attack, str(message))
                 self._run_errors[key] += 1
                 # One error repeated for every goal would bury the log.
                 if self._run_errors[key] <= 2:
-                    self._log(f"  [yellow]! goal {self._done}: {escape(key[1])}[/]")
+                    self._log(f"  [yellow]! goal {goal}: {escape(key[1])}[/]")
                 elif self._run_errors[key] == 3:
                     self._log("  [dim]… further repeats are counted in the summary[/]")
         elif event_type == "attack_finished":
