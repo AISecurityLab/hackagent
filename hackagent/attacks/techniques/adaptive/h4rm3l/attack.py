@@ -338,11 +338,14 @@ class H4rm3lAttack(IterativeAttack[H4rm3lParams]):
         for index, program in enumerate(programs):
             label = f"program {index + 1}/{len(programs)}"
             with phase(label, program=program, index=index) as path:
-                decorate = self._compile(program)
-                if decorate is None:
+                if self._compile(program) is None:
                     continue
 
-                prompt = await self._apply(decorate, goal)
+                # Built afresh for each goal, so a random decorator's state
+                # depends on the goal alone and not on which goals ran before
+                # it: goals attacked concurrently get the same prompts in any
+                # order, run after run.
+                prompt = await self._apply(self._build(program), goal)
                 if prompt is None:
                     continue
 
