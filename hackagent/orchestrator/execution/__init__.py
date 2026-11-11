@@ -7,6 +7,7 @@
   ``hackagent run``, ``hackagent campaign run`` and any other executor of
   a queued run, and the tracked run behind every campaign with remote
   storage
+- :mod:`.activity`: the run's activity log, sent to the platform as it runs
 - :mod:`.adopted`: the store that runs a campaign inside an existing run
 - :mod:`.credits`: stop a run on the gateway's first "out of credits" answer
 - :mod:`.heartbeat`: the background heartbeat with cancel and rejection signals
