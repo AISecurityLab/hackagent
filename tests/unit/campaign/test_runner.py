@@ -345,20 +345,29 @@ def test_the_run_emits_lifecycle_events_per_attack_and_goal(tmp_path):
     )
 
     kinds = [event for event, _ in events]
-    assert kinds[0] == "attack_started"
+    assert kinds[:3] == ["campaign_started", "goals_loaded", "models_resolved"]
+    assert kinds[3] == "attack_started"
     assert kinds[-1] == "attack_finished"
     assert kinds.count("goal_finished") == 2
 
-    started = events[0][1]
+    assert events[0][1] == {"campaign": "test-campaign"}
+    assert events[1][1] == {"goals": 2}
+    assert events[2][1]["attacks"] == 1
+
+    started = events[3][1]
     assert started["attack"] == "baseline"
     assert started["expected_goals"] == 2
 
     finished = [payload for event, payload in events if event == "goal_finished"]
     assert {payload["goal_index"] for payload in finished} == {0, 1}
     assert all(payload["success"] is True for payload in finished)
+    assert all(payload["successful"] == 1 for payload in finished)
+    assert all(payload["goals"] == 2 for payload in finished)
     assert all("elapsed_s" in payload and "attempts" in payload for payload in finished)
 
     assert events[-1][1]["error"] is None
+    assert events[-1][1]["attempts"] == 2
+    assert events[-1][1]["successful"] == 2
 
 
 # --- the iterative path ------------------------------------------------------
@@ -1064,12 +1073,14 @@ def test_a_run_scoped_prepare_runs_once_and_is_traced(tmp_path):
             "summarizer": ScriptedModel(strategy),
         }
     )
+    events = []
     result = run_campaign(
         values,
         build=builder,
         load=goals("goal one", "goal two"),
         store=RecordingStore(),
         build_embed=lambda _config: embed,
+        on_event=lambda event, **payload: events.append((event, payload)),
     )
 
     [outcome] = result.attacks
@@ -1078,6 +1089,31 @@ def test_a_run_scoped_prepare_runs_once_and_is_traced(tmp_path):
     assert all(node.scope == "run" for node in outcome.run_trace)
     # Two warm-up goals plus lifelong epochs reached the target.
     assert len(builder.models["target"].requests) >= 2
+    # The warm-up is reported, between the attack's start and its first goal.
+    kinds = [event for event, _ in events]
+    started = kinds.index("preparation_started")
+    assert kinds[started - 1] == "attack_started"
+    assert kinds[started + 1] == "preparation_finished"
+    assert "goal_finished" not in kinds[:started]
+    assert events[started][1]["goals"] == 2
+    assert events[started][1]["run_id"] == outcome.run_id
+    assert events[started + 1][1]["elapsed_s"] >= 0
+
+
+def test_an_attack_without_setup_reports_no_preparation(tmp_path):
+    events = []
+    run_campaign(
+        campaign(
+            attacks=[{"name": "pair", "roles": {"attacker": attacker_role()}}],
+            execution={"output": {"directory": str(tmp_path)}},
+        ),
+        build=FakeBuilder(models_for(attacker=ScriptedModel("[[PROMPT]]: p"))),
+        load=goals("goal one"),
+        store=_store(),
+        on_event=lambda event, **payload: events.append((event, payload)),
+    )
+
+    assert not [event for event, _ in events if event.startswith("preparation")]
 
 
 # --- a resolution the caller already made -----------------------------------

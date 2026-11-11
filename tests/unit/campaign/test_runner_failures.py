@@ -129,10 +129,11 @@ def test_a_failed_write_stops_the_other_goals_of_its_attack(tmp_path):
 
 
 def _stopped_by(exc: Exception, tmp_path):
-    """Run two attacks with a listener that raises ``exc`` straight away."""
+    """Run two attacks with a listener that raises ``exc`` as the first starts."""
 
     def on_event(event: str, **_payload: Any) -> None:
-        raise exc
+        if event == "attack_started":
+            raise exc
 
     store = _store()
     with pytest.raises(type(exc)):
@@ -153,6 +154,25 @@ def test_a_listener_that_raises_stops_the_campaign(tmp_path):
     # The second attack never starts, and the first is not left running.
     assert _statuses(store) == {RunStatus.FAILED.value}
     assert campaign_run.status == RunStatus.FAILED.value
+
+
+def test_a_listener_that_raises_before_any_attack_stops_the_campaign(tmp_path):
+    def on_event(event: str, **_payload: Any) -> None:
+        if event == "goals_loaded":
+            raise RuntimeError("listener broke")
+
+    store = _store()
+    with pytest.raises(RuntimeError, match="listener broke"):
+        run_campaign(
+            _baseline(tmp_path, "baseline"),
+            build=FakeBuilder({"judge": ScriptedModel("yes")}),
+            load=goals("goal one"),
+            store=store,
+            on_event=on_event,
+        )
+
+    assert not store.runs
+    assert not store.campaign_runs
 
 
 def test_a_listener_that_cancels_records_the_runs_as_cancelled(tmp_path):
