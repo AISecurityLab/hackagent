@@ -18,12 +18,16 @@ from .fakes import FakeBuilder, ScriptedModel, campaign, failure, goals, model
 TARGET_REPLY = "a reply the judge will read"
 
 
-def run(values, *, models=None):
+def run(values, *, models=None, on_event=None):
     from tests.fakes import RecordingStore
 
     builder = FakeBuilder(models or {})
     return run_campaign(
-        values, build=builder, load=goals("goal one"), store=RecordingStore()
+        values,
+        build=builder,
+        load=goals("goal one"),
+        store=RecordingStore(),
+        on_event=on_event,
     )
 
 
@@ -90,6 +94,36 @@ def test_the_target_is_not_attacked_when_preflight_fails():
         run(with_preflight(), models={**models_for(), "target": target})
     # Only the preflight check reached the target; no attack request followed.
     assert len(target.requests) == 1
+
+
+def test_preflight_reports_its_start_and_result():
+    events = []
+    run(
+        with_preflight(),
+        models=models_for(),
+        on_event=lambda event, **payload: events.append((event, payload)),
+    )
+
+    preflight = [item for item in events if item[0].startswith("preflight")]
+    assert preflight == [
+        ("preflight_started", {"models": 2}),
+        ("preflight_finished", {"models": 2}),
+    ]
+
+
+def test_a_failed_preflight_reports_each_unreachable_model():
+    events = []
+    with pytest.raises(PreflightError):
+        run(
+            with_preflight(),
+            models=models_for(target=lambda _m: failure("connection refused")),
+            on_event=lambda event, **payload: events.append((event, payload)),
+        )
+
+    [(_, failed)] = [item for item in events if item[0] == "preflight_failed"]
+    assert failed["models"] == 2
+    [reason] = failed["failures"]
+    assert reason.startswith("target (target): ")
 
 
 def test_an_unreachable_judge_stops_the_run():

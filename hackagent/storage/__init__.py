@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from hackagent.storage.remote import ClaimResult as ClaimResult
     from hackagent.storage.remote import ExecutorRejected as ExecutorRejected
     from hackagent.storage.remote import InvalidApiKey as InvalidApiKey
+    from hackagent.storage.remote import RunAlreadyFinished as RunAlreadyFinished
+    from hackagent.storage.remote import RunEventsUnsupported as RunEventsUnsupported
     from hackagent.storage.remote import RunNotClaimable as RunNotClaimable
 
 #: Executor protocol types, loaded with the remote backend on first use so
@@ -31,6 +33,8 @@ _REMOTE_EXPORTS = frozenset(
         "ClaimResult",
         "ExecutorRejected",
         "InvalidApiKey",
+        "RunAlreadyFinished",
+        "RunEventsUnsupported",
         "RunNotClaimable",
     }
 )

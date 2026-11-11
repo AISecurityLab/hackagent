@@ -19,6 +19,7 @@ from hackagent.models import ModelResponse, Reachability
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV
 from hackagent.orchestrator.execution import AdoptedRunStore, execute
 from hackagent.storage import remote
+from hackagent.storage import ExecutorRejected
 from hackagent.storage.remote import ClaimResult
 from tests.fakes import RecordingStore
 from tests.unit.campaign.fakes import FakeBuilder, ScriptedModel, campaign, goals, model
@@ -41,6 +42,9 @@ class RecordingAdoptedStore(AdoptedRunStore):
         self.memory = RecordingStore()
         self.finished: list[tuple] = []
         self.finish_error: Exception | None = None
+        self.events: list[dict] = []
+        self.events_error: Exception | None = None
+        self.calls: list[str] = []
         for name in (
             "create_attack",
             "create_run",
@@ -55,7 +59,26 @@ class RecordingAdoptedStore(AdoptedRunStore):
     def heartbeat_run(self, run_id):
         return False
 
+    def send_run_events(self, run_id, events):
+        """The platform's POST /run/{id}/events: one event per seq, nothing
+        accepted once the run is finished (its token is revoked then)."""
+        self.calls.append("events")
+        if self.events_error is not None:
+            raise self.events_error
+        if self.finished:
+            raise ExecutorRejected("401")
+        kept = {event["seq"] for event in self.events}
+        fresh = [event for event in events if event["seq"] not in kept]
+        self.events.extend(fresh)
+        return {
+            "accepted": len(fresh),
+            "duplicates": len(events) - len(fresh),
+            "dropped": 0,
+            "last_seq": max((event["seq"] for event in self.events), default=0),
+        }
+
     def finish_run(self, run_id, status, note=""):
+        self.calls.append("finish")
         self.finished.append((run_id, status, note))
         if self.finish_error is not None:
             raise self.finish_error
@@ -927,3 +950,145 @@ def test_a_run_the_check_accepts_executes(tmp_path):
     outcome, _, _ = execute_with(stored_campaign(tmp_path), check=lambda spec: None)
 
     assert outcome.status == "COMPLETED"
+
+
+# --- run activity ------------------------------------------------------------
+
+
+def test_the_platform_receives_the_run_s_activity_before_the_finish(tmp_path):
+    outcome, store, run = execute_with(
+        stored_campaign(tmp_path), texts=("goal one", "goal two")
+    )
+
+    assert outcome.status == "COMPLETED"
+    # Everything was sent, then the run was finished, then nothing more.
+    assert store.calls[-1] == "finish"
+    assert "events" in store.calls
+    seqs = [event["seq"] for event in store.events]
+    assert seqs == list(range(1, len(seqs) + 1))
+
+    by_kind = [(event["kind"], event["message"]) for event in store.events]
+    assert by_kind[:3] == [
+        ("campaign", "campaign test-campaign · started · loading goals and models"),
+        ("dataset", "dataset · 2 goals loaded"),
+        ("campaign", "campaign · 2 models ready · 1 attack · 1 judge"),
+    ]
+    assert ("attack", "baseline · started · 2 goals") in by_kind
+    goals = [event for event in store.events if event["kind"] == "goal"]
+    assert sorted(event["goal_index"] for event in goals) == [0, 1]
+    assert {event["message"].split(" · ", 2)[2] for event in goals} == {
+        "1 attempt · 1 successful"
+    }
+    attack_run = goals[0]["attack_run"]
+    assert attack_run is not None
+    assert all(event["attack"] == "baseline" for event in goals)
+    assert any(
+        message.startswith("baseline · finished · 2 attempts · 2 successful")
+        for _, message in by_kind
+    )
+    assert by_kind[-1] == ("campaign", "campaign · completed")
+
+    sent = str(store.events)
+    assert "goal one" not in sent and "goal two" not in sent
+    assert "a reply" not in sent
+    assert GATEWAY_KEY not in sent
+
+
+def test_a_failed_run_says_why_in_its_last_line(tmp_path):
+    def broken(config, *, retries=0):
+        raise RuntimeError(f"cannot build {config.name}")
+
+    outcome, store, _ = execute_with(stored_campaign(tmp_path), builder=broken)
+
+    assert outcome.status == "FAILED"
+    last = store.events[-1]
+    assert last["level"] == "error"
+    assert last["message"].startswith("campaign · failed · RuntimeError: cannot build")
+    assert store.calls[-1] == "finish"
+
+
+def test_a_failing_activity_sender_never_fails_the_run(tmp_path, monkeypatch):
+    def failing(self, run_id, events):
+        self.calls.append("events")
+        raise ConnectionError("platform unreachable")
+
+    monkeypatch.setattr(RecordingAdoptedStore, "send_run_events", failing)
+
+    outcome, store, _ = execute_with(stored_campaign(tmp_path))
+
+    assert outcome.status == "COMPLETED"
+    assert store.finished == [(store.run_id, "COMPLETED", "")]
+    assert "events" in store.calls
+
+
+def test_a_batch_sent_again_after_a_network_error_is_stored_once(tmp_path, monkeypatch):
+    original = RecordingAdoptedStore.send_run_events
+    lost = []
+
+    def flaky(self, run_id, events):
+        # The first batch reaches the platform, but its answer is lost.
+        result = original(self, run_id, events)
+        if not lost:
+            lost.append(result)
+            raise ConnectionError("connection reset")
+        return result
+
+    monkeypatch.setattr(RecordingAdoptedStore, "send_run_events", flaky)
+
+    outcome, store, _ = execute_with(stored_campaign(tmp_path))
+
+    assert outcome.status == "COMPLETED"
+    assert lost
+    seqs = [event["seq"] for event in store.events]
+    assert seqs == list(range(1, len(seqs) + 1))
+    assert store.events[-1]["message"] == "campaign · completed"
+
+
+def test_a_server_without_activity_runs_as_before(tmp_path, monkeypatch):
+    from hackagent.storage.remote import RunEventsUnsupported
+
+    def unsupported(self, run_id, events):
+        self.calls.append("events")
+        raise RunEventsUnsupported("404")
+
+    monkeypatch.setattr(RecordingAdoptedStore, "send_run_events", unsupported)
+
+    outcome, store, _ = execute_with(
+        stored_campaign(tmp_path), texts=("one", "two", "three")
+    )
+
+    assert outcome.status == "COMPLETED"
+    assert store.calls.count("events") == 1
+
+
+def test_activity_never_shows_the_run_s_secrets(tmp_path):
+    import logging
+
+    # Some test modules silence logging when collected; this test logs.
+    disabled = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    try:
+        _run_with_a_leaky_library(tmp_path, logging)
+    finally:
+        logging.disable(disabled)
+
+
+def _run_with_a_leaky_library(tmp_path, logging):
+    seen = []
+    library = logging.getLogger("hackagent.tests.leak")
+
+    def leaky(event, **payload):
+        if event == "goals_loaded":
+            # A library logging the keys it was given, inside the run.
+            library.warning("using %s and %s", GATEWAY_KEY, os.environ["OPENAI_KEY"])
+            seen.append(event)
+
+    outcome, store, _ = execute_with(
+        stored_campaign(tmp_path),
+        env={"OPENAI_KEY": "secret-for-test-value"},
+        on_event=leaky,
+    )
+
+    assert seen == ["goals_loaded"]
+    [leak] = [e for e in store.events if e["message"].startswith("using")]
+    assert leak["message"] == "using [REDACTED] and [REDACTED]"

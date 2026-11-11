@@ -6,8 +6,9 @@
 :func:`execute_run` runs a queued run for any executor, ``hackagent run``
 among them, so a run behaves the same wherever it executes. It claims the
 run, binds the gateway models of the run's campaign to this executor, runs
-the campaign while heartbeating, and finishes the run with a status and a
-note. :func:`execute_spec` does the same for a campaign whose results go to
+the campaign while heartbeating and sending its activity (see
+:mod:`.activity`), and finishes the run with a status and a note.
+:func:`execute_spec` does the same for a campaign whose results go to
 the server its ``execution.storage`` names, starting its run first, and
 :func:`arun_remote_campaign` is its asynchronous form, which
 :func:`~hackagent.orchestrator.campaign.runner.arun_campaign` uses for every
@@ -22,12 +23,13 @@ import signal
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import partial
 from types import FrameType
 from typing import Any, Literal, Optional
 from uuid import UUID
 
 from hackagent.core.async_utils import run_coroutine_blocking
-from hackagent.core.credentials import env_reference, resolve_api_key
+from hackagent.core.credentials import env_reference, reference_name, resolve_api_key
 from hackagent.core.logging import get_logger
 from hackagent.core.settings import (
     Settings,
@@ -41,6 +43,7 @@ from hackagent.models import build_embedder, build_model
 from hackagent.orchestrator.campaign.audit import CalibrationLoader
 from hackagent.orchestrator.campaign.loader import load_stored_campaign
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV, bind_gateway
+from hackagent.orchestrator.campaign.preflight import campaign_models
 from hackagent.orchestrator.campaign.resolve import (
     EmbedderBuilder,
     GoalLoader,
@@ -55,6 +58,7 @@ from hackagent.orchestrator.campaign.runner import (
 )
 from hackagent.orchestrator.campaign.spec import CampaignSpec, StorageSpec
 from hackagent.orchestrator.campaign.tracking import register_target
+from hackagent.orchestrator.execution.activity import ActivityRelay
 from hackagent.orchestrator.execution.adopted import AdoptedRunStore
 from hackagent.orchestrator.execution.credits import CreditGuard
 from hackagent.orchestrator.execution.heartbeat import RunHeartbeat
@@ -381,6 +385,10 @@ class _Execution:
         self.environment = {**(env or {}), GATEWAY_KEY_ENV: gateway_key}
         self.heartbeat = RunHeartbeat(adopted, adopted.run_id)
         self.credits = CreditGuard(base_url)
+        self.activity = ActivityRelay(
+            partial(adopted.send_run_events, adopted.run_id),
+            secrets=_secrets(self.spec, self.environment, adopted),
+        )
         self.on_event = on_event
         self.build = build
         self.load = load
@@ -402,54 +410,89 @@ class _Execution:
         )
 
     async def campaign(self) -> CampaignResult:
-        """Run the campaign while heartbeating, stopping it when told to."""
+        """Run the campaign while heartbeating and sending its activity,
+        stopping it when told to."""
         loop = asyncio.get_running_loop()
-        task = loop.create_task(
-            arun_campaign(
-                self.spec,
-                store=self.adopted,
-                on_event=self.on_event,
-                build=self.credits.wrap(self.build),
-                load=self.load,
-                calibration=self.calibration,
-                build_embed=self.build_embed,
-                resolved=self.resolved,
-                settings=self.settings,
+        with self.activity.capture():
+            # The task copies this context, so its logs are the run's activity.
+            task = loop.create_task(
+                arun_campaign(
+                    self.spec,
+                    store=self.adopted,
+                    on_event=self._on_event,
+                    build=self.credits.wrap(self.build),
+                    load=self.load,
+                    calibration=self.calibration,
+                    build_embed=self.build_embed,
+                    resolved=self.resolved,
+                    settings=self.settings,
+                )
             )
-        )
 
-        def stop() -> None:
-            loop.call_soon_threadsafe(task.cancel)
+            def stop() -> None:
+                loop.call_soon_threadsafe(task.cancel)
 
-        # A cancel request, a rejection or spent credits stop the campaign; the
-        # runner records its runs as cancelled on the way out.
-        self.heartbeat.on_change = stop
-        self.credits.on_trip = stop
-        with self.heartbeat:
-            return await task
+            # A cancel request, a rejection or spent credits stop the campaign;
+            # the runner records its runs as cancelled on the way out.
+            self.heartbeat.on_change = stop
+            self.credits.on_trip = stop
+            with self.heartbeat:
+                return await task
+
+    def _on_event(self, event: str, **payload: Any) -> None:
+        """Relay ``event``, then hand it to the caller's listener."""
+        self.activity.on_event(event, **payload)
+        if self.on_event is not None:
+            self.on_event(event, **payload)
 
     def settle(
         self, result: Optional[CampaignResult], error: Optional[BaseException]
     ) -> ExecutionOutcome:
-        """Finish the run for how the campaign ended, and say how."""
-        if self.heartbeat.rejected.is_set():
-            # The server stopped accepting this executor, so it would refuse
-            # the finish too; it closes the run itself.
-            logger.warning(
-                "run %s | the server no longer accepts this executor",
-                self.adopted.run_id,
+        """Finish the run for how the campaign ended, and say how.
+
+        The run's last activity is sent first: the server refuses events
+        for a finished run.
+        """
+        try:
+            if self.heartbeat.rejected.is_set():
+                # The server stopped accepting this executor, so it would
+                # refuse the finish too; it closes the run itself.
+                logger.warning(
+                    "run %s | the server no longer accepts this executor",
+                    self.adopted.run_id,
+                )
+                return ExecutionOutcome("FAILED", REJECTED_NOTE)
+            outcome = _outcome(
+                self.adopted.final_status,
+                result,
+                error,
+                cancel_requested=self.heartbeat.cancel_requested.is_set(),
+                out_of_credits=self.credits.tripped.is_set(),
+                interrupted_as=self.interrupted_as,
             )
-            return ExecutionOutcome("FAILED", REJECTED_NOTE)
-        outcome = _outcome(
-            self.adopted.final_status,
-            result,
-            error,
-            cancel_requested=self.heartbeat.cancel_requested.is_set(),
-            out_of_credits=self.credits.tripped.is_set(),
-            interrupted_as=self.interrupted_as,
-        )
+            self.activity.finished(outcome.status, outcome.note)
+        finally:
+            # Bounded, and a signal meanwhile waits for the finish below.
+            with _HeldSignals():
+                self.activity.close()
         _finish(self.adopted, self.adopted.run_id, outcome)
         return outcome
+
+
+def _secrets(
+    spec: CampaignSpec, environment: Mapping[str, str], store: RemoteBackend
+) -> list[Any]:
+    """The secret values a run's activity must never show.
+
+    The keys this executor runs with, the secret values handed to the run,
+    and the values of the variables its models read their API keys from.
+    """
+    values: list[Any] = [store.get_api_key(), *environment.values()]
+    for _, config in campaign_models(spec):
+        name = reference_name(config.connection.api_key)
+        if name is not None:
+            values.append(environment.get(name) or os.environ.get(name))
+    return values
 
 
 def _execute(execution: _Execution) -> ExecutionOutcome:
