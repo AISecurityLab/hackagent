@@ -158,6 +158,24 @@ def test_category_filter_precedes_range():
     assert [goal.index for goal in selected] == [0, 1]
 
 
+def test_a_range_past_the_matching_goals_says_so():
+    from hackagent.core.contracts import Goal
+    from hackagent.datasets.config import DatasetSelection, select_goals
+
+    goals = [Goal(text=str(i), index=i, labels={"category": "E"}) for i in range(2)]
+    with pytest.raises(ValueError, match=r"range 2 to the end is past the 2 goal"):
+        select_goals(goals, DatasetSelection(start=2, filters={"categories": ["E"]}))
+
+
+def test_no_matching_goal_names_the_categories_not_the_range():
+    from hackagent.core.contracts import Goal
+    from hackagent.datasets.config import DatasetSelection, select_goals
+
+    goals = [Goal(text=str(i), index=i, labels={"category": "A"}) for i in range(2)]
+    with pytest.raises(ValueError, match=r"No goal is labelled with any of \['E'\]"):
+        select_goals(goals, DatasetSelection(start=5, filters={"categories": ["E"]}))
+
+
 def test_bundled_intents_load_without_dataset_provider(monkeypatch):
     from hackagent.datasets.intents import intent_catalog, intents_of
 

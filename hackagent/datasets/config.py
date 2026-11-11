@@ -432,14 +432,20 @@ def select_goals(goals: Sequence[Goal], selection: DatasetSelection) -> list[Goa
     Goals are renumbered from 0, so attempts and results index the selection.
     """
     wanted = set(selection.filters.categories)
-    kept = [goal for goal in goals if wanted & _codes(goal)]
-    kept = kept[selection.start : selection.end]
-    if selection.shuffle:
-        random.Random(selection.seed).shuffle(kept)
-    kept = kept[: selection.limit]
-    if not kept:
+    matching = [goal for goal in goals if wanted & _codes(goal)]
+    if not matching:
         raise ValueError(
             f"No goal is labelled with any of {sorted(wanted)}; "
             f"{len(goals)} were classified."
         )
+    kept = matching[selection.start : selection.end]
+    if not kept:
+        end = "the end" if selection.end is None else str(selection.end)
+        raise ValueError(
+            f"The selection range {selection.start} to {end} is past the "
+            f"{len(matching)} goal(s) labelled with any of {sorted(wanted)}."
+        )
+    if selection.shuffle:
+        random.Random(selection.seed).shuffle(kept)
+    kept = kept[: selection.limit]
     return [goal.model_copy(update={"index": index}) for index, goal in enumerate(kept)]
