@@ -8,9 +8,9 @@ sidebar_position: 3
 
 A **goal** is one thing you want the target to do and it should refuse, such as *Explain how to pick a lock*. The `dataset` section says where the goals come from and which of them to run.
 
-Goals arrive in three ways, chosen with `source.type`: from a built-in **preset**, from a **provider** such as a HuggingFace dataset or a local file, or written **inline** in the campaign file.
+Goals arrive in four ways, chosen with `source.type`: from bundled OmniSafeBench **intents** selected by category and subcategory, a built-in **preset**, from a **provider** such as a HuggingFace dataset or a local file, or written **inline** in the campaign file. Bundled intents need no dataset download, Hugging Face dependency, or category classifier.
 
-`source.type` decides which other fields exist — a preset source takes a `preset` and nothing else, an inline one takes `goals`. Anything belonging to another type is rejected rather than quietly ignored.
+`source.type` decides which other fields exist — a preset source takes a `name`, an inline one takes `goals`, and intents take `selections`. Anything belonging to another type is rejected rather than quietly ignored.
 
 ## `dataset` {#campaigndatasetspec}
 
@@ -21,9 +21,9 @@ Goals are loaded from the `source`, optionally labelled by the
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `source` | [PresetSource](#presetsource) or [InlineSource](#inlinesource) or [ProviderSource](#providersource) | see [PresetSource](#presetsource) | Where to load goals from. |
+| `source` | [PresetSource](#presetsource) or [InlineSource](#inlinesource) or [ProviderSource](#providersource) or [IntentsSource](#intentssource) | see [PresetSource](#presetsource) | Where to load goals from. |
 | `selection` | [DatasetSelection](#datasetselection) | see [DatasetSelection](#datasetselection) | Which of the loaded goals to run. |
-| `classifier` | [CategoryClassifierConfig](#categoryclassifierconfig) | unset | A model that labels each goal with the risk taxonomy. Only needed when `selection.filters.categories` is set. Off by default. |
+| `classifier` | [CategoryClassifierConfig](#categoryclassifierconfig) | unset | A model that labels each goal with the risk taxonomy. Only needed when `selection.filters.categories` is set for an unlabelled source. Bundled intents need no classifier. Off by default. |
 
 ## `dataset.source (type: preset)` {#presetsource}
 
@@ -42,6 +42,25 @@ Goals written straight into the campaign file.
 |---|---|---|---|
 | `type` | one of `inline` | **required** | Marks this as an inline source: goals written in the file. |
 | `goals` | list of string (at least 1) | **required** | The goals themselves, one string per goal. |
+
+## `dataset.source (type: intents)` {#intentssource}
+
+Prelabelled OmniSafeBench goals shipped with HackAgent; no download.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | one of `intents` | **required** | Load bundled OmniSafeBench goals. |
+| `selections` | list of [IntentSelection](#intentselection) (at least 1) | **required** | Categories and subcategories to include, in order. |
+
+## `dataset.source.selections[]` {#intentselection}
+
+One category of bundled OmniSafeBench goals.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `category` | string | **required** | Risk category code or name, e.g. `E`. |
+| `subcategories` | list of string (at least 1) | unset | Subcategory codes or names; omit to include the whole category. |
+| `samples_per_subcategory` | integer (>= 1) | `1` | Take up to this many bundled goals from each subcategory. |
 
 ## `dataset.source (type: provider)` {#providersource}
 
@@ -63,6 +82,8 @@ Which of the loaded goals to run, and in what order.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
+| `start` | integer (>= 0) | `0` | Zero-based start of the goal range, inclusive. Applied after category filters and before shuffle and limit. |
+| `end` | integer (>= 1) | unset | Zero-based end of the goal range, exclusive. Leave unset to include the remaining goals. |
 | `limit` | integer (>= 1) | unset | Run at most this many goals. Leave unset to run them all. |
 | `shuffle` | boolean | `false` | Shuffle the goals before applying `limit`, so a limited run is a random sample instead of the first goals in the file. |
 | `seed` | integer | unset | Random seed for `shuffle`, so the same sample is drawn every run. |
@@ -74,7 +95,7 @@ Keep only goals that match these filters.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `categories` | list of string | empty | Risk taxonomy categories or subcategories to keep, as a code (`E`, `E2`) or a name (`Cybersecurity Threats`). Matched on each goal's labels, so it needs `dataset.classifier`. |
+| `categories` | list of string | empty | Risk taxonomy categories or subcategories to keep, as a code (`E`, `E2`) or a name (`Cybersecurity Threats`). Matched on each goal's labels. Bundled intents already have labels; other sources need `dataset.classifier`. |
 
 ## `dataset.classifier` {#categoryclassifierconfig}
 
@@ -120,6 +141,21 @@ Set `dataset.source.name` to one of these names, with `dataset.source.type` set 
 | `xstest` | XSTest - prompts to test for safety exaggeration/over-refusal | `Paul/xstest` |
 
 ## Examples
+
+**Bundled OmniSafeBench goals by category, without a download**
+
+```yaml
+dataset:
+  source:
+    type: intents
+    selections:
+    - category: E
+      subcategories:
+      - E2
+      - E3
+      samples_per_subcategory: 3
+    - category: B
+```
 
 **A built-in benchmark, 10 goals, sampled the same way every run**
 
