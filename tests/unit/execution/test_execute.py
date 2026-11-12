@@ -63,8 +63,9 @@ class RecordingAdoptedStore(AdoptedRunStore):
         """The platform's POST /run/{id}/events: one event per seq, nothing
         accepted once the run is finished (its token is revoked then)."""
         self.calls.append("events")
-        if self.events_error is not None:
-            raise self.events_error
+        events_error = self.events_error
+        if events_error is not None:
+            raise events_error
         if self.finished:
             raise ExecutorRejected("401")
         kept = {event["seq"] for event in self.events}
@@ -1071,6 +1072,83 @@ def test_activity_never_shows_the_run_s_secrets(tmp_path):
         _run_with_a_leaky_library(tmp_path, logging)
     finally:
         logging.disable(disabled)
+
+
+def test_activity_redacts_literal_model_keys(tmp_path, starting_store):
+    import logging
+
+    literal_key = "opaque-model-credential-for-test"
+    target = model("target")
+    target["connection"]["api_key"] = literal_key
+    spec = remote_spec(tmp_path, target=target)
+    library = logging.getLogger("hackagent.tests.literal_key")
+
+    def leaky(event, **payload):
+        if event == "goals_loaded":
+            library.warning("provider rejected %s", literal_key)
+
+    disabled = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    try:
+        execute.execute_spec(
+            spec, build=FakeBuilder(models()), load=goals("one"), on_event=leaky
+        )
+    finally:
+        logging.disable(disabled)
+
+    store = RecordingAdoptedStore.instances[-1]
+    [leak] = [e for e in store.events if e["message"].startswith("provider rejected")]
+    assert leak["message"] == "provider rejected [REDACTED]"
+
+
+@pytest.mark.parametrize("reply", ["private judge reply", "private judge reply " * 10])
+def test_unparsed_judge_replies_never_reach_activity(tmp_path, reply):
+    import json
+    import logging
+
+    disabled = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    try:
+        _, store, _ = execute_with(
+            stored_campaign(tmp_path), builder=FakeBuilder(models(judge=reply))
+        )
+    finally:
+        logging.disable(disabled)
+
+    assert "private judge reply" not in json.dumps(store.events)
+    assert any("Unknown response" in e["message"] for e in store.events)
+    [goal] = [e for e in store.events if e["kind"] == "goal"]
+    assert goal["data"]["errors"]
+
+
+@pytest.mark.parametrize("signal_name", ["SIGINT", "SIGTERM"])
+def test_signals_during_activity_flush_are_replayed_after_finish(
+    tmp_path, monkeypatch, signal_name
+):
+    import signal
+
+    signum = getattr(signal, signal_name)
+    original_close = execute.ActivityRelay.close
+
+    def interrupted_close(self):
+        signal.raise_signal(signum)
+        original_close(self)
+
+    def interrupt(signum, frame):
+        RecordingAdoptedStore.instances[-1].calls.append("signal")
+        raise KeyboardInterrupt
+
+    previous = signal.signal(signum, interrupt)
+    monkeypatch.setattr(execute.ActivityRelay, "close", interrupted_close)
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            execute_with(stored_campaign(tmp_path))
+    finally:
+        signal.signal(signum, previous)
+
+    store = RecordingAdoptedStore.instances[-1]
+    assert store.finished == [(store.run_id, "COMPLETED", "")]
+    assert store.calls[-2:] == ["finish", "signal"]
 
 
 def _run_with_a_leaky_library(tmp_path, logging):

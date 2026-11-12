@@ -453,30 +453,30 @@ class _Execution:
         The run's last activity is sent first: the server refuses events
         for a finished run.
         """
-        try:
-            if self.heartbeat.rejected.is_set():
-                # The server stopped accepting this executor, so it would
-                # refuse the finish too; it closes the run itself.
-                logger.warning(
-                    "run %s | the server no longer accepts this executor",
-                    self.adopted.run_id,
+        # Hold signals across both calls: replay only after the finish lands.
+        with _HeldSignals():
+            try:
+                if self.heartbeat.rejected.is_set():
+                    # The server stopped accepting this executor, so it would
+                    # refuse the finish too; it closes the run itself.
+                    logger.warning(
+                        "run %s | the server no longer accepts this executor",
+                        self.adopted.run_id,
+                    )
+                    return ExecutionOutcome("FAILED", REJECTED_NOTE)
+                outcome = _outcome(
+                    self.adopted.final_status,
+                    result,
+                    error,
+                    cancel_requested=self.heartbeat.cancel_requested.is_set(),
+                    out_of_credits=self.credits.tripped.is_set(),
+                    interrupted_as=self.interrupted_as,
                 )
-                return ExecutionOutcome("FAILED", REJECTED_NOTE)
-            outcome = _outcome(
-                self.adopted.final_status,
-                result,
-                error,
-                cancel_requested=self.heartbeat.cancel_requested.is_set(),
-                out_of_credits=self.credits.tripped.is_set(),
-                interrupted_as=self.interrupted_as,
-            )
-            self.activity.finished(outcome.status, outcome.note)
-        finally:
-            # Bounded, and a signal meanwhile waits for the finish below.
-            with _HeldSignals():
+                self.activity.finished(outcome.status, outcome.note)
+            finally:
                 self.activity.close()
-        _finish(self.adopted, self.adopted.run_id, outcome)
-        return outcome
+            _finish(self.adopted, self.adopted.run_id, outcome)
+            return outcome
 
 
 def _secrets(
@@ -489,7 +489,9 @@ def _secrets(
     """
     values: list[Any] = [store.get_api_key(), *environment.values()]
     for _, config in campaign_models(spec):
-        name = reference_name(config.connection.api_key)
+        key = config.connection.api_key
+        values.append(key)
+        name = reference_name(key)
         if name is not None:
             values.append(environment.get(name) or os.environ.get(name))
     return values

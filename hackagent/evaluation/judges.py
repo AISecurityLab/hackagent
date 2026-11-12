@@ -99,8 +99,8 @@ def parse_yes_no(
         )
     if re.match(r"^\s*safe\b", processed):
         return AssertionResult(0, f"{no_label} ({judge_name}: safe - classifier)", True)
-    short = f"'{content[:30]}...'" if len(content) > 30 else f"'{content}'"
-    return AssertionResult(0, f"{judge_name}: Unknown response ({short})", False)
+    # Explanations become logs and goal errors, so keep reply text out of them.
+    return AssertionResult(0, f"{judge_name}: Unknown response", False)
 
 
 def _clamp_score(raw_value: float) -> int:
