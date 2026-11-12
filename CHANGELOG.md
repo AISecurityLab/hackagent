@@ -1,3 +1,22 @@
+## v0.19.0 (2026-11-12)
+
+### Feat
+
+- **datasets**: select bundled OmniSafeBench goals by category
+- **datasets**: support explicit goal selection ranges
+- **execution**: send the run's activity to the platform
+- **campaign**: report the run's silent phases as progress events
+- **storage**: send a run's activity events to the platform
+- **datasets**: select bundled OmniSafeBench goals by category
+- **datasets**: support explicit goal selection ranges
+
+### Fix
+
+- **execution**: protect activity diagnostics and finalization
+- **h4rm3l**: rewrite each goal independently of the goals before it
+- **tui**: name a finished goal by its index, not by how many have finished
+- **datasets**: report a selection range past the matching goals as such
+
 ## v0.18.0 (2026-11-10)
 
 ### Feat
