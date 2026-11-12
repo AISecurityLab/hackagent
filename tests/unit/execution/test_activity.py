@@ -372,6 +372,25 @@ def test_secrets_never_leave(message, leaked):
     assert "[REDACTED]" in event["message"]
 
 
+@pytest.mark.parametrize("padding", [190, 199])
+def test_goal_errors_are_redacted_before_they_are_shortened(padding):
+    sender = FakeSender()
+    activity = relay(sender)
+    activity.on_event(
+        "goal_finished",
+        attack="pair",
+        goal_index=0,
+        errors=["x" * padding + SECRET + " refused"],
+    )
+    activity.close()
+
+    [event] = sender.events
+    assert SECRET[:5] not in json.dumps(event)
+    assert event["data"]["errors"] == [
+        ("x" * padding + "[REDACTED] refused")[:199] + "…"
+    ]
+
+
 def test_operational_text_is_kept():
     text = "pair · goal 3/10 · 2 errors: target call failed: KeyError: 'choices'"
 

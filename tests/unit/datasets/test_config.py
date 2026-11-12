@@ -121,15 +121,15 @@ def test_range_past_the_dataset_is_an_empty_selection():
 
 
 def test_provider_range_keeps_metadata_aligned(monkeypatch):
-    import hackagent.datasets.config as config
-
     calls = []
 
     def load(provider_config):
         calls.append(provider_config)
         return ["a", "b", "c", "d"], {i: {"row": i} for i in range(4)}
 
-    monkeypatch.setattr(config, "load_goals_and_extra_fields_from_config", load)
+    monkeypatch.setattr(
+        "hackagent.datasets.config.load_goals_and_extra_fields_from_config", load
+    )
     spec = DatasetSpec.model_validate(
         {
             "source": {"type": "preset", "name": "harmbench"},

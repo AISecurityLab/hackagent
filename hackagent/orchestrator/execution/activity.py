@@ -702,6 +702,13 @@ class ActivityRelay:
         """Campaign runner listener: relay ``event``. Never raises."""
         try:
             _TAP.refresh()
+            if event == "goal_finished":
+                # Event conversion clips errors; redact full values first so a
+                # credential crossing the boundary cannot leave a partial key.
+                payload["errors"] = [
+                    self._redactor.text(str(error))
+                    for error in payload.get("errors") or ()
+                ]
             activity = activity_from_event(event, payload)
             if activity is not None:
                 self.add(activity)
