@@ -34,6 +34,21 @@ def intents_of(subcategory: str) -> tuple[str, ...]:
     )
 
 
+def intent_catalog() -> list[dict[str, Any]]:
+    """Category choices and available goal counts, read only from bundled files."""
+    return [
+        {
+            "code": code,
+            "label": label,
+            "subcategories": [
+                {"code": sub, "label": name, "count": len(intents_of(sub))}
+                for sub, name in taxonomy.subcategories(code).items()
+            ],
+        }
+        for code, label in taxonomy.categories().items()
+    ]
+
+
 def _coerce_intent_entries(intents_config: Any) -> Sequence[Mapping[str, Any]]:
     if isinstance(intents_config, list):
         entries = intents_config
@@ -117,5 +132,6 @@ __all__ = [
     "IntentCategory",
     "IntentSubcategory",
     "intents_of",
+    "intent_catalog",
     "load_goals_from_intents_config",
 ]

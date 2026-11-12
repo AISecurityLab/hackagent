@@ -152,13 +152,18 @@ run anywhere.
 
 ### Machine-readable output
 
-`--json` prints one JSON object per line: an event as each attack and goal
-progresses, then the summary.
+`--json` prints one JSON object per line: an event as the run loads its goals
+and models, and as each attack and goal progresses, then the summary.
 
 ```text
+{"event": "campaign_started", "campaign": "First run"}
+{"event": "goals_loaded", "goals": 1}
+{"event": "models_resolved", "attacks": 1, "judges": 1, "models": 2}
+{"event": "preflight_started", "models": 2}
+{"event": "preflight_finished", "models": 2}
 {"event": "attack_started", "attack": "flipattack", "run_id": "055b4734-…", "expected_goals": 1}
-{"event": "goal_finished", "attack": "flipattack", "run_id": "055b4734-…", "goal_index": 0, "success": true, "attempts": 1, "errors": [], "elapsed_s": 76.3}
-{"event": "attack_finished", "attack": "flipattack", "run_id": "055b4734-…", "error": null}
+{"event": "goal_finished", "attack": "flipattack", "run_id": "055b4734-…", "goal_index": 0, "goals": 1, "success": true, "attempts": 1, "successful": 1, "errors": [], "elapsed_s": 76.3}
+{"event": "attack_finished", "attack": "flipattack", "run_id": "055b4734-…", "error": null, "attempts": 1, "successful": 1, "elapsed_s": 76.4}
 {"campaign": "First run", "run_id": "87275163-…", "campaign_run_id": "72b85d8f-…", "dry_run": false, "succeeded": true, "attempt_errors": 0, "audit_passed": null, "attacks": [{"name": "flipattack", "run_id": "055b4734-…", "attempts": 1, "successes": 1, "error": null}], "outputs": ["logs/runs/87275163-…/campaign.yaml", "logs/runs/87275163-…/results.json", "logs/runs/87275163-…/traces.jsonl"], "output_directory": "./logs/runs"}
 ```
 

@@ -250,9 +250,12 @@ def test_an_enabled_audit_is_emitted_before_attack_progress(monkeypatch):
         on_event=lambda event, **payload: events.append((event, payload)),
     )
 
-    assert events[0][0] == "audit_finished"
-    assert events[0][1]["audit"]["passed"] is True
-    assert events[1][0] == "attack_started"
+    kinds = [event for event, _ in events]
+    audit = kinds.index("audit_finished")
+    assert kinds[audit - 1] == "audit_started"
+    assert events[audit - 1][1] == {"judges": 1}
+    assert events[audit][1]["audit"]["passed"] is True
+    assert kinds[audit + 1] == "attack_started"
 
 
 def test_an_audit_that_grades_nothing_reports_no_verdict():
