@@ -8,7 +8,7 @@ Used when the remote backend is selected explicitly
 ``storage.backend: remote`` in a campaign); having an API key alone never
 selects it. Every HTTP call the SDK makes to
 the platform's tracking API goes through this module, which also implements
-the executor protocol (claim, heartbeat, finish) used by queued runs.
+the executor protocol (claim, heartbeat, events, finish) used by queued runs.
 
 Append-only writes (result updates and traces) are deferred to a background
 thread; reads flush that queue first. See :meth:`RemoteBackend.flush`.
@@ -26,7 +26,8 @@ import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from urllib.parse import quote
 from uuid import UUID
 
 from pydantic import AnyUrl
@@ -105,6 +106,10 @@ _WRITE_QUEUE_MAXSIZE = 1000
 #: Longest server reason a refused claim carries.
 _DETAIL_LIMIT = 200
 
+#: How long one POST /run/{id}/events may take. Activity is best effort: a
+#: slow server must not hold the executor for the client's full timeout.
+_EVENTS_TIMEOUT_S = 5.0
+
 #: The statuses a run's executor ends it with (POST /run/{id}/finish).
 _FINAL_STATUSES = frozenset(status.value for status in FinishStatusEnum)
 
@@ -141,6 +146,15 @@ class ExecutorRejected(RuntimeError):
     """The server no longer accepts the caller as the run's executor (401 or
     403): its key or run token was revoked, it is not the executor that
     claimed the run, or the run is no longer running."""
+
+
+class RunAlreadyFinished(RuntimeError):
+    """The run the executor reports on has already finished (409)."""
+
+
+class RunEventsUnsupported(RuntimeError):
+    """The server does not record run activity: it predates
+    ``POST /run/{id}/events`` (404 or 405)."""
 
 
 @dataclass(frozen=True)
@@ -1111,6 +1125,50 @@ class RemoteBackend:
                 f"RemoteBackend: heartbeat of run {run_id} returned {resp.status_code}"
             )
         return bool(self._parse_json_response(resp).get("cancel_requested"))
+
+    def send_run_events(
+        self, run_id: UUID, events: Sequence[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Add ``events`` (1 to 200, as JSON objects) to the activity log of
+        the run's campaign, and return the server's count of what it kept
+        (``accepted``, ``duplicates``, ``dropped``, ``last_seq``).
+
+        Sending an event twice is safe: the server keeps one per ``seq``.
+        Raises :class:`RunAlreadyFinished` on 409,
+        :class:`RunEventsUnsupported` on 404 or 405,
+        :class:`ExecutorRejected` on 401 or 403 (as after the run's finish),
+        and ``ValueError`` on 400, when the server refused the whole batch. Called through the HTTP
+        client directly, so an executor keeps working against a server
+        whose schema does not have the endpoint yet.
+        """
+        resp = self._client.get_httpx_client().request(
+            "post",
+            f"/run/{quote(str(run_id), safe='')}/events",
+            json={"events": list(events)},
+            timeout=_EVENTS_TIMEOUT_S,
+        )
+        if resp.status_code in (401, 403):
+            raise ExecutorRejected(
+                f"RemoteBackend: the server refused the events of run {run_id} "
+                f"({resp.status_code})"
+            )
+        if resp.status_code == 409:
+            raise RunAlreadyFinished(f"RemoteBackend: run {run_id} already finished")
+        if resp.status_code == 400:
+            raise ValueError(
+                f"RemoteBackend: the server refused the events of run {run_id}: "
+                + resp.content.decode("utf-8", errors="replace")[:_DETAIL_LIMIT]
+            )
+        if resp.status_code in (404, 405):
+            raise RunEventsUnsupported(
+                "RemoteBackend: the server does not record run activity "
+                f"({resp.status_code})"
+            )
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"RemoteBackend: events of run {run_id} returned {resp.status_code}"
+            )
+        return self._parse_json_response(resp)
 
     def finish_run(self, run_id: UUID, status: str, note: str = "") -> Run:
         """End the run as COMPLETED, FAILED or CANCELLED, with ``note`` as its

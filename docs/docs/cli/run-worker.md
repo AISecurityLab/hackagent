@@ -62,7 +62,8 @@ hackagent run 3f0c2a4e-5d6b-4c1e-9a2f-0e8b7c6d5a41
 5. It prints the dashboard link to follow the run, claims the run as
    `local:<hostname> (<user>)`, and runs it, printing a line as each attack
    starts and finishes. Models that use the HackAgent gateway are called with
-   your API key.
+   your API key. Meanwhile, the run page's activity log shows what the run is
+   doing: progress, retries, warnings and errors, never prompts or replies.
 6. It finishes the run on the platform as completed, failed or cancelled.
 
 The run's files are written under the campaign's output directory, relative to
