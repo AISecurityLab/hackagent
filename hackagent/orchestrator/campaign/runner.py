@@ -55,7 +55,7 @@ from hackagent.attacks.techniques.trace import (
 )
 from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.core.contracts import Goal, RunStatus, Sample, Verdict
-from hackagent.core.logging import get_logger
+from hackagent.core.logging import REPORTED_AS_EVENT, get_logger
 from hackagent.core.settings import Settings
 from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals, select_goals
@@ -67,7 +67,7 @@ from hackagent.orchestrator.campaign.audit import (
     aaudit_configured_panel,
 )
 from hackagent.orchestrator.campaign.loader import load_campaign
-from hackagent.orchestrator.campaign.preflight import preflight
+from hackagent.orchestrator.campaign.preflight import PreflightError, preflight
 from hackagent.orchestrator.campaign.resolve import (
     EmbedderBuilder,
     GoalLoader,
@@ -129,12 +129,27 @@ def _active_goal_elapsed() -> Optional[float]:
     )
 
 
-#: Receives ``(event_name, **payload)``. An audited run first emits
-#: ``audit_finished`` (``audit``), then ``attack_started`` (``attack``,
-#: ``run_id``, ``expected_goals``), a ``goal_finished`` per goal (``attack``,
-#: ``run_id``, ``goal_index``, ``success``, ``attempts``, ``errors`` (distinct
-#: messages of its failed attempts and abstaining judges), ``elapsed_s``), and
-#: ``attack_finished`` (``attack``, ``run_id``, ``error``).
+#: Receives ``(event_name, **payload)``. Payloads hold names and counts,
+#: never goal texts, prompts or replies. In order, a run emits:
+#:
+#: - ``campaign_started`` (``campaign``), before goals and models are loaded;
+#: - ``goals_loaded`` (``goals``) and ``models_resolved`` (``attacks``,
+#:   ``judges``, ``models``: distinct models built);
+#: - with ``execution.preflight``, ``preflight_started`` (``models``), then
+#:   ``preflight_finished`` (``models``) or ``preflight_failed`` (``models``,
+#:   ``failures``: one reason per unreachable model);
+#: - with ``evaluation.audit``, ``audit_started`` (``judges``), then
+#:   ``audit_finished`` (``audit``);
+#: - per attack, ``attack_started`` (``attack``, ``run_id``,
+#:   ``expected_goals``); for an attack with run-scoped setup (AutoDAN-Turbo's
+#:   warm-up, h4rm3l's program search), ``preparation_started`` (``attack``,
+#:   ``run_id``, ``goals``) and ``preparation_finished`` (``attack``,
+#:   ``run_id``, ``elapsed_s``); a ``goal_finished`` per goal (``attack``,
+#:   ``run_id``, ``goal_index``, ``goals`` (the campaign's goal count),
+#:   ``success``, ``attempts``, ``successful``, ``errors`` (distinct messages
+#:   of its failed attempts and abstaining judges), ``elapsed_s``); and
+#:   ``attack_finished`` (``attack``, ``run_id``, ``error``, ``attempts``,
+#:   ``successful``, ``elapsed_s``).
 EventCallback = Callable[..., None]
 
 
@@ -287,6 +302,7 @@ async def arun_campaign(
             resolved=resolved,
             settings=settings,
         )
+    _notify(on_event, "campaign_started", campaign=spec.campaign.name)
     resolved = resolved or resolve_campaign(
         spec, build=build, load=load, build_embed=build_embed, settings=settings
     )
@@ -296,6 +312,15 @@ async def arun_campaign(
         len(resolved.goals),
         len(resolved.attacks),
         len(spec.evaluation.judges),
+        extra=REPORTED_AS_EVENT,
+    )
+    _notify(on_event, "goals_loaded", goals=len(resolved.goals))
+    _notify(
+        on_event,
+        "models_resolved",
+        attacks=len(resolved.attacks),
+        judges=len(spec.evaluation.judges),
+        models=len(resolved.probes),
     )
     if spec.execution.dry_run:
         return CampaignResult(
@@ -316,11 +341,22 @@ async def arun_campaign(
         if spec.execution.preflight:
             # Fail fast on an unreachable model, before any attack
             # has started recording against it.
-            await preflight(resolved)
+            models = len(resolved.probes)
+            _notify(on_event, "preflight_started", models=models)
+            try:
+                await preflight(resolved)
+            except PreflightError as exc:
+                _notify(
+                    on_event, "preflight_failed", models=models, failures=exc.failures
+                )
+                raise
+            _notify(on_event, "preflight_finished", models=models)
 
         # Before the first attack: a failing panel should cost one audit, not a
         # whole run whose numbers then mean nothing. The report belongs to the
         # campaign run; attack runs reference that parent through a foreign key.
+        if spec.evaluation.audit.enabled:
+            _notify(on_event, "audit_started", judges=len(spec.evaluation.judges))
         try:
             audit = await aaudit_configured_panel(
                 resolved.panel,
@@ -556,7 +592,13 @@ class _AttackRunner:
                 _record_quietly(self.store, created.cancel)
             raise
         run_id = str(tracker.run_id)
-        logger.info("%s | started | run=%s | goals=%d", attack.name, run_id, len(goals))
+        logger.info(
+            "%s | started | run=%s | goals=%d",
+            attack.name,
+            run_id,
+            len(goals),
+            extra=REPORTED_AS_EVENT,
+        )
 
         attempts: list[Attempt] = []
         run_trace: tuple[TraceNode, ...] = ()
@@ -570,7 +612,7 @@ class _AttackRunner:
                 run_id=run_id,
                 expected_goals=len(goals),
             )
-            run_trace = await self._prepare(attack, goals)
+            run_trace = await self._prepare(attack, goals, run_id)
             await asyncio.wait_for(
                 _all_or_none(
                     self._run_goal(attack, goal, tracker, attempts, run_id)
@@ -590,10 +632,22 @@ class _AttackRunner:
             raise
         except Exception as exc:
             error = _describe(exc)
-            logger.error("%s | failed | run=%s | %s", attack.name, run_id, error)
+            logger.error(
+                "%s | failed | run=%s | %s",
+                attack.name,
+                run_id,
+                error,
+                extra=REPORTED_AS_EVENT,
+            )
             await asyncio.to_thread(_record_quietly, self.store, tracker.fail, exc)
             self._emit(
-                "attack_finished", attack=attack.name, run_id=run_id, error=error
+                "attack_finished",
+                attack=attack.name,
+                run_id=run_id,
+                error=error,
+                attempts=len(attempts),
+                successful=_successful(attempts),
+                elapsed_s=monotonic() - started,
             )
             return AttackOutcome(
                 attack.name, run_id, _ordered(attempts), error, run_trace
@@ -605,31 +659,60 @@ class _AttackRunner:
             _record_quietly(self.store, tracker.cancel)
             raise
 
-        successes = sum(
-            bool(item.verdict and item.verdict.success) for item in attempts
-        )
+        successes = _successful(attempts)
+        elapsed = monotonic() - started
         logger.info(
             "%s | completed | run=%s | attempts=%d | successes=%d | %.1fs",
             attack.name,
             run_id,
             len(attempts),
             successes,
-            monotonic() - started,
+            elapsed,
+            extra=REPORTED_AS_EVENT,
         )
-        self._emit("attack_finished", attack=attack.name, run_id=run_id, error=None)
+        self._emit(
+            "attack_finished",
+            attack=attack.name,
+            run_id=run_id,
+            error=None,
+            attempts=len(attempts),
+            successful=successes,
+            elapsed_s=elapsed,
+        )
         return AttackOutcome(attack.name, run_id, _ordered(attempts), None, run_trace)
 
     async def _prepare(
-        self, attack: ResolvedAttack, goals: tuple[Goal, ...]
+        self, attack: ResolvedAttack, goals: tuple[Goal, ...], run_id: str
     ) -> tuple[TraceNode, ...]:
-        """Run an iterative attack's run-scoped setup, tracing it as its own scope."""
+        """Run an iterative attack's run-scoped setup, tracing it as its own scope.
+
+        An attack that has setup of its own, rather than the default that does
+        nothing, is reported as preparing while it runs: AutoDAN-Turbo's
+        warm-up can take longer than any goal.
+        """
         if not isinstance(attack.attack, IterativeAttack):
             return ()
+        reported = type(attack.attack).prepare is not IterativeAttack.prepare
+        if reported:
+            self._emit(
+                "preparation_started",
+                attack=attack.name,
+                run_id=run_id,
+                goals=len(goals),
+            )
+        started = monotonic()
         with recording(scope="run") as trace:
             async with self.limits.attack:
                 await attack.attack.prepare(
                     [goal.text for goal in goals], self._send, self._ask_panel
                 )
+        if reported:
+            self._emit(
+                "preparation_finished",
+                attack=attack.name,
+                run_id=run_id,
+                elapsed_s=monotonic() - started,
+            )
         return tuple(trace.nodes)
 
     async def _run_goal(
@@ -654,22 +737,25 @@ class _AttackRunner:
         for attempt in attempts:
             await asyncio.to_thread(tracker.record, attempt)
         sink.extend(attempts)
-        success = any(bool(item.verdict and item.verdict.success) for item in attempts)
+        successful = _successful(attempts)
         logger.info(
             "%s | goal %d/%d | %d attempts | %d successful",
             attack.name,
             goal.index + 1,
             len(self.resolved.goals),
             len(attempts),
-            sum(bool(item.verdict and item.verdict.success) for item in attempts),
+            successful,
+            extra=REPORTED_AS_EVENT,
         )
         self._emit(
             "goal_finished",
             attack=attack.name,
             run_id=run_id,
             goal_index=goal.index,
-            success=success,
+            goals=len(self.resolved.goals),
+            success=successful > 0,
             attempts=len(attempts),
+            successful=successful,
             errors=list(dict.fromkeys(e for item in attempts for e in item.errors)),
             elapsed_s=monotonic() - started,
         )
@@ -1022,6 +1108,21 @@ async def _outlasting_cancels(work: asyncio.Future[T]) -> Optional[T]:
             continue
         except Exception:
             return None
+
+
+def _notify(on_event: Optional[EventCallback], event: str, **payload: Any) -> None:
+    """Send a campaign-level event, before or between attacks, to ``on_event``.
+
+    What the listener raises reaches the caller unchanged, as it does for
+    ``audit_finished``.
+    """
+    if on_event is not None:
+        on_event(event, **payload)
+
+
+def _successful(attempts: Iterable[Attempt]) -> int:
+    """How many of ``attempts`` a judge passed."""
+    return sum(bool(item.verdict and item.verdict.success) for item in attempts)
 
 
 def _is_cancellation(exc: BaseException) -> bool:

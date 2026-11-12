@@ -213,6 +213,38 @@ class TestTheRun:
         # The run ended: Run is offered again rather than left disabled.
         assert builder._campaign_running is False
 
+    @pytest.mark.asyncio
+    async def test_a_goal_is_named_by_its_index_whatever_order_goals_finish_in(
+        self, cli_config
+    ):
+        """Goals run concurrently, so the third to finish need not be goal 3."""
+        app = self._app(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            builder = app.query_one(CampaignBuilder)
+            builder._on_run_event(
+                "attack_started", {"attack": "baseline", "expected_goals": 3}
+            )
+            for index, success, errors in (
+                (2, True, []),
+                (0, False, ["target timed out"]),
+                (1, False, []),
+            ):
+                builder._on_run_event(
+                    "goal_finished",
+                    {
+                        "attack": "baseline",
+                        "goal_index": index,
+                        "success": success,
+                        "errors": errors,
+                    },
+                )
+            log = "\n".join(builder._run_lines)
+
+        assert "goal 3: jailbroken" in log
+        assert "goal 1: target timed out" in log
+        assert builder._done == 3
+
 
 def _straight_through(callback, *args, **kwargs):
     """Stand in for ``call_from_thread``: the test is already on that thread."""

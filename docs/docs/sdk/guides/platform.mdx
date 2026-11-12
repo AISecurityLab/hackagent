@@ -99,7 +99,11 @@ else:
 
 This is what `hackagent campaign run` does with the same campaign. The run is
 created on the platform, claimed by your machine, and kept alive with a
-heartbeat while it runs. The campaign is recorded as written, with the
+heartbeat while it runs. What it is doing shows in the run page's activity
+log as it happens: goals loading, preflight, each attack's warm-up and goals,
+request retries and timeouts, warnings and errors. Only short operational
+messages are sent, never goal texts, prompts or replies, and known secrets are
+redacted from them. A server too old to record activity is not sent any. The campaign is recorded as written, with the
 gateway models still as markers and keys only as references, so it can be
 launched again from the dashboard.
 

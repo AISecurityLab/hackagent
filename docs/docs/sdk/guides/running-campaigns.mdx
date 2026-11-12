@@ -152,14 +152,24 @@ and raises `PreflightError` before any attack starts.
 ## Follow progress
 
 Pass `on_event` to be told what the run is doing. It is called as
-`on_event(event_name, **payload)`:
+`on_event(event_name, **payload)`, in this order. Payloads hold names and
+counts, never goal texts, prompts or replies:
 
 | Event | When | Payload |
 |---|---|---|
-| `audit_finished` | The judge audit ran, when `evaluation.audit` is on | `audit` |
+| `campaign_started` | The run begins, before goals and models are loaded | `campaign` |
+| `goals_loaded` | The dataset is loaded | `goals` |
+| `models_resolved` | Every model is built | `attacks`, `judges`, `models` (distinct models) |
+| `preflight_started` | Preflight checks the models, when `execution.preflight` is on | `models` |
+| `preflight_finished` | Every model answered | `models` |
+| `preflight_failed` | A model did not answer; `PreflightError` follows | `models`, `failures` (one reason per model) |
+| `audit_started` | The judge audit begins, when `evaluation.audit` is on | `judges` |
+| `audit_finished` | The judge audit ran | `audit` |
 | `attack_started` | An attack begins | `attack`, `run_id`, `expected_goals` |
-| `goal_finished` | An attack is done with one goal | `attack`, `run_id`, `goal_index`, `success`, `attempts`, `errors`, `elapsed_s` |
-| `attack_finished` | An attack ends | `attack`, `run_id`, `error` (`None` when it completed) |
+| `preparation_started` | An attack with run-wide setup starts it (AutoDAN-Turbo's warm-up, h4rm3l's program search) | `attack`, `run_id`, `goals` |
+| `preparation_finished` | That setup is done | `attack`, `run_id`, `elapsed_s` |
+| `goal_finished` | An attack is done with one goal | `attack`, `run_id`, `goal_index`, `goals` (the campaign's goal count), `success`, `attempts`, `successful`, `errors`, `elapsed_s` |
+| `attack_finished` | An attack ends | `attack`, `run_id`, `error` (`None` when it completed), `attempts`, `successful`, `elapsed_s` |
 
 ```python
 from hackagent.orchestrator.campaign import run_campaign
@@ -191,7 +201,13 @@ flipattack: 2 goals
 ```
 
 Accept `**payload` rather than naming every key, so a listener keeps working
-when an event gains a field. Keep the listener fast: it runs inside the run.
+when an event gains a field, and ignore event names you do not handle, so it
+keeps working when an event is added. Keep the listener fast: it runs inside
+the run.
+
+A run the platform tracks also sends these events, with the warnings, errors
+and request retries the run logs, to the run page's activity log. See
+[Run on the platform](./platform.mdx).
 
 ## Stop a run early
 
