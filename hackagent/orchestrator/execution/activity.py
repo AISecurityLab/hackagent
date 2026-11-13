@@ -466,6 +466,91 @@ def _name(payload: Mapping[str, Any]) -> Optional[str]:
     return str(attack) if attack else None
 
 
+def _live_goal(payload: Mapping[str, Any], event: str) -> Activity:
+    index = payload.get("goal_index")
+    position = str(index + 1) if type(index) is int else "?"
+    if type(payload.get("goals")) is int:
+        position += f"/{payload['goals']}"
+    data: dict[str, Any] = {"event": event}
+    for key in (
+        "step",
+        "total",
+        "branches",
+        "candidates",
+        "dropped",
+        "kept",
+        "backtracks",
+        "documents",
+        "chunks",
+        "epoch",
+        "candidate",
+    ):
+        if type(payload.get(key)) is int and payload[key] >= 0:
+            data[key] = payload[key]
+    path = payload.get("path")
+    if isinstance(path, (list, tuple)) and all(type(n) is int and n >= 0 for n in path):
+        data["path"] = list(path[:32])
+    if event == "goal_started":
+        description = "started"
+    elif event == "jailbreak_found":
+        description = "jailbreak found"
+        if type(payload.get("score")) in (int, float):
+            data["score"] = payload["score"]
+    else:
+        phase = payload.get("phase")
+        allowed = {
+            "round",
+            "turn",
+            "iteration",
+            "stream",
+            "branch",
+            "candidate",
+            "query",
+            "warm-up goal",
+            "attempt",
+            "prefix",
+            "program",
+            "technique",
+            "expand",
+            "on topic",
+            "panel review",
+            "write",
+            "poison",
+            "queries",
+            "index",
+            "tool-chain",
+            "retrieval",
+            "selection",
+            "stopped",
+            "pruned",
+            "skipped",
+            "refused",
+            "backtracked",
+            "kept",
+        }
+        data["phase"] = phase if phase in allowed else "attack phase"
+        data["stage"] = (
+            payload.get("stage")
+            if payload.get("stage") in {"started", "finished", "decision"}
+            else "started"
+        )
+        description = data["phase"]
+        if "step" in data:
+            description += f" {data['step']}"
+            if "total" in data:
+                description += f"/{data['total']}"
+        description += f" · {data['stage']}"
+    return Activity(
+        "info",
+        "attack" if event == "attack_progress" else "goal",
+        f"{payload.get('attack')} · goal {position} · {description}",
+        attack=_name(payload),
+        attack_run=payload.get("run_id"),
+        goal_index=index if type(index) is int else None,
+        data=data,
+    )
+
+
 _EVENTS: dict[str, Callable[[Mapping[str, Any]], Activity]] = {
     "campaign_started": _campaign_started,
     "goals_loaded": _goals_loaded,
@@ -479,6 +564,9 @@ _EVENTS: dict[str, Callable[[Mapping[str, Any]], Activity]] = {
     "preparation_started": _preparation_started,
     "preparation_finished": _preparation_finished,
     "goal_finished": _goal_finished,
+    "goal_started": lambda payload: _live_goal(payload, "goal_started"),
+    "attack_progress": lambda payload: _live_goal(payload, "attack_progress"),
+    "jailbreak_found": lambda payload: _live_goal(payload, "jailbreak_found"),
     "attack_finished": _attack_finished,
 }
 

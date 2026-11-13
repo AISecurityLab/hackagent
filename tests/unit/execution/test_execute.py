@@ -975,7 +975,11 @@ def test_the_platform_receives_the_run_s_activity_before_the_finish(tmp_path):
         ("campaign", "campaign · 2 models ready · 1 attack · 1 judge"),
     ]
     assert ("attack", "baseline · started · 2 goals") in by_kind
-    goals = [event for event in store.events if event["kind"] == "goal"]
+    goals = [
+        event
+        for event in store.events
+        if event["kind"] == "goal" and "event" not in event["data"]
+    ]
     assert sorted(event["goal_index"] for event in goals) == [0, 1]
     assert {event["message"].split(" · ", 2)[2] for event in goals} == {
         "1 attempt · 1 successful"
@@ -1117,8 +1121,11 @@ def test_unparsed_judge_replies_never_reach_activity(tmp_path, reply):
 
     assert "private judge reply" not in json.dumps(store.events)
     assert any("Unknown response" in e["message"] for e in store.events)
-    [goal] = [e for e in store.events if e["kind"] == "goal"]
+    [goal] = [
+        e for e in store.events if e["kind"] == "goal" and "event" not in e["data"]
+    ]
     assert goal["data"]["errors"]
+    assert not any(e["data"].get("event") == "jailbreak_found" for e in store.events)
 
 
 @pytest.mark.parametrize("signal_name", ["SIGINT", "SIGTERM"])
@@ -1170,3 +1177,64 @@ def _run_with_a_leaky_library(tmp_path, logging):
     assert seen == ["goals_loaded"]
     [leak] = [e for e in store.events if e["message"].startswith("using")]
     assert leak["message"] == "using [REDACTED] and [REDACTED]"
+
+
+def test_tap_reports_rounds_branches_and_a_jailbreak_before_goal_completion(tmp_path):
+    import json
+
+    outcome, store, _ = execute_with(
+        stored_campaign(
+            tmp_path,
+            attacks=[
+                {
+                    "name": "tap",
+                    "parameters": {
+                        "depth": 2,
+                        "streams": 2,
+                        "branching_factor": 2,
+                        "width": 2,
+                    },
+                    "roles": {"attacker": model("attacker")},
+                }
+            ],
+        ),
+        texts=("private goal one", "private goal two"),
+        builder=FakeBuilder(
+            models(
+                attacker=ScriptedModel(
+                    json.dumps(
+                        {
+                            "prompt": "private attack prompt",
+                            "improvement": "private improvement",
+                        }
+                    )
+                )
+            )
+        ),
+    )
+
+    assert outcome.status == "COMPLETED"
+    for index in (0, 1):
+        events = [event for event in store.events if event["goal_index"] == index]
+        assert events[0]["data"]["event"] == "goal_started"
+        assert any(
+            event["data"].get("phase") == "round"
+            and event["data"].get("step") == 1
+            and event["data"].get("total") == 2
+            for event in events
+        )
+        assert any(event["data"].get("phase") == "branch" for event in events)
+        found = next(
+            i
+            for i, event in enumerate(events)
+            if event["data"].get("event") == "jailbreak_found"
+        )
+        finished = next(
+            i
+            for i, event in enumerate(events)
+            if "attempts" in event["data"] and event["kind"] == "goal"
+        )
+        assert found < finished
+        assert events[found]["attack_run"] == events[finished]["attack_run"]
+    assert "private" not in json.dumps(store.events)
+    assert "a reply" not in json.dumps(store.events)
