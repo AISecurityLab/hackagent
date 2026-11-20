@@ -16,6 +16,7 @@ Subclasses set the class attributes, read their own options in
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import os
 import shutil
 from abc import abstractmethod
@@ -34,6 +35,20 @@ class CLIConfigurationError(Exception):
 
 class CLIInteractionError(Exception):
     """A CLI backend failed while producing a response (timeout, bad exit)."""
+
+
+#: Working directory requested for the call in flight. LiteLLM does not forward
+#: unknown keyword arguments to a ``CustomLLM``, so :meth:`complete` publishes
+#: the override here and the handler reads it in the same thread. A context
+#: variable keeps concurrent calls (each in its own worker thread) isolated.
+_CALL_CWD: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "hackagent_cli_call_cwd", default=None
+)
+
+
+def call_cwd() -> Optional[str]:
+    """Return the per-call working directory override, if any."""
+    return _CALL_CWD.get()
 
 
 def _litellm() -> Optional[Any]:
@@ -184,12 +199,15 @@ class SubprocessCLIModel(Model):
     ) -> ModelResponse:
         """Run one agent turn through the CLI and return its reply.
 
-        Overrides are ignored: the CLI takes the conversation only. Failures are
-        returned as an error response.
+        The CLI takes the conversation only, so overrides are ignored except
+        ``cwd``, which runs the CLI in that directory for this call (handlers
+        read it with :func:`call_cwd`). Failures are returned as an error
+        response.
         """
         litellm = _litellm()
         if litellm is None:
             return ModelResponse.failed(RuntimeError("litellm is not installed"))
+        token = _CALL_CWD.set(overrides.get("cwd"))
         try:
             response = self._call(litellm, [dict(message) for message in messages])
         except Exception as exc:
@@ -197,6 +215,8 @@ class SubprocessCLIModel(Model):
                 f"{self.LABEL} dispatch failed for backend {self.id}: {exc}"
             )
             return ModelResponse.failed(exc)
+        finally:
+            _CALL_CWD.reset(token)
         return ModelResponse.from_value(response)
 
     async def acomplete(
@@ -210,6 +230,7 @@ __all__ = [
     "CLIConfigurationError",
     "CLIInteractionError",
     "SubprocessCLIModel",
+    "call_cwd",
     "is_ollama_launcher",
     "last_user_text",
 ]
