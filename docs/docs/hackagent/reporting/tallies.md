@@ -70,7 +70,7 @@ The judges&#x27; votes on one attempt, as the text key the tallies store.
 A JSON object with sorted keys and no spaces, mapping each judge that
 recorded a vote (`eval_<judge>`) to `1`, `0`, `null` (abstained)
 or `"invalid"`. A judge with no key in `metrics` is left out (it
-did not vote).
+did not vote). Metrics that are not an object hold no votes.
 
 ## ResultRow Objects
 

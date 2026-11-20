@@ -9,6 +9,15 @@ Attempts are numbered from 1 in `created_at`, then `id`, order: the
 order the conversation happened in, and the one `first_jailbreak_attempt`
 of the costs counts in.
 
+#### metrics\_of
+
+```python
+def metrics_of(value: Any) -> dict[str, Any]
+```
+
+An attempt&#x27;s `evaluation_metrics` as an object; anything a store
+holds that is not one (a list, a number, null) reads as no metrics.
+
 #### attempt\_page
 
 ```python

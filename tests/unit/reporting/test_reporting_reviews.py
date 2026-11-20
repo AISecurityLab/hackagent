@@ -143,6 +143,9 @@ class TestJudgeVotes:
             '{"eval_a":0,"eval_b":1,"eval_c":null,"eval_d":"invalid","eval_e":1}'
         )
         assert judge_votes(None) == judge_votes({}) == "{}"
+        # A store may hold any JSON there; what is not an object holds no votes.
+        for value in ([1, 0], 5, "x"):
+            assert judge_votes(value) == "{}"  # type: ignore[arg-type]
 
     def test_rows_count_attempts_per_automated_outcome_and_votes(self):
         rows = goal_judge_votes(
@@ -365,3 +368,22 @@ class TestReviewResponses:
             "automated_bucket": "jailbreak",
         }
         assert body["outcome"] == "inconclusive"
+
+
+def test_attempts_read_metrics_that_are_not_an_object_as_none():
+    from hackagent.reporting.attempts import attack_structure, attempt_page
+    from hackagent.reporting.rows import Attempt, StructureResult
+
+    for value in ([1, 0], 5, "x", None):
+        page = attempt_page(
+            [Attempt("a", "r", "mitigated", None, T0, evaluation_metrics=value)],
+            1,
+            1,
+            20,
+            None,
+        )
+        assert page["results"][0]["evaluation_metrics"] == {}
+        structure = attack_structure(
+            [StructureResult("a", "r", "FAILED_JAILBREAK", None, {}, {}, T0, value)], []
+        )
+        assert structure["attempts"][0]["evaluation_metrics"] == {}

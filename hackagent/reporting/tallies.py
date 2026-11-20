@@ -97,10 +97,12 @@ def judge_votes(metrics: Optional[Mapping[str, Any]]) -> str:
     A JSON object with sorted keys and no spaces, mapping each judge that
     recorded a vote (``eval_<judge>``) to ``1``, ``0``, ``null`` (abstained)
     or ``"invalid"``. A judge with no key in ``metrics`` is left out (it
-    did not vote).
+    did not vote). Metrics that are not an object hold no votes.
     """
     votes: dict[str, Any] = {}
-    for key, value in (metrics or {}).items():
+    if not isinstance(metrics, Mapping):
+        return NO_VOTES
+    for key, value in metrics.items():
         if not isinstance(key, str) or not is_judge(key):
             continue
         if value is None:
