@@ -113,7 +113,7 @@ async def aaudit_configured_panel(
     samples = load(spec.dataset)
     passes = 1 + (len(spec.robustness.resolve()) if spec.robustness.enabled else 0)
     logger.info(
-        "audit | %d samples x %d judges x %d pass(es) before the first attack",
+        "audit · %d samples × %d judges × %d pass(es) before the first attack",
         len(samples),
         len(panel.judges),
         passes,
@@ -173,7 +173,7 @@ def write_report(report: AuditReport, path: str | Path) -> Path:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(report.model_dump_json(indent=2), encoding="utf-8")
-    logger.info("audit | report written to %s", destination)
+    logger.info("audit · report written to %s", destination)
     return destination
 
 
@@ -316,7 +316,7 @@ def format_report(report: AuditReport) -> str:
 def _log(report: AuditReport) -> None:
     for row in report.judges:
         logger.info(
-            "audit | %-24s precision=%.3f recall=%.3f f1=%.3f | %s",
+            "audit · %s · precision %.3f · recall %.3f · f1 %.3f · %s",
             row.judge,
             row.metrics.precision,
             row.metrics.recall,

@@ -155,7 +155,9 @@ def extract_embedding_vector(response: Any) -> np.ndarray:
 
 def request_embedding(config: Dict[str, Any], text: str) -> np.ndarray:
     """Request a real embedding, never chat completions or textual signatures."""
-    import litellm
+    from hackagent.models._litellm import litellm as _quiet_litellm
+
+    litellm = _quiet_litellm()
 
     kwargs = embedding_request_kwargs(config)
     if kwargs.get("custom_llm_provider") == "openai":

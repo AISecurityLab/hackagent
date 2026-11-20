@@ -29,6 +29,10 @@ There are four kinds of node:
 The campaign runner opens a :func:`recording` per goal and records every
 call itself, so attacks mark only their own structure: a :func:`phase` per
 iteration and a :func:`decision` when the search turns.
+
+Each node is also logged as it is recorded (:mod:`.trace_log`), naming the
+attack and goal the runner set with :func:`about`, so a run can be followed
+in its log while it happens.
 """
 
 from __future__ import annotations
@@ -44,6 +48,7 @@ from hackagent.core.contracts import Sample, Verdict
 from hackagent.core.contracts.protocols import CompletionResult
 
 from .contract import Completion, Messages
+from .trace_log import log_node
 
 #: Where a node belongs. ``goal`` is one goal's search; ``run`` is work a
 #: technique does once for the whole run (AutoDAN's strategy library,
@@ -83,6 +88,12 @@ class Trace:
         self.scope = scope
         self.nodes: list[TraceNode] = []
         self._children: dict[Path, int] = {}
+        #: Which attack and goal the nodes belong to, for the log.
+        self.subject: Mapping[str, Any] = dict(_subject.get())
+        self._phases: dict[Path, str] = {}
+        #: How many phases of each label each parent has opened, so the log
+        #: can tell "candidate #2" from "candidate #3".
+        self._ordinals: dict[tuple[Path, str], int] = {}
 
     def add(self, node: str, *, label: str = "", **fields: Any) -> TraceNode:
         """Append a node as the next child of the current path."""
@@ -93,7 +104,30 @@ class Trace:
             path=parent + (index,), node=node, label=label, scope=self.scope, **fields
         )
         self.nodes.append(recorded)
+        if node == "phase":
+            key = (parent, label)
+            self._ordinals[key] = self._ordinals.get(key, 0) + 1
+            self._phases[recorded.path] = _numbered(label, self._ordinals[key])
+        within = [
+            self._phases[recorded.path[:end]]
+            for end in range(1, len(recorded.path))
+            if recorded.path[:end] in self._phases
+        ]
+        log_node(
+            recorded,
+            self.subject,
+            within,
+            self._phases.get(recorded.path, label),
+        )
         return recorded
+
+
+def _numbered(label: str, ordinal: int) -> str:
+    """A phase's label for the log: numbered among same-named siblings,
+    unless it carries a number of its own ("depth 2/3")."""
+    if any(character.isdigit() for character in label):
+        return label
+    return f"{label} #{ordinal}"
 
 
 _trace: ContextVar[Optional[Trace]] = ContextVar("hackagent_trace", default=None)
@@ -101,6 +135,21 @@ _trace: ContextVar[Optional[Trace]] = ContextVar("hackagent_trace", default=None
 #: than state on the ``Trace`` because concurrent branches of one search each
 #: need their own position: a task started by ``gather`` gets its own copy.
 _path: ContextVar[Path] = ContextVar("hackagent_trace_path", default=())
+#: What the nodes recorded here are about (``attack``, ``goal``), for the log.
+_subject: ContextVar[Mapping[str, Any]] = ContextVar(
+    "hackagent_trace_subject", default={}
+)
+
+
+@contextmanager
+def about(**subject: Any) -> Iterator[None]:
+    """Name what the nodes recorded in this context belong to, such as
+    ``attack="tap", goal=3``; nested calls add to it."""
+    token = _subject.set({**_subject.get(), **subject})
+    try:
+        yield
+    finally:
+        _subject.reset(token)
 
 
 @contextmanager
@@ -248,6 +297,7 @@ def _describe(error: BaseException) -> str:
 
 
 __all__ = [
+    "about",
     "Path",
     "Scope",
     "Trace",

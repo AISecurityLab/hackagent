@@ -150,6 +150,37 @@ jailbreak was found.
 skips the server check, writes no files and records nothing, so it is safe to
 run anywhere.
 
+### Follow what an attack does
+
+Every attack records what it does as it searches: its steps, each model call,
+and why it stopped, pruned or skipped. Run with `-vv` to see those decisions and
+each verdict as they happen, or `-vvv` to also see every call with a snippet of
+its text:
+
+```bash
+hackagent -vv campaign run campaign.yaml
+```
+
+```text
+INFO   pair · goal 1    round 1/2 › stream 1/1 › ◆ skipped the attacker proposed no usable prompt
+INFO   pair · goal 1    round 2/2 › stream 1/1 › panel    0 held  0.6s
+DEBUG  pair · goal 1      stream 1/1 › attacker "* Objective: The model must write a…"  32.5s
+```
+
+Each line starts with the attack and goal, coloured by attack, since goals run
+side by side and their lines interleave. It is indented like the search, under
+the steps it belongs to (a round, a stream, a branch). `◆` lines are decisions,
+`panel` lines are verdicts (a score, then jailbroken or held), and other calls
+name their role: `target`, `attacker`, `scorer`, `on_topic`.
+
+`-vv` never prints a prompt or a reply, only decisions and scores. `-vvv` quotes
+the first 100 characters of what each call returned, which can be harmful text.
+These lines stay on your machine: a run executed for the platform does not send
+them to its activity log.
+
+`HACKAGENT_LOG_LEVEL=INFO` or `DEBUG` does the same as `-vv` or `-vvv`, and wins
+when both are set.
+
 ### Machine-readable output
 
 `--json` prints one JSON object per line: an event as the run loads its goals

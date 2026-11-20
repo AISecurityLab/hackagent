@@ -32,6 +32,10 @@ The campaign runner opens a :func:`recording` per goal and records every
 call itself, so attacks mark only their own structure: a :func:`phase` per
 iteration and a :func:`decision` when the search turns.
 
+Each node is also logged as it is recorded (:mod:`.trace_log`), naming the
+attack and goal the runner set with :func:`about`, so a run can be followed
+in its log while it happens.
+
 #### Scope
 
 Where a node belongs. `goal` is one goal&#x27;s search; `run` is work a
@@ -50,6 +54,15 @@ One node of a search, at a known position in it.
 #### data
 
 Node-specific payload: the call, the decision, or the artifact.
+
+#### parent
+
+```python
+@property
+def parent() -> Path
+```
+
+The path of the node this one sits under; `()` for a top-level node.
 
 #### under
 
@@ -74,6 +87,16 @@ def add(node: str, *, label: str = "", **fields: Any) -> TraceNode
 ```
 
 Append a node as the next child of the current path.
+
+#### about
+
+```python
+@contextmanager
+def about(**subject: Any) -> Iterator[None]
+```
+
+Name what the nodes recorded in this context belong to, such as
+`attack="tap", goal=3`; nested calls add to it.
 
 #### recording
 
@@ -151,6 +174,15 @@ def record_judge_call(sample: Sample, verdict: Verdict,
 ```
 
 Record one panel verdict.
+
+#### evaluation\_request
+
+```python
+@contextmanager
+def evaluation_request(prompt: str, response: str) -> Iterator[None]
+```
+
+Keep evaluator inputs separable for independent retention filtering.
 
 #### traced\_completion
 

@@ -30,7 +30,10 @@ from hackagent.interfaces.cli.bootstrap import (
 )
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.cli.help_page import _help_option_callback
-from hackagent.interfaces.cli.logging_setup import setup_package_logging
+from hackagent.interfaces.cli.logging_setup import (
+    apply_verbosity,
+    setup_package_logging,
+)
 from hackagent.interfaces.cli.safe_stdio import (
     configure_safe_stdio,
     install_on_click_command,
@@ -121,6 +124,12 @@ def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
                 "in the configuration file.[/dim]"
             )
         ctx.exit(1)
+
+    # -vv shows what attacks decide, -vvv every call they make; a count given
+    # here or saved in the configuration file sets the log level.
+    config = ctx.obj["config"]
+    if config.source_of("verbose") != "Default":
+        apply_verbosity(config.verbose)
 
     # Launch TUI by default if no subcommand is provided
     if ctx.invoked_subcommand is None:

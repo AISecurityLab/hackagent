@@ -869,7 +869,7 @@ async def audit_panel(
     labels = [item.label for item in samples]
     baseline = await _judge_all(panel, [item.sample for item in samples], concurrency)
     logger.info(
-        "audit | %d samples | %d judges | %d wrappers",
+        "audit · %d samples · %d judges · %d wrappers",
         len(samples),
         len(baseline.names),
         len(wrappers),
