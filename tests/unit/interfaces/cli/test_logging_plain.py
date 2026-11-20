@@ -90,6 +90,22 @@ def test_a_message_with_line_breaks_stays_one_line():
     )
 
 
+def test_a_record_with_a_traceback_stays_one_line():
+    try:
+        raise ValueError("bad reply")
+    except ValueError:
+        import sys
+
+        failed = record("hackagent.runner", "call failed", exc_info=sys.exc_info())
+
+    line = PlainFormatter().format(failed)
+
+    assert "\n" not in line
+    message = LINE.match(line)["message"]
+    assert message.startswith("call failed ⏎ Traceback (most recent call last):")
+    assert message.endswith("ValueError: bad reply")
+
+
 def test_logs_go_to_stderr_so_stdout_stays_command_output(monkeypatch):
     import sys
 

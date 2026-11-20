@@ -183,10 +183,10 @@ class PlainFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         step = trace_step(record)
         message = trace_breadcrumb(step) if step is not None else record.getMessage()
-        line = plain_line(record.levelname, one_line(message), record.created)
         if record.exc_info:
-            line += "\n" + self.formatException(record.exc_info)
-        return line
+            # The traceback joins the message, so the record stays one line.
+            message += "\n" + self.formatException(record.exc_info)
+        return plain_line(record.levelname, one_line(message), record.created)
 
 
 def logs_to_terminal() -> bool:
