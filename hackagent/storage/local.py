@@ -1981,20 +1981,12 @@ class LocalBackend:
         """Return the per-goal judge vote patterns of a campaign run."""
         with self._lock:
             rows = self._conn.execute(
-                "SELECT * FROM goal_judge_votes WHERE campaign_run_id=?",
+                "SELECT campaign_run_id, run_id, goal_index, outcome, votes, "
+                "attempts FROM goal_judge_votes WHERE campaign_run_id=?",
                 (campaign_run_id,),
             ).fetchall()
-        return [
-            GoalJudgeVotes(
-                campaign_run_id=row["campaign_run_id"],
-                run_id=row["run_id"],
-                goal_index=row["goal_index"],
-                outcome=row["outcome"],
-                votes=row["votes"],
-                attempts=row["attempts"],
-            )
-            for row in rows
-        ]
+        # Positional: a report reads one row per goal, run and vote pattern.
+        return [GoalJudgeVotes(*row) for row in rows]
 
     def report_latencies(self, run_ids: List[str]) -> List[Latency]:
         """Return the distinct target latencies recorded per run.

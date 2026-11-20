@@ -76,7 +76,7 @@ class Target:
         self.cwds.append(str(cwd))
         self.poisons.append((cwd / self.poison_path).read_text(encoding="utf-8"))
         self.listings.append(
-            {str(p.relative_to(cwd)) for p in cwd.rglob("*") if p.is_file()}
+            {p.relative_to(cwd).as_posix() for p in cwd.rglob("*") if p.is_file()}
         )
         if self.touch:
             (cwd / self.touch).write_text("left over", encoding="utf-8")

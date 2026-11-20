@@ -30,7 +30,7 @@ GOALS = 2_000
 ATTEMPTS = 10  # per attack run and goal: 5 * 2000 * 10 = 100k results
 STEPS = 3  # per attempt: 300k traces
 BUDGET_S = 1.0
-TRIES = 3
+TRIES = 5
 CAMPAIGN = "c0000000-0000-4000-8000-000000000100"
 
 

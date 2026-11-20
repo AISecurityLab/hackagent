@@ -34,7 +34,7 @@ same floats whatever order they read the rows in.
 from __future__ import annotations
 
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from fractions import Fraction
 from itertools import combinations
 from typing import Any, Iterable, Optional, Sequence
@@ -94,18 +94,20 @@ def _patterns(count: Counter[tuple[str, str]]) -> list[dict[str, Any]]:
 
 
 def _weighted(
-    rows: Sequence[tuple[GoalJudgeVotes, str, str]], key: Any
+    goals: int, shares: dict[tuple[str, str], Counter[int]]
 ) -> dict[str, Any]:
-    """Goal-weighted outcome patterns of ``rows``, goals grouped by ``key``."""
-    per_goal: Counter[Any] = Counter()
-    for row, _, _ in rows:
-        per_goal[key(row)] += row.attempts
-    weights: dict[tuple[str, str], Fraction] = {}
-    for row, outcome, pattern in rows:
-        share = Fraction(row.attempts, per_goal[key(row)])
-        weights[(outcome, pattern)] = weights.get((outcome, pattern), 0) + share
+    """Goal-weighted outcome patterns over ``goals`` goals.
+
+    ``shares`` maps each ``(outcome, pattern)`` to its attempts per goal size:
+    shares over the same goal size add as integers, so only the few distinct
+    sizes are summed as fractions, still exactly.
+    """
+    weights = {
+        label: sum((Fraction(n, size) for size, n in sizes.items()), Fraction(0))
+        for label, sizes in shares.items()
+    }
     return {
-        "goals": len({row.goal_index for row, _, _ in rows}),
+        "goals": goals,
         "outcome_patterns": [
             {"outcome": outcome, "pattern": pattern, "weight": float(weight)}
             for (outcome, pattern), weight in sorted(weights.items())
@@ -142,12 +144,37 @@ def judge_agreement(
     """The ``judge_agreement`` of a report: agreement across the attempts of
     ``runs`` (their stored vote rows; rows of other runs are ignored)."""
     ids = {run.id for run in runs}
-    counted = sorted(
-        (row for row in rows if row.run_id in ids and row.attempts > 0),
-        key=lambda row: (row.run_id, row.goal_index, row.outcome, row.votes),
-    )
-    parsed = [(row, json.loads(row.votes)) for row in counted]
-    judges = sorted({judge for _, votes in parsed for judge in votes})
+    counted = [row for row in rows if row.run_id in ids and row.attempts > 0]
+    recorded_votes = {
+        votes: json.loads(votes) for votes in {row.votes for row in counted}
+    }
+    judges = sorted({judge for votes in recorded_votes.values() for judge in votes})
+
+    # Every tally but the goal weights depends only on a row's run, outcome
+    # and votes, and a campaign has few distinct ones: add up their attempts
+    # first.
+    grouped: Counter[tuple[str, str, str]] = Counter()
+    goal_size: Counter[int] = Counter()
+    run_goal_size: Counter[tuple[str, int]] = Counter()
+    for row in counted:
+        grouped[(row.run_id, row.outcome, row.votes)] += row.attempts
+        goal_size[row.goal_index] += row.attempts
+        run_goal_size[(row.run_id, row.goal_index)] += row.attempts
+    valid_votes: dict[str, dict[str, int]] = {}
+    pattern_of: dict[str, str] = {}
+    for votes, recorded in recorded_votes.items():
+        valid_votes[votes] = {
+            judge: recorded[judge]
+            for judge in judges
+            if judge in recorded
+            and recorded[judge] is not None
+            and recorded[judge] != INVALID_VOTE
+            and recorded[judge] in _VALID
+        }
+        pattern_of[votes] = "".join(
+            str(valid_votes[votes][judge]) if judge in valid_votes[votes] else "?"
+            for judge in judges
+        )
 
     status: dict[str, Counter[str]] = {judge: Counter() for judge in judges}
     pairs = {pair: Counter() for pair in combinations(judges, 2)}
@@ -158,31 +185,40 @@ def judge_agreement(
     patterns: Counter[str] = Counter()
     outcome_patterns: Counter[tuple[str, str]] = Counter()
     by_run: dict[str, dict[str, Counter[Any]]] = {}
-    labelled: list[tuple[GoalJudgeVotes, str, str]] = []
     complete: Counter[int] = Counter()
     voted = majority = 0
 
-    for row, recorded in parsed:
-        n = row.attempts
-        valid: dict[str, int] = {}
+    # Goal weights: across runs a goal is its index; in a run's breakdown,
+    # the run's own attempts at it.
+    shares: defaultdict[tuple[str, str], Counter[int]] = defaultdict(Counter)
+    run_shares: defaultdict[str, defaultdict[tuple[str, str], Counter[int]]] = (
+        defaultdict(lambda: defaultdict(Counter))
+    )
+    for row in counted:
+        label = (_outcome(row.outcome), pattern_of[row.votes])
+        shares[label][goal_size[row.goal_index]] += row.attempts
+        run_shares[row.run_id][label][run_goal_size[(row.run_id, row.goal_index)]] += (
+            row.attempts
+        )
+    run_goals = Counter(run_id for run_id, _ in run_goal_size)
+
+    for (run_id, bucket, votes), n in grouped.items():
+        recorded = recorded_votes[votes]
+        valid = valid_votes[votes]
         for judge in judges:
-            if judge not in recorded:
+            if judge in valid:
+                status[judge]["valid"] += n
+                status[judge]["success"] += n * valid[judge]
+            elif judge not in recorded:
                 status[judge]["missing"] += n
             elif recorded[judge] is None:
                 status[judge]["abstained"] += n
-            elif recorded[judge] != INVALID_VOTE and recorded[judge] in _VALID:
-                valid[judge] = recorded[judge]
-                status[judge]["valid"] += n
-                status[judge]["success"] += n * recorded[judge]
             else:
                 status[judge]["invalid"] += n
-        pattern = "".join(
-            str(valid[judge]) if judge in valid else "?" for judge in judges
-        )
-        outcome = _outcome(row.outcome)
+        pattern = pattern_of[votes]
+        outcome = _outcome(bucket)
         positive = sum(valid.values())
         category = _category(valid)
-        labelled.append((row, outcome, pattern))
 
         distribution[category] += n
         vote_counts[(len(valid), positive)] += n
@@ -192,7 +228,7 @@ def judge_agreement(
         patterns[pattern] += n
         outcome_patterns[(outcome, pattern)] += n
         mine = by_run.setdefault(
-            row.run_id,
+            run_id,
             {
                 "distribution": Counter(),
                 "votes": Counter(),
@@ -221,9 +257,7 @@ def judge_agreement(
     }
     return {
         "unit": "attempt",
-        "goal_weighted": _weighted(labelled, lambda row: row.goal_index)
-        if labelled
-        else {"goals": 0, "outcome_patterns": []},
+        "goal_weighted": _weighted(len(goal_size), shares),
         "outcome_patterns": _patterns(outcome_patterns),
         "patterns": [
             {"pattern": pattern, "attempts": count}
@@ -274,10 +308,7 @@ def judge_agreement(
         "runs": [
             {
                 "run_id": run.id,
-                "goal_weighted": _weighted(
-                    [item for item in labelled if item[0].run_id == run.id],
-                    lambda row: row.goal_index,
-                ),
+                "goal_weighted": _weighted(run_goals[run.id], run_shares[run.id]),
                 "outcome_patterns": _patterns(by_run[run.id]["outcome_patterns"]),
                 "patterns": [
                     {"pattern": pattern, "attempts": count}
