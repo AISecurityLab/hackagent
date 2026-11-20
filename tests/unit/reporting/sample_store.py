@@ -3,10 +3,10 @@
 
 """Load the conformance sample into a ``LocalBackend``.
 
-Agents, campaigns, attacks and runs are inserted as they are. Results and
-traces go through the backend's own write methods, with ids and clock
-pinned to the sample's, so their per-goal tallies are kept by the same code
-that keeps them for a real campaign. Revisions and run timestamps, which
+Agents, campaigns, attacks and runs are inserted as they are. Results,
+traces and reviews go through the backend's own write methods, with ids and
+clock pinned to the sample's, so their per-goal tallies are kept by the same
+code that keeps them for a real campaign. Revisions and run timestamps, which
 those writes move, are then set to the sample's values.
 """
 
@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Iterator
 from unittest import mock
 from uuid import UUID
 
+from hackagent.reporting import parse_review
 from hackagent.storage.local import LocalBackend
 
 
@@ -25,6 +27,9 @@ from hackagent.storage.local import LocalBackend
 def _pinned(ident: str, at: str) -> Iterator[None]:
     with (
         mock.patch("hackagent.storage.local._now_str", return_value=at),
+        mock.patch(
+            "hackagent.storage.local._now", return_value=datetime.fromisoformat(at)
+        ),
         mock.patch("hackagent.storage.local.uuid.uuid4", return_value=UUID(ident)),
     ):
         yield
@@ -141,8 +146,24 @@ def load_sample(backend: LocalBackend, sample: dict[str, Any]) -> None:
                 UUID(result["id"]),
                 evaluation_status=result["evaluation_status"],
                 evaluation_notes=result["evaluation_notes"],
+                evaluation_metrics=result["evaluation_metrics"],
                 agent_specific_data=result["agent_specific_data"],
                 latency_ms=result["latency_ms"],
+            )
+
+    # As a reviewer records them, in order.
+    for review in sample["reviews"]:
+        with _pinned(review["id"], review["created_at"]):
+            backend.review_attempt(
+                review["result"],
+                parse_review(
+                    {
+                        "outcome": review["outcome"],
+                        "explanation": review["explanation"],
+                        "expected_review_id": review["supersedes"],
+                    }
+                ),
+                reviewer=review["reviewer"],
             )
 
     for run in sample["campaign_runs"]:

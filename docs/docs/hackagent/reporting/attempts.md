@@ -26,6 +26,14 @@ def attempt_page(
 by the database), with the page of the first jailbreak. `query` is the
 request&#x27;s query parameters, which the page links keep.
 
+#### trace\_item
+
+```python
+def trace_item(trace: StructureTrace) -> dict[str, Any]
+```
+
+Render one trace step as it appears in a `/structure` response.
+
 #### attack\_structure
 
 ```python

@@ -15,7 +15,13 @@ updates them in the same transaction as every write that affects them:
 * result or trace deleted: recompute both rows of the goal from what is left,
   with :func:`goal_outcome`, :func:`trace_coverage` and :func:`goal_usage`
   (or delete them when no result is left);
+* review recorded: recompute the goal's :class:`GoalOutcome` as for a
+  result update (the review changes the attempt's bucket);
 * attack run deleted: delete its rows.
+
+A third table, :class:`GoalJudgeVotes`, counts the goal's attempts per
+pattern of judge votes. Recompute it with :func:`goal_judge_votes` whenever
+the goal's :class:`GoalOutcome` is recomputed from its results.
 
 Timestamps are timezone-aware datetimes. Ids are lowercase canonical UUID
 strings; ordering "by ``created_at`` then ``id``" compares those strings,
@@ -24,11 +30,17 @@ which is also how Postgres orders ``uuid`` and SQLite orders ``TEXT``.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
-from hackagent.reporting.buckets import JAILBREAK, result_bucket
+from hackagent.reporting.buckets import (
+    JAILBREAK,
+    effective_bucket,
+    overrides,
+    result_bucket,
+)
 
 #: Label of the usage row that counts a goal's ``interaction`` steps.
 INTERACTION = ""
@@ -63,6 +75,43 @@ def _path(data: Any, *keys: str) -> Any:
     return data
 
 
+#: :func:`judge_votes` of an attempt no judge voted on.
+NO_VOTES = "{}"
+
+#: A judge's vote that is neither 0, 1 nor null.
+INVALID_VOTE = "invalid"
+
+
+def is_judge(key: str) -> bool:
+    """Whether an ``evaluation_metrics`` key holds one judge's vote.
+
+    Judges record ``eval_<judge>`` (``1`` jailbreak, ``0`` mitigated, ``null``
+    abstained); ``eval_<judge>_mean`` is a score, not a vote.
+    """
+    return key.startswith("eval_") and not key.endswith("_mean")
+
+
+def judge_votes(metrics: Optional[Mapping[str, Any]]) -> str:
+    """The judges' votes on one attempt, as the text key the tallies store.
+
+    A JSON object with sorted keys and no spaces, mapping each judge that
+    recorded a vote (``eval_<judge>``) to ``1``, ``0``, ``null`` (abstained)
+    or ``"invalid"``. A judge with no key in ``metrics`` is left out (it
+    did not vote).
+    """
+    votes: dict[str, Any] = {}
+    for key, value in (metrics or {}).items():
+        if not isinstance(key, str) or not is_judge(key):
+            continue
+        if value is None:
+            votes[key] = None
+        elif not isinstance(value, str) and value in (0, 1):
+            votes[key] = int(value)
+        else:
+            votes[key] = INVALID_VOTE
+    return json.dumps(votes, sort_keys=True, separators=(",", ":"))
+
+
 # ── Light input rows ─────────────────────────────────────────────────────────
 
 
@@ -77,12 +126,18 @@ class ResultRow:
                agent_specific_data->>'subcategory'             AS subcategory,
                (agent_specific_data->'attack_metadata'
                   ->>'goal_active_target_elapsed_s')::float     AS active_elapsed_s,
-               created_at, updated_at
+               created_at, updated_at,
+               evaluation_metrics,
+               <outcome of the result's latest review>         AS review
         FROM result WHERE run_id = %s AND goal_index = %s
 
     ``category`` and ``subcategory`` are ``None`` when missing or empty.
-    ``active_elapsed_s`` is ``None`` unless it is a JSON number.
-    :meth:`from_data` builds the row from a result already in memory.
+    ``active_elapsed_s`` is ``None`` unless it is a JSON number. ``review`` is
+    the outcome of the attempt's latest review
+    (:class:`~hackagent.reporting.reviews.Review`), ``None`` when it has none
+    or the latest withdraws. ``votes`` is :func:`judge_votes` of
+    ``evaluation_metrics``. :meth:`from_data` builds the row from a result
+    already in memory.
     """
 
     id: str
@@ -94,6 +149,18 @@ class ResultRow:
     active_elapsed_s: Optional[float]
     created_at: datetime
     updated_at: datetime
+    review: Optional[str] = None
+    votes: str = NO_VOTES
+
+    @property
+    def automated_bucket(self) -> str:
+        """The bucket the automated evaluation gave the attempt."""
+        return result_bucket(self.evaluation_status, self.evaluation_notes)
+
+    @property
+    def bucket(self) -> str:
+        """The attempt's bucket, its latest review applied."""
+        return effective_bucket(self.automated_bucket, self.review)
 
     @classmethod
     def from_data(
@@ -106,11 +173,15 @@ class ResultRow:
         agent_specific_data: Optional[Mapping[str, Any]],
         created_at: datetime,
         updated_at: datetime,
+        evaluation_metrics: Optional[Mapping[str, Any]] = None,
+        review: Optional[str] = None,
     ) -> ResultRow:
         """Build the row from a result already in memory.
 
         Category, subcategory and the goal clock are read from
-        ``agent_specific_data``, as the stored columns are.
+        ``agent_specific_data``, as the stored columns are; the votes from
+        ``evaluation_metrics``. ``review`` is the outcome of the result's
+        latest review.
         """
         data = agent_specific_data or {}
         return cls(
@@ -125,6 +196,8 @@ class ResultRow:
             ),
             created_at=created_at,
             updated_at=updated_at,
+            review=review,
+            votes=judge_votes(evaluation_metrics),
         )
 
 
@@ -227,10 +300,10 @@ class GoalOutcome:
                                              one, ``''`` when none has
     subcategory                text          of that same attempt, or ``''``
     attempts                   integer       results
-    jailbreak                  integer       results per bucket
-    mitigated                  integer
-    error                      integer
-    pending                    integer
+    jailbreak                  integer       results per bucket, with
+    mitigated                  integer       human reviews applied
+    error                      integer       (:func:`~hackagent.reporting.
+    pending                    integer       buckets.effective_bucket`)
     first_jailbreak_attempt    integer, null ordinal (1-based, ``created_at``
                                              then ``id``) of the first jailbreak
     min_jailbreak_elapsed_s    float, null   smallest active goal clock among
@@ -241,6 +314,11 @@ class GoalOutcome:
     labelled_call_attempts     integer       see :class:`TraceCoverage`
     target_call_attempts       integer
     interaction_attempts       integer
+    reviewed_attempts          integer       results whose latest review has
+                                             an outcome
+    inconclusive_attempts      integer       of which ``inconclusive``
+    overridden_attempts        integer       of which the review changed the
+                                             automated bucket
     =========================  ============  ===================================
 
     "Latest" is the greatest (``created_at``, ``id``).
@@ -265,6 +343,9 @@ class GoalOutcome:
     labelled_call_attempts: int = 0
     target_call_attempts: int = 0
     interaction_attempts: int = 0
+    reviewed_attempts: int = 0
+    inconclusive_attempts: int = 0
+    overridden_attempts: int = 0
 
     @property
     def coverage(self) -> TraceCoverage:
@@ -308,6 +389,34 @@ class GoalUsage:
     prompt_tokens: int
     completion_tokens: int
     usage_calls: int
+
+
+@dataclass(frozen=True)
+class GoalJudgeVotes:
+    """Table ``goal_judge_votes``: a goal's attempts per pattern of judge votes.
+
+    Primary key ``(run_id, goal_index, outcome, votes)``; index
+    ``(campaign_run_id, run_id, goal_index)``.
+
+    ===============  ==========  ============================================
+    column           type        value
+    ===============  ==========  ============================================
+    campaign_run_id  uuid, null  the attack run's campaign run
+    run_id           uuid        the attack run
+    goal_index       integer
+    outcome          text        the automated bucket (reviews do not change
+                                 what the judges decided)
+    votes            text        :func:`judge_votes` of the attempts
+    attempts         integer     attempts with this outcome and these votes
+    ===============  ==========  ============================================
+    """
+
+    campaign_run_id: Optional[str]
+    run_id: str
+    goal_index: int
+    outcome: str
+    votes: str
+    attempts: int
 
 
 # ── Rules ────────────────────────────────────────────────────────────────────
@@ -364,9 +473,8 @@ def goal_outcome(
     if not results:
         return None
     ordered = sorted(results, key=lambda row: (row.created_at, row.id))
-    buckets = [
-        result_bucket(row.evaluation_status, row.evaluation_notes) for row in ordered
-    ]
+    buckets = [row.bucket for row in ordered]
+    reviewed = [row for row in ordered if row.review is not None]
     latest = ordered[-1]
     labelled = next((row for row in reversed(ordered) if row.category), None)
     jailbreaks = [row for row, bucket in zip(ordered, buckets) if bucket == JAILBREAK]
@@ -395,7 +503,31 @@ def goal_outcome(
         labelled_call_attempts=coverage.labelled_call_attempts,
         target_call_attempts=coverage.target_call_attempts,
         interaction_attempts=coverage.interaction_attempts,
+        reviewed_attempts=len(reviewed),
+        inconclusive_attempts=sum(row.review == "inconclusive" for row in reviewed),
+        overridden_attempts=sum(
+            overrides(row.automated_bucket, row.review) for row in reviewed
+        ),
     )
+
+
+def goal_judge_votes(
+    *,
+    campaign_run_id: Optional[str],
+    run_id: str,
+    goal_index: int,
+    results: Iterable[ResultRow],
+) -> list[GoalJudgeVotes]:
+    """The vote pattern rows of a goal from every one of its results, ordered
+    by outcome, then votes."""
+    counts: dict[tuple[str, str], int] = {}
+    for row in results:
+        key = (row.automated_bucket, row.votes)
+        counts[key] = counts.get(key, 0) + 1
+    return [
+        GoalJudgeVotes(campaign_run_id, run_id, goal_index, outcome, votes, count)
+        for (outcome, votes), count in sorted(counts.items())
+    ]
 
 
 def goal_usage(
@@ -478,17 +610,23 @@ def add_trace(
 
 
 __all__ = [
+    "GoalJudgeVotes",
     "GoalOutcome",
     "GoalUsage",
     "INTERACTION",
     "INTERACTION_STEP",
+    "INVALID_VOTE",
+    "NO_VOTES",
     "ResultRow",
     "TraceCoverage",
     "TraceFlags",
     "TraceRow",
     "add_trace",
+    "goal_judge_votes",
     "goal_outcome",
     "goal_usage",
+    "is_judge",
+    "judge_votes",
     "trace_coverage",
     "trace_flags",
     "usage_label",

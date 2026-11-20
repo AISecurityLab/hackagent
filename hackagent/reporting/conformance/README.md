@@ -18,8 +18,9 @@ fixed ISO 8601 string in UTC; store them as they are.
 | `attacks` | `id`, `type`, `agent`, `configuration`, `created_at` |
 | `campaign_runs` (parent runs) | `id`, `name`, `campaign` (or null), `agent`, `status`, `executor` (`local` or `cli`), `configuration` (the campaign spec), `audit` (or null), `notes` (or null), `revision`, `created_at`, `updated_at`, `finished_at` (or null) |
 | `attack_runs` (child runs) | `id`, `campaign_run`, `attack`, `agent`, `status`, `configuration` (`run_config`), `notes` (or null), `created_at`, `updated_at` |
-| `results` | `id`, `run` (attack run), `goal`, `goal_index`, `request_payload`, `agent_specific_data`, `evaluation_status`, `evaluation_notes` (or null), `latency_ms` (or null), `created_at`, `updated_at` |
+| `results` | `id`, `run` (attack run), `goal`, `goal_index`, `request_payload`, `agent_specific_data`, `evaluation_status`, `evaluation_notes` (or null), `evaluation_metrics`, `latency_ms` (or null), `created_at`, `updated_at` |
 | `traces` | `id`, `result`, `sequence`, `step_type`, `content`, `timestamp` |
+| `reviews` (human reviews of results, in the order they were recorded) | `id`, `result`, `outcome` (`jailbreak`, `mitigated`, `inconclusive`, or null for a withdrawal), `explanation`, `reviewer`, `created_at`, `supersedes` (the review it follows, or null) |
 
 `null` notes mean "no notes"; a store that keeps an empty string instead
 stores `''`. As the runner writes it, a result's `agent_specific_data`
@@ -34,11 +35,17 @@ runner records for every target exchange.
    uses, so the per-goal tallies (`goal_outcome`, `goal_usage`) are kept by
    the production write path: the result, then its traces in `sequence`
    order, then its evaluation (`evaluation_status`, `evaluation_notes`,
-   `agent_specific_data`, `latency_ms`).
-3. Then overwrite every timestamp the writes set (`created_at`/`timestamp`,
+   `evaluation_metrics`, `agent_specific_data`, `latency_ms`). The per-goal
+   tallies are `goal_outcome`, `goal_usage` and `goal_judge_votes`.
+3. Record each review, in order, through the same path as
+   `POST /result/{id}/reviews` (body `outcome`, `explanation`,
+   `expected_review_id` = the sample's `supersedes`), as its `reviewer`, with
+   its id and `created_at`. Reviews change the goal's tallies like an
+   evaluation does.
+4. Then overwrite every timestamp the writes set (`created_at`/`timestamp`,
    `updated_at` of results; `updated_at` of runs) with the sample's, and
    recompute the tallies' timestamps if they were taken from the clock.
-4. Finally set each campaign run's `revision` to the sample's value: the
+5. Finally set each campaign run's `revision` to the sample's value: the
    writes bump it, and how many times is each server's own business. The
    ETags in the cases are computed from these values.
 
@@ -58,6 +65,9 @@ A case with `mutates: true` deletes data: run it against a freshly loaded
 sample. All others leave the store as it was.
 
 Not in the cases, because they need a write: after any write that changes a
-campaign run's report (a result, a trace, an attack run's or the campaign
-run's status), the next `GET` with the old ETag must answer `200` with a new
-ETag. Each server tests that itself.
+campaign run's report (a result, a trace, a review, an attack run's or the
+campaign run's status), the next `GET` with the old ETag must answer `200`
+with a new ETag. A review that is recorded answers `201` with the review
+(`hackagent.reporting.review_created`); its id and time are the server's, so
+each server tests that itself too, along with what the review then changes
+in the reports.

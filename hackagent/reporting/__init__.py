@@ -17,6 +17,9 @@ functions, so the two servers cannot drift:
 * :mod:`~hackagent.reporting.goals`, :mod:`~hackagent.reporting.report`,
   :mod:`~hackagent.reporting.attempts` and :mod:`~hackagent.reporting.costs`
   build the responses;
+* :mod:`~hackagent.reporting.reviews` applies human reviews of attempts and
+  serves their routes; :mod:`~hackagent.reporting.agreement` measures how the
+  judges agree;
 * :mod:`~hackagent.reporting.http` parses requests, pages and computes ETags;
 * :mod:`~hackagent.reporting.conformance` ships a sample and the exact
   responses both servers must return for it.
@@ -24,6 +27,7 @@ functions, so the two servers cannot drift:
 Nothing here touches a database, a web framework or the rest of the SDK.
 """
 
+from hackagent.reporting.agreement import judge_agreement
 from hackagent.reporting.attempts import attack_structure, attempt_page
 from hackagent.reporting.buckets import (
     BUCKETS,
@@ -31,7 +35,10 @@ from hackagent.reporting.buckets import (
     JAILBREAK,
     MITIGATED,
     PENDING,
+    REVIEW_OUTCOMES,
     Bucket,
+    ReviewOutcome,
+    effective_bucket,
     result_bucket,
 )
 from hackagent.reporting.costs import campaign_run_costs
@@ -61,10 +68,19 @@ from hackagent.reporting.rows import (
     FirstSuccess,
     GoalTotal,
     Latency,
+    Review,
     StructureResult,
     StructureTrace,
 )
+from hackagent.reporting.reviews import (
+    ReviewRequest,
+    check_review,
+    parse_review,
+    review_created,
+    review_history,
+)
 from hackagent.reporting.tallies import (
+    GoalJudgeVotes,
     GoalOutcome,
     GoalUsage,
     ResultRow,
@@ -72,8 +88,10 @@ from hackagent.reporting.tallies import (
     TraceFlags,
     TraceRow,
     add_trace,
+    goal_judge_votes,
     goal_outcome,
     goal_usage,
+    judge_votes,
     trace_coverage,
     trace_flags,
 )
@@ -87,6 +105,7 @@ __all__ = [
     "ERROR",
     "FirstSuccess",
     "GoalFilters",
+    "GoalJudgeVotes",
     "GoalOutcome",
     "GoalSummary",
     "GoalTotal",
@@ -95,7 +114,11 @@ __all__ = [
     "Latency",
     "MITIGATED",
     "PENDING",
+    "REVIEW_OUTCOMES",
     "ResultRow",
+    "Review",
+    "ReviewOutcome",
+    "ReviewRequest",
     "StructureResult",
     "StructureTrace",
     "TERMINAL_STATUSES",
@@ -110,16 +133,24 @@ __all__ = [
     "campaign_run_summaries",
     "campaign_run_summary",
     "category_summaries",
+    "check_review",
     "compare_runs",
+    "effective_bucket",
+    "goal_judge_votes",
     "goal_listing",
     "goal_matrix",
     "goal_outcome",
     "goal_usage",
     "goal_verdict",
+    "judge_agreement",
+    "judge_votes",
     "outcome_counts",
+    "parse_review",
     "pick_previous",
     "previous_summary",
     "result_bucket",
+    "review_created",
+    "review_history",
     "summarize_goals",
     "trace_coverage",
     "trace_flags",

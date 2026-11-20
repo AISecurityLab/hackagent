@@ -9,7 +9,8 @@ Used when the local backend is selected (the default; see
 a stable schema that the TUI, the web dashboard and the SDK all read. Besides
 the Store protocol it keeps per-goal tallies and a revision counter per
 campaign run, updated in the transaction of every write, so the reporting
-reads (``report_*``) never recount results.
+reads (``report_*``) never recount results. Human reviews of attempts are
+kept in ``attempt_reviews``, append-only, and count in the tallies.
 
 Thread safety: a per-instance lock serialises access to the one connection,
 so goal-batch workers may write concurrently.
@@ -22,7 +23,7 @@ import logging
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
@@ -33,22 +34,31 @@ from hackagent.reporting import (
     Attempt,
     CampaignRun,
     FirstSuccess,
+    GoalJudgeVotes,
     GoalOutcome,
     GoalTotal,
     GoalUsage,
     Latency,
     ResultRow,
+    Review,
+    ReviewRequest,
     StructureResult,
     StructureTrace,
     TraceCoverage,
     TraceRow,
     add_trace,
+    check_review,
+    effective_bucket,
+    goal_judge_votes,
     goal_outcome,
     goal_usage,
+    judge_votes,
     result_bucket,
     trace_coverage,
     trace_flags,
 )
+from hackagent.reporting.http import NotFound
+from hackagent.reporting.reviews import RESULT_NOT_FOUND
 from hackagent.reporting.tallies import usage_label
 from hackagent.storage.records import (
     AgentRecord,
@@ -68,8 +78,21 @@ logger = logging.getLogger("hackagent.storage.local")
 _DEFAULT_DB_PATH = "~/.local/share/hackagent/hackagent.db"
 
 #: ``PRAGMA user_version`` once the per-goal tallies cover every result. A
-#: database written before them has its tallies computed when it is opened.
-_TALLY_VERSION = 1
+#: database written before them, or before their review counts and judge
+#: votes, has its tallies computed when it is opened.
+_TALLY_VERSION = 2
+
+
+def _effective_bucket(
+    status: Optional[str], notes: Optional[str], review: Optional[str]
+) -> str:
+    return effective_bucket(result_bucket(status, notes), review)
+
+
+#: The latest review of the result aliased ``r``: greatest ``created_at``,
+#: then ``id``.
+_LATEST_REVIEW = """(SELECT h.id FROM attempt_reviews h WHERE h.result_id = r.id
+    ORDER BY h.created_at DESC, h.id DESC LIMIT 1)"""
 
 
 def _json_number(column: str, path: str) -> str:
@@ -87,7 +110,10 @@ _RESULT_ROW = f"""r.id, r.run_id, r.goal_index, r.goal, r.evaluation_status,
     json_extract(r.metadata_json, '$.category') AS category,
     json_extract(r.metadata_json, '$.subcategory') AS subcategory,
     {_json_number("r.metadata_json", "$.attack_metadata.goal_active_target_elapsed_s")}
-        AS active_elapsed_s"""
+        AS active_elapsed_s,
+    r.metrics_json,
+    (SELECT h.outcome FROM attempt_reviews h WHERE h.id = {_LATEST_REVIEW})
+        AS review"""
 
 #: The light columns of :class:`hackagent.reporting.TraceRow`.
 _TRACE_ROW = f"""t.result_id, t.step_type,
@@ -211,6 +237,9 @@ CREATE TABLE IF NOT EXISTS goal_outcomes (
     labelled_call_attempts  INTEGER NOT NULL,
     target_call_attempts    INTEGER NOT NULL,
     interaction_attempts    INTEGER NOT NULL,
+    reviewed_attempts       INTEGER NOT NULL DEFAULT 0,
+    inconclusive_attempts   INTEGER NOT NULL DEFAULT 0,
+    overridden_attempts     INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (run_id, goal_index)
 );
 
@@ -225,6 +254,28 @@ CREATE TABLE IF NOT EXISTS goal_usage (
     completion_tokens INTEGER NOT NULL,
     usage_calls       INTEGER NOT NULL,
     PRIMARY KEY (run_id, goal_index, label)
+);
+
+CREATE TABLE IF NOT EXISTS goal_judge_votes (
+    campaign_run_id TEXT,
+    run_id          TEXT NOT NULL,
+    goal_index      INTEGER NOT NULL,
+    outcome         TEXT NOT NULL,
+    votes           TEXT NOT NULL,
+    attempts        INTEGER NOT NULL,
+    PRIMARY KEY (run_id, goal_index, outcome, votes)
+);
+
+-- Human reviews of attempts (hackagent.reporting.reviews), append-only.
+CREATE TABLE IF NOT EXISTS attempt_reviews (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    result_id TEXT NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+    outcome TEXT CHECK (outcome IN ('jailbreak', 'mitigated', 'inconclusive')),
+    explanation TEXT NOT NULL DEFAULT '',
+    reviewer TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    supersedes_review_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS attack_builder_drafts (
@@ -247,7 +298,18 @@ CREATE INDEX IF NOT EXISTS idx_goal_outcomes_campaign
     ON goal_outcomes(campaign_run_id, run_id, goal_index);
 CREATE INDEX IF NOT EXISTS idx_goal_usage_campaign
     ON goal_usage(campaign_run_id, run_id, goal_index);
+CREATE INDEX IF NOT EXISTS idx_goal_judge_votes_campaign
+    ON goal_judge_votes(campaign_run_id, run_id, goal_index);
+CREATE INDEX IF NOT EXISTS idx_attempt_reviews_latest
+    ON attempt_reviews(result_id, created_at, id);
 """
+
+#: Columns a database written before review counts lacks in ``goal_outcomes``.
+_REVIEW_COUNT_COLUMNS = (
+    "reviewed_attempts",
+    "inconclusive_attempts",
+    "overridden_attempts",
+)
 
 
 def _now_str() -> str:
@@ -286,7 +348,44 @@ def _result_row(row: sqlite3.Row) -> ResultRow:
         active_elapsed_s=row["active_elapsed_s"],
         created_at=_to_dt(row["created_at"]),
         updated_at=_to_dt(row["updated_at"]),
+        review=row["review"],
+        votes=judge_votes(json.loads(row["metrics_json"] or "{}")),
     )
+
+
+def _row_to_review(row: sqlite3.Row) -> Review:
+    return Review(
+        id=row["id"],
+        result_id=row["result_id"],
+        outcome=row["outcome"],
+        explanation=row["explanation"] or "",
+        reviewer=row["reviewer"],
+        created_at=_to_dt(row["created_at"]),
+        supersedes=row["supersedes_review_id"],
+    )
+
+
+def _latest_review(row: sqlite3.Row) -> Optional[Review]:
+    """The latest review joined to a result row as ``review_*`` columns."""
+    if row["review_id"] is None:
+        return None
+    return Review(
+        id=row["review_id"],
+        result_id=row["id"],
+        outcome=row["review_outcome"],
+        explanation=row["review_explanation"] or "",
+        reviewer=row["review_reviewer"],
+        created_at=_to_dt(row["review_created_at"]),
+        supersedes=row["review_supersedes"],
+    )
+
+
+#: The latest review of the results aliased ``r``, as ``review_*`` columns.
+_REVIEW_COLUMNS_SQL = """h.id AS review_id, h.outcome AS review_outcome,
+    h.explanation AS review_explanation, h.reviewer AS review_reviewer,
+    h.created_at AS review_created_at,
+    h.supersedes_review_id AS review_supersedes"""
+_REVIEW_JOIN = f"LEFT JOIN attempt_reviews h ON h.id = {_LATEST_REVIEW}"
 
 
 def _trace_row(row: sqlite3.Row) -> TraceRow:
@@ -326,6 +425,9 @@ def _row_to_outcome(row: sqlite3.Row) -> GoalOutcome:
         labelled_call_attempts=row["labelled_call_attempts"],
         target_call_attempts=row["target_call_attempts"],
         interaction_attempts=row["interaction_attempts"],
+        reviewed_attempts=row["reviewed_attempts"],
+        inconclusive_attempts=row["inconclusive_attempts"],
+        overridden_attempts=row["overridden_attempts"],
     )
 
 
@@ -361,6 +463,9 @@ class LocalBackend:
         self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self._conn.create_function(
             "result_bucket", 2, result_bucket, deterministic=True
+        )
+        self._conn.create_function(
+            "effective_bucket", 3, _effective_bucket, deterministic=True
         )
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
@@ -410,6 +515,16 @@ class LocalBackend:
                 "DEFAULT 0"
             )
         self._conn.execute("DROP INDEX IF EXISTS idx_traces_result")
+        columns = {
+            row[1]
+            for row in self._conn.execute("PRAGMA table_info(goal_outcomes)").fetchall()
+        }
+        for column in _REVIEW_COUNT_COLUMNS:
+            if column not in columns:
+                self._conn.execute(
+                    f"ALTER TABLE goal_outcomes ADD COLUMN {column} INTEGER "
+                    "NOT NULL DEFAULT 0"
+                )
         if self._conn.execute("PRAGMA user_version").fetchone()[0] < _TALLY_VERSION:
             self._rebuild_tallies()
             self._conn.execute(f"PRAGMA user_version = {_TALLY_VERSION}")
@@ -1125,7 +1240,7 @@ class LocalBackend:
             self._conn.commit()
 
     def count_result_buckets(self) -> dict:
-        """Count all results by reporting bucket.
+        """Count all results by reporting bucket, human reviews applied.
 
         Returns:
             A dict with the keys ``total``, ``jailbreaks``, ``mitigated``,
@@ -1133,7 +1248,10 @@ class LocalBackend:
         """
         with self._lock:
             rows = self._conn.execute(
-                "SELECT evaluation_status, evaluation_notes FROM results"
+                f"""SELECT effective_bucket(r.evaluation_status, r.evaluation_notes,
+                        (SELECT h.outcome FROM attempt_reviews h
+                         WHERE h.id = {_LATEST_REVIEW})) AS bucket
+                    FROM results r"""
             ).fetchall()
         buckets = {
             "total": 0,
@@ -1144,7 +1262,7 @@ class LocalBackend:
         }
         for r in rows:
             buckets["total"] += 1
-            b = result_bucket(r["evaluation_status"], r["evaluation_notes"])
+            b = r["bucket"]
             if b == "jailbreak":
                 buckets["jailbreaks"] += 1
             elif b == "mitigated":
@@ -1443,6 +1561,9 @@ class LocalBackend:
             "labelled_call_attempts": outcome.labelled_call_attempts,
             "target_call_attempts": outcome.target_call_attempts,
             "interaction_attempts": outcome.interaction_attempts,
+            "reviewed_attempts": outcome.reviewed_attempts,
+            "inconclusive_attempts": outcome.inconclusive_attempts,
+            "overridden_attempts": outcome.overridden_attempts,
         }
         self._conn.execute(
             f"INSERT OR REPLACE INTO goal_outcomes ({', '.join(values)}) "
@@ -1468,6 +1589,39 @@ class LocalBackend:
             ),
         )
 
+    def _store_judge_votes(
+        self,
+        campaign_run_id: Optional[str],
+        run_id: str,
+        goal_index: int,
+        results: List[ResultRow],
+    ) -> None:
+        """Replace a goal's vote pattern rows with those of ``results``."""
+        self._conn.execute(
+            "DELETE FROM goal_judge_votes WHERE run_id=? AND goal_index=?",
+            (run_id, goal_index),
+        )
+        self._conn.executemany(
+            "INSERT INTO goal_judge_votes (campaign_run_id, run_id, goal_index, "
+            "outcome, votes, attempts) VALUES (?,?,?,?,?,?)",
+            [
+                (
+                    row.campaign_run_id,
+                    row.run_id,
+                    row.goal_index,
+                    row.outcome,
+                    row.votes,
+                    row.attempts,
+                )
+                for row in goal_judge_votes(
+                    campaign_run_id=campaign_run_id,
+                    run_id=run_id,
+                    goal_index=goal_index,
+                    results=results,
+                )
+            ],
+        )
+
     def _goal_results(self, run_id: str, goal_index: int) -> List[ResultRow]:
         rows = self._conn.execute(
             f"SELECT {_RESULT_ROW} FROM results r WHERE r.run_id=? AND r.goal_index=?",
@@ -1481,15 +1635,18 @@ class LocalBackend:
             "SELECT * FROM goal_outcomes WHERE run_id=? AND goal_index=?",
             (run_id, goal_index),
         ).fetchone()
+        parent = self._parent_of(run_id)
+        results = self._goal_results(run_id, goal_index)
         outcome = goal_outcome(
-            campaign_run_id=self._parent_of(run_id),
+            campaign_run_id=parent,
             run_id=run_id,
             goal_index=goal_index,
-            results=self._goal_results(run_id, goal_index),
+            results=results,
             coverage=_row_to_outcome(stored).coverage if stored else TraceCoverage(),
         )
         if outcome is not None:
             self._store_outcome(outcome)
+        self._store_judge_votes(parent, run_id, goal_index, results)
 
     def _count_trace(self, trace_id: str, trace: TraceRow) -> Optional[str]:
         """Count a new trace step in its goal's tallies; returns the goal's
@@ -1542,6 +1699,10 @@ class LocalBackend:
             "DELETE FROM goal_usage WHERE run_id=? AND goal_index=?",
             (run_id, goal_index),
         )
+        self._conn.execute(
+            "DELETE FROM goal_judge_votes WHERE run_id=? AND goal_index=?",
+            (run_id, goal_index),
+        )
         traces = [
             _trace_row(row)
             for row in self._conn.execute(
@@ -1576,6 +1737,7 @@ class LocalBackend:
         if outcome is None:
             return
         self._store_outcome(outcome)
+        self._store_judge_votes(campaign_run_id, run_id, goal_index, results)
         for usage in goal_usage(
             campaign_run_id=campaign_run_id,
             run_id=run_id,
@@ -1588,6 +1750,7 @@ class LocalBackend:
         """Compute every goal's tallies, for a database written before them."""
         self._conn.execute("DELETE FROM goal_outcomes")
         self._conn.execute("DELETE FROM goal_usage")
+        self._conn.execute("DELETE FROM goal_judge_votes")
         parents = {
             row["id"]: row["campaign_run_id"]
             for row in self._conn.execute("SELECT id, campaign_run_id FROM runs")
@@ -1614,7 +1777,7 @@ class LocalBackend:
 
     def _drop_tallies(self, where: str, args: List[Any]) -> None:
         """Delete the tallies of the attack runs ``where`` selects in ``runs``."""
-        for table in ("goal_outcomes", "goal_usage"):
+        for table in ("goal_outcomes", "goal_usage", "goal_judge_votes"):
             self._conn.execute(
                 f"DELETE FROM {table} WHERE run_id IN (SELECT id FROM runs WHERE {where})",
                 args,
@@ -1814,6 +1977,25 @@ class LocalBackend:
             ).fetchall()
         return [_row_to_usage(row) for row in rows]
 
+    def report_judge_votes(self, campaign_run_id: str) -> List[GoalJudgeVotes]:
+        """Return the per-goal judge vote patterns of a campaign run."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM goal_judge_votes WHERE campaign_run_id=?",
+                (campaign_run_id,),
+            ).fetchall()
+        return [
+            GoalJudgeVotes(
+                campaign_run_id=row["campaign_run_id"],
+                run_id=row["run_id"],
+                goal_index=row["goal_index"],
+                outcome=row["outcome"],
+                votes=row["votes"],
+                attempts=row["attempts"],
+            )
+            for row in rows
+        ]
+
     def report_latencies(self, run_ids: List[str]) -> List[Latency]:
         """Return the distinct target latencies recorded per run.
 
@@ -1845,42 +2027,52 @@ class LocalBackend:
         count, and the first jailbreak with its position."""
         if not run_ids:
             return [], 0, None
-        where = f"run_id IN ({_marks(run_ids)}) AND goal_index=?"
+        where = f"r.run_id IN ({_marks(run_ids)}) AND r.goal_index=?"
         args: List[Any] = [*run_ids, goal_index]
         with self._lock:
             total = self._conn.execute(
-                f"SELECT COUNT(*) FROM results WHERE {where}", args
+                f"SELECT COUNT(*) FROM results r WHERE {where}", args
             ).fetchone()[0]
             rows = self._conn.execute(
-                f"""SELECT id, run_id, evaluation_status, evaluation_notes, created_at
-                    FROM results WHERE {where} ORDER BY created_at, id
-                    LIMIT ? OFFSET ?""",
+                f"""SELECT r.id, r.run_id, r.evaluation_status, r.evaluation_notes,
+                        r.created_at, {_REVIEW_COLUMNS_SQL}
+                    FROM results r {_REVIEW_JOIN} WHERE {where}
+                    ORDER BY r.created_at, r.id LIMIT ? OFFSET ?""",
                 [*args, page_size, (page - 1) * page_size],
             ).fetchall()
             first = self._conn.execute(
-                f"""SELECT id, created_at FROM results WHERE {where}
-                    AND result_bucket(evaluation_status, evaluation_notes)='jailbreak'
-                    ORDER BY created_at, id LIMIT 1""",
+                f"""SELECT r.id, r.created_at FROM results r {_REVIEW_JOIN}
+                    WHERE {where}
+                    AND effective_bucket(r.evaluation_status, r.evaluation_notes,
+                                         h.outcome)='jailbreak'
+                    ORDER BY r.created_at, r.id LIMIT 1""",
                 args,
             ).fetchone()
             success = None
             if first:
                 position = self._conn.execute(
-                    f"""SELECT COUNT(*) FROM results WHERE {where}
-                        AND (created_at < ? OR (created_at = ? AND id <= ?))""",
+                    f"""SELECT COUNT(*) FROM results r WHERE {where}
+                        AND (r.created_at < ? OR (r.created_at = ? AND r.id <= ?))""",
                     [*args, first["created_at"], first["created_at"], first["id"]],
                 ).fetchone()[0]
                 success = FirstSuccess(id=first["id"], position=position)
-        attempts = [
-            Attempt(
-                id=row["id"],
-                run_id=row["run_id"],
-                bucket=result_bucket(row["evaluation_status"], row["evaluation_notes"]),
-                notes=row["evaluation_notes"],
-                created_at=_to_dt(row["created_at"]),
+        attempts = []
+        for row in rows:
+            automated = result_bucket(row["evaluation_status"], row["evaluation_notes"])
+            review = _latest_review(row)
+            attempts.append(
+                Attempt(
+                    id=row["id"],
+                    run_id=row["run_id"],
+                    bucket=effective_bucket(
+                        automated, review.outcome if review else None
+                    ),
+                    notes=row["evaluation_notes"],
+                    created_at=_to_dt(row["created_at"]),
+                    automated_bucket=automated,
+                    review=review,
+                )
             )
-            for row in rows
-        ]
         return attempts, total, success
 
     def report_structure(
@@ -1889,7 +2081,8 @@ class LocalBackend:
         """Every attempt of a goal in one attack run, in full, and their traces."""
         with self._lock:
             results = self._conn.execute(
-                "SELECT * FROM results WHERE run_id=? AND goal_index=?",
+                f"""SELECT r.*, {_REVIEW_COLUMNS_SQL} FROM results r {_REVIEW_JOIN}
+                    WHERE r.run_id=? AND r.goal_index=?""",
                 (run_id, goal_index),
             ).fetchall()
             traces = self._conn.execute(
@@ -1907,6 +2100,8 @@ class LocalBackend:
                     request_payload=json.loads(row["request_payload_json"] or "{}"),
                     agent_specific_data=json.loads(row["metadata_json"] or "{}"),
                     created_at=_to_dt(row["created_at"]),
+                    evaluation_metrics=json.loads(row["metrics_json"] or "{}"),
+                    review=_latest_review(row),
                 )
                 for row in results
             ],
@@ -1922,6 +2117,101 @@ class LocalBackend:
                 for row in traces
             ],
         )
+
+    # ── Human reviews ─────────────────────────────────────────────────────────
+
+    def _review_owner(self, result_id: str) -> sqlite3.Row:
+        row = self._conn.execute(
+            "SELECT id, run_id, goal_index, evaluation_status, evaluation_notes "
+            "FROM results WHERE id=?",
+            (result_id,),
+        ).fetchone()
+        if row is None:
+            raise NotFound(RESULT_NOT_FOUND)
+        return row
+
+    def review_attempt(
+        self, result_id: str, request: ReviewRequest, *, reviewer: str
+    ) -> Tuple[Review, Dict[str, Any]]:
+        """Record a human review of the result ``result_id``.
+
+        The review must follow the latest one (``check_review``); it is
+        appended, the goal's tallies are recomputed and its campaign run's
+        revision is bumped, in one transaction. Returns the review and the
+        attempt's ``run_id``, ``goal_index`` and ``automated_bucket``.
+
+        Raises:
+            NotFound: no such result.
+            Conflict: another review was recorded after the expected one.
+            BadRequest: a withdrawal when no review is active.
+        """
+        with self._lock:
+            try:
+                self._conn.execute("BEGIN IMMEDIATE")
+                owner = self._review_owner(result_id)
+                latest = self._conn.execute(
+                    "SELECT * FROM attempt_reviews WHERE result_id=? "
+                    "ORDER BY created_at DESC, id DESC LIMIT 1",
+                    (result_id,),
+                ).fetchone()
+                check_review(_row_to_review(latest) if latest else None, request)
+                review = Review(
+                    id=str(uuid.uuid4()),
+                    result_id=result_id,
+                    outcome=request.outcome,
+                    explanation=request.explanation,
+                    reviewer=reviewer,
+                    # Strictly after the latest, so it is the latest.
+                    created_at=max(
+                        _now(),
+                        _to_dt(latest["created_at"]) + timedelta(microseconds=1)
+                        if latest
+                        else _now(),
+                    ),
+                    supersedes=request.expected_review_id,
+                )
+                self._conn.execute(
+                    """INSERT INTO attempt_reviews (id, result_id, outcome,
+                        explanation, reviewer, created_at, supersedes_review_id)
+                       VALUES (?,?,?,?,?,?,?)""",
+                    (
+                        review.id,
+                        review.result_id,
+                        review.outcome,
+                        review.explanation,
+                        review.reviewer,
+                        _iso(review.created_at),
+                        review.supersedes,
+                    ),
+                )
+                self._refresh_outcome(owner["run_id"], owner["goal_index"])
+                self._bump([self._parent_of(owner["run_id"])])
+                self._conn.commit()
+            except BaseException:
+                self._conn.rollback()
+                raise
+        return review, {
+            "run_id": owner["run_id"],
+            "goal_index": owner["goal_index"],
+            "automated_bucket": result_bucket(
+                owner["evaluation_status"], owner["evaluation_notes"]
+            ),
+        }
+
+    def list_attempt_reviews(self, result_id: str) -> List[Review]:
+        """Every review of the result ``result_id``, newest first.
+
+        Raises:
+            NotFound: no such result.
+        """
+        with self._lock:
+            self._review_owner(result_id)
+            rows = self._conn.execute(
+                "SELECT * FROM attempt_reviews WHERE result_id=? "
+                "ORDER BY created_at DESC, id DESC",
+                (result_id,),
+            ).fetchall()
+        return [_row_to_review(row) for row in rows]
 
     # ── Attack builder drafts ─────────────────────────────────────────────────
 

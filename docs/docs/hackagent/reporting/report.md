@@ -9,6 +9,14 @@ Every function takes rows (:mod:`hackagent.reporting.rows`, the stored
 :class:`~hackagent.reporting.tallies.GoalOutcome`) and returns the JSON body
 of a route, so both servers answer identically.
 
+## CampaignRunSummary Objects
+
+```python
+class CampaignRunSummary(TypedDict)
+```
+
+One campaign run&#x27;s row in `/run/summary`: identity, status, verdicts.
+
 #### iso
 
 ```python
@@ -97,19 +105,21 @@ def scoped_runs(
 
 ```python
 def campaign_run_report(
-        run: CampaignRun,
-        attack_runs: Iterable[AttackRun],
-        outcomes: Iterable[GoalOutcome],
-        *,
-        scope_run_id: Optional[str] = None,
-        previous: Optional[dict[str, Any]] = None) -> dict[str, Any]
+    run: CampaignRun,
+    attack_runs: Iterable[AttackRun],
+    outcomes: Iterable[GoalOutcome],
+    *,
+    scope_run_id: Optional[str] = None,
+    previous: Optional[dict[str, Any]] = None,
+    judge_votes: Iterable[GoalJudgeVotes] = ()
+) -> dict[str, Any]
 ```
 
 `GET /run/{id}/report`.
 
-`outcomes` are the stored goal outcomes of `run` (rows of other runs
-are ignored); `previous` is :func:`previous_summary` of
-:func:`pick_previous`, or None.
+`outcomes` and `judge_votes` are the stored goal tallies of `run`
+(rows of other runs are ignored); `previous` is
+:func:`previous_summary` of :func:`pick_previous`, or None.
 
 #### goal\_listing
 
@@ -133,6 +143,10 @@ def goal_matrix(run: CampaignRun, attack_runs: Iterable[AttackRun],
 ```
 
 `GET /run/{id}/matrix`: every goal&#x27;s verdict per attack run, columnar.
+
+`cells`, `attempts`, `reviewed`, `inconclusive` and `overridden`
+are one row per goal and one column per run, `None` where the run did
+not try the goal.
 
 #### compare\_runs
 

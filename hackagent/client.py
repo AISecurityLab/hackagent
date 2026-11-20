@@ -689,6 +689,37 @@ class HackAgent:
         """
         return self._reports().report_goal_usage(campaign_run_id)
 
+    def report_judge_votes(self, campaign_run_id: str) -> List[Any]:
+        """Return the per-goal judge vote patterns of a campaign run.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+        """
+        return self._reports().report_judge_votes(campaign_run_id)
+
+    def review_attempt(self, result_id: str, request: Any, *, reviewer: str) -> Any:
+        """Record a human review of one attempt (a parsed
+        :class:`hackagent.reporting.ReviewRequest`).
+
+        Returns the review and the attempt's ``run_id``, ``goal_index`` and
+        ``automated_bucket``.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+            hackagent.reporting.http.ReportError: An unknown result, or a
+                review that does not follow the attempt's latest one.
+        """
+        return self._reports().review_attempt(result_id, request, reviewer=reviewer)
+
+    def attempt_reviews(self, result_id: str) -> List[Any]:
+        """Return every review of one attempt, newest first.
+
+        Raises:
+            NotImplementedError: When the session does not use local storage.
+            hackagent.reporting.http.NotFound: An unknown result.
+        """
+        return self._reports().list_attempt_reviews(result_id)
+
     def report_latencies(self, run_ids: List[str]) -> List[Any]:
         """Return the distinct target latencies (ms) recorded per run, with counts.
 

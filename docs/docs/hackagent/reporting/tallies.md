@@ -17,7 +17,13 @@ updates them in the same transaction as every write that affects them:
 * result or trace deleted: recompute both rows of the goal from what is left,
   with :func:`goal_outcome`, :func:`trace_coverage` and :func:`goal_usage`
   (or delete them when no result is left);
+* review recorded: recompute the goal&#x27;s :class:`GoalOutcome` as for a
+  result update (the review changes the attempt&#x27;s bucket);
 * attack run deleted: delete its rows.
+
+A third table, :class:`GoalJudgeVotes`, counts the goal&#x27;s attempts per
+pattern of judge votes. Recompute it with :func:`goal_judge_votes` whenever
+the goal&#x27;s :class:`GoalOutcome` is recomputed from its results.
 
 Timestamps are timezone-aware datetimes. Ids are lowercase canonical UUID
 strings; ordering &quot;by `created_at` then `id`&quot; compares those strings,
@@ -33,6 +39,38 @@ Label of the usage row that counts a goal&#x27;s `interaction` steps.
 target. Both stores keep it as written (`StepKind.INTERACTION`; the
 platform&#x27;s `Trace.StepType.INTERACTION`) and every rule compares it
 exactly.
+
+#### NO\_VOTES
+
+:func:`judge_votes` of an attempt no judge voted on.
+
+#### INVALID\_VOTE
+
+A judge&#x27;s vote that is neither 0, 1 nor null.
+
+#### is\_judge
+
+```python
+def is_judge(key: str) -> bool
+```
+
+Whether an `evaluation_metrics` key holds one judge&#x27;s vote.
+
+Judges record `eval_<judge>` (`1` jailbreak, `0` mitigated, `null`
+abstained); `eval_<judge>_mean` is a score, not a vote.
+
+#### judge\_votes
+
+```python
+def judge_votes(metrics: Optional[Mapping[str, Any]]) -> str
+```
+
+The judges&#x27; votes on one attempt, as the text key the tallies store.
+
+A JSON object with sorted keys and no spaces, mapping each judge that
+recorded a vote (`eval_<judge>`) to `1`, `0`, `null` (abstained)
+or `"invalid"`. A judge with no key in `metrics` is left out (it
+did not vote).
 
 ## ResultRow Objects
 
@@ -50,12 +88,60 @@ Read for every result of one (attack run, goal index)::
            agent_specific_data-&gt;&gt;&#x27;subcategory&#x27;             AS subcategory,
            (agent_specific_data-&gt;&#x27;attack_metadata&#x27;
               -&gt;&gt;&#x27;goal_active_target_elapsed_s&#x27;)::float     AS active_elapsed_s,
-           created_at, updated_at
+           created_at, updated_at,
+           evaluation_metrics,
+           &lt;outcome of the result&#x27;s latest review&gt;         AS review
     FROM result WHERE run_id = %s AND goal_index = %s
 
 `category` and `subcategory` are `None` when missing or empty.
-`active_elapsed_s` is `None` unless it is a JSON number.
-:meth:`from_data` builds the row from a result already in memory.
+`active_elapsed_s` is `None` unless it is a JSON number. `review` is
+the outcome of the attempt&#x27;s latest review
+(:class:`~hackagent.reporting.reviews.Review`), `None` when it has none
+or the latest withdraws. `votes` is :func:`judge_votes` of
+`evaluation_metrics`. :meth:`from_data` builds the row from a result
+already in memory.
+
+#### automated\_bucket
+
+```python
+@property
+def automated_bucket() -> str
+```
+
+The bucket the automated evaluation gave the attempt.
+
+#### bucket
+
+```python
+@property
+def bucket() -> str
+```
+
+The attempt&#x27;s bucket, its latest review applied.
+
+#### from\_data
+
+```python
+@classmethod
+def from_data(cls,
+              *,
+              id: str,
+              goal: str,
+              evaluation_status: Optional[str],
+              evaluation_notes: Optional[str],
+              agent_specific_data: Optional[Mapping[str, Any]],
+              created_at: datetime,
+              updated_at: datetime,
+              evaluation_metrics: Optional[Mapping[str, Any]] = None,
+              review: Optional[str] = None) -> ResultRow
+```
+
+Build the row from a result already in memory.
+
+Category, subcategory and the goal clock are read from
+`agent_specific_data`, as the stored columns are; the votes from
+`evaluation_metrics`. `review` is the outcome of the result&#x27;s
+latest review.
 
 ## TraceRow Objects
 
@@ -82,6 +168,18 @@ Read with::
 
 :meth:`from_content` builds the row from a trace already in memory, which
 is what a backend does when it creates one.
+
+#### from\_content
+
+```python
+@classmethod
+def from_content(cls, result_id: str, step_type: str,
+                 content: Optional[Mapping[str, Any]]) -> TraceRow
+```
+
+Build the row from a trace step&#x27;s content.
+
+Token usage is read from `data.usage`, else from `response.usage`.
 
 ## TraceCoverage Objects
 
@@ -136,10 +234,10 @@ category                   text          of the latest attempt that has
                                          one, `''` when none has
 subcategory                text          of that same attempt, or `''`
 attempts                   integer       results
-jailbreak                  integer       results per bucket
-mitigated                  integer
-error                      integer
-pending                    integer
+jailbreak                  integer       results per bucket, with
+mitigated                  integer       human reviews applied
+error                      integer       (:func:`~hackagent.reporting.
+pending                    integer       buckets.effective_bucket`)
 first_jailbreak_attempt    integer, null ordinal (1-based, `created_at`
                                          then `id`) of the first jailbreak
 min_jailbreak_elapsed_s    float, null   smallest active goal clock among
@@ -150,9 +248,23 @@ last_updated_at            timestamp     MAX(updated_at) of the results
 labelled_call_attempts     integer       see :class:`TraceCoverage`
 target_call_attempts       integer
 interaction_attempts       integer
+reviewed_attempts          integer       results whose latest review has
+                                         an outcome
+inconclusive_attempts      integer       of which `inconclusive`
+overridden_attempts        integer       of which the review changed the
+                                         automated bucket
 =========================  ============  ===================================
 
 &quot;Latest&quot; is the greatest (`created_at`, `id`).
+
+#### coverage
+
+```python
+@property
+def coverage() -> TraceCoverage
+```
+
+The trace coverage counts of this goal as a :class:`TraceCoverage`.
 
 ## GoalUsage Objects
 
@@ -180,6 +292,30 @@ prompt_tokens      bigint      sum over the steps that report it
 completion_tokens  bigint      sum over the steps that report it
 usage_calls        integer     steps that report both token counts
 =================  ==========  ==========================================
+
+## GoalJudgeVotes Objects
+
+```python
+@dataclass(frozen=True)
+class GoalJudgeVotes()
+```
+
+Table `goal_judge_votes`: a goal&#x27;s attempts per pattern of judge votes.
+
+Primary key `(run_id, goal_index, outcome, votes)`; index
+`(campaign_run_id, run_id, goal_index)`.
+
+===============  ==========  ============================================
+column           type        value
+===============  ==========  ============================================
+campaign_run_id  uuid, null  the attack run&#x27;s campaign run
+run_id           uuid        the attack run
+goal_index       integer
+outcome          text        the automated bucket (reviews do not change
+                             what the judges decided)
+votes            text        :func:`judge_votes` of the attempts
+attempts         integer     attempts with this outcome and these votes
+===============  ==========  ============================================
 
 #### usage\_label
 
@@ -224,6 +360,17 @@ def goal_outcome(
 
 The outcome row of a goal from every one of its results, or None
 when it has none. `coverage` is kept as given: results do not change it.
+
+#### goal\_judge\_votes
+
+```python
+def goal_judge_votes(*, campaign_run_id: Optional[str], run_id: str,
+                     goal_index: int,
+                     results: Iterable[ResultRow]) -> list[GoalJudgeVotes]
+```
+
+The vote pattern rows of a goal from every one of its results, ordered
+by outcome, then votes.
 
 #### goal\_usage
 
