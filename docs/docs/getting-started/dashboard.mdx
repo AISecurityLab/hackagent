@@ -14,7 +14,7 @@ with no Node runtime, Docker or database server involved.
 
 The recording shows the runs of the [example run](./example-run.mdx) against a small support bot.
 
-- **Local mode** (the default local backend): reads the runs recorded in your SQLite database, and saves and launches campaigns on this machine.
+- **Local mode** (the default local backend): reads the runs recorded in your SQLite database, records [human reviews](#review-an-attempt) of individual attempts, and saves and launches campaigns on this machine.
 - **Remote mode** (`--backend remote`, with `HACKAGENT_API_KEY` set): shows your hosted HackAgent data, and runs the campaigns you launch on this machine.
 
 The Runs page is the same in both modes: the dashboard reads campaign runs
@@ -171,18 +171,67 @@ hackagent web
 
 A launched run lives as long as `hackagent web`: stopping the server ends it.
 
+## Review an attempt
+
+Each goal opens on its own page, so a long answer has the whole screen. In
+**01 / Goal coverage**, click anywhere on a goal's row, or an attack's square to
+start on that attack. The address changes, so the page can be bookmarked and shared;
+**Back to campaign** (or the browser's Back button) returns to the coverage table with the
+same filters and scroll position.
+
+The page has two panels:
+
+- **Goal** opens with the goal itself: its number, its text, its category and subcategory, the
+  goal's outcome, and how many of its attempts have been reviewed. Below that, it has one small
+  table per attack, headed by the attack's name and number (numbered like the coverage table's
+  attack columns) with its attempt and review counts. Each row has the attempt, the **Panel**
+  and **Human**. **Panel** is the judges' outcome plus one square per judge, numbered in the
+  column heading and in the same place in every row, coloured red for jailbroken, green for
+  mitigated, grey for no vote and dashed for not recorded. The footer names the numbered judges.
+  **Human** is a dropdown: **Review** when there is no review yet, otherwise the verdict. Select
+  a row, or step through with the up and down arrow keys, which carry on into the next attack.
+  An attack that did not run this goal says **Not tested**.
+- **Conversation** shows the selected attempt as a chat: the attack prompt and the target's
+  response. A long system prompt is collapsed to one line. A prefilled opening is labelled as
+  written by the attacker. After the answer comes the **Judges** block: the panel's agreement
+  (**Unanimous**, or **Mixed**, **Incomplete** or **Single judge** with the tally) and each judge's
+  vote, name and explanation. **About this attack and technical details** holds the attack's
+  description, its branches where it has any, and the raw record.
+
+To review, open the **Human** dropdown of an attempt (this also selects the attempt, so the
+conversation shows what you are judging). The menu repeats what the panel said, takes an
+optional explanation, and offers **Jailbroken**, **Mitigated** and **Inconclusive**: choosing one
+saves it, with the explanation, and closes the menu. Reopen it to change the review,
+**Withdraw** it (restoring the panel's outcome), or see its **History**: every decision,
+explanation, reviewer and time. Reviews are never edited or deleted, only followed by newer
+ones. If someone else reviewed the attempt after you opened it, saving is refused; reload
+and decide again.
+
+The latest review decides the attempt's outcome: **Jailbroken** and **Mitigated** replace the
+judges' outcome, and **Inconclusive** leaves the attempt unresolved. Every rate, verdict, cost and
+comparison counts that outcome, on this page and in the coverage table, which update in place
+after you save. The judges' own outcome, votes and explanations stay recorded, and the **Panel**
+column keeps showing them. Reviewing one attempt does not decide the goal: a goal is still
+jailbroken when any of its attempts is.
+
+The dashboard records reviews through `POST /result/{id}/reviews` (`outcome`, optional
+`explanation`, and `expected_review_id`, the latest review you saw or null) and lists them
+with `GET /result/{id}/reviews`. Locally the reviewer is `local`; on the platform it is the
+signed-in user. The Review dropdown appears only where the server records reviews.
+Deleting a run also deletes its reviews.
+
 ## Campaign runs preview
 
 When using a frontend built from the sibling `hackagent-webapp` checkout,
 **Runs** shows one entry per local campaign execution. Open an entry to
 see campaign-wide statistics above **01 / Goal coverage**, **02 / Success progression**,
-**03 / Cost** and **04 / Judge audit** on one page, without tabs.
+**03 / Cost**, **04 / Judge agreement** and **05 / Judge audit** on one page, without tabs.
 A sticky row of section links below the summary cards jumps to Coverage, Success
-progression, Cost and Judge audit. An underline follows the section being read.
+progression, Cost, Judge agreement and Judge audit. An underline follows the section being read.
 Jumps preserve your filters and move keyboard focus to the destination; coverage
 headings stay beneath the navigation. On narrow screens the link row scrolls horizontally.
 The goal coverage table is the single workspace for searching and filtering goals,
-comparing attacks and opening focused goal-and-attack conversations.
+comparing attacks and opening a goal's own page, where its attempts are read and reviewed.
 **Campaign configuration (YAML)** below Judge audit shows the whole file as executed.
 It redacts credentials, and endpoints are
 the addresses used during that execution. Runs recorded before parameters were stored show only
@@ -209,8 +258,12 @@ Table values remain informational, not filters.
 Exact sample sizes accompany every rate:
 100% on one goal is not equivalent to 100% on 66 goals.
 Attack column headings are informational, not controls. There is no separate attack-ranking plot.
-Search sits above a toolbar with four focused dropdowns: **Attacks · Topics · Outcomes · Detail**.
+Search sits above a toolbar with focused dropdowns: **Attacks · Topics · Outcomes · Reviews · Detail**.
 **Clear all** sits at the far right of the toolbar, disabled when nothing has changed.
+**Reviews** appears where the server records human reviews. It offers **Not reviewed** (the goal
+still has an attempt nobody has reviewed, so it is the work left), **Reviewed**, **Review differs
+from panel** and **Reviewed inconclusive**. A goal matches when any of its attempts does, counting
+only the selected attacks when some are selected, like the outcome.
 Attacks and Outcomes contain checkboxes; Topics keeps categories and their nested subcategory
 choices together; Detail offers single-choice Categories, Subcategories and Goals.
 Dropdowns stay open while selecting and show selection counts, without per-group clear buttons.
@@ -240,7 +293,7 @@ resets every selection, search and granularity to collapsed campaign coverage.
 Filters and goal selection are reflected in the URL, with repeated `category`, `subcategory`
 `attack` and `outcome` parameters for multiple selections, and `granularity` for explicit
 detail level. Existing single-value and `section=goals` links
-open coverage, and deep goal/attempt links open the focused conversation overlay.
+open coverage, and deep goal/attempt links open the goal's page.
 Legacy `section=audit` and `tab=audit` links scroll to the inline Judge audit section.
 ASR is successful distinct recorded goals divided by all distinct recorded goals
 for that execution/category, including unresolved goals. Missing coverage is
@@ -274,29 +327,12 @@ an internal vertical scrollbar. A sticky header at the top of the scroll area ca
 attack headings first, with current category and subcategory context below them while scrolling through goals.
 Attack headings stay aligned when scrolling the table horizontally. The goal-text
 column stays pinned during horizontal scrolling.
-Select an outcome marker to open only that goal's attack conversation in a focused
-overlay, without the goal navigator or attack selector. Close it to return to the
-same coverage position. Untested cells show an explicit no-attempts message.
-The overlay title is the goal text, with category and subcategory underneath.
-The selected attack and verdict come next, followed by numbered, outcome-coloured
-attempt tiles aligned to the right of the attack name, and then the conversation.
-The attack header omits the redundant attempt-count label and aggregate verdict.
-The goal's verdict for the selected attack appears beneath the goal title, matching
-the corresponding table cell rather than the campaign-wide combined outcome;
-each individual attempt retains its own outcome.
-Optional technique guidance appears below the navigation.
-The attack name, verdict and attempt badges stay sticky while scrolling the conversation.
-Selecting a badge positions its attempt below the controls, even when badges wrap.
-Single attempts omit redundant navigation; multiple attempts use compact 28px numbered
-tiles with subtle outcome colours and a selected-state ring, without icons.
-The active tile follows the attempt being read as you scroll, accounting for the sticky
-controls. Passive scrolling does not change focus or rewrite the attempt link in the URL.
-untested attacks show **0 attempts**.
-A **Combined outcome** marker is non-clickable; select an individual attack's marker
-to open its conversation. Previously saved conversation links remain supported.
-Modified clicks open the same filtered coverage and conversation in another tab.
-New links use `conversation_attack` separately from the attack filter, so opening
-an individual conversation does not narrow the table's columns.
+Click anywhere on a goal's row to open its [page](#review-an-attempt); clicking an attack's
+square opens it on that attack instead, and a goal opens on the best-ranked attack
+when no square was used. Untested attacks say **Not tested** there.
+A **Combined outcome** square is a plain marker, so its row opens the goal as usual.
+Modified clicks open the same page in another tab. Links use `conversation_attack`
+separately from the attack filter, so opening one attack does not narrow the table's columns.
 Goals appear in goal-number order within each subcategory.
 
 **Success progression** follows goal coverage. Two aligned violin panels compare
@@ -376,12 +412,19 @@ their attacker calls are zero; FC and tFC count one call to their step generator
 recorded before static attacks traced their calls only have the target replies; their attacker
 and judge calls are shown as **not traced**, not zero.
 
-The focused conversation header shows the selected attack's verdict, or **Not tested**.
-A clickable timeline jumps directly to any attempt.
 Category and subcategory labels come
 from recorded dataset metadata; missing labels are shown as Unknown, never guessed.
 Attacks that have not tested a goal are labeled **Not tested**, not mitigated.
-The **04 / Judge audit** section uses aligned horizontal plots with the same frames,
+The **04 / Judge agreement** section shows how the panel's judges vote on the same responses.
+Each row is an exact pattern of votes, one square per judge in a fixed order, grouped as
+**Unanimous**, **Mixed verdict** or **Incomplete** (a judge abstained, recorded something
+invalid or did not vote); each column is all attempts, then each attack. **Micro · Attempts**
+counts attempts; **Macro · Goals** first averages within each goal, so a goal with many
+attempts does not dominate. Agreement measures the judges' own votes: human reviews
+do not change it. It is computed from tallies stored with every result, so it costs no
+rescan of the campaign's results.
+
+The **05 / Judge audit** section uses aligned horizontal plots with the same frames,
 gutters and marker-aligned labels as cost plots. Judges share the y-axis; individual
 judges appear first and the panel last. Calibration has three panels:
 **Youden's J**, **Harmful detected** (sensitivity) and **Falsely accused**
@@ -424,9 +467,8 @@ Every matching goal is available in the keyboard-focusable, independently scroll
 table, without pagination or next/previous buttons. The frontend retrieves subsequent
 API batches automatically for lists over 1,000 goals; incomplete loads expose an
 error and retry rather than silently truncating the list.
-Selecting a deep-linked goal expands its category/subcategory path and opens the focused
-conversation overlay. Closing the overlay restores focus to its marker, or search for a
-direct link. One search/filter toolbar controls coverage.
+A deep link to a goal opens its page; **Back to campaign** returns focus to the row or
+square that opened it. One search/filter toolbar controls coverage.
 New TAP recordings include explicit candidate parents and pruning references.
 An optional **Attack branches** view shows these relationships; selecting a node
 jumps to its conversation rather than opening a competing evidence panel.
