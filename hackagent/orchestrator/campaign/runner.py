@@ -46,6 +46,7 @@ from uuid import UUID, uuid4
 
 from hackagent.attacks.techniques.contract import Messages
 from hackagent.attacks.techniques.iterative import Finding, IterativeAttack
+from hackagent.attacks.techniques.progress import emit_progress, observe_progress
 from hackagent.attacks.techniques.trace import (
     TraceNode,
     record_call,
@@ -144,7 +145,13 @@ def _active_goal_elapsed() -> Optional[float]:
 #:   ``expected_goals``); for an attack with run-scoped setup (AutoDAN-Turbo's
 #:   warm-up, h4rm3l's program search), ``preparation_started`` (``attack``,
 #:   ``run_id``, ``goals``) and ``preparation_finished`` (``attack``,
-#:   ``run_id``, ``elapsed_s``); a ``goal_finished`` per goal (``attack``,
+#:   ``run_id``, ``elapsed_s``); per goal, ``goal_started`` once admitted to
+#:   the attack concurrency limit, ``attack_progress`` for phase start/end
+#:   (``phase``, numeric ``path``, ``stage``, optional ``step``, ``total`` and
+#:   counts), and ``jailbreak_found`` (``path``, ``score``) as soon as the
+#:   panel passes a reply. These carry ``attack``, ``run_id``, ``goal_index``
+#:   and ``goals``; concurrent goals and branches can interleave. Finally,
+#:   a ``goal_finished`` per goal (``attack``,
 #:   ``run_id``, ``goal_index``, ``goals`` (the campaign's goal count),
 #:   ``success``, ``attempts``, ``successful``, ``errors`` (distinct messages
 #:   of its failed attempts and abstaining judges), ``elapsed_s``); and
@@ -726,10 +733,20 @@ class _AttackRunner:
         started = monotonic()
         token = _goal_timing.set(_GoalTiming(started))
         try:
-            if isinstance(attack.attack, IterativeAttack):
-                attempts = await self._search(attack, goal)
-            else:
-                attempts = await self._generate_and_send(attack, goal)
+            with observe_progress(
+                lambda event, **fields: self._emit(
+                    event,
+                    attack=attack.name,
+                    run_id=run_id,
+                    goal_index=goal.index,
+                    goals=len(self.resolved.goals),
+                    **fields,
+                )
+            ):
+                if isinstance(attack.attack, IterativeAttack):
+                    attempts = await self._search(attack, goal)
+                else:
+                    attempts = await self._generate_and_send(attack, goal)
         finally:
             _goal_timing.reset(token)
         if goal.labels:
@@ -770,6 +787,7 @@ class _AttackRunner:
         with recording() as generation:
             try:
                 async with _slot(self.limits.attack):
+                    emit_progress("goal_started")
                     requests = await attack.attack.generate(goal.text)
             except Exception as exc:
                 logger.warning(
@@ -904,6 +922,7 @@ class _AttackRunner:
         with recording() as trace:
             try:
                 async with _slot(self.limits.attack):
+                    emit_progress("goal_started")
                     findings = await attack.attack.run(
                         goal.text, timed_target, self._ask_panel
                     )
