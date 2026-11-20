@@ -2035,7 +2035,7 @@ class LocalBackend:
             ).fetchone()[0]
             rows = self._conn.execute(
                 f"""SELECT r.id, r.run_id, r.evaluation_status, r.evaluation_notes,
-                        r.created_at, {_REVIEW_COLUMNS_SQL}
+                        r.created_at, r.metrics_json, {_REVIEW_COLUMNS_SQL}
                     FROM results r {_REVIEW_JOIN} WHERE {where}
                     ORDER BY r.created_at, r.id LIMIT ? OFFSET ?""",
                 [*args, page_size, (page - 1) * page_size],
@@ -2071,6 +2071,7 @@ class LocalBackend:
                     created_at=_to_dt(row["created_at"]),
                     automated_bucket=automated,
                     review=review,
+                    evaluation_metrics=json.loads(row["metrics_json"] or "{}"),
                 )
             )
         return attempts, total, success

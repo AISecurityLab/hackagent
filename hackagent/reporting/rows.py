@@ -144,7 +144,8 @@ class Attempt:
     ::
 
         SELECT id, run_id, bucket, evaluation_notes AS notes,
-               timestamp AS created_at, evaluation_status, <latest review>
+               timestamp AS created_at, evaluation_status, evaluation_metrics,
+               <latest review>
         FROM result WHERE run_id IN (...) AND goal_index = %s
         ORDER BY created_at, id LIMIT %s OFFSET %s
 
@@ -152,8 +153,8 @@ class Attempt:
     (:func:`~hackagent.reporting.buckets.effective_bucket`) and
     ``automated_bucket`` the one the evaluation gave it
     (:func:`~hackagent.reporting.buckets.result_bucket`). ``review`` is the
-    latest review, or ``None``. ``notes`` may be ``''`` or ``None`` for no
-    notes.
+    latest review, or ``None``. ``evaluation_metrics`` carries the judges'
+    votes. ``notes`` may be ``''`` or ``None`` for no notes.
     """
 
     id: str
@@ -163,6 +164,7 @@ class Attempt:
     created_at: datetime
     automated_bucket: Optional[str] = None
     review: Optional[Review] = None
+    evaluation_metrics: Optional[Mapping[str, Any]] = None
 
 
 @dataclass(frozen=True)

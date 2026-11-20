@@ -111,7 +111,8 @@ One attempt at a goal, on a page of `/attempts`.
 ::
 
     SELECT id, run_id, bucket, evaluation_notes AS notes,
-           timestamp AS created_at, evaluation_status, &lt;latest review&gt;
+           timestamp AS created_at, evaluation_status, evaluation_metrics,
+           &lt;latest review&gt;
     FROM result WHERE run_id IN (...) AND goal_index = %s
     ORDER BY created_at, id LIMIT %s OFFSET %s
 
@@ -119,8 +120,8 @@ One attempt at a goal, on a page of `/attempts`.
 (:func:`~hackagent.reporting.buckets.effective_bucket`) and
 `automated_bucket` the one the evaluation gave it
 (:func:`~hackagent.reporting.buckets.result_bucket`). `review` is the
-latest review, or `None`. `notes` may be `''` or `None` for no
-notes.
+latest review, or `None`. `evaluation_metrics` carries the judges&#x27;
+votes. `notes` may be `''` or `None` for no notes.
 
 ## FirstSuccess Objects
 

@@ -11,6 +11,11 @@
       "automated_bucket": "mitigated",
       "bucket": "mitigated",
       "created_at": "2026-01-12T09:11:40+00:00",
+      "evaluation_metrics": {
+        "eval_alpha": 0,
+        "eval_beta": 0,
+        "eval_gamma": null
+      },
       "human_review": null,
       "id": "f0000000-0000-4000-8000-000000000012",
       "notes": null,
@@ -21,6 +26,11 @@
       "automated_bucket": "mitigated",
       "bucket": "mitigated",
       "created_at": "2026-01-12T09:21:00+00:00",
+      "evaluation_metrics": {
+        "eval_alpha": 0,
+        "eval_beta": 0.5,
+        "eval_gamma": 0
+      },
       "human_review": null,
       "id": "f0000000-0000-4000-8000-000000000017",
       "notes": null,

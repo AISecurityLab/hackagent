@@ -48,6 +48,7 @@ def attempt_page(
                 "human_review": human_review(row.review),
                 "notes": row.notes or None,
                 "created_at": iso(row.created_at),
+                "evaluation_metrics": dict(row.evaluation_metrics or {}),
             }
             for position, row in enumerate(rows, start=1)
         ],
