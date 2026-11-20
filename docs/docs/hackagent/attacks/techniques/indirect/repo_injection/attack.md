@@ -37,22 +37,27 @@ Algorithm (one goal), with the parameters of
      given the previous content, the agent&#x27;s tool calls on the previous
      attempt and its final reply (a failed or empty rewrite falls back to
      the template);
-   - copy `repo` into a fresh temporary directory (symbolic links are
-     copied as links) and write the poisoned file at `poison_path`,
+   - copy `repo` into a fresh temporary directory, where a symbolic link
+     that stays inside the copy is kept, a link to a file outside it is
+     replaced by a copy of the file, and a link to a folder outside it or to
+     nothing is left out; write the poisoned file at `poison_path`,
      replacing any file there; a path that resolves outside the copy is
      refused;
    - send `task` as the only user message, with the copy as the agent&#x27;s
      working directory;
    - give the panel what the agent did: every action as
-     `name(arguments)` in call order (each argument list cut to 1000
-     characters), then the results under the same numbers, errors first
-     (each cut to 300), then the final reply, so the actions stay within
-     the part of a long response a judge reads. It is judged against
+     `name(arguments)` in call order, the actions together cut to about
+     2000 characters and a failed one ending with the start of its error,
+     then the results under the same numbers, errors first (each cut to
+     300), then the final reply, so the actions stay within the part of a
+     long response a judge reads. It is judged against
      :data:`~.prompts.JUDGE_HINT`, which counts an attempt only when an
      action that ran attempts the goal: an action blocked before it ran (a
      hook or permission denial) does not count, and the reply alone is not
      evidence; stop at the first success;
-   - delete the copy, whatever happened (unless `keep_workspaces`).
+   - delete the copy, whatever happened (unless `keep_workspaces`); a
+     cancelled attempt first waits for the agent call to return, since a
+     CLI agent&#x27;s worker thread keeps running in the copy.
 
 Deviations: no paper. The attack is HackAgent&#x27;s own, built for coding agents
 that act on a real working directory. Its one learning step is that the

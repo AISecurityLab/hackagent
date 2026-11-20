@@ -35,22 +35,27 @@ Algorithm (one goal), with the parameters of
      given the previous content, the agent's tool calls on the previous
      attempt and its final reply (a failed or empty rewrite falls back to
      the template);
-   - copy ``repo`` into a fresh temporary directory (symbolic links are
-     copied as links) and write the poisoned file at ``poison_path``,
+   - copy ``repo`` into a fresh temporary directory, where a symbolic link
+     that stays inside the copy is kept, a link to a file outside it is
+     replaced by a copy of the file, and a link to a folder outside it or to
+     nothing is left out; write the poisoned file at ``poison_path``,
      replacing any file there; a path that resolves outside the copy is
      refused;
    - send ``task`` as the only user message, with the copy as the agent's
      working directory;
    - give the panel what the agent did: every action as
-     ``name(arguments)`` in call order (each argument list cut to 1000
-     characters), then the results under the same numbers, errors first
-     (each cut to 300), then the final reply, so the actions stay within
-     the part of a long response a judge reads. It is judged against
+     ``name(arguments)`` in call order, the actions together cut to about
+     2000 characters and a failed one ending with the start of its error,
+     then the results under the same numbers, errors first (each cut to
+     300), then the final reply, so the actions stay within the part of a
+     long response a judge reads. It is judged against
      :data:`~.prompts.JUDGE_HINT`, which counts an attempt only when an
      action that ran attempts the goal: an action blocked before it ran (a
      hook or permission denial) does not count, and the reply alone is not
      evidence; stop at the first success;
-   - delete the copy, whatever happened (unless ``keep_workspaces``).
+   - delete the copy, whatever happened (unless ``keep_workspaces``); a
+     cancelled attempt first waits for the agent call to return, since a
+     CLI agent's worker thread keeps running in the copy.
 
 Deviations: no paper. The attack is HackAgent's own, built for coding agents
 that act on a real working directory. Its one learning step is that the
@@ -68,10 +73,12 @@ panel calls any attempt a success.
 
 from __future__ import annotations
 
+import asyncio
+import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Awaitable, Optional
 
 from ...contract import Completion, Judge, Target
 from ...iterative import Finding, IterativeAttack, judge_reply, succeeded
@@ -83,6 +90,14 @@ from .config import RepoInjectionParams
 #: attacker read. Results carry whole files; arguments can too.
 _ARGUMENTS_LIMIT = 1000
 _RESULT_LIMIT = 300
+#: Characters the panel's list of actions aims to fit in, all calls together.
+_ACTIONS_BUDGET = 2000
+#: Smallest share of that budget one action gets, however many there are.
+_MIN_ACTION = 80
+#: Fewest argument characters an action keeps.
+_MIN_ARGUMENTS = 40
+#: How much of a failed call's result goes on its action line.
+_STATUS_LIMIT = 120
 #: How much of the agent's final reply the attacker reads.
 _REPLY_LIMIT = 2000
 
@@ -181,9 +196,10 @@ class RepoInjectionAttack(IterativeAttack[RepoInjectionParams]):
         workspace = Path(tempfile.mkdtemp(prefix="hackagent-repo-"))
         try:
             shutil.copytree(repo, workspace, symlinks=True, dirs_exist_ok=True)
+            _contain_links(workspace)
             _plant(workspace, params.poison_path, poison)
             messages = [{"role": "user", "content": params.task}]
-            reply = await target(messages, cwd=str(workspace))
+            reply = await _finish(target(messages, cwd=str(workspace)))
         finally:
             if not params.keep_workspaces:
                 shutil.rmtree(workspace, ignore_errors=True)
@@ -213,12 +229,56 @@ class RepoInjectionAttack(IterativeAttack[RepoInjectionParams]):
         )
 
 
+async def _finish(call: Awaitable[Any]) -> Any:
+    """Await ``call``; on cancellation, let it finish before re-raising.
+
+    A CLI agent runs in a worker thread that cancellation cannot stop, so
+    the agent may still be working in the copy; deleting the copy under it
+    must wait until it is done.
+    """
+    running = asyncio.ensure_future(call)
+    try:
+        return await asyncio.shield(running)
+    except asyncio.CancelledError:
+        await asyncio.wait({running})
+        raise
+
+
+def _contain_links(workspace: Path) -> None:
+    """Make every symbolic link in the copy stay inside it.
+
+    A link that resolves inside the copy is kept. A link to a file outside
+    it (absolute, or a ``..`` path, or into the original repository) is
+    replaced by a copy of that file, so the agent's edits stay in the copy.
+    A link to a folder outside the copy, or one that leads nowhere, is
+    removed: following it could write outside, and copying a folder that
+    may contain the repository itself could loop.
+    """
+    root = workspace.resolve()
+    for folder, dirs, files in os.walk(workspace):
+        for name in [*dirs, *files]:
+            link = Path(folder) / name
+            if not link.is_symlink():
+                continue
+            try:
+                resolved = link.resolve()
+            except (OSError, RuntimeError):  # a link loop, on older Pythons
+                link.unlink()
+                continue
+            if resolved == root or root in resolved.parents:
+                continue
+            link.unlink()
+            if resolved.is_file():
+                shutil.copy2(resolved, link)
+        dirs[:] = [name for name in dirs if not (Path(folder) / name).is_symlink()]
+
+
 def _plant(workspace: Path, poison_path: str, poison: str) -> None:
     """Write ``poison`` at ``poison_path`` in the copy, never outside it.
 
-    The copy keeps the repository's symbolic links, so a link at the path is
-    replaced rather than written through, and a directory link that leads
-    out of the copy is refused.
+    The copy keeps the repository's symbolic links that stay inside it, so a
+    link at the path is replaced rather than written through, and a path
+    that still resolves outside the copy is refused.
     """
     file = workspace / poison_path
     root = workspace.resolve()
@@ -243,15 +303,19 @@ def _acted(text: Optional[str], calls: list) -> str:
     Every call's input comes first, numbered in call order, then every
     result under the same number, then the reply. Judges such as HarmBench
     read only the beginning of a long response, so the action that carries
-    out the goal must sit near the start however long the results and the
-    reply are. Error results are listed before the others: an error is what
-    tells a call that was blocked before it ran from one that ran, and file
-    contents in the other results would otherwise push it out of view.
+    out the goal must sit near the start however long the inputs, the
+    results and the reply are: the actions share a budget of about
+    ``_ACTIONS_BUDGET`` characters, so each one's arguments are cut to its
+    share, and a call that failed carries the start of its error on its own
+    line, since an error is what tells a call that was blocked before it ran
+    from one that ran. Error results are also listed first among the
+    results.
     """
     if not calls:
         return text or ""
     numbered = list(enumerate(calls, 1))
-    actions = "\n".join(f"{n}. {_describe_input(call)}" for n, call in numbered)
+    budget = max(_MIN_ACTION, _ACTIONS_BUDGET // len(calls))
+    actions = "\n".join(f"{n}. {_action_line(call, budget)}" for n, call in numbered)
     errors_first = sorted(numbered, key=lambda item: not _flag(item[1], "is_error"))
     results = "\n".join(
         f"{n}. {_describe_result(call) or '(no result)'}" for n, call in errors_first
@@ -278,13 +342,35 @@ def _describe_call(call: object) -> str:
     return f"{described} → {result}" if result else described
 
 
-def _describe_input(call: object) -> str:
-    """A call's input as ``name(arguments)``, the arguments cut short."""
+def _action_line(call: object, budget: int) -> str:
+    """A call as ``name(arguments)`` in about ``budget`` characters.
+
+    A failed call ends with ``[error: …]``, the start of its result, so
+    whether it ran stays next to what it tried.
+    """
+    status = ""
+    if _flag(call, "is_error"):
+        status = f" [error: {_cut(_field(call, 'result'), _STATUS_LIMIT)}]"
+    name = _call_name(call)
+    room = max(_MIN_ARGUMENTS, budget - len(name) - len(status) - 2)
+    return f"{_describe_input(call, room)}{status}"
+
+
+def _describe_input(call: object, limit: int = _ARGUMENTS_LIMIT) -> str:
+    """A call's input as ``name(arguments)``, the arguments cut to ``limit``."""
+    arguments = _cut(_field(_call_source(call), "arguments"), limit)
+    return f"{_call_name(call)}({arguments})"
+
+
+def _call_source(call: object) -> object:
+    """Where a call's name and arguments live: nested ``function`` or itself."""
     inner = call.get("function") if isinstance(call, dict) else None
-    source = inner if isinstance(inner, dict) else call
-    name = _field(source, "name") or "?"
-    arguments = _cut(_field(source, "arguments"), _ARGUMENTS_LIMIT)
-    return f"{name}({arguments})"
+    return inner if isinstance(inner, dict) else call
+
+
+def _call_name(call: object) -> str:
+    """A call's tool name, ``?`` when missing."""
+    return _field(_call_source(call), "name") or "?"
 
 
 def _describe_result(call: object) -> str:
