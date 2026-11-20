@@ -18,8 +18,9 @@ Logs go to stderr, so a command's own output on stdout (``--json`` lines)
 stays machine-readable. Anywhere but a terminal (a file, a Slurm job, a
 pipe) every record is one plain line: date and time, level, message, the
 first three in fixed columns, so each line stands alone in a grep. Line
-breaks inside a message are shown as ``⏎``; only a traceback spans lines. A trace record's message says where it
-happened, attack, goal and the steps it is nested in, as a breadcrumb::
+breaks inside a message, a traceback's among them, are shown as ``⏎``.
+A trace record's message says where it happened, attack, goal and the
+steps it is nested in, as a breadcrumb::
 
     11-20 15:58:12 DEBUG   bon · goal 18 · step 2/2 · candidate #3 · target: "Sure, here is…" · 410 tok · 1.2s
     11-20 15:58:12 INFO    bon · goal 18 · step 2/2 · candidate #3 · panel: jailbroken (score 10) · 0.1s
