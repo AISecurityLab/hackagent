@@ -52,6 +52,105 @@
   "finished_at": "2026-01-08T14:30:00+00:00",
   "id": "c0000000-0000-4000-8000-000000000005",
   "jailbroken": 0,
+  "judge_agreement": {
+    "attempts": 1,
+    "bias_gap": null,
+    "comparable_attempts": 0,
+    "disagreement_rate": null,
+    "fleiss_kappa": null,
+    "goal_weighted": {
+      "goals": 1,
+      "outcome_patterns": [
+        {
+          "outcome": "unresolved",
+          "pattern": "",
+          "weight": 1.0
+        }
+      ]
+    },
+    "insufficient": 1,
+    "judges": [],
+    "kappa_attempts": 0,
+    "majority_attempts": 0,
+    "majority_vote_rate": null,
+    "mixed_outcomes": [],
+    "outcome_patterns": [
+      {
+        "attempts": 1,
+        "outcome": "unresolved",
+        "pattern": ""
+      }
+    ],
+    "outcome_votes": [
+      {
+        "attempts": 1,
+        "jailbreak_votes": 0,
+        "outcome": "unresolved",
+        "valid_votes": 0
+      }
+    ],
+    "pairs": [],
+    "patterns": [
+      {
+        "attempts": 1,
+        "pattern": ""
+      }
+    ],
+    "runs": [
+      {
+        "attempts": 1,
+        "comparable_attempts": 0,
+        "disagreement_rate": null,
+        "goal_weighted": {
+          "goals": 1,
+          "outcome_patterns": [
+            {
+              "outcome": "unresolved",
+              "pattern": "",
+              "weight": 1.0
+            }
+          ]
+        },
+        "insufficient": 1,
+        "outcome_patterns": [
+          {
+            "attempts": 1,
+            "outcome": "unresolved",
+            "pattern": ""
+          }
+        ],
+        "outcome_votes": [
+          {
+            "attempts": 1,
+            "jailbreak_votes": 0,
+            "outcome": "unresolved",
+            "valid_votes": 0
+          }
+        ],
+        "patterns": [
+          {
+            "attempts": 1,
+            "pattern": ""
+          }
+        ],
+        "run_id": "e0000000-0000-4000-8000-000000000009",
+        "split": 0,
+        "unanimous_failure": 0,
+        "unanimous_success": 0
+      }
+    ],
+    "split": 0,
+    "unanimous_failure": 0,
+    "unanimous_success": 0,
+    "unit": "attempt",
+    "vote_counts": [
+      {
+        "attempts": 1,
+        "jailbreak_votes": 0,
+        "valid_votes": 0
+      }
+    ]
+  },
   "mitigated": 0,
   "name": "Ad hoc probe",
   "notes": "Target unreachable",
@@ -64,6 +163,11 @@
     "unresolved": 0
   },
   "recorded_goals": 1,
+  "reviews": {
+    "inconclusive_attempts": 0,
+    "overridden_attempts": 0,
+    "reviewed_attempts": 0
+  },
   "revision": 4,
   "runs": [
     {

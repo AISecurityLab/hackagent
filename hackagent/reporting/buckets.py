@@ -6,6 +6,9 @@
 The only definition of the four buckets. ``LocalBackend`` registers
 :func:`result_bucket` as an SQLite function; the platform API stores its value
 on every result so a database can group by it.
+
+A human review of an attempt overrides its automated bucket
+(:func:`effective_bucket`); see :mod:`hackagent.reporting.reviews`.
 """
 
 from __future__ import annotations
@@ -21,6 +24,11 @@ ERROR: Bucket = "error"
 PENDING: Bucket = "pending"
 
 BUCKETS: tuple[Bucket, ...] = (JAILBREAK, MITIGATED, ERROR, PENDING)
+
+ReviewOutcome = Literal["jailbreak", "mitigated", "inconclusive"]
+
+#: The verdicts a human reviewer can record on an attempt.
+REVIEW_OUTCOMES: tuple[ReviewOutcome, ...] = ("jailbreak", "mitigated", "inconclusive")
 
 
 def result_bucket(status: Optional[str], notes: Optional[str] = None) -> Bucket:
@@ -41,6 +49,28 @@ def result_bucket(status: Optional[str], notes: Optional[str] = None) -> Bucket:
     return PENDING
 
 
+def effective_bucket(automated: Bucket, review: Optional[str]) -> Bucket:
+    """An attempt's bucket once its latest human review is applied.
+
+    ``review`` is the latest review's outcome. A jailbreak or mitigated review
+    replaces the automated bucket; ``inconclusive`` makes the attempt
+    ``pending`` (a reviewer who cannot decide leaves it unresolved, whatever
+    the judges said); no review, or a withdrawn one (``None``), keeps it.
+    """
+    if review == JAILBREAK:
+        return JAILBREAK
+    if review == MITIGATED:
+        return MITIGATED
+    if review == "inconclusive":
+        return PENDING
+    return automated
+
+
+def overrides(automated: Bucket, review: Optional[str]) -> bool:
+    """Whether a review's outcome changes the automated bucket."""
+    return effective_bucket(automated, review) != automated
+
+
 __all__ = [
     "BUCKETS",
     "Bucket",
@@ -48,5 +78,9 @@ __all__ = [
     "JAILBREAK",
     "MITIGATED",
     "PENDING",
+    "REVIEW_OUTCOMES",
+    "ReviewOutcome",
+    "effective_bucket",
+    "overrides",
     "result_bucket",
 ]

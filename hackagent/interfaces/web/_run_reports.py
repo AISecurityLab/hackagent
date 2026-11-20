@@ -5,7 +5,8 @@
 
 ``/run/summary``, ``/run/delete`` and the detail actions ``summary``,
 ``report``, ``goals``, ``matrix``, ``attempts``, ``structure``, ``costs`` and
-``compare`` of a campaign run, answered from the local store. The store reads
+``compare`` of a campaign run, and the human reviews of an attempt
+(``/result/{id}/reviews``), answered from the local store. The store reads
 light rows (mostly its per-goal tallies) and :mod:`hackagent.reporting`
 builds every response, as it does on the platform, so the dashboard gets the
 same JSON from both.
@@ -40,6 +41,13 @@ from hackagent.reporting import (
     previous_summary,
 )
 from hackagent.reporting import http
+from hackagent.reporting.reviews import (
+    RESULT_NOT_FOUND,
+    parse_review,
+    review_created,
+    review_history,
+    review_history_etag,
+)
 from hackagent.reporting.report import scoped_runs
 
 
@@ -154,6 +162,7 @@ def register_run_reports(bp: Blueprint, client: Any) -> None:
                 )
                 if previous is not None
                 else None,
+                judge_votes=client.report_judge_votes(run.id),
             )
 
         return conditional(
@@ -258,6 +267,27 @@ def register_run_reports(bp: Blueprint, client: Any) -> None:
                 client.report_goal_outcomes(baseline.id),
             ),
         )
+
+    @bp.get("/result/<result_id>/reviews")
+    def result_reviews(result_id: str):
+        parsed = http.parse_uuid(result_id)
+        if parsed is None:
+            raise http.NotFound(RESULT_NOT_FOUND)
+        reviews = client.attempt_reviews(parsed)
+        return conditional(
+            review_history_etag(query(), reviews), lambda: review_history(reviews)
+        )
+
+    @bp.post("/result/<result_id>/reviews")
+    def result_review(result_id: str):
+        parsed = http.parse_uuid(result_id)
+        if parsed is None:
+            raise http.NotFound(RESULT_NOT_FOUND)
+        body = parse_review(request.get_json(silent=True))
+        review, attempt = client.review_attempt(
+            parsed, body, reviewer=client.backend.get_context().user_id
+        )
+        return jsonify(review_created(review, **attempt)), 201
 
 
 __all__ = ["register_run_reports"]

@@ -20,6 +20,30 @@ TERMINAL_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 
 @dataclass(frozen=True)
+class Review:
+    """One recorded review of an attempt.
+
+    ::
+
+        SELECT id, result_id, outcome, explanation, reviewer, created_at,
+               supersedes_review_id AS supersedes
+        FROM attempt_review WHERE result_id = %s
+        ORDER BY created_at DESC, id DESC
+
+    An attempt's latest review is the first row. ``reviewer`` is how the
+    server names the person who recorded it.
+    """
+
+    id: str
+    result_id: str
+    outcome: Optional[str]
+    explanation: str
+    reviewer: str
+    created_at: datetime
+    supersedes: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class CampaignRun:
     """One campaign run: a parent run, with its agent's name.
 
@@ -120,11 +144,17 @@ class Attempt:
     ::
 
         SELECT id, run_id, bucket, evaluation_notes AS notes,
-               timestamp AS created_at
+               timestamp AS created_at, evaluation_status, evaluation_metrics,
+               <latest review>
         FROM result WHERE run_id IN (...) AND goal_index = %s
         ORDER BY created_at, id LIMIT %s OFFSET %s
 
-    ``notes`` may be ``''`` or ``None`` for no notes.
+    ``bucket`` is the attempt's bucket with its latest review applied
+    (:func:`~hackagent.reporting.buckets.effective_bucket`) and
+    ``automated_bucket`` the one the evaluation gave it
+    (:func:`~hackagent.reporting.buckets.result_bucket`). ``review`` is the
+    latest review, or ``None``. ``evaluation_metrics`` carries the judges'
+    votes. ``notes`` may be ``''`` or ``None`` for no notes.
     """
 
     id: str
@@ -132,13 +162,16 @@ class Attempt:
     bucket: str
     notes: Optional[str]
     created_at: datetime
+    automated_bucket: Optional[str] = None
+    review: Optional[Review] = None
+    evaluation_metrics: Optional[Mapping[str, Any]] = None
 
 
 @dataclass(frozen=True)
 class FirstSuccess:
     """The first jailbreak among a goal's attempts and its 1-based position.
 
-    ::
+    ``bucket`` has the latest review applied::
 
         SELECT id, timestamp FROM result
         WHERE run_id IN (...) AND goal_index = %s AND bucket = 'jailbreak'
@@ -157,7 +190,8 @@ class FirstSuccess:
 class StructureResult:
     """One attempt of a goal in full, for ``/structure``.
 
-    Every result of one (attack run, goal index), all columns.
+    Every result of one (attack run, goal index), all columns, with its
+    latest review (or ``None``).
     """
 
     id: str
@@ -167,6 +201,8 @@ class StructureResult:
     request_payload: Optional[Mapping[str, Any]]
     agent_specific_data: Optional[Mapping[str, Any]]
     created_at: datetime
+    evaluation_metrics: Optional[Mapping[str, Any]] = None
+    review: Optional[Review] = None
 
 
 @dataclass(frozen=True)
@@ -204,6 +240,7 @@ __all__ = [
     "FirstSuccess",
     "GoalTotal",
     "Latency",
+    "Review",
     "StructureResult",
     "StructureTrace",
     "TERMINAL_STATUSES",

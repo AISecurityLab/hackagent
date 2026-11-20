@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Iterable, Optional, Sequence, TypedDict
 
+from hackagent.reporting.agreement import judge_agreement
 from hackagent.reporting.goals import (
     VERDICT_CODES,
     GoalFilters,
@@ -25,13 +26,14 @@ from hackagent.reporting.goals import (
     goal_verdict,
     is_complete,
     outcome_counts,
+    review_counts,
     run_order,
     subcategory_name,
     summarize_goals,
 )
 from hackagent.reporting.http import ATTACK_RUN_NOT_FOUND, NotFound
 from hackagent.reporting.rows import AttackRun, CampaignRun, GoalTotal
-from hackagent.reporting.tallies import GoalOutcome
+from hackagent.reporting.tallies import GoalJudgeVotes, GoalOutcome
 
 
 class CampaignRunSummary(TypedDict):
@@ -217,12 +219,13 @@ def campaign_run_report(
     *,
     scope_run_id: Optional[str] = None,
     previous: Optional[dict[str, Any]] = None,
+    judge_votes: Iterable[GoalJudgeVotes] = (),
 ) -> dict[str, Any]:
     """``GET /run/{id}/report``.
 
-    ``outcomes`` are the stored goal outcomes of ``run`` (rows of other runs
-    are ignored); ``previous`` is :func:`previous_summary` of
-    :func:`pick_previous`, or None.
+    ``outcomes`` and ``judge_votes`` are the stored goal tallies of ``run``
+    (rows of other runs are ignored); ``previous`` is
+    :func:`previous_summary` of :func:`pick_previous`, or None.
     """
     runs, selected = scoped_runs(run, attack_runs, scope_run_id)
     rows = _of(outcomes, selected)
@@ -317,6 +320,8 @@ def campaign_run_report(
         "technique_outcomes": technique_outcomes,
         "category_outcomes": categories,
         "attack_category_outcomes": attack_categories,
+        "reviews": review_counts(rows),
+        "judge_agreement": judge_agreement(judge_votes, selected),
         "previous": previous,
     }
 
@@ -343,7 +348,11 @@ def goal_matrix(
     attack_runs: Iterable[AttackRun],
     outcomes: Iterable[GoalOutcome],
 ) -> dict[str, Any]:
-    """``GET /run/{id}/matrix``: every goal's verdict per attack run, columnar."""
+    """``GET /run/{id}/matrix``: every goal's verdict per attack run, columnar.
+
+    ``cells``, ``attempts``, ``reviewed``, ``inconclusive`` and ``overridden``
+    are one row per goal and one column per run, ``None`` where the run did
+    not try the goal."""
     runs = children(run, attack_runs)
     rows = _of(outcomes, runs)
     goals = summarize_goals(rows, is_complete(run.status, runs), runs)
@@ -369,15 +378,23 @@ def goal_matrix(
             ]
             for goal in goals
         ],
-        "attempts": [
-            [
-                row.attempts
-                if (row := cell.get((item.id, goal["index"]))) is not None
-                else None
-                for item in runs
+        **{
+            key: [
+                [
+                    getattr(row, column)
+                    if (row := cell.get((item.id, goal["index"]))) is not None
+                    else None
+                    for item in runs
+                ]
+                for goal in goals
             ]
-            for goal in goals
-        ],
+            for key, column in (
+                ("attempts", "attempts"),
+                ("reviewed", "reviewed_attempts"),
+                ("inconclusive", "inconclusive_attempts"),
+                ("overridden", "overridden_attempts"),
+            )
+        },
     }
 
 

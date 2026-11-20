@@ -11,6 +11,25 @@ over the platform&#x27;s tables (`run`, `result`, `trace`, `attack`,
 Queries only filter, select columns and GROUP BY with plain aggregates;
 every rule is applied by :mod:`hackagent.reporting` to the rows.
 
+## Review Objects
+
+```python
+@dataclass(frozen=True)
+class Review()
+```
+
+One recorded review of an attempt.
+
+::
+
+    SELECT id, result_id, outcome, explanation, reviewer, created_at,
+           supersedes_review_id AS supersedes
+    FROM attempt_review WHERE result_id = %s
+    ORDER BY created_at DESC, id DESC
+
+An attempt&#x27;s latest review is the first row. `reviewer` is how the
+server names the person who recorded it.
+
 ## CampaignRun Objects
 
 ```python
@@ -92,11 +111,17 @@ One attempt at a goal, on a page of `/attempts`.
 ::
 
     SELECT id, run_id, bucket, evaluation_notes AS notes,
-           timestamp AS created_at
+           timestamp AS created_at, evaluation_status, evaluation_metrics,
+           &lt;latest review&gt;
     FROM result WHERE run_id IN (...) AND goal_index = %s
     ORDER BY created_at, id LIMIT %s OFFSET %s
 
-`notes` may be `''` or `None` for no notes.
+`bucket` is the attempt&#x27;s bucket with its latest review applied
+(:func:`~hackagent.reporting.buckets.effective_bucket`) and
+`automated_bucket` the one the evaluation gave it
+(:func:`~hackagent.reporting.buckets.result_bucket`). `review` is the
+latest review, or `None`. `evaluation_metrics` carries the judges&#x27;
+votes. `notes` may be `''` or `None` for no notes.
 
 ## FirstSuccess Objects
 
@@ -107,7 +132,7 @@ class FirstSuccess()
 
 The first jailbreak among a goal&#x27;s attempts and its 1-based position.
 
-::
+`bucket` has the latest review applied::
 
     SELECT id, timestamp FROM result
     WHERE run_id IN (...) AND goal_index = %s AND bucket = &#x27;jailbreak&#x27;
@@ -126,7 +151,8 @@ class StructureResult()
 
 One attempt of a goal in full, for `/structure`.
 
-Every result of one (attack run, goal index), all columns.
+Every result of one (attack run, goal index), all columns, with its
+latest review (or `None`).
 
 ## StructureTrace Objects
 

@@ -127,18 +127,211 @@
   "finished_at": null,
   "id": "c0000000-0000-4000-8000-000000000003",
   "jailbroken": 1,
+  "judge_agreement": {
+    "attempts": 4,
+    "bias_gap": null,
+    "comparable_attempts": 0,
+    "disagreement_rate": null,
+    "fleiss_kappa": null,
+    "goal_weighted": {
+      "goals": 2,
+      "outcome_patterns": [
+        {
+          "outcome": "jailbreak",
+          "pattern": "",
+          "weight": 0.5
+        },
+        {
+          "outcome": "mitigated",
+          "pattern": "",
+          "weight": 1.0
+        },
+        {
+          "outcome": "unresolved",
+          "pattern": "",
+          "weight": 0.5
+        }
+      ]
+    },
+    "insufficient": 4,
+    "judges": [],
+    "kappa_attempts": 0,
+    "majority_attempts": 0,
+    "majority_vote_rate": null,
+    "mixed_outcomes": [],
+    "outcome_patterns": [
+      {
+        "attempts": 1,
+        "outcome": "jailbreak",
+        "pattern": ""
+      },
+      {
+        "attempts": 2,
+        "outcome": "mitigated",
+        "pattern": ""
+      },
+      {
+        "attempts": 1,
+        "outcome": "unresolved",
+        "pattern": ""
+      }
+    ],
+    "outcome_votes": [
+      {
+        "attempts": 1,
+        "jailbreak_votes": 0,
+        "outcome": "jailbreak",
+        "valid_votes": 0
+      },
+      {
+        "attempts": 2,
+        "jailbreak_votes": 0,
+        "outcome": "mitigated",
+        "valid_votes": 0
+      },
+      {
+        "attempts": 1,
+        "jailbreak_votes": 0,
+        "outcome": "unresolved",
+        "valid_votes": 0
+      }
+    ],
+    "pairs": [],
+    "patterns": [
+      {
+        "attempts": 4,
+        "pattern": ""
+      }
+    ],
+    "runs": [
+      {
+        "attempts": 2,
+        "comparable_attempts": 0,
+        "disagreement_rate": null,
+        "goal_weighted": {
+          "goals": 2,
+          "outcome_patterns": [
+            {
+              "outcome": "mitigated",
+              "pattern": "",
+              "weight": 2.0
+            }
+          ]
+        },
+        "insufficient": 2,
+        "outcome_patterns": [
+          {
+            "attempts": 2,
+            "outcome": "mitigated",
+            "pattern": ""
+          }
+        ],
+        "outcome_votes": [
+          {
+            "attempts": 2,
+            "jailbreak_votes": 0,
+            "outcome": "mitigated",
+            "valid_votes": 0
+          }
+        ],
+        "patterns": [
+          {
+            "attempts": 2,
+            "pattern": ""
+          }
+        ],
+        "run_id": "e0000000-0000-4000-8000-000000000006",
+        "split": 0,
+        "unanimous_failure": 0,
+        "unanimous_success": 0
+      },
+      {
+        "attempts": 2,
+        "comparable_attempts": 0,
+        "disagreement_rate": null,
+        "goal_weighted": {
+          "goals": 2,
+          "outcome_patterns": [
+            {
+              "outcome": "jailbreak",
+              "pattern": "",
+              "weight": 1.0
+            },
+            {
+              "outcome": "unresolved",
+              "pattern": "",
+              "weight": 1.0
+            }
+          ]
+        },
+        "insufficient": 2,
+        "outcome_patterns": [
+          {
+            "attempts": 1,
+            "outcome": "jailbreak",
+            "pattern": ""
+          },
+          {
+            "attempts": 1,
+            "outcome": "unresolved",
+            "pattern": ""
+          }
+        ],
+        "outcome_votes": [
+          {
+            "attempts": 1,
+            "jailbreak_votes": 0,
+            "outcome": "jailbreak",
+            "valid_votes": 0
+          },
+          {
+            "attempts": 1,
+            "jailbreak_votes": 0,
+            "outcome": "unresolved",
+            "valid_votes": 0
+          }
+        ],
+        "patterns": [
+          {
+            "attempts": 2,
+            "pattern": ""
+          }
+        ],
+        "run_id": "e0000000-0000-4000-8000-000000000007",
+        "split": 0,
+        "unanimous_failure": 0,
+        "unanimous_success": 0
+      }
+    ],
+    "split": 0,
+    "unanimous_failure": 0,
+    "unanimous_success": 0,
+    "unit": "attempt",
+    "vote_counts": [
+      {
+        "attempts": 4,
+        "jailbreak_votes": 0,
+        "valid_votes": 0
+      }
+    ]
+  },
   "mitigated": 0,
   "name": "Weekly jailbreak sweep",
   "notes": null,
   "previous": {
     "created_at": "2026-01-12T09:00:00+00:00",
     "id": "c0000000-0000-4000-8000-000000000002",
-    "jailbroken": 2,
-    "mitigated": 2,
+    "jailbroken": 3,
+    "mitigated": 1,
     "recorded_goals": 6,
     "unresolved": 2
   },
   "recorded_goals": 2,
+  "reviews": {
+    "inconclusive_attempts": 0,
+    "overridden_attempts": 0,
+    "reviewed_attempts": 0
+  },
   "revision": 5,
   "runs": [
     {

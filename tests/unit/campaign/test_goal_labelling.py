@@ -109,7 +109,9 @@ def test_a_goal_with_an_unspecified_subcategory_matches_its_category_only(wanted
     load = goals("hack a server", "scam someone")
     if not kept:
         with pytest.raises(ValueError):
-            run_campaign(values, build=FakeBuilder(models), load=load)
+            run_campaign(
+                values, build=FakeBuilder(models), load=load, store=RecordingStore()
+            )
         return
     result = run_campaign(
         values, build=FakeBuilder(models), load=load, store=RecordingStore()

@@ -10,17 +10,24 @@ of the costs counts in.
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable, Mapping, Optional, Sequence
 
-from hackagent.reporting.buckets import result_bucket
+from hackagent.reporting.buckets import effective_bucket, result_bucket
 from hackagent.reporting.http import paginate
 from hackagent.reporting.report import iso
+from hackagent.reporting.reviews import human_review
 from hackagent.reporting.rows import (
     Attempt,
     FirstSuccess,
     StructureResult,
     StructureTrace,
 )
+
+
+def metrics_of(value: Any) -> dict[str, Any]:
+    """An attempt's ``evaluation_metrics`` as an object; anything a store
+    holds that is not one (a list, a number, null) reads as no metrics."""
+    return dict(value) if isinstance(value, Mapping) else {}
 
 
 def attempt_page(
@@ -43,8 +50,11 @@ def attempt_page(
                 "run_id": row.run_id,
                 "ordinal": offset + position,
                 "bucket": row.bucket,
+                "automated_bucket": row.automated_bucket or row.bucket,
+                "human_review": human_review(row.review),
                 "notes": row.notes or None,
                 "created_at": iso(row.created_at),
+                "evaluation_metrics": metrics_of(row.evaluation_metrics),
             }
             for position, row in enumerate(rows, start=1)
         ],
@@ -76,6 +86,10 @@ def attack_structure(
     attack run, including work that produced no result."""
     ordered = sorted(results, key=lambda row: (row.created_at, row.id))
     position = {row.id: index for index, row in enumerate(ordered)}
+    automated = {
+        row.id: result_bucket(row.evaluation_status, row.evaluation_notes)
+        for row in ordered
+    }
     steps = sorted(
         (trace for trace in traces if trace.result_id in position),
         key=lambda trace: (position[trace.result_id], trace.sequence, trace.id),
@@ -86,11 +100,16 @@ def attack_structure(
                 "id": row.id,
                 "ordinal": ordinal,
                 "run_id": row.run_id,
-                "bucket": result_bucket(row.evaluation_status, row.evaluation_notes),
+                "bucket": effective_bucket(
+                    automated[row.id], row.review.outcome if row.review else None
+                ),
+                "automated_bucket": automated[row.id],
+                "human_review": human_review(row.review),
                 "notes": row.evaluation_notes or None,
                 "created_at": iso(row.created_at),
                 "metadata": (row.agent_specific_data or {}).get("attack_metadata")
                 or {},
+                "evaluation_metrics": metrics_of(row.evaluation_metrics),
             }
             for ordinal, row in enumerate(ordered, start=1)
         ],
@@ -107,4 +126,4 @@ def attack_structure(
     }
 
 
-__all__ = ["attack_structure", "attempt_page", "trace_item"]
+__all__ = ["attack_structure", "attempt_page", "metrics_of", "trace_item"]

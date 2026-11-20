@@ -28,6 +28,38 @@ class ReportError(Exception)
 
 A request a server refuses, as `{"detail": ...}` with `status`.
 
+#### body
+
+```python
+def body() -> dict[str, str]
+```
+
+Return the JSON error body, `{"detail": ...}`.
+
+## BadRequest Objects
+
+```python
+class BadRequest(ReportError)
+```
+
+A malformed request (HTTP 400).
+
+## NotFound Objects
+
+```python
+class NotFound(ReportError)
+```
+
+A campaign run, attack run or goal that does not exist (HTTP 404).
+
+## Conflict Objects
+
+```python
+class Conflict(ReportError)
+```
+
+A request that conflicts with the resource&#x27;s state (HTTP 409).
+
 #### parse\_uuid
 
 ```python
@@ -69,6 +101,14 @@ def paginate(
 
 The DRF page envelope, with :func:`page_link` links to the next and
 previous pages of the request whose query parameters are `query`.
+
+#### page\_slice
+
+```python
+def page_slice(items: Sequence[Any], page: int, page_size: int) -> list[Any]
+```
+
+Return the items of 1-based `page` of `page_size` items.
 
 #### goal\_index\_arg
 
@@ -136,7 +176,7 @@ pairs as :func:`query_pairs` orders them, revisions in the order given),
 cut to 32 hex digits:
 `W/"<digits>"`. `route` is the name of the route (`"summary-list"`,
 `"summary"`, `"report"`, `"matrix"`, `"goals"`, `"attempts"`,
-`"structure"`, `"costs"`, `"compare"`); `revisions` lists every
+`"structure"`, `"costs"`, `"compare"`, `"reviews"`); `revisions` lists every
 campaign run whose data is in the response, and `extra` anything else
 it depends on (the list&#x27;s total).
 

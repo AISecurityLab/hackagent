@@ -1,8 +1,23 @@
 {
   "attempts": [
     {
+      "automated_bucket": "mitigated",
       "bucket": "mitigated",
       "created_at": "2026-01-12T09:30:00+00:00",
+      "evaluation_metrics": {
+        "eval_alpha": 0,
+        "eval_beta": 0,
+        "eval_gamma": 0
+      },
+      "human_review": {
+        "created_at": "2026-01-13T10:20:00+00:00",
+        "explanation": "",
+        "id": "d0000000-0000-4000-8000-000000000005",
+        "outcome": "mitigated",
+        "result_id": "f0000000-0000-4000-8000-000000000022",
+        "reviewer": "reviewer-2",
+        "supersedes_review_id": null
+      },
       "id": "f0000000-0000-4000-8000-000000000022",
       "metadata": {},
       "notes": null,
@@ -10,8 +25,15 @@
       "run_id": "e0000000-0000-4000-8000-000000000005"
     },
     {
+      "automated_bucket": "mitigated",
       "bucket": "mitigated",
       "created_at": "2026-01-12T09:30:30+00:00",
+      "evaluation_metrics": {
+        "eval_alpha": 0,
+        "eval_beta": 0,
+        "eval_gamma": 0
+      },
+      "human_review": null,
       "id": "f0000000-0000-4000-8000-000000000023",
       "metadata": {},
       "notes": null,
