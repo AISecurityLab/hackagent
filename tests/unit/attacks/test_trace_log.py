@@ -164,3 +164,15 @@ def test_goal_numbers_are_as_wide_as_the_run_s_goal_count(records):
     with about(attack="pair", goal=3, goals=20), recording():
         record_call("target", [], "reply", 0.1)
     assert trace_step(records[0])["source"] == "pair · goal 03"
+
+
+def test_info_records_show_no_attack_text_from_decisions_or_artifacts(records):
+    with about(attack="h4rm3l", goal=1), recording():
+        decision("skipped", "the program does not compile", program="SECRET()", kept=3)
+        artifact("poisoned_document", document="d1", payloads=2, text="SECRET doc")
+        artifact("tool", tool={"description": "SECRET tool"}, uri="file:///t")
+    decided, poisoned, tool = (trace_step(record) for record in records)
+    assert decided["details"] == {"kept": "3"}
+    assert poisoned["details"] == {"payloads": "2"}
+    assert tool["details"] == {"uri": "file:///t"}
+    assert not any("SECRET" in record.getMessage() for record in records)

@@ -91,12 +91,14 @@ def build_embedder(
         for text in texts:
             try:
                 response = litellm.embedding(input=[text], **kwargs)
+                vector = [float(x) for x in extract_embedding_vector(response)]
             except Exception as exc:
                 # Callers often fall back without one (no retrieval), so say
-                # why here rather than leave the run quietly degraded.
+                # why here rather than leave the run quietly degraded: the
+                # call failing, or a reply with no usable vector.
                 logger.warning("embedder %s failed: %s", config.name, _first_line(exc))
                 raise
-            vectors.append([float(x) for x in extract_embedding_vector(response)])
+            vectors.append(vector)
         return vectors
 
     async def embed(texts: Sequence[str]) -> list[list[float]]:

@@ -45,6 +45,22 @@ def test_a_jailbreak_says_which_attempt_and_where_in_the_search():
     assert _goal_summary(attempts) == "jailbroken at attempt 2 (round 2/3, stream 1/2)"
 
 
+def test_a_round_kept_by_an_earlier_attempt_still_names_the_winner_s_place():
+    # The goal's trace is split between attempts: the round both streams
+    # share went to the first, the winning stream's nodes to the second.
+    first = (
+        TraceNode(path=(0,), node="phase", label="round 1/3"),
+        TraceNode(path=(0, 0), node="phase", label="stream 1/2"),
+        panel((0, 0, 0), False),
+    )
+    second = (
+        TraceNode(path=(0, 1), node="phase", label="stream 2/2"),
+        panel((0, 1, 0), True),
+    )
+    attempts = [attempt(0, False, trace=first), attempt(1, True, trace=second)]
+    assert _goal_summary(attempts) == "jailbroken at attempt 2 (round 1/3, stream 2/2)"
+
+
 def test_an_attack_without_steps_names_only_the_attempt():
     assert (
         _goal_summary([attempt(0, False), attempt(1, True)])

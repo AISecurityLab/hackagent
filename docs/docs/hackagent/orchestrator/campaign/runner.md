@@ -35,12 +35,27 @@ failed. Cancelling the task that runs :func:`arun_campaign` does the same.
 
 #### EventCallback
 
-Receives `(event_name, **payload)`. An audited run first emits
-`audit_finished` (`audit`), then `attack_started` (`attack`,
-`run_id`, `expected_goals`), a `goal_finished` per goal (`attack`,
-`run_id`, `goal_index`, `success`, `attempts`, `errors` (distinct
-messages of its failed attempts and abstaining judges), `elapsed_s`), and
-`attack_finished` (`attack`, `run_id`, `error`).
+Receives `(event_name, **payload)`. Payloads hold names and counts,
+never goal texts, prompts or replies. In order, a run emits:
+
+- `campaign_started` (`campaign`), before goals and models are loaded;
+- `goals_loaded` (`goals`) and `models_resolved` (`attacks`,
+  `judges`, `models`: distinct models built);
+- with `execution.preflight`, `preflight_started` (`models`), then
+  `preflight_finished` (`models`) or `preflight_failed` (`models`,
+  `failures`: one reason per unreachable model);
+- with `evaluation.audit`, `audit_started` (`judges`), then
+  `audit_finished` (`audit`);
+- per attack, `attack_started` (`attack`, `run_id`,
+  `expected_goals`); for an attack with run-scoped setup (AutoDAN-Turbo&#x27;s
+  warm-up, h4rm3l&#x27;s program search), `preparation_started` (`attack`,
+  `run_id`, `goals`) and `preparation_finished` (`attack`,
+  `run_id`, `elapsed_s`); a `goal_finished` per goal (`attack`,
+  `run_id`, `goal_index`, `goals` (the campaign&#x27;s goal count),
+  `success`, `attempts`, `successful`, `errors` (distinct messages
+  of its failed attempts and abstaining judges), `elapsed_s`); and
+  `attack_finished` (`attack`, `run_id`, `error`, `attempts`,
+  `successful`, `elapsed_s`).
 
 ## CampaignCancelled Objects
 
@@ -71,6 +86,21 @@ def run_campaign(
 Synchronous form of :func:`arun_campaign`.
 
 Safe to call while an event loop is already running, as in a notebook.
+Takes the same arguments and raises the same errors.
+
+**Example**:
+
+  Run a campaign file, printing each progress event:
+  
+    ```python
+    from hackagent.orchestrator.campaign import run_campaign, summary
+
+    def show(event, **data):
+        print(event)
+
+    result = run_campaign("campaign.yaml", on_event=show)
+    print(summary(result))
+    ```
 
 #### arun\_campaign
 
@@ -99,4 +129,54 @@ A caller that already resolved the campaign — to report what the run
 will do before starting it — passes it as `resolved`, and the goals
 and models it checked are the ones the run uses. It has to come from
 the same campaign, or the report would describe a different run.
+
+Without a `store`, a campaign whose `execution.storage` is remote
+runs as a run the server tracks, as `hackagent campaign run` runs it:
+started there claimed by this machine, heartbeating, its gateway models
+bound to that server, and finished once (see
+:func:`~hackagent.orchestrator.execution.execute.arun_remote_campaign`).
+
+**Arguments**:
+
+- `source` - A campaign file path, an already-decoded mapping, or a
+  :class:`CampaignSpec`.
+- `on_event` - Called as `on_event(name, **payload)` for each progress
+  event, on the event loop. An exception it raises stops the
+  campaign; raising `CampaignCancelled` ends it as cancelled.
+- `build` - Builds a model from its config; replaced in tests.
+- `load` - Loads the goals of the dataset spec.
+- `store` - Store to record the run in, instead of the one
+  `execution.storage` selects.
+- `calibration` - Loads the labelled samples of a judge audit.
+- `build_embed` - Builds the embedders of retrieval attacks.
+- `settings` - Settings for gateway credentials and storage; resolved
+  once when omitted.
+- `resolved` - The campaign already resolved by the caller.
+  
+
+**Returns**:
+
+  The attacks&#x27; outcomes, the audit report and the output files. With
+  `execution.dry_run` the campaign is only resolved and the result
+  has no attacks.
+  
+
+**Raises**:
+
+- `ValueError` - When `resolved` was built from a different campaign,
+  or the campaign is invalid.
+- `AuditFailed` - When the judge audit fails and is configured to stop.
+  
+
+**Example**:
+
+  Inside an event loop:
+  
+    ```python
+    from hackagent.orchestrator.campaign import arun_campaign, load_campaign
+
+    spec = load_campaign("campaign.yaml")
+    result = await arun_campaign(spec)
+    print(result.succeeded, result.outputs)
+    ```
 

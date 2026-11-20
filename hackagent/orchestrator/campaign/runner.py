@@ -1137,10 +1137,19 @@ def _jailbroke(attempt: Attempt) -> bool:
     return bool(attempt.verdict and attempt.verdict.success)
 
 
-def _where(attempt: Attempt) -> str:
+def _where(attempt: Attempt, attempts: Iterable[Attempt] = ()) -> str:
     """The steps of the search the attempt's passing verdict came from, such
-    as ``round 2/3, stream 1/2``; empty for an attack without steps."""
-    phases = {node.path: node.label for node in attempt.trace if node.node == "phase"}
+    as ``round 2/3, stream 1/2``; empty for an attack without steps.
+
+    A goal's trace is split between its attempts, and a phase they share (a
+    round) is kept by the first; ``attempts``, the goal's others, supply it.
+    """
+    phases = {
+        node.path: node.label
+        for item in (attempt, *attempts)
+        for node in item.trace
+        if node.node == "phase"
+    }
     verdict = next(
         (
             node
@@ -1171,7 +1180,7 @@ def _goal_summary(attempts: Iterable[Attempt]) -> str:
         None,
     )
     if first is not None:
-        where = _where(ordered[first - 1])
+        where = _where(ordered[first - 1], ordered)
         return f"jailbroken at attempt {first}" + (f" ({where})" if where else "")
     if ordered and all(attempt.errors for attempt in ordered):
         return f"failed: {ordered[0].errors[0]}"

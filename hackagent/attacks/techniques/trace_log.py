@@ -13,7 +13,9 @@ for a handler that draws them.
 Levels say how much a reader wants:
 
 - ``INFO``: what the search decided (stopped, pruned, skipped…), what it
-  wrote down, and each panel verdict, as a score. No prompt or reply text.
+  wrote down, and each panel verdict, as a score. No prompt or reply text:
+  of the data a decision or artifact carries, only numbers, flags and a
+  ``uri`` are shown (:func:`safe_details`); the rest stays in the trace.
 - ``DEBUG``: every model call with a short snippet of what came back (the
   target's reply, the attacker's prompt…).
 
@@ -110,6 +112,25 @@ def _value(value: Any) -> str:
     return snippet(value, VALUE_CHARS)
 
 
+#: Keys whose text names where something is, never what it says.
+_SAFE_TEXT_KEYS = frozenset({"uri"})
+
+
+def safe_details(data: Mapping[str, Any], skip: str = "") -> dict[str, str]:
+    """The data of a decision or artifact a log may show: numbers, flags and
+    locations. Text, lists and mappings can hold attack text (a program, a
+    poisoned document, a tool description) and are left to the trace."""
+    return {
+        key: _value(value)
+        for key, value in data.items()
+        if key != skip
+        and (
+            isinstance(value, (bool, int, float))
+            or (key in _SAFE_TEXT_KEYS and isinstance(value, str))
+        )
+    }
+
+
 def _usage(data: Mapping[str, Any]) -> Optional[int]:
     usage = data.get("usage")
     if not isinstance(usage, Mapping):
@@ -143,21 +164,19 @@ def describe(
     }
     if node.node == "decision":
         step["reason"] = str(data.get("reason") or "")
-        step["details"] = {
-            key: _value(value) for key, value in data.items() if key != "reason"
-        }
+        step["details"] = safe_details(data, skip="reason")
         body = node.label + (f": {step['reason']}" if step["reason"] else "")
         if step["details"]:
             body += (
                 " (" + ", ".join(f"{k}={v}" for k, v in step["details"].items()) + ")"
             )
     elif node.node == "artifact":
-        step["details"] = {key: _value(value) for key, value in data.items()}
+        step["details"] = safe_details(data)
         body = f"artifact {node.label}" + (
             f" {step['details']['uri']}" if step["details"].get("uri") else ""
         )
     elif node.node == "phase":
-        step["details"] = {key: _value(value) for key, value in data.items()}
+        step["details"] = safe_details(data)
         body = step["label"]
     elif node.node == "call":
         step["role"] = node.label
@@ -222,4 +241,4 @@ def log_node(
     logger.log(level, "%s", step["message"], extra={"trace_step": step})
 
 
-__all__ = ["describe", "level_of", "log_node", "proposal", "snippet"]
+__all__ = ["describe", "level_of", "log_node", "proposal", "safe_details", "snippet"]

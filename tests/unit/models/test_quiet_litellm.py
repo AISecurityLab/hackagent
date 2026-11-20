@@ -16,16 +16,11 @@ def test_litellm_prints_no_banner_when_it_raises():
     assert litellm().suppress_debug_info is True
 
 
-def test_a_failing_embedder_logs_why(monkeypatch, caplog):
+def _failing_embedder(monkeypatch, embedding):
     from hackagent.models import build
     from hackagent.models.config import ModelConfig
 
-    module = litellm()
-
-    def refuse(**_):
-        raise RuntimeError("maximum context length is 256 tokens\nlong tail")
-
-    monkeypatch.setattr(module, "embedding", refuse)
+    monkeypatch.setattr(litellm(), "embedding", embedding)
     config = ModelConfig.model_validate(
         {
             "name": "mini",
@@ -36,17 +31,38 @@ def test_a_failing_embedder_logs_why(monkeypatch, caplog):
             },
         }
     )
-    embed = build.build_embedder(config)
+    return build.build_embedder(config)
+
+
+def _warnings_when_embedding(embed, caplog):
+    from hackagent.models import build
+
     logger = logging.getLogger("hackagent")
     propagate, logger.propagate = logger.propagate, True
     try:
         with caplog.at_level(logging.WARNING, logger="hackagent.models.build"):
-            with pytest.raises(RuntimeError):
+            with pytest.raises(Exception):
                 build.asyncio.run(embed(["a long text"]))
     finally:
         logger.propagate = propagate
+    return caplog.text
+
+
+def test_a_failing_embedder_logs_why(monkeypatch, caplog):
+    def refuse(**_):
+        raise RuntimeError("maximum context length is 256 tokens\nlong tail")
+
+    text = _warnings_when_embedding(_failing_embedder(monkeypatch, refuse), caplog)
     assert (
         "embedder mini failed: RuntimeError: maximum context length is 256 tokens"
-        in caplog.text
+        in text
     )
-    assert "long tail" not in caplog.text
+    assert "long tail" not in text
+
+
+def test_a_reply_without_a_usable_vector_logs_why(monkeypatch, caplog):
+    def empty(**_):
+        return {"data": [{"embedding": []}]}
+
+    text = _warnings_when_embedding(_failing_embedder(monkeypatch, empty), caplog)
+    assert "embedder mini failed" in text

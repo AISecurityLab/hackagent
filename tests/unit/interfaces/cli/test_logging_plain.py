@@ -11,6 +11,7 @@ import re
 
 from hackagent.core.logging import TRACE_LOGGER
 from hackagent.interfaces.cli.commands.campaign import _summary_lines
+from hackagent.interfaces.cli import logging_setup
 from hackagent.interfaces.cli.logging_setup import (
     PlainFormatter,
     plain_line,
@@ -77,3 +78,21 @@ def test_the_summary_is_log_lines_in_a_file():
         ("ERROR", "summary · tap · 0 attempts · 0 jailbroken · failed: timeout"),
         ("INFO", "output → ./logs/runs"),
     ]
+
+
+def test_a_message_with_line_breaks_stays_one_line():
+    line = PlainFormatter().format(
+        record("py.warnings", "x.py:3: UserWarning: careful\n  warnings.warn(msg)\n")
+    )
+    assert "\n" not in line
+    assert LINE.match(line)["message"] == (
+        "x.py:3: UserWarning: careful ⏎ warnings.warn(msg)"
+    )
+
+
+def test_logs_go_to_stderr_so_stdout_stays_command_output(monkeypatch):
+    import sys
+
+    monkeypatch.setattr(logging_setup, "logs_to_terminal", lambda: False)
+    handler = logging_setup._handler()
+    assert handler.stream is sys.stderr

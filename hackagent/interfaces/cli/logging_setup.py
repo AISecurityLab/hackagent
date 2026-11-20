@@ -14,9 +14,11 @@ rather than their message: a coloured tag per attack and goal, indented like
 the search tree, with the role of each call, verdicts coloured like the
 dashboard, and quoted text that is never read as markup.
 
-Anywhere else (a file, a Slurm job, a pipe) every record is one plain line:
-date and time, level, message, the first three in fixed columns, so each
-line stands alone in a grep. A trace record's message says where it
+Logs go to stderr, so a command's own output on stdout (``--json`` lines)
+stays machine-readable. Anywhere but a terminal (a file, a Slurm job, a
+pipe) every record is one plain line: date and time, level, message, the
+first three in fixed columns, so each line stands alone in a grep. Line
+breaks inside a message are shown as ``⏎``; only a traceback spans lines. A trace record's message says where it
 happened, attack, goal and the steps it is nested in, as a breadcrumb::
 
     11-20 15:58:12 DEBUG   bon · goal 18 · step 2/2 · candidate #3 · target: "Sure, here is…" · 410 tok · 1.2s
@@ -36,7 +38,7 @@ import time
 import zlib
 from typing import Any, Mapping, Optional
 
-from rich.console import ConsoleRenderable
+from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
 from rich.text import Text
 
@@ -155,6 +157,18 @@ def plain_line(level: str, message: str, created: Optional[float] = None) -> str
     return f"{stamp} {level:<{LEVEL_WIDTH}} {message}"
 
 
+#: What a line break inside a message is written as, to keep it one line.
+LINE_BREAK = " ⏎ "
+
+
+def one_line(message: str) -> str:
+    """``message`` with its line breaks shown as :data:`LINE_BREAK`, so a
+    provider error or a captured warning is one line like every other."""
+    return LINE_BREAK.join(
+        line.strip() for line in message.splitlines() if line.strip()
+    )
+
+
 def trace_breadcrumb(step: Mapping[str, Any]) -> str:
     """A trace record as one sentence: attack, goal, the steps it is nested
     in, then what happened, joined by ``·``."""
@@ -169,18 +183,17 @@ class PlainFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         step = trace_step(record)
         message = trace_breadcrumb(step) if step is not None else record.getMessage()
-        # Python's warnings end with a newline of their own.
-        message = message.rstrip()
-        line = plain_line(record.levelname, message, record.created)
+        line = plain_line(record.levelname, one_line(message), record.created)
         if record.exc_info:
             line += "\n" + self.formatException(record.exc_info)
         return line
 
 
 def logs_to_terminal() -> bool:
-    """Whether log lines go to a terminal, and so are drawn with Rich."""
+    """Whether log lines (on stderr) go to a terminal, and so are drawn with
+    Rich."""
     try:
-        return sys.stdout.isatty()
+        return sys.stderr.isatty()
     except (AttributeError, ValueError):
         return False
 
@@ -251,6 +264,7 @@ def _handler(level: int = logging.NOTSET) -> logging.Handler:
     """The CLI's log handler: Rich in a terminal, plain lines elsewhere."""
     if logs_to_terminal():
         handler: logging.Handler = HackAgentRichHandler(
+            console=Console(stderr=True),
             show_time=True,
             show_level=True,
             show_path=False,
@@ -260,7 +274,7 @@ def _handler(level: int = logging.NOTSET) -> logging.Handler:
         )
     else:
         # A file or a pipe: one plain line per record, as vLLM writes.
-        handler = logging.StreamHandler(sys.stdout)
+        handler = logging.StreamHandler(sys.stderr)
         handler.setFormatter(PlainFormatter())
     handler.setLevel(level)
     handler.hackagent_cli = True  # type: ignore[attr-defined]
