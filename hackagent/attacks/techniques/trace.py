@@ -48,6 +48,7 @@ from hackagent.core.contracts import Sample, Verdict
 from hackagent.core.contracts.protocols import CompletionResult
 
 from .contract import Completion, Messages
+from .progress import decision_progress, emit_progress, phase_progress
 from .trace_log import log_node
 
 #: Where a node belongs. ``goal`` is one goal's search; ``run`` is work a
@@ -178,9 +179,13 @@ def phase(label: str, **data: Any) -> Iterator[Path]:
     node = trace.add("phase", label=label, data=data)
     token = _path.set(node.path)
     try:
+        phase_progress(label, node.path, data, "started")
         yield node.path
     finally:
-        _path.reset(token)
+        try:
+            phase_progress(label, node.path, data, "finished")
+        finally:
+            _path.reset(token)
 
 
 def decision(outcome: str, reason: str = "", **data: Any) -> None:
@@ -188,6 +193,7 @@ def decision(outcome: str, reason: str = "", **data: Any) -> None:
     trace = _trace.get()
     if trace is not None:
         trace.add("decision", label=outcome, data={"reason": reason, **data})
+        decision_progress(outcome, data)
 
 
 def artifact(kind: str, uri: str = "", **data: Any) -> None:
@@ -254,6 +260,8 @@ def record_judge_call(sample: Sample, verdict: Verdict, latency_s: float) -> Non
         latency_s,
         error=verdict.error,
     )
+    if verdict.success and not verdict.error:
+        emit_progress("jailbreak_found", path=list(current_path()), score=verdict.score)
 
 
 _evaluation_request: ContextVar[Optional[dict[str, str]]] = ContextVar(

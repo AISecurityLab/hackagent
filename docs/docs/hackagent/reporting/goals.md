@@ -20,6 +20,50 @@ How `/matrix` codes a per-attack verdict.
 
 Category of a goal no attempt labelled, and subcategory of one with none.
 
+## AttackOutcome Objects
+
+```python
+class AttackOutcome(TypedDict)
+```
+
+One attack run&#x27;s verdict on a goal, how many attempts it made and how
+many of them a human reviewed.
+
+## GoalSummary Objects
+
+```python
+class GoalSummary(_GoalFields)
+```
+
+One goal&#x27;s verdict and counts across a scope (a campaign run or one attack run).
+
+`attack_outcomes` is present only when the per-attack breakdown was
+requested.
+
+## OutcomeCounts Objects
+
+```python
+class OutcomeCounts(TypedDict)
+```
+
+How many recorded goals ended in each verdict.
+
+## SubcategorySummary Objects
+
+```python
+class SubcategorySummary(OutcomeCounts)
+```
+
+Verdict counts of the goals in one subcategory.
+
+## CategorySummary Objects
+
+```python
+class CategorySummary(OutcomeCounts)
+```
+
+Verdict counts of the goals in one category, with its subcategories.
+
 #### goal\_verdict
 
 ```python
@@ -68,6 +112,22 @@ A goal&#x27;s text comes from the most recently created attack run of `runs`
 that recorded it, and its labels from the most recently created one that
 recorded a category (`created_at`, then `id`; runs not in `runs`
 come first).
+
+## ReviewCounts Objects
+
+```python
+class ReviewCounts(TypedDict)
+```
+
+How many attempts a human reviewed, found inconclusive, or overrode.
+
+#### review\_counts
+
+```python
+def review_counts(rows: Iterable[GoalOutcome]) -> ReviewCounts
+```
+
+The review counts of `rows`, summed.
 
 #### outcome\_counts
 

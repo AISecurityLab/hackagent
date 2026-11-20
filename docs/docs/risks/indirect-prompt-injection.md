@@ -9,7 +9,7 @@ This page describes a dedicated cybersecurity risk scenario where an LLM is mani
 
 - **Risk Macro-Category**: Cybersecurity
 - **Risk Scenario**: Indirect Injection (hidden instructions in content the model consumes)
-- **Example Attacks in HackAgent**: [RAG Attack](../attacks/indirect/rag.mdx) (`attack_type="rag"`), [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx) (`attack_type="tool_output_ipi"`), [ToolHijacker](../attacks/indirect/toolhijacker.mdx) (`attack_type="toolhijacker"`)
+- **Example Attacks in HackAgent**: [RAG Attack](../attacks/indirect/rag.mdx) (`attack_type="rag"`), [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx) (`attack_type="tool_output_ipi"`), [ToolHijacker](../attacks/indirect/toolhijacker.mdx) (`attack_type="toolhijacker"`), [Repo injection](../attacks/indirect/repo_injection.mdx) (`attack_type="repo_injection"`)
 
 Indirect injection is a *family* of attacks, not a single technique. Any data path that feeds external content into the model's context can be weaponized. The implemented vectors above cover document poisoning, tool-observation injection, and tool-description poisoning; other channels share the same root cause.
 
@@ -33,11 +33,12 @@ Indirect injection can enter through any channel that injects external text into
 | **RAG / document poisoning** | Poisoned documents are chunked, embedded, and retrieved as context | A poisoned KB article retrieved for a benign query (see [RAG Attack](../attacks/indirect/rag.mdx)) |
 | **Tool / function-call output** | A tool the agent calls returns attacker-controlled text | A poisoned tool observation after a benign lookup (see [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx)) |
 | **Tool registry descriptions** | A malicious tool document is retrieved and offered to the selector | A description that directs the agent to select an attacker-controlled tool (see [ToolHijacker](../attacks/indirect/toolhijacker.mdx)) |
+| **Repository files** | A coding agent reads instruction files in the repository it works in | A `CLAUDE.md` whose setup steps tell the agent to send a file out (see [Repo injection](../attacks/indirect/repo_injection.mdx)) |
 | **Web search & browsing** | The agent fetches a page whose content includes injected directives | A crafted webpage that says "ignore prior rules and…" in visible or hidden text |
 | **Ingested messages & files** | Emails, tickets, calendar invites, or uploaded files are summarized/acted on | A support email containing a hidden instruction the agent follows |
 | **Multi-agent / shared memory** | One agent writes attacker-influenced content another agent later reads | A poisoned shared note propagated across an agent pipeline |
 
-`rag`, `tool_output_ipi`, and `toolhijacker` are the implemented vectors. The others share the same root cause (the model trusting untrusted context) and similar evaluation signals.
+`rag`, `tool_output_ipi`, `toolhijacker` and `repo_injection` are the implemented vectors. The others share the same root cause (the model trusting untrusted context) and similar evaluation signals.
 
 ## Comparison with Direct Prompt Injection
 
@@ -125,7 +126,7 @@ Recommended evaluation signals:
 
 ## Implemented vectors
 
-HackAgent ships three end-to-end indirect-injection attacks: [RAG poisoning](../attacks/indirect/rag.mdx), [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx) and [ToolHijacker](../attacks/indirect/toolhijacker.mdx). Each page explains how the attack works, what it costs and how to read its results. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. How to choose between the three: [Indirect attacks](../attacks/indirect/index.mdx).
+HackAgent ships four end-to-end indirect-injection attacks: [RAG poisoning](../attacks/indirect/rag.mdx), [Tool-output IPI](../attacks/indirect/tool_output_ipi.mdx), [ToolHijacker](../attacks/indirect/toolhijacker.mdx) and [Repo injection](../attacks/indirect/repo_injection.mdx). Each page explains how the attack works, what it costs and how to read its results. Other vectors in the table above share the same root cause but are not implemented as dedicated techniques. How to choose between them: [Indirect attacks](../attacks/indirect/index.mdx).
 
 ### RAG Attack — document poisoning
 

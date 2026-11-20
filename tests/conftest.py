@@ -15,6 +15,19 @@ import pytest
 pytest_plugins = ["tests.support.campaigns"]
 
 
+@pytest.fixture(autouse=True)
+def _no_default_database(tmp_path, monkeypatch):
+    """Keep every test away from the developer's own database.
+
+    A store opened without a path, or settings resolved from the environment,
+    would otherwise land in ``~/.local/share/hackagent``: reading whatever runs
+    are there, writing into them, and migrating their schema.
+    """
+    database = str(tmp_path / "hackagent.db")
+    monkeypatch.setenv("HACKAGENT_DB_PATH", database)
+    monkeypatch.setattr("hackagent.storage.local._DEFAULT_DB_PATH", database)
+
+
 def pytest_addoption(parser):
     """Add custom command line options for integration tests.
 

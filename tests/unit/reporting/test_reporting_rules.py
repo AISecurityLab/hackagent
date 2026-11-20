@@ -393,6 +393,9 @@ class TestReports:
             "goals": [],
             "cells": [],
             "attempts": [],
+            "reviewed": [],
+            "inconclusive": [],
+            "overridden": [],
         }
         assert campaign_run_costs([], [], [], []) == {"runs": []}
         assert campaign_run_summary(run, [], [])["recorded_goals"] == 0

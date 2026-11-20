@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /ABSOLUTE/PATH/TO/hackagent/examples/claude/guard/guard_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -35,6 +35,7 @@ _ATTACKS: dict[str, str] = {
     "advprefix": "adaptive.advprefix:AdvPrefixAttack",
     "tool_output_ipi": "indirect.tool_output_ipi:ToolOutputIPIAttack",
     "toolhijacker": "indirect.toolhijacker:ToolHijackerAttack",
+    "repo_injection": "indirect.repo_injection:RepoInjectionAttack",
     "rag": "indirect.rag:RagAttack",
     "autodan_turbo": "adaptive.autodan_turbo:AutoDANTurboAttack",
 }

@@ -38,11 +38,15 @@ UNSPECIFIED = "Unspecified"
 
 
 class AttackOutcome(TypedDict):
-    """One attack run's verdict on a goal and how many attempts it made."""
+    """One attack run's verdict on a goal, how many attempts it made and how
+    many of them a human reviewed."""
 
     run_id: str
     verdict: AttackVerdict
     attempts: int
+    reviewed_attempts: int
+    inconclusive_attempts: int
+    overridden_attempts: int
 
 
 class _GoalFields(TypedDict):
@@ -56,6 +60,9 @@ class _GoalFields(TypedDict):
     successful_attempts: int
     errors: int
     pending: int
+    reviewed_attempts: int
+    inconclusive_attempts: int
+    overridden_attempts: int
     run_ids: list[str]
 
 
@@ -165,10 +172,29 @@ def summarize_goals(
                 "successful_attempts": jailbreak,
                 "errors": sum(row.error for row in rows),
                 "pending": sum(row.pending for row in rows),
+                **review_counts(rows),
                 "run_ids": sorted({row.run_id for row in rows}),
             }
         )
     return goals
+
+
+class ReviewCounts(TypedDict):
+    """How many attempts a human reviewed, found inconclusive, or overrode."""
+
+    reviewed_attempts: int
+    inconclusive_attempts: int
+    overridden_attempts: int
+
+
+def review_counts(rows: Iterable[GoalOutcome]) -> ReviewCounts:
+    """The review counts of ``rows``, summed."""
+    rows = list(rows)
+    return {
+        "reviewed_attempts": sum(row.reviewed_attempts for row in rows),
+        "inconclusive_attempts": sum(row.inconclusive_attempts for row in rows),
+        "overridden_attempts": sum(row.overridden_attempts for row in rows),
+    }
 
 
 def outcome_counts(goals: Iterable[GoalSummary]) -> OutcomeCounts:
@@ -226,6 +252,7 @@ def attack_outcomes(
                 "run_id": run.id,
                 "verdict": attack_verdict(row),
                 "attempts": row.attempts,
+                **review_counts([row]),
             }
             for run in ordered
             if (row := by_goal.get((run.id, goal["index"]))) is not None
@@ -268,6 +295,7 @@ __all__ = [
     "GoalSummary",
     "GoalVerdict",
     "OutcomeCounts",
+    "ReviewCounts",
     "SubcategorySummary",
     "UNKNOWN_CATEGORY",
     "UNSPECIFIED",
@@ -280,6 +308,7 @@ __all__ = [
     "goal_verdict",
     "is_complete",
     "outcome_counts",
+    "review_counts",
     "run_order",
     "subcategory_name",
     "summarize_goals",

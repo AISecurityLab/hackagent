@@ -40,6 +40,7 @@ and which helper models it drives.
 | `pair` | [PAIR](../../attacks/adaptive/pair.mdx) | Adaptive | `attacker` |
 | `pap` | [PAP](../../attacks/adaptive/pap.mdx) | Adaptive | `attacker` |
 | `rag` | [RAG poisoning](../../attacks/indirect/rag.mdx) | Indirect | `attacker`, `embedder` |
+| `repo_injection` | [Repo injection](../../attacks/indirect/repo_injection.mdx) | Indirect | none |
 | `stac` | [STAC](../../attacks/multi-turn/stac.mdx) | Multi-turn | none |
 | `static_template` | [Static Template](../../attacks/static/static_template.mdx) | Static | none |
 | `tap` | [TAP](../../attacks/adaptive/tap.mdx) | Adaptive | `attacker` |

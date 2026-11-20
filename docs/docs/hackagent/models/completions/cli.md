@@ -30,6 +30,14 @@ class CLIInteractionError(Exception)
 
 A CLI backend failed while producing a response (timeout, bad exit).
 
+#### call\_cwd
+
+```python
+def call_cwd() -> Optional[str]
+```
+
+Return the per-call working directory override, if any.
+
 #### last\_user\_text
 
 ```python
@@ -80,4 +88,35 @@ Default per-turn timeout in seconds.
 #### LITELLM\_API\_KEY
 
 API key passed to LiteLLM; the CLIs handle their own authentication.
+
+#### is\_reachable
+
+```python
+async def is_reachable() -> Reachability
+```
+
+Report reachable without running the agent; only the binary was checked.
+
+#### complete
+
+```python
+def complete(messages: Sequence[Mapping[str, Any]],
+             **overrides: Any) -> ModelResponse
+```
+
+Run one agent turn through the CLI and return its reply.
+
+The CLI takes the conversation only, so overrides are ignored except
+`cwd`, which runs the CLI in that directory for this call (handlers
+read it with :func:`call_cwd`). Failures are returned as an error
+response.
+
+#### acomplete
+
+```python
+async def acomplete(messages: Sequence[Mapping[str, Any]],
+                    **overrides: Any) -> ModelResponse
+```
+
+Run :meth:`complete` in a worker thread.
 

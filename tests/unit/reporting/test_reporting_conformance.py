@@ -82,7 +82,7 @@ class TestConformance(unittest.TestCase):
 
     def test_the_write_path_keeps_the_tallies_a_full_recomputation_gives(self):
         backend, _ = self.serve()
-        tables = ("goal_outcomes", "goal_usage")
+        tables = ("goal_outcomes", "goal_usage", "goal_judge_votes")
 
         def snapshot():
             return {
@@ -110,6 +110,7 @@ class TestConformance(unittest.TestCase):
                 "attack_runs",
                 "results",
                 "traces",
+                "reviews",
             },
         )
         buckets = {result["evaluation_status"] for result in sample["results"]}

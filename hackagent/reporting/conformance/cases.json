@@ -7,7 +7,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"fa0cd45576bc6f901d593339eafe928c\"",
+  "etag": "W/\"68aaefaebf31b4e049868ab2c9c564b8\"",
   "expected": "summary-list.json",
   "mutates": false
  },
@@ -24,7 +24,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"0c6aa59e127b930f4c76d64237dfaf99\"",
+  "etag": "W/\"38145645d120e47780c278bba4ebe6e8\"",
   "expected": "summary-list-campaign.json",
   "mutates": false
  },
@@ -41,7 +41,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"a5c671812e7e17c122e615975e2b539a\"",
+  "etag": "W/\"08928e7623ab924708819584eed5b7a4\"",
   "expected": "summary-list-agent.json",
   "mutates": false
  },
@@ -62,7 +62,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"ee561ffe1299dfea36792de4c4291bec\"",
+  "etag": "W/\"3854218181e62799809c15a0028e5f50\"",
   "expected": "summary-list-status-page-1.json",
   "mutates": false
  },
@@ -87,7 +87,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"01779d626c645d14c19c0fd0d65b2057\"",
+  "etag": "W/\"dcd4cb0015b18e19d14fd96643da38e4\"",
   "expected": "summary-list-status-page-2.json",
   "mutates": false
  },
@@ -99,7 +99,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"0c7b5c97d6e09e06dd97df6d19d15a1b\"",
+  "etag": "W/\"d5220844cac4c1665a018b1bb46f6f2a\"",
   "expected": "summary-completed.json",
   "mutates": false
  },
@@ -111,7 +111,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"8a13af1a814b9103df2ee3446fd8026b\"",
+  "etag": "W/\"9f1fd23ca40501085f5792861d9aedc2\"",
   "expected": "summary-running.json",
   "mutates": false
  },
@@ -123,7 +123,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"d9fb909b058fb4cdce39069048d44be2\"",
+  "etag": "W/\"4769436f272a39ae1c8937167a7ad9ce\"",
   "expected": "summary-empty.json",
   "mutates": false
  },
@@ -147,7 +147,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"b7380d07cbafd4b5a2889ff71569059d\"",
+  "etag": "W/\"23c558c183e1e29f5a7d094d3f674366\"",
   "expected": "report-completed.json",
   "mutates": false
  },
@@ -164,7 +164,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"03075f583bb2de0a19f2dc915274d113\"",
+  "etag": "W/\"7fa1605e61ea61e301ae07a8399ea0c5\"",
   "expected": "report-completed-scoped.json",
   "mutates": false
  },
@@ -176,7 +176,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"206d4f930b63677428ae034c64952e4f\"",
+  "etag": "W/\"4b81c2ecd0ef138bd2ba6bc63e05210e\"",
   "expected": "report-running.json",
   "mutates": false
  },
@@ -188,7 +188,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"fbdeff14b62e428658c05bd2e0d3e9a3\"",
+  "etag": "W/\"464855296576a93a7a729794854360b1\"",
   "expected": "report-failed-no-campaign.json",
   "mutates": false
  },
@@ -200,7 +200,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"4feafeec17d323ccdaf70c0482b6c9f9\"",
+  "etag": "W/\"8381538d421a8199506a7f2021dea8f2\"",
   "expected": "report-oldest.json",
   "mutates": false
  },
@@ -212,7 +212,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"6aeedc35212523772745bc95a61d902f\"",
+  "etag": "W/\"f41a7fe7e543e99526d0c19e7b6bcb0d\"",
   "expected": "report-empty.json",
   "mutates": false
  },
@@ -265,7 +265,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"1e3e857ea23563748e47d0e74bd396c4\"",
+  "etag": "W/\"ca2967618d7a11cab2b3e75e44488ccb\"",
   "expected": "goals.json",
   "mutates": false
  },
@@ -282,7 +282,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"5934a5b4df6099e5d19fc22af3a5114d\"",
+  "etag": "W/\"d09f12a9793493dd2c31911155adf836\"",
   "expected": "goals-scoped.json",
   "mutates": false
  },
@@ -299,7 +299,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"8919b97b6830211ba2ca87b796da0b1e\"",
+  "etag": "W/\"86e5352c6fbcb645d69301312184f664\"",
   "expected": "goals-goal-index.json",
   "mutates": false
  },
@@ -316,7 +316,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"b8efcdf25bb103bc09f8fcb32a3244ac\"",
+  "etag": "W/\"ccf6ba047ad2e034b2a2e5cdcdf378e9\"",
   "expected": "goals-category.json",
   "mutates": false
  },
@@ -337,7 +337,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"0ed24b353d3ef583e2447dafc0dea72e\"",
+  "etag": "W/\"4dfbd2ff75f29be6a60d3c73689b8a4d\"",
   "expected": "goals-subcategory.json",
   "mutates": false
  },
@@ -354,7 +354,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"0dbb0246ec8b80deb109d805f1ddfacc\"",
+  "etag": "W/\"bd65e302015e33b91a98158afff1902d\"",
   "expected": "goals-unspecified.json",
   "mutates": false
  },
@@ -371,7 +371,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"fac514cdb699b25dcd14e40a1c9eea93\"",
+  "etag": "W/\"94261200e686b9e029022769ac7788f7\"",
   "expected": "goals-search.json",
   "mutates": false
  },
@@ -388,7 +388,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"37003aafbe673e54655d456f4b0b61d6\"",
+  "etag": "W/\"bc8e159118d973af7c69f1d6e96c7dbe\"",
   "expected": "goals-verdict.json",
   "mutates": false
  },
@@ -409,7 +409,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"f14c3f193fb7311bc6d4caac6a3356b7\"",
+  "etag": "W/\"ced85f730c8b542296f81c449f4ae206\"",
   "expected": "goals-page-2.json",
   "mutates": false
  },
@@ -421,7 +421,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"a3865ecdc0576733d29106e02cfa6c16\"",
+  "etag": "W/\"be5653d82f64b8e094eb019b5d897548\"",
   "expected": "goals-running.json",
   "mutates": false
  },
@@ -467,7 +467,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"57b2e07ef8026d18d39c64fd4c9b27ce\"",
+  "etag": "W/\"b50497298dcbae0fdba16499726862bd\"",
   "expected": "matrix.json",
   "mutates": false
  },
@@ -479,7 +479,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"3af1f89b5f685f910f93acbc6f4651a2\"",
+  "etag": "W/\"49fc8f6e21b09e9b40e4bdce27ff7984\"",
   "expected": "matrix-running.json",
   "mutates": false
  },
@@ -491,7 +491,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"425099268451bb957bf7c1820792163d\"",
+  "etag": "W/\"31d469f174ca4e5b771b8c3e4259eeb4\"",
   "expected": "matrix-empty.json",
   "mutates": false
  },
@@ -508,7 +508,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"470131578d8c58196556b3500739d2d7\"",
+  "etag": "W/\"27dffcbfa9ba9590847125d3cd19af2e\"",
   "expected": "attempts.json",
   "mutates": false
  },
@@ -533,7 +533,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"0160010a2f81c9aff8c800a2d63e6991\"",
+  "etag": "W/\"519dd89b652e0c7ea05c7aecd2621c88\"",
   "expected": "attempts-scoped-first-success.json",
   "mutates": false
  },
@@ -558,7 +558,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"588aee380fabc8f3f625b71b718c9140\"",
+  "etag": "W/\"f32a72499def592529405b1895b6c4ef\"",
   "expected": "attempts-page-2.json",
   "mutates": false
  },
@@ -612,7 +612,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"13170e3e164434f3c8a052ca7a98febf\"",
+  "etag": "W/\"3e665922e45f8dafbed08fa14b4a1767\"",
   "expected": "structure.json",
   "mutates": false
  },
@@ -633,7 +633,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"87f6c80c63aa01084a91c032b81b9ad3\"",
+  "etag": "W/\"8667b8da72cfef6fb86d482ad3973e7a\"",
   "expected": "structure-goal-scoped-batch.json",
   "mutates": false
  },
@@ -679,7 +679,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"1277a7b44f43baadacc0f2d3ae3dcd5f\"",
+  "etag": "W/\"7d9ee3512566a79bfca4f29fc24b3e3f\"",
   "expected": "costs.json",
   "mutates": false
  },
@@ -691,7 +691,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"366bb3a718a5ac1ae021e1c32b8b102b\"",
+  "etag": "W/\"25eee81a78636c70db247fc60f730b82\"",
   "expected": "costs-running.json",
   "mutates": false
  },
@@ -703,7 +703,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"c423738ac167c31cc96290c11614dc1c\"",
+  "etag": "W/\"0e0605d884a0710771b5d0fe5ec8357f\"",
   "expected": "costs-failed.json",
   "mutates": false
  },
@@ -715,7 +715,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"cf01a40a8062bbfc99e15ffa33d050b9\"",
+  "etag": "W/\"4056a579e90e8fbacfacf8fd447da6df\"",
   "expected": "costs-empty.json",
   "mutates": false
  },
@@ -732,7 +732,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"ad528d92e8a3c3d2a268e3e51e4572dd\"",
+  "etag": "W/\"99a24604c1dd863f9e6916d5fd05df8e\"",
   "expected": "compare.json",
   "mutates": false
  },
@@ -749,7 +749,7 @@
   "headers": {},
   "body": null,
   "status": 200,
-  "etag": "W/\"a3430bde69fcbd73790890385c5c03e8\"",
+  "etag": "W/\"014beee2a2847eb298d961a7d0b65d52\"",
   "expected": "compare-running.json",
   "mutates": false
  },
@@ -805,11 +805,11 @@
   "path": "/run/c0000000-0000-4000-8000-000000000002/report",
   "query": [],
   "headers": {
-   "If-None-Match": "W/\"b7380d07cbafd4b5a2889ff71569059d\""
+   "If-None-Match": "W/\"23c558c183e1e29f5a7d094d3f674366\""
   },
   "body": null,
   "status": 304,
-  "etag": "W/\"b7380d07cbafd4b5a2889ff71569059d\"",
+  "etag": "W/\"23c558c183e1e29f5a7d094d3f674366\"",
   "expected": null,
   "mutates": false
  },
@@ -819,11 +819,11 @@
   "path": "/run/summary",
   "query": [],
   "headers": {
-   "If-None-Match": "W/\"fa0cd45576bc6f901d593339eafe928c\""
+   "If-None-Match": "W/\"68aaefaebf31b4e049868ab2c9c564b8\""
   },
   "body": null,
   "status": 304,
-  "etag": "W/\"fa0cd45576bc6f901d593339eafe928c\"",
+  "etag": "W/\"68aaefaebf31b4e049868ab2c9c564b8\"",
   "expected": null,
   "mutates": false
  },
@@ -833,11 +833,11 @@
   "path": "/run/c0000000-0000-4000-8000-000000000002/matrix",
   "query": [],
   "headers": {
-   "If-None-Match": "W/\"b7380d07cbafd4b5a2889ff71569059d\""
+   "If-None-Match": "W/\"23c558c183e1e29f5a7d094d3f674366\""
   },
   "body": null,
   "status": 200,
-  "etag": "W/\"57b2e07ef8026d18d39c64fd4c9b27ce\"",
+  "etag": "W/\"b50497298dcbae0fdba16499726862bd\"",
   "expected": "matrix-other-etag.json",
   "mutates": false
  },
@@ -915,6 +915,225 @@
   "status": 409,
   "etag": null,
   "expected": "delete-one-active.json",
+  "mutates": false
+ },
+ {
+  "name": "attempts-reviewed",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/attempts",
+  "query": [
+   [
+    "goal_index",
+    "1"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"f42051723e83237b1500abcb2071c78c\"",
+  "expected": "attempts-reviewed.json",
+  "mutates": false
+ },
+ {
+  "name": "structure-reviewed",
+  "method": "GET",
+  "path": "/run/c0000000-0000-4000-8000-000000000002/structure",
+  "query": [
+   [
+    "goal_index",
+    "3"
+   ],
+   [
+    "run_id",
+    "e0000000-0000-4000-8000-000000000003"
+   ]
+  ],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"c9d8e310fd079fd41eeb7cd92fdce209\"",
+  "expected": "structure-reviewed.json",
+  "mutates": false
+ },
+ {
+  "name": "reviews",
+  "method": "GET",
+  "path": "/result/f0000000-0000-4000-8000-000000000010/reviews",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"c6776ed902c01b8299a531bdc3b89d52\"",
+  "expected": "reviews.json",
+  "mutates": false
+ },
+ {
+  "name": "reviews-withdrawn",
+  "method": "GET",
+  "path": "/result/f0000000-0000-4000-8000-000000000014/reviews",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"6a9492b26053569a2d077894cc12a5ca\"",
+  "expected": "reviews-withdrawn.json",
+  "mutates": false
+ },
+ {
+  "name": "reviews-none",
+  "method": "GET",
+  "path": "/result/f0000000-0000-4000-8000-000000000015/reviews",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 200,
+  "etag": "W/\"92a456d7c0077f76b5e02ad26075b571\"",
+  "expected": "reviews-none.json",
+  "mutates": false
+ },
+ {
+  "name": "reviews-unknown-result",
+  "method": "GET",
+  "path": "/result/00000000-0000-4000-8000-000000000000/reviews",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "reviews-unknown-result.json",
+  "mutates": false
+ },
+ {
+  "name": "reviews-not-a-uuid",
+  "method": "GET",
+  "path": "/result/not-a-uuid/reviews",
+  "query": [],
+  "headers": {},
+  "body": null,
+  "status": 404,
+  "etag": null,
+  "expected": "reviews-not-a-uuid.json",
+  "mutates": false
+ },
+ {
+  "name": "review-stale",
+  "method": "POST",
+  "path": "/result/f0000000-0000-4000-8000-000000000010/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": "mitigated",
+   "explanation": "",
+   "expected_review_id": null
+  },
+  "status": 409,
+  "etag": null,
+  "expected": "review-stale.json",
+  "mutates": false
+ },
+ {
+  "name": "review-stale-after-withdrawal",
+  "method": "POST",
+  "path": "/result/f0000000-0000-4000-8000-000000000014/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": "jailbreak",
+   "expected_review_id": "d0000000-0000-4000-8000-000000000003"
+  },
+  "status": 409,
+  "etag": null,
+  "expected": "review-stale-after-withdrawal.json",
+  "mutates": false
+ },
+ {
+  "name": "review-withdraw-nothing",
+  "method": "POST",
+  "path": "/result/f0000000-0000-4000-8000-000000000015/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": null,
+   "expected_review_id": null
+  },
+  "status": 400,
+  "etag": null,
+  "expected": "review-withdraw-nothing.json",
+  "mutates": false
+ },
+ {
+  "name": "review-withdraw-withdrawn",
+  "method": "POST",
+  "path": "/result/f0000000-0000-4000-8000-000000000014/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": null,
+   "expected_review_id": "d0000000-0000-4000-8000-000000000004"
+  },
+  "status": 400,
+  "etag": null,
+  "expected": "review-withdraw-withdrawn.json",
+  "mutates": false
+ },
+ {
+  "name": "review-invalid-outcome",
+  "method": "POST",
+  "path": "/result/f0000000-0000-4000-8000-000000000015/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": "maybe",
+   "expected_review_id": null
+  },
+  "status": 400,
+  "etag": null,
+  "expected": "review-invalid-outcome.json",
+  "mutates": false
+ },
+ {
+  "name": "review-missing-expected",
+  "method": "POST",
+  "path": "/result/f0000000-0000-4000-8000-000000000015/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": "jailbreak"
+  },
+  "status": 400,
+  "etag": null,
+  "expected": "review-missing-expected.json",
+  "mutates": false
+ },
+ {
+  "name": "review-unknown-field",
+  "method": "POST",
+  "path": "/result/f0000000-0000-4000-8000-000000000015/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": "jailbreak",
+   "expected_review_id": null,
+   "bucket": "x"
+  },
+  "status": 400,
+  "etag": null,
+  "expected": "review-unknown-field.json",
+  "mutates": false
+ },
+ {
+  "name": "review-unknown-result",
+  "method": "POST",
+  "path": "/result/00000000-0000-4000-8000-000000000000/reviews",
+  "query": [],
+  "headers": {},
+  "body": {
+   "outcome": "jailbreak",
+   "expected_review_id": null
+  },
+  "status": 404,
+  "etag": null,
+  "expected": "review-unknown-result.json",
   "mutates": false
  },
  {

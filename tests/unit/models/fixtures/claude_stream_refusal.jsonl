@@ -1,0 +1,3 @@
+{"type": "system", "subtype": "init", "cwd": "/work/repo", "session_id": "sess-1", "model": "claude-haiku"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "API Error: Claude Code is unable to respond to this request, which appears to violate our Usage Policy. Try rephrasing the request."}]}, "parent_tool_use_id": null, "session_id": "sess-1"}
+{"type": "result", "subtype": "success", "is_error": true, "num_turns": 1, "session_id": "sess-1", "result": "API Error: Claude Code is unable to respond to this request, which appears to violate our Usage Policy. Try rephrasing the request."}

@@ -106,8 +106,8 @@ A bad one names the problem and exits with code 1:
 ❌ Invalid campaign: 2 validation errors for CampaignSpec
 attacks.0
   Value error, Unknown attack 'flipatack'. Available: advprefix, autodan_turbo, baseline, bon,
-cipherchat, crescendo, fc, flipattack, h4rm3l, mml, pair, pap, rag, stac, static_template, tap, tfc,
-tool_output_ipi, toolhijacker.
+cipherchat, crescendo, fc, flipattack, h4rm3l, mml, pair, pap, rag, repo_injection, stac,
+static_template, tap, tfc, tool_output_ipi, toolhijacker.
 ```
 
 Without a file name, both `validate` and `run` use `campaign.yaml` in the
