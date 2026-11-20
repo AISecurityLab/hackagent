@@ -29,7 +29,7 @@ flowchart LR
   S["<b>Static</b><br/><small>prompts built up front</small>"] --> S1["baseline · static_template<br/>flipattack · cipherchat<br/>mml · fc · tfc"]
   D["<b>Adaptive</b><br/><small>a search over single-turn attempts</small>"] --> D1["pair · tap · pap · bon<br/>advprefix · autodan_turbo<br/>h4rm3l"]
   M["<b>Multi-turn</b><br/><small>one growing conversation</small>"] --> M1["crescendo · stac"]
-  I["<b>Indirect</b><br/><small>instructions hidden in data</small>"] --> I1["tool_output_ipi<br/>toolhijacker · rag"]
+  I["<b>Indirect</b><br/><small>instructions hidden in data</small>"] --> I1["tool_output_ipi · toolhijacker<br/>rag · repo_injection"]
 ```
 
 [**Static attacks**](./static/index.mdx) build their prompts before anything
@@ -96,6 +96,7 @@ target reply also costs one panel evaluation, which is one call per judge.
 | [Tool-output IPI](./indirect/tool_output_ipi.mdx) | Indirect | optional: `attacker` | 1, with a planted tool result | Minimal: 1 call; up to 3 with an attacker | Agents that act on what their tools return |
 | [ToolHijacker](./indirect/toolhijacker.mdx) | Indirect | optional: `attacker`, `embedder` | 1 | Low: up to 9 calls, and no judge calls | Agents that pick tools from a registry. Goals are benign tasks |
 | [RAG poisoning](./indirect/rag.mdx) | Indirect | `attacker`, `embedder` | 1, with retrieved context | Medium: 5 calls, plus 1 attacker call for the queries and up to 25 per poisoned document | Assistants that answer from documents. You supply the corpus in `documents` |
+| [Repo injection](./indirect/repo_injection.mdx) | Indirect | optional: `attacker` | 1 task; the agent then works on its own | Minimal: 1 agent run; up to 3 with an attacker, each a full agent run | Coding agents such as Claude Code that read the repository's files. You supply the repository in `repo` |
 
 Two attacks decide success themselves instead of asking the judges: STAC
 checks the sandbox's final state, and ToolHijacker checks which tool the target
@@ -116,8 +117,9 @@ called. A campaign of only those two needs no judges.
    answers it as a later step of a friendly conversation.
 4. **Go indirect when the agent reads tools or documents.** Add
    `tool_output_ipi` for an agent that calls tools, `toolhijacker` for one
-   that picks from a tool registry, and `rag` for an assistant that answers
-   from retrieved text. These test a different risk from jailbreaking: the
+   that picks from a tool registry, `rag` for an assistant that answers
+   from retrieved text, and `repo_injection` for a coding agent that reads
+   the repository it works in. These test a different risk from jailbreaking: the
    agent obeying text it should only have read.
 
 Special cases:
