@@ -68,15 +68,34 @@ def _runtime_settings():
 def event_printer(as_json: bool):
     """The run-progress callback shared by ``campaign run`` and ``run``."""
 
+    from hackagent.interfaces.cli.logging_setup import plain_line
+
+    import logging
+
+    def say(markup: str, plain: str, level: str = "INFO") -> None:
+        if console.is_terminal:
+            console.print(markup)
+        # In a file the runner's own INFO line already says it; without
+        # INFO logging, this line does, in the same format.
+        elif not logging.getLogger("hackagent").isEnabledFor(logging.INFO):
+            click.echo(plain_line(level, plain))
+
     def on_event(event: str, **payload: Any) -> None:
+        attack = payload.get("attack")
         if as_json:
             click.echo(json.dumps({"event": event, **payload}))
         elif event == "attack_started":
-            console.print(f"[cyan]▶ {payload.get('attack')}[/cyan] started")
+            say(f"[cyan]▶ {attack}[/cyan] started", f"▶ {attack} started")
         elif event == "attack_finished":
             error = payload.get("error")
-            mark = "[red]✗[/red]" if error else "[green]✓[/green]"
-            console.print(f"{mark} {payload.get('attack')} finished")
+            if error:
+                say(
+                    f"[red]✗[/red] {attack} finished",
+                    f"✗ {attack} failed: {error}",
+                    "ERROR",
+                )
+            else:
+                say(f"[green]✓[/green] {attack} finished", f"✓ {attack} finished")
 
     return on_event
 
@@ -186,6 +205,7 @@ def run(
 ) -> None:
     """Run a campaign file against its (or overridden) model servers."""
     from hackagent.interfaces.cli.logging_setup import (
+        route_library_logs,
         setup_package_logging,
         suppress_noisy_libraries,
     )
@@ -243,6 +263,7 @@ def run(
 
     setup_package_logging(default_level_str="INFO")
     suppress_noisy_libraries("httpx", "httpcore", "LiteLLM")
+    route_library_logs()
 
     if not spec.execution.dry_run:
         try:
@@ -331,7 +352,47 @@ def schema(output: Optional[str]) -> None:
         click.echo(text, nl=False)
 
 
+def _summary_lines(report: dict[str, Any]) -> list[tuple[str, str]]:
+    """The summary as ``(level, message)`` log lines, for a file."""
+    attacks = report["attacks"]
+    lines = [
+        (
+            "INFO" if report["succeeded"] else "WARNING",
+            f"campaign {report['campaign']} "
+            f"{'succeeded' if report['succeeded'] else 'failed'} · "
+            f"{len(attacks)} attacks · "
+            f"{sum(a['attempts'] for a in attacks)} attempts · "
+            f"{sum(a['successes'] for a in attacks)} jailbroken"
+            + (
+                f" · {report['attempt_errors']} attempt errors"
+                if report.get("attempt_errors")
+                else ""
+            ),
+        )
+    ]
+    for attack in attacks:
+        line = (
+            f"summary · {attack['name']} · {attack['attempts']} attempts · "
+            f"{attack['successes']} jailbroken"
+        )
+        lines.append(
+            ("ERROR", f"{line} · failed: {attack['error']}")
+            if attack["error"]
+            else ("INFO", line)
+        )
+    if report.get("output_directory"):
+        lines.append(("INFO", f"output → {report['output_directory']}"))
+    return lines
+
+
 def _render_summary(report: dict[str, Any]) -> None:
+    if not console.is_terminal:
+        # A file: the summary in the format of every other line.
+        from hackagent.interfaces.cli.logging_setup import plain_line
+
+        for level, message in _summary_lines(report):
+            click.echo(plain_line(level, message))
+        return
     status = "[green]succeeded[/green]" if report["succeeded"] else "[red]failed[/red]"
     console.print(f"\nCampaign [bold]{report['campaign']}[/bold] {status}")
     table = Table(show_header=True, header_style="bold")

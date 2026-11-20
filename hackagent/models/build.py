@@ -12,6 +12,7 @@ from typing import Any, Mapping
 
 from hackagent.core.contracts import AgentType, ModelSpec
 from hackagent.core.credentials import resolve_api_key
+from hackagent.core.logging import get_logger
 from hackagent.models.completions import LiteLLMModel
 from hackagent.models.config import ModelConfig, ModelConnection, ModelGeneration
 from hackagent.models.completions.litellm import (
@@ -26,6 +27,9 @@ from hackagent.models.retry import RetryingModel
 
 class ModelCallError(RuntimeError):
     """A model gave no usable reply."""
+
+
+logger = get_logger(__name__)
 
 
 def build_model(config: ModelConfig, *, retries: int = 0) -> Model:
@@ -79,12 +83,22 @@ def build_embedder(
         kwargs["model"] = f"openai/{kwargs['model']}"
 
     def _embed(texts: Sequence[str]) -> list[list[float]]:
-        import litellm
+        from hackagent.models._litellm import litellm as _quiet_litellm
+
+        litellm = _quiet_litellm()
 
         vectors: list[list[float]] = []
         for text in texts:
-            response = litellm.embedding(input=[text], **kwargs)
-            vectors.append([float(x) for x in extract_embedding_vector(response)])
+            try:
+                response = litellm.embedding(input=[text], **kwargs)
+                vector = [float(x) for x in extract_embedding_vector(response)]
+            except Exception as exc:
+                # Callers often fall back without one (no retrieval), so say
+                # why here rather than leave the run quietly degraded: the
+                # call failing, or a reply with no usable vector.
+                logger.warning("embedder %s failed: %s", config.name, _first_line(exc))
+                raise
+            vectors.append(vector)
         return vectors
 
     async def embed(texts: Sequence[str]) -> list[list[float]]:
@@ -94,6 +108,12 @@ def build_embedder(
         return await asyncio.to_thread(_embed, batch)
 
     return embed
+
+
+def _first_line(error: BaseException) -> str:
+    """An error's first line, without the provider's long tail."""
+    text = str(error).strip().splitlines()
+    return f"{type(error).__name__}: {text[0]}" if text else type(error).__name__
 
 
 async def embedder_is_reachable(

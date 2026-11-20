@@ -115,7 +115,7 @@ name. They apply to that one invocation and are not saved.
 | `--backend local\|remote` | Choose the storage backend. |
 | `--base-url URL` | Use this HackAgent API. |
 | `--ca-bundle PATH` | Trust this CA bundle for the API. The file must exist. |
-| `-v`, `-vv`, `-vvv` | Show more output. |
+| `-v`, `-vv`, `-vvv` | Show more log messages: `-vv` adds what each attack decides, `-vvv` every model call it makes (see [Follow what an attack does](./running-campaigns.md#follow-what-an-attack-does)). `HACKAGENT_LOG_LEVEL` overrides it. |
 | `--version` | Print the version and exit. |
 | `-h`, `--help` | Print help and exit. |
 

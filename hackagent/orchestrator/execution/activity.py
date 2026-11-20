@@ -47,7 +47,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
-from hackagent.core.logging import get_logger, reported_as_event
+from hackagent.core.logging import TRACE_LOGGER, get_logger, reported_as_event
 from hackagent.orchestrator.campaign.spec import _is_credential_name, redacted
 from hackagent.storage.remote import (
     ExecutorRejected,
@@ -589,12 +589,16 @@ def activity_from_record(record: logging.LogRecord) -> Optional[Activity]:
     """The activity line for a log record, or ``None`` for one not relayed.
 
     ``hackagent`` records at INFO and above become ``log`` lines, except the
-    ones a progress event reports too. From the HTTP and model client
+    ones a progress event reports too and the attack trace's
+    (:data:`~hackagent.core.logging.TRACE_LOGGER`), which quotes prompts. From the HTTP and model client
     libraries, retries and timeouts become ``retry`` warnings, other warnings
     and errors ``log`` lines, and everything else, such as a line per request,
     is left out.
     """
     if reported_as_event(record) or record.name == logger.name:
+        return None
+    # The attack trace quotes prompts and replies: it stays on this machine.
+    if _under(record.name, TRACE_LOGGER):
         return None
     if record.levelno < logging.INFO:
         return None

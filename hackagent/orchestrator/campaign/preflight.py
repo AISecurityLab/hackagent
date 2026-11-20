@@ -113,7 +113,10 @@ async def preflight(resolved: "ResolvedCampaign") -> int:
     if failures:
         raise PreflightError(failures)
     logger.info(
-        "preflight | %d model(s) reachable", len(results), extra=REPORTED_AS_EVENT
+        "preflight · %d %s answered",
+        len(results),
+        "model" if len(results) == 1 else "models",
+        extra=REPORTED_AS_EVENT,
     )
     return len(results)
 

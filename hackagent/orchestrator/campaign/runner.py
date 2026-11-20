@@ -49,6 +49,7 @@ from hackagent.attacks.techniques.iterative import Finding, IterativeAttack
 from hackagent.attacks.techniques.progress import emit_progress, observe_progress
 from hackagent.attacks.techniques.trace import (
     TraceNode,
+    about,
     record_call,
     record_judge_call,
     record_target_call,
@@ -56,7 +57,7 @@ from hackagent.attacks.techniques.trace import (
 )
 from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.core.contracts import Goal, RunStatus, Sample, Verdict
-from hackagent.core.logging import REPORTED_AS_EVENT, get_logger
+from hackagent.core.logging import REPORTED_AS_EVENT, get_logger, goal_label
 from hackagent.core.settings import Settings
 from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals, select_goals
@@ -314,11 +315,11 @@ async def arun_campaign(
         spec, build=build, load=load, build_embed=build_embed, settings=settings
     )
     logger.info(
-        "campaign %s | resolved %d goals, %d attacks, %d judges",
+        "campaign %s · %s · %s · %s",
         spec.campaign.name,
-        len(resolved.goals),
-        len(resolved.attacks),
-        len(spec.evaluation.judges),
+        _count(len(resolved.goals), "goal"),
+        _count(len(resolved.attacks), "attack"),
+        _count(len(spec.evaluation.judges), "judge"),
         extra=REPORTED_AS_EVENT,
     )
     _notify(on_event, "goals_loaded", goals=len(resolved.goals))
@@ -600,10 +601,10 @@ class _AttackRunner:
             raise
         run_id = str(tracker.run_id)
         logger.info(
-            "%s | started | run=%s | goals=%d",
+            "%s started · %s · run %s",
             attack.name,
-            run_id,
-            len(goals),
+            _count(len(goals), "goal"),
+            run_id[:8],
             extra=REPORTED_AS_EVENT,
         )
 
@@ -640,9 +641,8 @@ class _AttackRunner:
         except Exception as exc:
             error = _describe(exc)
             logger.error(
-                "%s | failed | run=%s | %s",
+                "%s failed: %s",
                 attack.name,
-                run_id,
                 error,
                 extra=REPORTED_AS_EVENT,
             )
@@ -662,17 +662,16 @@ class _AttackRunner:
         except BaseException:
             # Cancelled or interrupted. The loop may be going away, so record
             # it here and now rather than through another thread.
-            logger.warning("%s | cancelled | run=%s", attack.name, run_id)
+            logger.warning("%s cancelled", attack.name)
             _record_quietly(self.store, tracker.cancel)
             raise
 
         successes = _successful(attempts)
         elapsed = monotonic() - started
         logger.info(
-            "%s | completed | run=%s | attempts=%d | successes=%d | %.1fs",
+            "%s finished · %s · %d jailbroken · %.1fs",
             attack.name,
-            run_id,
-            len(attempts),
+            _count(len(attempts), "attempt"),
             successes,
             elapsed,
             extra=REPORTED_AS_EVENT,
@@ -708,7 +707,7 @@ class _AttackRunner:
                 goals=len(goals),
             )
         started = monotonic()
-        with recording(scope="run") as trace:
+        with about(attack=attack.name), recording(scope="run") as trace:
             async with self.limits.attack:
                 await attack.attack.prepare(
                     [goal.text for goal in goals], self._send, self._ask_panel
@@ -733,15 +732,23 @@ class _AttackRunner:
         started = monotonic()
         token = _goal_timing.set(_GoalTiming(started))
         try:
-            with observe_progress(
-                lambda event, **fields: self._emit(
-                    event,
+            # The trace log names the attack and goal of every node below.
+            with (
+                about(
                     attack=attack.name,
-                    run_id=run_id,
-                    goal_index=goal.index,
+                    goal=goal.index + 1,
                     goals=len(self.resolved.goals),
-                    **fields,
-                )
+                ),
+                observe_progress(
+                    lambda event, **fields: self._emit(
+                        event,
+                        attack=attack.name,
+                        run_id=run_id,
+                        goal_index=goal.index,
+                        goals=len(self.resolved.goals),
+                        **fields,
+                    )
+                ),
             ):
                 if isinstance(attack.attack, IterativeAttack):
                     attempts = await self._search(attack, goal)
@@ -755,13 +762,14 @@ class _AttackRunner:
             await asyncio.to_thread(tracker.record, attempt)
         sink.extend(attempts)
         successful = _successful(attempts)
+        # One line per goal says how it ended, so -vv alone tells the story.
         logger.info(
-            "%s | goal %d/%d | %d attempts | %d successful",
+            "%s · %s · result: %s · %s · %.1fs",
             attack.name,
-            goal.index + 1,
-            len(self.resolved.goals),
-            len(attempts),
-            successful,
+            goal_label(goal.index + 1, len(self.resolved.goals)),
+            _goal_summary(attempts),
+            _count(len(attempts), "attempt"),
+            monotonic() - started,
             extra=REPORTED_AS_EVENT,
         )
         self._emit(
@@ -791,9 +799,9 @@ class _AttackRunner:
                     requests = await attack.attack.generate(goal.text)
             except Exception as exc:
                 logger.warning(
-                    "%s | goal %d | generation failed: %s",
+                    "%s · %s · generation failed: %s",
                     attack.name,
-                    goal.index + 1,
+                    goal_label(goal.index + 1, len(self.resolved.goals)),
                     exc,
                 )
                 return [
@@ -833,7 +841,8 @@ class _AttackRunner:
         The target call and the panel evaluation are traced as they are for
         an iterative attack, including on the paths that stop early.
         """
-        with recording() as trace:
+        # A static attack's requests run side by side: the log names each.
+        with about(attempt=request_index + 1), recording() as trace:
             attempt = await self._send_and_judge(
                 attack, goal, request_index, messages, goal_started
             )
@@ -928,7 +937,10 @@ class _AttackRunner:
                     )
             except Exception as exc:
                 logger.warning(
-                    "%s | goal %d | search failed: %s", attack.name, goal.index + 1, exc
+                    "%s · %s · search failed: %s",
+                    attack.name,
+                    goal_label(goal.index + 1, len(self.resolved.goals)),
+                    exc,
                 )
                 return [
                     Attempt(
@@ -1129,6 +1141,11 @@ async def _outlasting_cancels(work: asyncio.Future[T]) -> Optional[T]:
             return None
 
 
+def _count(number: int, noun: str) -> str:
+    """``3 attempts``, ``1 goal``: a count for a log line."""
+    return f"{number} {noun}{'' if number == 1 else 's'}"
+
+
 def _notify(on_event: Optional[EventCallback], event: str, **payload: Any) -> None:
     """Send a campaign-level event, before or between attacks, to ``on_event``.
 
@@ -1137,6 +1154,63 @@ def _notify(on_event: Optional[EventCallback], event: str, **payload: Any) -> No
     """
     if on_event is not None:
         on_event(event, **payload)
+
+
+def _jailbroke(attempt: Attempt) -> bool:
+    return bool(attempt.verdict and attempt.verdict.success)
+
+
+def _where(attempt: Attempt, attempts: Iterable[Attempt] = ()) -> str:
+    """The steps of the search the attempt's passing verdict came from, such
+    as ``round 2/3, stream 1/2``; empty for an attack without steps.
+
+    A goal's trace is split between its attempts, and a phase they share (a
+    round) is kept by the first; ``attempts``, the goal's others, supply it.
+    """
+    phases = {
+        node.path: node.label
+        for item in (attempt, *attempts)
+        for node in item.trace
+        if node.node == "phase"
+    }
+    verdict = next(
+        (
+            node
+            for node in attempt.trace
+            if node.node == "call"
+            and node.label == "panel"
+            and isinstance(node.data.get("response"), Mapping)
+            and node.data["response"].get("success")
+        ),
+        None,
+    )
+    if verdict is None:
+        return ""
+    return ", ".join(
+        phases[verdict.path[:end]]
+        for end in range(1, len(verdict.path))
+        if verdict.path[:end] in phases
+    )
+
+
+def _goal_summary(attempts: Iterable[Attempt]) -> str:
+    """How a goal ended for one attack, for its summary line: ``jailbroken at
+    attempt 3 (round 2/3, stream 1/2)``, ``mitigated``, ``unresolved`` or
+    ``failed: <error>``."""
+    ordered = sorted(attempts, key=lambda attempt: attempt.request_index)
+    first = next(
+        (index for index, attempt in enumerate(ordered, 1) if _jailbroke(attempt)),
+        None,
+    )
+    if first is not None:
+        where = _where(ordered[first - 1], ordered)
+        return f"jailbroken at attempt {first}" + (f" ({where})" if where else "")
+    if ordered and all(attempt.errors for attempt in ordered):
+        return f"failed: {ordered[0].errors[0]}"
+    errors = sum(bool(attempt.errors) for attempt in ordered)
+    judged = [attempt for attempt in ordered if attempt.verdict is not None]
+    outcome = "mitigated" if judged else "unresolved"
+    return outcome + (f" · {_count(errors, 'error')}" if errors else "")
 
 
 def _successful(attempts: Iterable[Attempt]) -> int:

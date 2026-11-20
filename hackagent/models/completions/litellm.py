@@ -124,7 +124,9 @@ class LiteLLMModel(Model):
         **overrides: Any,
     ) -> ModelResponse:
         """Run a synchronous LiteLLM completion."""
-        import litellm
+        from hackagent.models._litellm import litellm as _quiet_litellm
+
+        litellm = _quiet_litellm()
 
         kwargs = self._litellm_kwargs(messages, overrides)
         try:
@@ -139,7 +141,9 @@ class LiteLLMModel(Model):
         **overrides: Any,
     ) -> ModelResponse:
         """Run an asynchronous LiteLLM completion."""
-        import litellm
+        from hackagent.models._litellm import litellm as _quiet_litellm
+
+        litellm = _quiet_litellm()
 
         kwargs = self._litellm_kwargs(messages, overrides)
         try:
