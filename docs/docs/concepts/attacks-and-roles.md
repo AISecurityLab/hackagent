@@ -16,7 +16,7 @@ flowchart LR
   S["<b>Static</b><br/><small>prompts built up front,<br/>replies never read</small>"] --> S1["baseline · static_template<br/>flipattack · cipherchat<br/>mml · fc · tfc"]
   D["<b>Adaptive</b><br/><small>a search over single-turn attempts,<br/>each reply picks the next</small>"] --> D1["pair · tap · pap · bon<br/>advprefix · autodan_turbo<br/>h4rm3l"]
   M["<b>Multi-turn</b><br/><small>one conversation that grows<br/>turn by turn</small>"] --> M1["crescendo · stac"]
-  I["<b>Indirect</b><br/><small>instructions hidden in tool results,<br/>tool descriptions or documents</small>"] --> I1["tool_output_ipi<br/>toolhijacker · rag"]
+  I["<b>Indirect</b><br/><small>instructions hidden in tool results,<br/>tool descriptions or documents</small>"] --> I1["tool_output_ipi · toolhijacker<br/>rag · repo_injection"]
 ```
 
 Start with a static attack to confirm the setup works end to end, then add

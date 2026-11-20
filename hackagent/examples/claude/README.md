@@ -123,3 +123,8 @@ Uses Ollama as the launcher:
 | `flipattack-claude.yaml` | Red-teams local Claude Code using an Anthropic/LiteLLM judge |
 | `flipattack-ollama.yaml` | Red-teams local Claude Code using a local Ollama-backed setup |
 | `README.md` | Explains the scenarios and how to run them |
+---
+
+### Guard your agent
+
+[`guard/`](guard/README.md) is a Claude Code `PreToolUse` hook that asks Granite Guardian (local Ollama) before `Bash` and `WebFetch` calls run, and blocks calls that send local secrets outside. Install it in your user-level settings to defend against the `repo_injection` attack.

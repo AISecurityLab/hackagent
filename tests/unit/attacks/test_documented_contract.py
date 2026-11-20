@@ -92,6 +92,7 @@ def _roles(params_type: Any, names: set[str]) -> dict[str, Any]:
 #: descriptions say "Required."; these are the smallest values that satisfy them.
 _REQUIRED_PARAMETERS: dict[str, dict[str, Any]] = {
     "rag": {"documents": ("A document the attack can poison.",)},
+    "repo_injection": {"repo": "."},
 }
 
 

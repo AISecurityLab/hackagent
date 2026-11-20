@@ -8,6 +8,14 @@ Name → class lookup for the attacks a campaign can run.
 Attack modules are imported on first use, so naming an attack does not pull
 in the image dependencies of FC or MML.
 
+#### attack\_family
+
+```python
+def attack_family(name: str) -> Optional[str]
+```
+
+Return the family `name` belongs to (`static`, `adaptive`, …), or None.
+
 #### get\_attack\_class
 
 ```python
