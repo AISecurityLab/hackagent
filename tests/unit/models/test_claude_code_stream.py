@@ -54,6 +54,8 @@ class FakeClaude:
 
 @pytest.fixture
 def fake_claude(tmp_path):
+    if sys.platform == "win32":
+        pytest.skip("the fake claude binary is a POSIX script run via its shebang")
     counter = iter(range(1000))
 
     def build(fixture=None, *, stdout=None, code=0, **config):
