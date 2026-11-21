@@ -61,7 +61,9 @@ def user_request(transcript_path: str) -> str:
                     if any(t.strip() for t in texts):
                         return "\n".join(texts).strip()
     except (OSError, ValueError):
-        pass
+        # An unreadable transcript means no known request: the judge then
+        # sees the action alone.
+        return ""
     return ""
 
 

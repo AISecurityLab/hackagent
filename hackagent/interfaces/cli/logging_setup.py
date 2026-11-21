@@ -222,19 +222,14 @@ def apply_verbosity(verbose: Optional[int], logger_name: str = "hackagent") -> N
     logging.getLogger(logger_name).setLevel(level)
 
 
-_rich_handler_configured_for_package = False
-
-
 def setup_package_logging(
     logger_name: str = "hackagent", default_level_str: str = "WARNING"
 ) -> logging.Logger:
-    """Configures RichHandler for the specified logger if not already set."""
-    global _rich_handler_configured_for_package
+    """Configures RichHandler for the specified logger if not already set.
 
+    Idempotent: a logger that already has the CLI's handler is left as is.
+    """
     package_logger = logging.getLogger(logger_name)
-
-    if logger_name == "hackagent" and _rich_handler_configured_for_package:
-        return package_logger
 
     # Use RichHandler specifically — StreamHandler is too broad since
     # RichHandler is a subclass and would incorrectly match the guard.
@@ -254,9 +249,6 @@ def setup_package_logging(
         package_logger.propagate = False  # Avoid duplicate logs with root logger
         if logger_name == "hackagent":
             _route_other_loggers()
-
-    if logger_name == "hackagent":
-        _rich_handler_configured_for_package = True
 
     return package_logger
 

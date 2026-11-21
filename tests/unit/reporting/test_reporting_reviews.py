@@ -147,6 +147,27 @@ class TestJudgeVotes:
         for value in ([1, 0], 5, "x"):
             assert judge_votes(value) == "{}"  # type: ignore[arg-type]
 
+    def test_a_judge_named_like_a_score_still_votes(self):
+        """What :func:`eval_columns` writes is what the tallies read back."""
+        from hackagent.core.contracts.judging import JudgeVote, Verdict
+        from hackagent.tracking.evaluation import eval_columns
+
+        metrics = eval_columns(
+            Verdict(
+                success=True,
+                score=10.0,
+                votes=[
+                    JudgeVote(judge="ensemble_mean", score=7.0, success=True),
+                    JudgeVote(judge="harmbench", score=0.0, success=False),
+                    JudgeVote(judge="quiet_mean", error="timeout"),
+                ],
+            )
+        )
+        assert {"eval_ensemble_mean", "eval_ensemble_mean_mean"} <= metrics.keys()
+        assert judge_votes(metrics) == (
+            '{"eval_ensemble_mean":1,"eval_hb":0,"eval_quiet_mean":null}'
+        )
+
     def test_rows_count_attempts_per_automated_outcome_and_votes(self):
         rows = goal_judge_votes(
             campaign_run_id="c",

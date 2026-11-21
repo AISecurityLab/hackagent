@@ -33,6 +33,8 @@ def test_parallel_goals_keep_their_own_paths_and_listener_after_an_interruption(
                         if interrupted:
                             raise asyncio.CancelledError()
                 except asyncio.CancelledError:
+                    # The interruption under test: the goal carries on, and
+                    # its next phase must start from a clean path.
                     pass
                 with phase("round 2/2"):
                     pass

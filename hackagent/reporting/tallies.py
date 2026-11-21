@@ -82,13 +82,18 @@ NO_VOTES = "{}"
 INVALID_VOTE = "invalid"
 
 
-def is_judge(key: str) -> bool:
-    """Whether an ``evaluation_metrics`` key holds one judge's vote.
+def is_judge(key: str, metrics: Mapping[str, Any]) -> bool:
+    """Whether ``key`` of ``metrics`` (an ``evaluation_metrics``) holds one
+    judge's vote.
 
     Judges record ``eval_<judge>`` (``1`` jailbreak, ``0`` mitigated, ``null``
-    abstained); ``eval_<judge>_mean`` is a score, not a vote.
+    abstained), and a judge that scored records ``eval_<judge>_mean`` beside
+    it. So ``eval_<x>_mean`` is a score only when ``eval_<x>`` is there too: a
+    judge named ``ensemble_mean`` votes in ``eval_ensemble_mean``.
     """
-    return key.startswith("eval_") and not key.endswith("_mean")
+    if not key.startswith("eval_"):
+        return False
+    return not (key.endswith("_mean") and key[: -len("_mean")] in metrics)
 
 
 def judge_votes(metrics: Optional[Mapping[str, Any]]) -> str:
@@ -103,7 +108,7 @@ def judge_votes(metrics: Optional[Mapping[str, Any]]) -> str:
     if not isinstance(metrics, Mapping):
         return NO_VOTES
     for key, value in metrics.items():
-        if not isinstance(key, str) or not is_judge(key):
+        if not isinstance(key, str) or not is_judge(key, metrics):
             continue
         if value is None:
             votes[key] = None
