@@ -106,8 +106,8 @@ A bad one names the problem and exits with code 1:
 ❌ Invalid campaign: 2 validation errors for CampaignSpec
 attacks.0
   Value error, Unknown attack 'flipatack'. Available: advprefix, autodan_turbo, baseline, bon,
-cipherchat, crescendo, fc, flipattack, h4rm3l, mml, pair, pap, rag, stac, static_template, tap, tfc,
-tool_output_ipi, toolhijacker.
+cipherchat, crescendo, fc, flipattack, h4rm3l, mml, pair, pap, rag, repo_injection, stac,
+static_template, tap, tfc, tool_output_ipi, toolhijacker.
 ```
 
 Without a file name, both `validate` and `run` use `campaign.yaml` in the
@@ -149,6 +149,43 @@ jailbreak was found.
 `--dry-run` resolves the campaign and prints the summary without attacking. It
 skips the server check, writes no files and records nothing, so it is safe to
 run anywhere.
+
+### Follow what an attack does
+
+Every attack records what it does as it searches: its steps, each model call,
+and why it stopped, pruned or skipped. Run with `-vv` to see those decisions and
+each verdict as they happen, or `-vvv` to also see every call with a snippet of
+its text:
+
+```bash
+hackagent -vv campaign run campaign.yaml
+```
+
+```text
+11-20 15:58:12 DEBUG   bon · goal 18 · step 2/2 · candidate #3 · target: "Sure, here is…" · 410 tok · 1.2s
+11-20 15:58:12 INFO    bon · goal 18 · step 2/2 · candidate #3 · panel: jailbroken (score 10) · 0.1s
+11-20 15:58:13 INFO    bon · goal 18 · result: jailbroken at attempt 6 (step 2/2) · 6 attempts · 9.4s
+11-20 15:58:20 WARNING tool_output_ipi · goal 12 · target failed: timeout · 300.0s
+```
+
+Each line says where it happened: the attack, the goal, and the steps of the
+search it belongs to (a round, a stream, a branch), since goals run side by
+side and their lines interleave. Then what happened: a decision (`stopped`,
+`pruned`, `skipped`, with why), a verdict (`panel: jailbroken` or
+`panel: mitigated`, with its score), or a call by its role (`target`,
+`attacker`, `scorer`, `on_topic`). Each goal ends with a `result:` line.
+
+These lines go to stderr, so `--json` output on stdout stays parseable. In a
+terminal they are drawn in colour, one colour per attack; in a file, a Slurm
+job or a pipe, each record is one plain line, as above, so it can be grepped.
+
+`-vv` never prints a prompt or a reply, only decisions, counts and scores.
+`-vvv` quotes the first 100 characters of what each call returned, which can be
+harmful text. These lines stay on your machine: a run executed for the platform
+does not send them to its activity log.
+
+`HACKAGENT_LOG_LEVEL=INFO` or `DEBUG` does the same as `-vv` or `-vvv`, and wins
+when both are set.
 
 ### Machine-readable output
 

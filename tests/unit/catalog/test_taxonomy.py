@@ -43,10 +43,11 @@ _ADAPTIVE = (
     "autodan_turbo",
     "tool_output_ipi",
     "toolhijacker",
+    "repo_injection",
 )
 _MULTI_TURN = ("crescendo", "stac")
 _MULTIMODAL = ("mml", "fc")
-_INDIRECT = ("rag", "tool_output_ipi", "toolhijacker", "stac")
+_INDIRECT = ("rag", "tool_output_ipi", "toolhijacker", "repo_injection", "stac")
 _RAG = ("rag",)
 
 

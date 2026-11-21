@@ -41,10 +41,32 @@ Optional config:
 - `system_prompt` / `append_system_prompt`: override or extend the
 system prompt.
 - `max_turns`: cap the agentic loop iterations.
-- `cwd`: working directory to run `claude` in.
+- `cwd`: default working directory to run `claude` in; a call can
+override it with `complete(messages, cwd=...)`.
+- `env`: `{name: value}` merged over `os.environ` for the
+`claude` subprocess only (e.g. `HTTP_PROXY`).
+- `stream_log_dir`: when set, each call&#x27;s raw `stream-json` output
+is written to `<dir>/<UTC timestamp>-<n>.jsonl` (default off).
 - `timeout` (seconds, default 300).
 - `extra_args`: list of additional raw `claude` flags.
 
+Each response carries `tool_calls`: the agent&#x27;s tool use in call order,
+``\{"name", "arguments" (JSON of the tool input), "result" (at most 2000
+chars, `…[truncated]` when cut), "is_error"\}``.
+
 Note: `endpoint` is accepted for interface symmetry but ignored — Claude
 Code is local and has no endpoint URL.
+
+#### complete
+
+```python
+def complete(messages, **overrides)
+```
+
+Run one turn and attach the agent&#x27;s tool calls to the response.
+
+LiteLLM would reshape `tool_calls` on its message into OpenAI
+function calls, so the handler hands them over in
+`provider_specific_fields` and they are set here, after
+normalisation, in the shape documented on the class.
 

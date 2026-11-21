@@ -48,6 +48,8 @@ attacks:
     roles: {synthesizer: *role}
   - name: tool_output_ipi
   - name: toolhijacker
+  - name: repo_injection
+    parameters: {repo: .}
   - name: rag
     parameters:
       documents: [A document.]

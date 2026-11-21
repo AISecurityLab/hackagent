@@ -18,7 +18,7 @@ from uuid import UUID
 from hackagent.reporting.goals import VERDICTS, GoalFilters
 
 #: Bumped when a response format changes, so cached ETags stop matching.
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 CAMPAIGN_RUN_NOT_FOUND = "Campaign run not found."
 ATTACK_RUN_NOT_FOUND = "Attack run not found."
@@ -202,7 +202,7 @@ def etag(
     cut to 32 hex digits:
     ``W/"<digits>"``. ``route`` is the name of the route (``"summary-list"``,
     ``"summary"``, ``"report"``, ``"matrix"``, ``"goals"``, ``"attempts"``,
-    ``"structure"``, ``"costs"``, ``"compare"``); ``revisions`` lists every
+    ``"structure"``, ``"costs"``, ``"compare"``, ``"reviews"``); ``revisions`` lists every
     campaign run whose data is in the response, and ``extra`` anything else
     it depends on (the list's total).
     """

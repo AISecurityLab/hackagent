@@ -1,0 +1,3 @@
+{
+  "detail": "Provide outcome (jailbreak, mitigated, inconclusive, or null to withdraw), optional explanation text, and expected_review_id (null for the first review)."
+}

@@ -94,4 +94,8 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "ToolHijacker",
         "description": "Poison a tool registry description to steer retrieval and tool selection across task paraphrases.",
     },
+    "repo_injection": {
+        "label": "Repo injection",
+        "description": "Indirect prompt injection via a poisoned file in the repository a coding agent works on (e.g. CLAUDE.md).",
+    },
 }

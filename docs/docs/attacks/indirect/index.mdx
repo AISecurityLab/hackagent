@@ -31,10 +31,14 @@ the risk itself.
   inside one user message, so any target that answers text works.
 - **They are cheap on the target, not always on helpers.** Each sends a handful
   of target calls per goal. RAG poisoning's attacker writes many payloads per
-  goal; the other two need no helper model at all.
+  goal; the others need no helper model at all.
 - **Success is measured differently.** Tool-output IPI and RAG poisoning ask the
   judge panel whether the reply carries out the goal. ToolHijacker ignores the
   panel and counts whether the injected tool was called.
+- **Repo injection is the exception to most of this.** It runs a real coding
+  agent (`CLAUDE_CODE`) in a real copy of a repository, so the agent's own
+  settings are in the loop, each target call is a whole agent run, and the
+  panel judges the tool calls the agent made, with its reply as context only.
 
 ## The attacks
 
@@ -54,6 +58,10 @@ Ask where the attacker's content would reach your agent.
   benign tasks, and it needs no judge.
 - **In documents the agent retrieves**: use [RAG poisoning](rag.mdx). It needs
   an `attacker` and an `embedder`, and the documents to poison, as text.
+- **In the repository a coding agent works in** (a `CLAUDE.md`, contributor
+  notes): use [Repo injection](repo_injection.mdx). Unlike the others it runs
+  the real agent, Claude Code, in a copy of your repository, and judges the
+  tool calls it made.
 
 To see whether an agent carries out a forbidden outcome across several real tool
 calls, use [STAC](../multi-turn/stac.mdx), which executes the calls in a

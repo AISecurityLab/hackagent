@@ -25,7 +25,7 @@ from hackagent.models.completions.cli import (
 )
 from hackagent.models.completions.claude import (
     ClaudeCodeModel,
-    _extract_result_text,
+    _parse_stream,
     _get_claude_code_custom_llm_class,
 )
 
@@ -95,7 +95,7 @@ class TestClaudeModuleLayout(unittest.TestCase):
     """Claude Code lives at ``models/completions/claude.py``."""
 
     def test_helpers_are_module_level(self):
-        self.assertIs(_extract_result_text, claude_module._extract_result_text)
+        self.assertIs(_parse_stream, claude_module._parse_stream)
         self.assertIs(ClaudeCodeModel, claude_module.ClaudeCodeModel)
 
 
@@ -118,29 +118,29 @@ class TestClaudeHelpers(unittest.TestCase):
     def test_last_user_text_returns_none_when_no_user_message(self):
         self.assertIsNone(_last_user_text([{"role": "system", "content": "x"}]))
 
-    def test_extract_result_text_parses_json_result(self):
-        self.assertEqual(_extract_result_text(_result_json("hi there")), "hi there")
+    def test_parse_stream_reads_result_event(self):
+        self.assertEqual(_parse_stream(_result_json("hi there")), ("hi there", []))
 
-    def test_extract_result_text_falls_back_to_plain_text(self):
-        self.assertEqual(_extract_result_text("not json output"), "not json output")
+    def test_parse_stream_falls_back_to_plain_text(self):
+        self.assertEqual(_parse_stream("not json output"), ("not json output", []))
 
-    def test_extract_result_text_empty_returns_none(self):
-        self.assertIsNone(_extract_result_text("   "))
+    def test_parse_stream_empty_returns_none(self):
+        self.assertEqual(_parse_stream("   "), (None, []))
 
-    def test_extract_result_text_raises_on_execution_error(self):
+    def test_parse_stream_raises_on_execution_error(self):
         """Genuine execution failures (error_* subtype) still raise."""
         payload = json.dumps(
             {
                 "type": "result",
                 "is_error": True,
-                "subtype": "error_max_turns",
+                "subtype": "error_during_execution",
                 "result": "boom",
             }
         )
         with self.assertRaises(CLIInteractionError):
-            _extract_result_text(payload)
+            _parse_stream(payload)
 
-    def test_extract_result_text_captures_usage_policy_block(self):
+    def test_parse_stream_captures_usage_policy_block(self):
         """A content-level refusal (Usage Policy block) is captured, not raised.
 
         The target's API blocks the prompt and reports ``is_error`` with a
@@ -156,7 +156,7 @@ class TestClaudeHelpers(unittest.TestCase):
             }
         )
         self.assertEqual(
-            _extract_result_text(payload),
+            _parse_stream(payload)[0],
             "API Error: ... violates our Usage Policy. Try rephrasing",
         )
 
@@ -164,7 +164,10 @@ class TestClaudeHelpers(unittest.TestCase):
 class TestClaudeCustomLLMTransport(unittest.TestCase):
     def test_build_argv_minimal(self):
         argv = _make_handler(model="opus")._build_argv()
-        self.assertEqual(argv[:4], [_FAKE_BINARY, "-p", "--output-format", "json"])
+        self.assertEqual(
+            argv[:4], [_FAKE_BINARY, "-p", "--output-format", "stream-json"]
+        )
+        self.assertEqual(argv[4], "--verbose")
         self.assertIn("--model", argv)
         self.assertEqual(argv[argv.index("--model") + 1], "opus")
 

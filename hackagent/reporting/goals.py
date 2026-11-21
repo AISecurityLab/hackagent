@@ -38,11 +38,15 @@ UNSPECIFIED = "Unspecified"
 
 
 class AttackOutcome(TypedDict):
-    """One attack run's verdict on a goal and how many attempts it made."""
+    """One attack run's verdict on a goal, how many attempts it made and how
+    many of them a human reviewed."""
 
     run_id: str
     verdict: AttackVerdict
     attempts: int
+    reviewed_attempts: int
+    inconclusive_attempts: int
+    overridden_attempts: int
 
 
 class _GoalFields(TypedDict):
@@ -56,6 +60,9 @@ class _GoalFields(TypedDict):
     successful_attempts: int
     errors: int
     pending: int
+    reviewed_attempts: int
+    inconclusive_attempts: int
+    overridden_attempts: int
     run_ids: list[str]
 
 
@@ -146,8 +153,14 @@ def summarize_goals(
     for index, rows in sorted(grouped.items()):
         rows.sort(key=lambda row: (rank.get(row.run_id, 0), row.run_id))
         labelled = next((row for row in reversed(rows) if row.category), None)
-        attempts = sum(row.attempts for row in rows)
-        jailbreak = sum(row.jailbreak for row in rows)
+        # One pass: a report summarizes every goal of every run several times.
+        attempts = jailbreak = mitigated = errors = pending = 0
+        for row in rows:
+            attempts += row.attempts
+            jailbreak += row.jailbreak
+            mitigated += row.mitigated
+            errors += row.error
+            pending += row.pending
         goals.append(
             {
                 "index": index,
@@ -158,17 +171,40 @@ def summarize_goals(
                 "verdict": goal_verdict(
                     attempts=attempts,
                     jailbreak=jailbreak,
-                    mitigated=sum(row.mitigated for row in rows),
+                    mitigated=mitigated,
                     complete=complete,
                 ),
                 "attempts": attempts,
                 "successful_attempts": jailbreak,
-                "errors": sum(row.error for row in rows),
-                "pending": sum(row.pending for row in rows),
+                "errors": errors,
+                "pending": pending,
+                **review_counts(rows),
                 "run_ids": sorted({row.run_id for row in rows}),
             }
         )
     return goals
+
+
+class ReviewCounts(TypedDict):
+    """How many attempts a human reviewed, found inconclusive, or overrode."""
+
+    reviewed_attempts: int
+    inconclusive_attempts: int
+    overridden_attempts: int
+
+
+def review_counts(rows: Iterable[GoalOutcome]) -> ReviewCounts:
+    """The review counts of ``rows``, summed."""
+    reviewed = inconclusive = overridden = 0
+    for row in rows:
+        reviewed += row.reviewed_attempts
+        inconclusive += row.inconclusive_attempts
+        overridden += row.overridden_attempts
+    return {
+        "reviewed_attempts": reviewed,
+        "inconclusive_attempts": inconclusive,
+        "overridden_attempts": overridden,
+    }
 
 
 def outcome_counts(goals: Iterable[GoalSummary]) -> OutcomeCounts:
@@ -226,6 +262,7 @@ def attack_outcomes(
                 "run_id": run.id,
                 "verdict": attack_verdict(row),
                 "attempts": row.attempts,
+                **review_counts([row]),
             }
             for run in ordered
             if (row := by_goal.get((run.id, goal["index"]))) is not None
@@ -268,6 +305,7 @@ __all__ = [
     "GoalSummary",
     "GoalVerdict",
     "OutcomeCounts",
+    "ReviewCounts",
     "SubcategorySummary",
     "UNKNOWN_CATEGORY",
     "UNSPECIFIED",
@@ -280,6 +318,7 @@ __all__ = [
     "goal_verdict",
     "is_complete",
     "outcome_counts",
+    "review_counts",
     "run_order",
     "subcategory_name",
     "summarize_goals",
