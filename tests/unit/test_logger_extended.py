@@ -8,7 +8,6 @@ import os
 import unittest
 from unittest.mock import patch
 
-import hackagent.interfaces.cli.logging_setup as logger_module
 from hackagent.core.logging import get_logger
 from hackagent.interfaces.cli.logging_setup import (
     setup_package_logging,
@@ -21,7 +20,6 @@ class TestSetupPackageLoggingExtended(unittest.TestCase):
 
     def setUp(self):
         """Reset state before each test."""
-        logger_module._rich_handler_configured_for_package = False
         logger = logging.getLogger("hackagent")
         logger.handlers.clear()
         logger.setLevel(logging.NOTSET)
@@ -29,7 +27,6 @@ class TestSetupPackageLoggingExtended(unittest.TestCase):
 
     def tearDown(self):
         """Clean up after each test."""
-        logger_module._rich_handler_configured_for_package = False
         logger = logging.getLogger("hackagent")
         logger.handlers.clear()
         logger.setLevel(logging.NOTSET)
@@ -106,28 +103,24 @@ class TestGetLoggerExtended(unittest.TestCase):
 
     def setUp(self):
         """Reset state before each test."""
-        logger_module._rich_handler_configured_for_package = False
         hackagent_logger = logging.getLogger("hackagent")
         hackagent_logger.handlers.clear()
         hackagent_logger.setLevel(logging.NOTSET)
 
     def tearDown(self):
         """Clean up after each test."""
-        logger_module._rich_handler_configured_for_package = False
 
     def test_get_logger_base_hackagent_installs_no_handler(self):
         """get_logger never configures logging, even for 'hackagent'."""
         logger = get_logger("hackagent")
         self.assertEqual(logger.name, "hackagent")
         self.assertEqual(logger.handlers, [])
-        self.assertFalse(logger_module._rich_handler_configured_for_package)
 
     def test_get_logger_hackagent_submodule_installs_no_handler(self):
         """get_logger for 'hackagent.sub' does not configure the package logger."""
         logger = get_logger("hackagent.some.module")
         self.assertEqual(logger.name, "hackagent.some.module")
         self.assertEqual(logging.getLogger("hackagent").handlers, [])
-        self.assertFalse(logger_module._rich_handler_configured_for_package)
 
     def test_importing_hackagent_installs_no_handler(self):
         """A fresh ``import hackagent`` leaves logging configuration alone."""
@@ -149,7 +142,7 @@ class TestGetLoggerExtended(unittest.TestCase):
         logger = get_logger("some_other_package")
         self.assertEqual(logger.name, "some_other_package")
         # Should NOT have triggered hackagent setup
-        self.assertFalse(logger_module._rich_handler_configured_for_package)
+        self.assertEqual(logging.getLogger("hackagent").handlers, [])
 
 
 if __name__ == "__main__":

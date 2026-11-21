@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 from hackagent.interfaces.cli.logging_setup import setup_package_logging
 from hackagent.core.logging import get_logger
-import hackagent.interfaces.cli.logging_setup as logger_module
 
 
 class TestSetupPackageLogging(unittest.TestCase):
@@ -18,8 +17,6 @@ class TestSetupPackageLogging(unittest.TestCase):
 
     def setUp(self):
         """Reset state before each test."""
-        # Reset the global flag
-        logger_module._rich_handler_configured_for_package = False
         # Clear any existing handlers
         logger = logging.getLogger("hackagent")
         logger.handlers.clear()
@@ -31,7 +28,6 @@ class TestSetupPackageLogging(unittest.TestCase):
 
     def tearDown(self):
         """Clean up loggers after each test."""
-        logger_module._rich_handler_configured_for_package = False
         logger = logging.getLogger("hackagent")
         logger.handlers.clear()
         logger.setLevel(logging.NOTSET)
@@ -98,14 +94,12 @@ class TestGetLogger(unittest.TestCase):
 
     def setUp(self):
         """Reset state before each test."""
-        logger_module._rich_handler_configured_for_package = False
         logger = logging.getLogger("hackagent")
         logger.handlers.clear()
         logger.setLevel(logging.NOTSET)
 
     def tearDown(self):
         """Clean up loggers after each test."""
-        logger_module._rich_handler_configured_for_package = False
 
     def test_get_logger_returns_logger(self):
         """Test that get_logger returns a logger instance."""
