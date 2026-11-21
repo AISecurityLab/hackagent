@@ -153,8 +153,14 @@ def summarize_goals(
     for index, rows in sorted(grouped.items()):
         rows.sort(key=lambda row: (rank.get(row.run_id, 0), row.run_id))
         labelled = next((row for row in reversed(rows) if row.category), None)
-        attempts = sum(row.attempts for row in rows)
-        jailbreak = sum(row.jailbreak for row in rows)
+        # One pass: a report summarizes every goal of every run several times.
+        attempts = jailbreak = mitigated = errors = pending = 0
+        for row in rows:
+            attempts += row.attempts
+            jailbreak += row.jailbreak
+            mitigated += row.mitigated
+            errors += row.error
+            pending += row.pending
         goals.append(
             {
                 "index": index,
@@ -165,13 +171,13 @@ def summarize_goals(
                 "verdict": goal_verdict(
                     attempts=attempts,
                     jailbreak=jailbreak,
-                    mitigated=sum(row.mitigated for row in rows),
+                    mitigated=mitigated,
                     complete=complete,
                 ),
                 "attempts": attempts,
                 "successful_attempts": jailbreak,
-                "errors": sum(row.error for row in rows),
-                "pending": sum(row.pending for row in rows),
+                "errors": errors,
+                "pending": pending,
                 **review_counts(rows),
                 "run_ids": sorted({row.run_id for row in rows}),
             }
@@ -189,11 +195,15 @@ class ReviewCounts(TypedDict):
 
 def review_counts(rows: Iterable[GoalOutcome]) -> ReviewCounts:
     """The review counts of ``rows``, summed."""
-    rows = list(rows)
+    reviewed = inconclusive = overridden = 0
+    for row in rows:
+        reviewed += row.reviewed_attempts
+        inconclusive += row.inconclusive_attempts
+        overridden += row.overridden_attempts
     return {
-        "reviewed_attempts": sum(row.reviewed_attempts for row in rows),
-        "inconclusive_attempts": sum(row.inconclusive_attempts for row in rows),
-        "overridden_attempts": sum(row.overridden_attempts for row in rows),
+        "reviewed_attempts": reviewed,
+        "inconclusive_attempts": inconclusive,
+        "overridden_attempts": overridden,
     }
 
 
