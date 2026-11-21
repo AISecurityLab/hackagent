@@ -1,3 +1,24 @@
+## v0.20.0 (2026-11-21)
+
+### Feat
+
+- stream structured attack progress during campaign execution
+- **examples**: Granite Guardian PreToolUse hook for Claude Code
+- **attacks**: add repo_injection for coding agents
+- **models**: record Claude Code tool calls and per-call cwd
+- **reporting**: return each attempt's judge votes in /attempts
+- **reporting**: human reviews of attempts and judge agreement
+- **logging**: follow what each attack does, in a log that reads like vLLM's
+
+### Fix
+
+- **reporting**: count judges whose names end in _mean as votes
+- **reporting**: bring /report back under its time budget; fix a Windows test
+- **logging**: keep a record with a traceback on one line
+- **attacks**: contain repo_injection copies and keep actions in the judge window
+- **reporting**: read evaluation metrics that are not an object as none
+- **logging**: address review of the trace log
+
 ## v0.19.0 (2026-11-12)
 
 ### Feat
