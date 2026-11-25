@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import time
 from abc import ABC, abstractmethod
+import contextvars
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional, Sequence
@@ -82,7 +83,13 @@ class Model(ABC):
         if max_concurrency == 1:
             return [complete_one(messages) for messages in requests]
         with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
-            return list(pool.map(complete_one, requests))
+            # Each request in a copy of the caller's context, so what it logs
+            # reaches the caller's run.
+            futures = [
+                pool.submit(contextvars.copy_context().run, complete_one, messages)
+                for messages in requests
+            ]
+            return [future.result() for future in futures]
 
     async def acomplete_batch(
         self,

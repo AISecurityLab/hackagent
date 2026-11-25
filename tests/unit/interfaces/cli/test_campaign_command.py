@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -93,6 +94,49 @@ def test_validate_reports_a_broken_campaign():
 
     assert result.exit_code == 1
     assert "no api key" in result.output.lower()
+
+
+@pytest.mark.parametrize("as_json", [False, True])
+def test_dry_run_reports_completion_without_writing_files(
+    tmp_path, monkeypatch, as_json
+):
+    from hackagent.orchestrator.campaign.resolve import resolve_campaign
+    from tests.unit.campaign.fakes import FakeBuilder, goals
+
+    package = logging.getLogger("hackagent")
+    monkeypatch.setattr(package, "handlers", [])
+    monkeypatch.setattr(package, "level", logging.NOTSET)
+    monkeypatch.setenv("HACKAGENT_LOG_LEVEL", "WARNING")
+    monkeypatch.setattr(logging.root.manager, "disable", logging.NOTSET)
+    output = tmp_path / "output"
+
+    def resolve(spec, **kwargs):
+        return resolve_campaign(spec, build=FakeBuilder(), load=goals("one", "two"))
+
+    with (
+        patch("hackagent.orchestrator.campaign.load_campaign", return_value=_spec()),
+        patch(
+            "hackagent.orchestrator.campaign.runner.resolve_campaign",
+            side_effect=resolve,
+        ),
+    ):
+        result = CliRunner().invoke(
+            campaign,
+            ["run", "campaign.yaml", "--dry-run", "--output-directory", str(output)]
+            + (["--json"] if as_json else []),
+        )
+
+    assert result.exit_code == 0, result.output
+    if as_json:
+        report = json.loads(result.stdout)
+        assert report["dry_run"] is True
+        assert report["succeeded"] is True
+    else:
+        assert (
+            "campaign demo · dry run completed · 2 goals · 1 attack · 1 judge"
+            in result.stdout
+        )
+    assert not output.exists()
 
 
 def test_run_applies_an_endpoint_override_and_reports_the_summary():

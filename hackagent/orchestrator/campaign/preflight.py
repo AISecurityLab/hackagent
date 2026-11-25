@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from hackagent.core.logging import REPORTED_AS_EVENT, get_logger
+from hackagent.core.logging import get_logger
 from hackagent.models import Model, ModelConfig, Reachability, embedder_is_reachable
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
@@ -104,6 +104,8 @@ async def preflight(resolved: "ResolvedCampaign") -> int:
     Raises :class:`PreflightError` naming each failure.
     """
     probes = resolved.probes
+    models = f"{len(probes)} model{'' if len(probes) == 1 else 's'}"
+    logger.info("preflight · checking %s", models)
     results = await asyncio.gather(*(_run(probe) for probe in probes))
     failures = [
         f"{probe.name} ({', '.join(probe.uses)}): {result.detail}"
@@ -111,13 +113,14 @@ async def preflight(resolved: "ResolvedCampaign") -> int:
         if not result
     ]
     if failures:
+        logger.error(
+            "preflight · %d of %s unreachable: %s",
+            len(failures),
+            models,
+            "; ".join(failures),
+        )
         raise PreflightError(failures)
-    logger.info(
-        "preflight · %d %s answered",
-        len(results),
-        "model" if len(results) == 1 else "models",
-        extra=REPORTED_AS_EVENT,
-    )
+    logger.info("preflight · %s reachable", models)
     return len(results)
 
 

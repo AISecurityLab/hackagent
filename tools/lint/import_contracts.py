@@ -9,6 +9,7 @@ import ast
 from pathlib import Path
 
 from importlinter.application import output
+from importlinter.domain import fields
 from importlinter.domain.contract import Contract, ContractCheck
 
 _HANDLER_CALLS = frozenset({"addHandler", "basicConfig", "dictConfig", "fileConfig"})
@@ -43,16 +44,23 @@ class LoggingHandlersContract(Contract):
     other module may obtain loggers and set levels, but must not call
     ``addHandler`` / ``basicConfig`` / ``dictConfig`` / ``fileConfig`` or
     import ``logging.handlers`` or ``rich.logging``.
+
+    ``allowed_modules`` names the modules exempt from that, each for a stated
+    reason in the configuration.
     """
 
     type_name = "logging_handlers"
+    allowed_modules = fields.ListField(subfield=fields.StringField(), required=False)
 
     def check(self, graph, verbose: bool) -> ContractCheck:
         del graph, verbose
         violations: list[str] = []
         root = Path("hackagent")
+        allowed = set(self.allowed_modules or ())  # type: ignore[arg-type]
         for path in sorted(root.rglob("*.py")):
             if "__pycache__" in path.parts or "interfaces" in path.parts:
+                continue
+            if ".".join(path.with_suffix("").parts) in allowed:
                 continue
             try:
                 tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

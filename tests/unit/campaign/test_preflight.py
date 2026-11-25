@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import asyncio
 
 import pytest
@@ -13,12 +15,14 @@ from hackagent.models import embedder_is_reachable
 from hackagent.orchestrator.campaign import load_campaign, run_campaign
 from hackagent.orchestrator.campaign.preflight import PreflightError
 
+from tests.support.run_events import recorded_lines
+
 from .fakes import FakeBuilder, ScriptedModel, campaign, failure, goals, model
 
 TARGET_REPLY = "a reply the judge will read"
 
 
-def run(values, *, models=None, on_event=None):
+def run(values, *, models=None):
     from tests.fakes import RecordingStore
 
     builder = FakeBuilder(models or {})
@@ -27,7 +31,6 @@ def run(values, *, models=None, on_event=None):
         build=builder,
         load=goals("goal one"),
         store=RecordingStore(),
-        on_event=on_event,
     )
 
 
@@ -97,33 +100,27 @@ def test_the_target_is_not_attacked_when_preflight_fails():
 
 
 def test_preflight_reports_its_start_and_result():
-    events = []
-    run(
-        with_preflight(),
-        models=models_for(),
-        on_event=lambda event, **payload: events.append((event, payload)),
-    )
+    with recorded_lines() as lines:
+        run(with_preflight(), models=models_for())
 
-    preflight = [item for item in events if item[0].startswith("preflight")]
-    assert preflight == [
-        ("preflight_started", {"models": 2}),
-        ("preflight_finished", {"models": 2}),
+    assert [line.text for line in lines if line.text.startswith("preflight")] == [
+        "preflight · checking 2 models",
+        "preflight · 2 models reachable",
     ]
 
 
 def test_a_failed_preflight_reports_each_unreachable_model():
-    events = []
-    with pytest.raises(PreflightError):
+    with recorded_lines() as lines, pytest.raises(PreflightError):
         run(
             with_preflight(),
             models=models_for(target=lambda _m: failure("connection refused")),
-            on_event=lambda event, **payload: events.append((event, payload)),
         )
 
-    [(_, failed)] = [item for item in events if item[0] == "preflight_failed"]
-    assert failed["models"] == 2
-    [reason] = failed["failures"]
-    assert reason.startswith("target (target): ")
+    [failed] = [line for line in lines if "unreachable" in line.text]
+    assert failed.level == logging.ERROR
+    assert failed.text.startswith(
+        "preflight · 1 of 2 models unreachable: target (target): "
+    )
 
 
 def test_an_unreachable_judge_stops_the_run():

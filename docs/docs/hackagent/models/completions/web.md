@@ -95,3 +95,12 @@ def complete(messages: Sequence[Mapping[str, Any]],
 
 Send a single turn to the live page via `litellm.completion`.
 
+#### acomplete
+
+```python
+async def acomplete(messages: Sequence[Mapping[str, Any]],
+                    **overrides: Any) -> ModelResponse
+```
+
+Run :meth:`complete` in a worker thread.
+

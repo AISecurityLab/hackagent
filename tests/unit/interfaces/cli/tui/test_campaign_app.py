@@ -593,7 +593,6 @@ class TestRunView:
             await pilot.pause()
 
             builder._log("while away")
-            builder._set_progress(60)
             builder._watch_run()
             await pilot.pause()
             rows = _rendered(app)

@@ -68,3 +68,26 @@ Optional config:
     - `fresh_session_per_request` (default True): if True, every request
       gets a brand-new session unless the caller supplies one.
 
+#### complete
+
+```python
+def complete(messages: Sequence[Mapping[str, Any]],
+             **overrides: Any) -> ModelResponse
+```
+
+Send `messages` to the ADK agent through LiteLLM&#x27;s custom provider.
+
+Only the `session_id` (or legacy `adk_session_id`) and
+`initial_session_state` overrides are used. The ADK events and session
+id the agent produced are added to the response metadata. Failures are
+returned as an error response.
+
+#### acomplete
+
+```python
+async def acomplete(messages: Sequence[Mapping[str, Any]],
+                    **overrides: Any) -> ModelResponse
+```
+
+Run :meth:`complete` in a worker thread.
+

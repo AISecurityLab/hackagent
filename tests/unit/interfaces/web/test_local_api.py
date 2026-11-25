@@ -16,6 +16,7 @@ from tempfile import TemporaryDirectory
 from unittest import mock
 
 from hackagent import HackAgent, Settings
+from hackagent.orchestrator.campaign import CampaignCancelled
 from hackagent.storage.local import LocalBackend
 from hackagent.interfaces.web import _static, create_app
 
@@ -331,7 +332,7 @@ class TestSavedCampaigns(_CampaignTestCase):
         self.assertEqual(agent["config"]["connection"]["type"], "OPENAI")
 
 
-def _fake_run(spec, *, store, on_event, **_kwargs):
+def _fake_run(spec, *, store, cancel, **_kwargs):
     """Record a campaign run with one attack run and one result, then finish."""
     agent = store.create_or_update_agent(spec.target.name, spec.target.model_dump())
     record = store.start_campaign(agent.id, spec.recorded())
@@ -341,17 +342,15 @@ def _fake_run(spec, *, store, on_event, **_kwargs):
     store.update_campaign_run(record.id, status="COMPLETED")
 
 
-def _slow_run(spec, *, store, on_event, **_kwargs):
-    """Record a campaign run, then report progress until cancelled."""
+def _slow_run(spec, *, store, cancel, **_kwargs):
+    """Record a campaign run, then keep going until cancelled."""
     agent = store.create_or_update_agent(spec.target.name, spec.target.model_dump())
     record = store.start_campaign(agent.id, spec.recorded())
-    try:
-        for _ in range(500):
-            on_event("attempt_finished")
-            time.sleep(0.01)
-    except Exception:
-        store.update_campaign_run(record.id, status="CANCELLED")
-        raise
+    for _ in range(500):
+        if cancel.is_set():
+            store.update_campaign_run(record.id, status="CANCELLED")
+            raise CampaignCancelled("Campaign cancelled")
+        time.sleep(0.01)
 
 
 class TestLaunchingOnThisMachine(_CampaignTestCase):

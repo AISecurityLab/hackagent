@@ -48,7 +48,8 @@ from hackagent.core.contracts import Sample, Verdict
 from hackagent.core.contracts.protocols import CompletionResult
 
 from .contract import Completion, Messages
-from .progress import decision_progress, emit_progress, phase_progress
+from hackagent.core.logging import about, subject_of
+
 from .trace_log import log_node
 
 #: Where a node belongs. ``goal`` is one goal's search; ``run`` is work a
@@ -90,7 +91,7 @@ class Trace:
         self.nodes: list[TraceNode] = []
         self._children: dict[Path, int] = {}
         #: Which attack and goal the nodes belong to, for the log.
-        self.subject: Mapping[str, Any] = dict(_subject.get())
+        self.subject: Mapping[str, Any] = dict(subject_of())
         self._phases: dict[Path, str] = {}
         #: How many phases of each label each parent has opened, so the log
         #: can tell "candidate #2" from "candidate #3".
@@ -136,21 +137,6 @@ _trace: ContextVar[Optional[Trace]] = ContextVar("hackagent_trace", default=None
 #: than state on the ``Trace`` because concurrent branches of one search each
 #: need their own position: a task started by ``gather`` gets its own copy.
 _path: ContextVar[Path] = ContextVar("hackagent_trace_path", default=())
-#: What the nodes recorded here are about (``attack``, ``goal``), for the log.
-_subject: ContextVar[Mapping[str, Any]] = ContextVar(
-    "hackagent_trace_subject", default={}
-)
-
-
-@contextmanager
-def about(**subject: Any) -> Iterator[None]:
-    """Name what the nodes recorded in this context belong to, such as
-    ``attack="tap", goal=3``; nested calls add to it."""
-    token = _subject.set({**_subject.get(), **subject})
-    try:
-        yield
-    finally:
-        _subject.reset(token)
 
 
 @contextmanager
@@ -179,13 +165,9 @@ def phase(label: str, **data: Any) -> Iterator[Path]:
     node = trace.add("phase", label=label, data=data)
     token = _path.set(node.path)
     try:
-        phase_progress(label, node.path, data, "started")
         yield node.path
     finally:
-        try:
-            phase_progress(label, node.path, data, "finished")
-        finally:
-            _path.reset(token)
+        _path.reset(token)
 
 
 def decision(outcome: str, reason: str = "", **data: Any) -> None:
@@ -193,7 +175,6 @@ def decision(outcome: str, reason: str = "", **data: Any) -> None:
     trace = _trace.get()
     if trace is not None:
         trace.add("decision", label=outcome, data={"reason": reason, **data})
-        decision_progress(outcome, data)
 
 
 def artifact(kind: str, uri: str = "", **data: Any) -> None:
@@ -260,8 +241,6 @@ def record_judge_call(sample: Sample, verdict: Verdict, latency_s: float) -> Non
         latency_s,
         error=verdict.error,
     )
-    if verdict.success and not verdict.error:
-        emit_progress("jailbreak_found", path=list(current_path()), score=verdict.score)
 
 
 _evaluation_request: ContextVar[Optional[dict[str, str]]] = ContextVar(

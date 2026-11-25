@@ -113,13 +113,21 @@ def test_snippets_are_one_short_line():
     assert trace_log.snippet(None) == ""
 
 
-def test_the_activity_relay_never_sends_the_trace():
-    from hackagent.orchestrator.execution.activity import activity_from_record
-
-    record = logging.LogRecord(
-        TRACE_LOGGER, logging.INFO, __file__, 1, "tap · goal 1 · secret", None, None
-    )
-    assert activity_from_record(record) is None
+def test_only_debug_lines_quote_model_text(records):
+    """What may leave the machine (INFO and above) never quotes a prompt or a
+    reply; the calls that do are DEBUG."""
+    with about(attack="pair", goal=1), recording():
+        record_call("attacker", [], '{"prompt": "the prompt"}', 0.5)
+        record_call("target", [], "the reply", 0.5)
+        record_call("panel", [], {"score": 9, "success": True}, 0.1)
+        decision("stopped", "the judge agreed", reply="the reply")
+    quoting = [
+        r
+        for r in records
+        if "the prompt" in r.getMessage() or "the reply" in r.getMessage()
+    ]
+    assert quoting and all(r.levelno == logging.DEBUG for r in quoting)
+    assert any(r.levelno == logging.INFO for r in records)
 
 
 def test_unnumbered_phases_are_numbered_among_their_siblings(records):

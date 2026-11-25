@@ -1,86 +1,90 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""The CLI draws attack trace records, and -v sets the log level."""
+"""The CLI's terminal log: the file's line, coloured; -v sets its level."""
 
 from __future__ import annotations
 
+import io
 import logging
+import sys
 
 from rich.console import Console
 
-from hackagent.interfaces.cli.logging_setup import apply_verbosity, render_trace_step
+from hackagent.core.logging import TRACE_LOGGER, PlainFormatter
+from hackagent.interfaces.cli.logging_setup import (
+    LogLineHandler,
+    apply_verbosity,
+    shown_level,
+)
 
 
-def plain(text) -> str:
-    console = Console(width=200, color_system=None)
-    with console.capture() as captured:
-        console.print(text)
-    return captured.get().rstrip("\n")
+def _terminal(width: int = 60) -> tuple[LogLineHandler, io.StringIO]:
+    out = io.StringIO()
+    console = Console(file=out, width=width, force_terminal=True, color_system=None)
+    return LogLineHandler(console), out
 
 
-def test_a_call_is_tagged_indented_and_quoted_without_markup():
-    line = render_trace_step(
-        {
-            "attack": "tap",
-            "goal": 3,
-            "depth": 3,
-            "node": "call",
-            "role": "target",
-            "within": ["depth 2/3", "branch 1"],
-            "text": "[bold]not markup[/bold]",
-            "tokens": 120,
-            "latency_s": 0.84,
-        }
+def _trace(**step) -> logging.LogRecord:
+    record = logging.LogRecord(TRACE_LOGGER, logging.INFO, "x.py", 1, "m", None, None)
+    record.trace_step = step
+    return record
+
+
+def test_a_terminal_shows_the_line_a_file_has():
+    """Same words as a file, the TUI and the platform; one record per line,
+    however narrow the terminal."""
+    handler, out = _terminal(width=40)
+    record = _trace(
+        source="pair · goal 1",
+        within=["round 2/3", "stream 1/2"],
+        what="panel: jailbroken (score 9) · 0.1s",
     )
-    assert plain(line) == (
-        'tap · goal 3      depth 2/3 › branch 1 › target   "[bold]not markup[/bold]"'
-        "  120 tok · 0.8s"
-    )
+    handler.handle(record)
+
+    assert out.getvalue().splitlines() == [PlainFormatter().format(record)]
 
 
-def test_a_verdict_and_a_decision():
-    verdict = render_trace_step(
-        {
-            "attack": "pair",
-            "goal": 1,
-            "depth": 1,
-            "node": "call",
-            "role": "panel",
-            "score": 9.0,
-            "success": True,
-        }
+def test_a_message_is_never_read_as_markup():
+    handler, out = _terminal()
+    record = logging.LogRecord(
+        "hackagent.x", logging.WARNING, "x.py", 1, "[bold]not markup[/bold]", None, None
     )
-    assert plain(verdict) == "pair · goal 1  panel    9 jailbroken"
-    decision = render_trace_step(
-        {
-            "attack": "pair",
-            "goal": 1,
-            "depth": 2,
-            "node": "decision",
-            "label": "stopped",
-            "reason": "judge agreed",
-            "details": {"score": "9"},
-            "within": ["round 2/3"],
-        }
-    )
-    assert (
-        plain(decision)
-        == "pair · goal 1    round 2/3 › ◆ stopped judge agreed (score=9)"
-    )
+    handler.handle(record)
+
+    assert "[bold]not markup[/bold]" in out.getvalue()
+
+
+def test_a_traceback_is_drawn_below_its_line():
+    handler, out = _terminal(width=100)
+    try:
+        raise ValueError("the reason")
+    except ValueError:
+        record = logging.LogRecord(
+            "hackagent.x", logging.ERROR, "x.py", 1, "it failed", None, sys.exc_info()
+        )
+    handler.handle(record)
+
+    first, *rest = out.getvalue().splitlines()
+    assert first.endswith("ERROR   it failed")
+    assert any("ValueError" in line and "the reason" in line for line in rest)
 
 
 def test_verbosity_sets_the_level_unless_the_environment_does(monkeypatch):
     logger = logging.getLogger("hackagent")
     level = logger.level
+    handlers = [(handler, handler.level) for handler in logger.handlers]
     try:
         monkeypatch.delenv("HACKAGENT_LOG_LEVEL", raising=False)
+        # What the CLI's log shows, with or without the CLI's handler.
         apply_verbosity(2)
-        assert logger.level == logging.INFO
+        assert shown_level() == logging.INFO
         apply_verbosity(5)
-        assert logger.level == logging.DEBUG
+        assert shown_level() == logging.DEBUG
         monkeypatch.setenv("HACKAGENT_LOG_LEVEL", "ERROR")
         apply_verbosity(2)
-        assert logger.level == logging.DEBUG
+        assert shown_level() == logging.DEBUG
     finally:
         logger.setLevel(level)
+        for handler, was in handlers:
+            handler.setLevel(was)

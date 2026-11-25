@@ -19,7 +19,7 @@ from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Footer, TabbedContent
+from textual.widgets import Footer
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.theme import css_variables
@@ -345,43 +345,26 @@ class HackAgentTUI(App):
         except Exception:
             pass
 
-    def _active_monitor_text(self) -> tuple[str, str]:
-        """Return ``(text, source)`` for the active attack-monitor panel.
+    def _run_log_text(self) -> str:
+        """The campaign run's log as plain text, as the run view shows it;
+        empty before any run."""
+        from rich.text import Text
 
-        Picks the Actions panel when its tab is active, otherwise the Logs
-        panel. Returns ``("", "logs")`` when no viewer is present.
-        """
-        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
-        from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
-
-        active = None
-        try:
-            monitor = self.query_one("#attack-monitor-container")
-            active = monitor.query_one(TabbedContent).active
-        except Exception:
-            active = None
-
-        if active == "actions-tab":
-            try:
-                return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
-            except Exception:
-                pass
-        try:
-            return self.query_one(AttackLogViewer).get_log_text(), "logs"
-        except Exception:
-            pass
-        try:
-            return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
-        except Exception:
-            return "", "logs"
+        builder = self.query(CampaignBuilder)
+        if not builder:
+            return ""
+        return "\n".join(
+            Text.from_markup(line).plain for line in builder.first()._run_lines
+        )
 
     def action_copy_selection(self) -> None:
-        """Copy logs (or a text selection) to the clipboard — bound to Ctrl+Y.
+        """Copy a text selection, else the run's log, to the clipboard — bound
+        to Ctrl+Y.
 
-        If you've dragged to select text, that selection is copied. Otherwise it
-        copies the whole visible Logs (or Actions) panel — so you can copy
-        without needing the mouse at all. Uses Textual's terminal-native
-        clipboard (OSC 52), which works locally and over SSH.
+        If you've dragged to select text, that selection is copied. Otherwise
+        it copies the campaign run's log, so you can copy without needing the
+        mouse at all. Uses Textual's terminal-native clipboard (OSC 52), which
+        works locally and over SSH.
         """
         from hackagent.interfaces.tui.widgets.clipboard import copy_to_clipboard
 
@@ -392,10 +375,10 @@ class HackAgentTUI(App):
         except Exception:
             text = ""
         if not text:
-            text, source = self._active_monitor_text()
+            text, source = self._run_log_text(), "the run's log"
         if not text:
             self.notify(
-                "Nothing to copy yet — run an attack, or drag to select text first.",
+                "Nothing to copy yet — run a campaign, or drag to select text first.",
                 title="Copy",
                 severity="warning",
             )

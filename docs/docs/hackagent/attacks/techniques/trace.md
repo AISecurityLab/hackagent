@@ -88,16 +88,6 @@ def add(node: str, *, label: str = "", **fields: Any) -> TraceNode
 
 Append a node as the next child of the current path.
 
-#### about
-
-```python
-@contextmanager
-def about(**subject: Any) -> Iterator[None]
-```
-
-Name what the nodes recorded in this context belong to, such as
-`attack="tap", goal=3`; nested calls add to it.
-
 #### recording
 
 ```python

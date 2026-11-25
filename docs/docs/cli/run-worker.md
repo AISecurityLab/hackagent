@@ -63,14 +63,15 @@ hackagent run 3f0c2a4e-5d6b-4c1e-9a2f-0e8b7c6d5a41
    `local:<hostname> (<user>)`, and runs it, printing a line as each attack
    starts and finishes. Models that use the HackAgent gateway are called with
    your API key. Meanwhile, the run page's activity log shows what the run is
-   doing: progress, retries, warnings and errors, never prompts or replies.
+   doing: progress, retries, warnings and errors, and the attacks'
+   decisions and verdicts, never prompts or replies.
 6. It finishes the run on the platform as completed, failed or cancelled.
 
 The run's files are written under the campaign's output directory, relative to
 the folder you run the command in: `./logs/runs/<run id>/` by default.
 
-`--json` prints the progress events as JSON lines, then
-`{"run_id": …, "status": …, "note": …}`.
+`--json` prints how the run ended as one JSON object on stdout,
+`{"run_id": …, "status": …, "note": …}`; the run's log still goes to stderr.
 
 ## Stopping a run
 

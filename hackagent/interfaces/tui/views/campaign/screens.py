@@ -18,7 +18,6 @@ from textual.widgets import (
     Input,
     Label,
     OptionList,
-    ProgressBar,
     RichLog,
     Static,
 )
@@ -33,6 +32,10 @@ _DIALOG_CSS = """
 {name} Horizontal {{ height: auto; margin-top: 1; }}
 {name} Button {{ width: 1fr; margin: 0 1 0 0; }}
 """
+
+
+#: How many of a run's lines the run view keeps and shows: the latest.
+RUN_LINES = 5000
 
 
 class ExampleScreen(ModalScreen[Optional[Path]]):
@@ -119,7 +122,6 @@ class RunScreen(Screen[None]):
     DEFAULT_CSS = """
     RunScreen { background: $surface; }
     RunScreen #run-head { height: 1; padding: 0 1; background: $panel; }
-    RunScreen #run-progress { margin: 1 2 0 2; }
     RunScreen #run-log {
         height: 1fr; margin: 1 2; border: round $primary-darken-2;
     }
@@ -137,19 +139,16 @@ class RunScreen(Screen[None]):
         self,
         title: str,
         lines: Sequence[str],
-        progress: float,
         stop: Callable[[], None],
     ) -> None:
         super().__init__()
         self._title = title
         self._lines = list(lines)
-        self._progress = progress
         self._stop = stop
 
     def compose(self) -> ComposeResult:
         yield Static(f"[b]{escape(self._title)}[/b]", id="run-head")
-        yield ProgressBar(total=100, show_eta=False, id="run-progress")
-        yield RichLog(markup=True, wrap=True, id="run-log")
+        yield RichLog(markup=True, wrap=True, max_lines=RUN_LINES, id="run-log")
         yield Static(
             "esc back to the campaign · f3 stop · the run carries on either way",
             id="run-hint",
@@ -159,13 +158,9 @@ class RunScreen(Screen[None]):
         log = self.query_one("#run-log", RichLog)
         for line in self._lines:
             log.write(line)
-        self.set_progress(self._progress)
 
     def write(self, markup: str) -> None:
         self.query_one("#run-log", RichLog).write(markup)
-
-    def set_progress(self, value: float) -> None:
-        self.query_one("#run-progress", ProgressBar).update(progress=value)
 
     def action_close(self) -> None:
         self.dismiss(None)

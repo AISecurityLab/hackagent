@@ -151,87 +151,119 @@ and raises `PreflightError` before any attack starts.
 
 ## Follow progress
 
-Pass `on_event` to be told what the run is doing. It is called as
-`on_event(event_name, **payload)`, in this order. Payloads hold names and
-counts, never goal texts, prompts or replies:
-
-| Event | When | Payload |
-|---|---|---|
-| `campaign_started` | The run begins, before goals and models are loaded | `campaign` |
-| `goals_loaded` | The dataset is loaded | `goals` |
-| `models_resolved` | Every model is built | `attacks`, `judges`, `models` (distinct models) |
-| `preflight_started` | Preflight checks the models, when `execution.preflight` is on | `models` |
-| `preflight_finished` | Every model answered | `models` |
-| `preflight_failed` | A model did not answer; `PreflightError` follows | `models`, `failures` (one reason per model) |
-| `audit_started` | The judge audit begins, when `evaluation.audit` is on | `judges` |
-| `audit_finished` | The judge audit ran | `audit` |
-| `attack_started` | An attack begins | `attack`, `run_id`, `expected_goals` |
-| `preparation_started` | An attack with run-wide setup starts it (AutoDAN-Turbo's warm-up, h4rm3l's program search) | `attack`, `run_id`, `goals` |
-| `preparation_finished` | That setup is done | `attack`, `run_id`, `elapsed_s` |
-| `goal_finished` | An attack is done with one goal | `attack`, `run_id`, `goal_index`, `goals` (the campaign's goal count), `success`, `attempts`, `successful`, `errors`, `elapsed_s` |
-| `attack_finished` | An attack ends | `attack`, `run_id`, `error` (`None` when it completed), `attempts`, `successful`, `elapsed_s` |
+A run says what it is doing through Python's `logging`, under the `hackagent`
+logger. To read it, configure logging as for any library:
 
 ```python
+import logging
+
 from hackagent.orchestrator.campaign import run_campaign
 
-
-def on_event(event, **payload):
-    if event == "attack_started":
-        print(f"{payload['attack']}: {payload['expected_goals']} goals")
-    elif event == "goal_finished":
-        mark = "jailbroken" if payload["success"] else "held"
-        print(f"  goal {payload['goal_index']}: {mark} "
-              f"after {payload['attempts']} attempts, {payload['elapsed_s']:.1f}s")
-        for error in payload["errors"]:
-            print("    error:", error)
-    elif event == "attack_finished" and payload["error"]:
-        print(f"{payload['attack']} failed: {payload['error']}")
-
-
-result = run_campaign("campaign.yaml", on_event=on_event)
+logging.basicConfig(level=logging.INFO)
+result = run_campaign("campaign.yaml")
 ```
 
 ```text
-baseline: 2 goals
-  goal 0: jailbroken after 1 attempts, 23.2s
-  goal 1: held after 1 attempts, 23.6s
-flipattack: 2 goals
-  goal 0: jailbroken after 1 attempts, 0.5s
-  goal 1: jailbroken after 1 attempts, 9.5s
+INFO:hackagent.campaign:baseline started · 2 goals · run 1c9e2f04
+INFO:hackagent.campaign.goals:baseline · goal 1 · result: jailbroken at attempt 1 · 1 attempt · 23.2s
+INFO:hackagent.campaign.goals:baseline · goal 2 · result: mitigated · 1 attempt · 23.6s
+INFO:hackagent.campaign:baseline finished · 1 of 2 goals jailbroken · 2 attempts (1 jailbroken) · 23.9s
 ```
 
-Accept `**payload` rather than naming every key, so a listener keeps working
-when an event gains a field, and ignore event names you do not handle, so it
-keeps working when an event is added. Keep the listener fast: it runs inside
-the run.
+`INFO` shows what the run does and what the attacks decide; `DEBUG` adds
+every model call, with a snippet of what it returned. The CLI, the terminal
+UI, the run's `run.log` and the platform's activity log show these same
+lines.
 
-A run the platform tracks also sends these events, with the warnings, errors
-and request retries the run logs, to the run page's activity log. See
+The logger says what kind of line it is:
+
+| Logger | Lines |
+|---|---|
+| `hackagent.campaign` | The campaign's own story: it started, each attack started and finished, the closing summary |
+| `hackagent.campaign.goals` | One line per goal and attack: how the goal ended |
+| `hackagent.trace` | Each step of an attack: decisions and verdicts (`INFO`), model calls (`DEBUG`) |
+| other `hackagent.*` loggers | What loading, preflight and the judge audit do, by the module that does it |
+
+A line logged while an attack or a goal runs also says which one it is
+about: `subject_of(record)` returns `{"attack": …, "goal": …, "goals": …}`,
+`goals` being the campaign's goal count.
+
+To show the run your own way, write a `logging.Handler` and attach it with
+`capture`. It receives the records logged while the block runs, at its own
+level (`INFO` unless you pass another), and only those of the run it wraps,
+so two runs side by side in one process each reach only their own handler.
+Other handlers keep their own levels. The `hackagent` logger's level is the
+floor for all of them, so open it as far as your handlers need:
+
+```python
+import logging
+
+from hackagent.core.logging import GOALS_LOGGER, capture, subject_of
+from hackagent.orchestrator.campaign import run_campaign
+
+logging.getLogger("hackagent").setLevel(logging.INFO)
+
+
+class Progress(logging.Handler):
+    """Count each goal's result out of the attack's goals."""
+
+    def __init__(self):
+        super().__init__()
+        self.done = 0
+
+    def emit(self, record):
+        if record.name != GOALS_LOGGER:
+            return
+        self.done += 1
+        about = subject_of(record)
+        print(f"{about['attack']}: goal {about['goal']}/{about['goals']} · "
+              f"{self.done} done · {record.getMessage().split(' · result: ')[1]}")
+
+
+with capture(Progress()):
+    result = run_campaign("campaign.yaml")
+```
+
+```text
+baseline: goal 1/2 · 1 done · jailbroken at attempt 1 · 1 attempt · 23.2s
+baseline: goal 2/2 · 2 done · mitigated · 1 attempt · 23.6s
+```
+
+Keep a handler fast: it runs inside the run. Because the run's lines travel
+through `logging`, `logging.disable()` silences them too.
+
+A run the platform tracks also sends its lines from `INFO`, with the
+warnings, errors and request retries the run logs, to the run page's
+activity log, each with the attack and goal it is about. Nothing below
+`INFO` leaves the machine, and nothing at `INFO` or above quotes a prompt or
+a reply, so the model calls' snippets stay on your machine. In a script that
+has not configured logging, the run opens the `hackagent` logger for itself;
+once you configure it, its level is yours to set, and so is the level of
+`openai._base_client`, whose `INFO` lines are the client's retries. See
 [Run on the platform](./platform.mdx).
 
 ## Stop a run early
 
-A listener that raises stops the whole campaign. Raise `CampaignCancelled` to
-mean "stop on purpose": the runs are recorded as **cancelled**, not failed,
-and the exception reaches your code.
+Pass a `threading.Event` as `cancel` and set it, from any thread, to stop the
+whole campaign. The runs are recorded as **cancelled**, not failed, and
+`run_campaign` raises `CampaignCancelled`:
 
 ```python
+import threading
+
 from hackagent.orchestrator.campaign import CampaignCancelled, run_campaign
 
-
-def stop_at_first_jailbreak(event, **payload):
-    if event == "goal_finished" and payload["success"]:
-        raise CampaignCancelled(f"goal {payload['goal_index']} fell")
-
+cancel = threading.Event()
+deadline = threading.Timer(15 * 60, cancel.set)  # stop after 15 minutes
+deadline.start()
 
 try:
-    result = run_campaign("campaign.yaml", on_event=stop_at_first_jailbreak)
-except CampaignCancelled as stopped:
-    print("Stopped early:", stopped)
+    result = run_campaign("campaign.yaml", cancel=cancel)
+except CampaignCancelled:
+    print("Stopped")
+finally:
+    deadline.cancel()  # a run that ended first leaves no timer waiting
 ```
-
-Any other exception from the listener stops the run too, but records it as
-failed and re-raises that exception.
 
 To stop a run after a deadline, or from other code, run it as a task with
 `arun_campaign` and cancel the task. The runs are recorded as cancelled:
@@ -306,7 +338,7 @@ as an attempt error instead, set `execution.preflight: false`.
 | Where | What | From the result |
 |---|---|---|
 | The store | The campaign run, one run per attack, every result and trace. Local SQLite unless the campaign selects remote storage. | `result.campaign_run_id`, and `outcome.run_id` per attack |
-| `<output directory>/<run id>/` | `campaign.yaml` (the campaign that ran, every default written out, keys as references only), `results.json` and/or `results.jsonl`, `traces.jsonl`, and `audit.json` when the audit ran | `result.outputs` (paths), `result.run_id` (the folder name) |
+| `<output directory>/<run id>/` | `campaign.yaml` (the campaign that ran, every default written out, keys as references only), `results.json` and/or `results.jsonl`, `traces.jsonl`, `audit.json` when the audit ran, and `run.log`, the run's log at `INFO` | `result.outputs` (paths), `result.run_id` (the folder name) |
 
 `result.run_id` names the output folder and `result.campaign_run_id` is the
 record in the store; they are different ids. Set

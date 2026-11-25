@@ -22,7 +22,6 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 
 from hackagent.orchestrator.campaign import (
-    CampaignCancelled,
     resolve_campaign,
     run_campaign,
 )
@@ -36,10 +35,6 @@ _START_TIMEOUT_S = 60.0
 
 class LaunchRefused(Exception):
     """The campaign cannot be launched; the message says why."""
-
-
-class _Cancelled(CampaignCancelled):
-    """Raised from the event callback when the dashboard cancels the run."""
 
 
 class _RecordingStore:
@@ -116,10 +111,6 @@ class LocalLauncher:
                 self._cancels[record.id] = cancel
             started.set()
 
-        def on_event(event_type: str, **payload: Any) -> None:
-            if cancel.is_set():
-                raise _Cancelled("Cancelled from the dashboard")
-
         def work() -> None:
             try:
                 run_campaign(
@@ -127,7 +118,7 @@ class LocalLauncher:
                     store=_RecordingStore(self._client.backend, on_start),
                     settings=self._client.settings,
                     resolved=resolved,
-                    on_event=on_event,
+                    cancel=cancel,
                 )
             except Exception as exc:  # recorded on the run by the runner
                 state.setdefault("error", exc)

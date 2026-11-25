@@ -98,6 +98,9 @@ class Candidate:
 
     prefix: str
     meta_prefix: str
+    #: Its number among the prefixes written for the goal, which every step
+    #: of it carries in the log ("prefix 3/8"), however many are dropped.
+    number: str = ""
     original_prefix_chars: int = 0
     prefix_truncated: bool = False
     attempts: list[Finding] = field(default_factory=list)
@@ -193,12 +196,27 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
         ]
         with phase("write", candidates=len(plan)):
             written = await asyncio.gather(
-                *(self._one_prefix(goal, meta) for meta in plan)
+                *(
+                    self._one_prefix(goal, meta, f"prefix {index}/{len(plan)}")
+                    for index, meta in enumerate(plan, start=1)
+                )
             )
         return [item for item in written if item is not None]
 
-    async def _one_prefix(self, goal: str, meta_prefix: str) -> Optional[Candidate]:
-        """Have the writer continue one opening; ``None`` when it fails or writes nothing."""
+    async def _one_prefix(
+        self, goal: str, meta_prefix: str, number: str = ""
+    ) -> Optional[Candidate]:
+        """Have the writer continue one opening, under the prefix's
+        ``number`` when it has one; ``None`` when it fails or writes nothing."""
+        if not number:
+            return await self._write_one(goal, meta_prefix)
+        with phase(number, meta_prefix=meta_prefix):
+            candidate = await self._write_one(goal, meta_prefix)
+        if candidate is not None:
+            candidate.number = number
+        return candidate
+
+    async def _write_one(self, goal: str, meta_prefix: str) -> Optional[Candidate]:
         messages: Messages = prompts.generation_turns(meta_prefix, goal)
         try:
             written = await self.attacker(messages)
@@ -272,18 +290,41 @@ class AdvPrefixAttack(IterativeAttack[AdvPrefixParams]):
     ) -> None:
         """Prefill each candidate several times and judge every continuation."""
         params = self.params
+        samples = params.samples_per_candidate
         for index, candidate in enumerate(candidates):
-            label = f"prefix {index + 1}/{len(candidates)}"
+            # The number it was written under, not its place among those kept.
+            label = candidate.number or f"prefix {index + 1}/{len(candidates)}"
             with phase(label, prefix=index, meta_prefix=candidate.meta_prefix) as path:
                 drawn = await asyncio.gather(
                     *(
-                        self._one_attempt(goal, index, candidate, target, judge, path)
-                        for _ in range(params.samples_per_candidate)
+                        self._one_sample(
+                            goal, index, candidate, target, judge, path, sample, samples
+                        )
+                        for sample in range(1, samples + 1)
                     )
                 )
                 candidate.attempts = [item for item in drawn if item is not None]
                 if not candidate.attempts:
                     decision("skipped", "the target gave no usable continuation")
+
+    async def _one_sample(
+        self,
+        goal: str,
+        index: int,
+        candidate: Candidate,
+        target: Target,
+        judge: Optional[Judge],
+        path: Path,
+        sample: int,
+        samples: int,
+    ) -> Optional[Finding]:
+        """One continuation, under its sample number. The attempt is the
+        sample's, so its trace is the sample's: the calls of every sample
+        recorded under the prefix would all go to its first attempt."""
+        with phase(f"sample {sample}/{samples}") as sample_path:
+            return await self._one_attempt(
+                goal, index, candidate, target, judge, sample_path
+            )
 
     async def _one_attempt(
         self,

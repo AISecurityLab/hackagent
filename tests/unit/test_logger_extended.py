@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from hackagent.core.logging import get_logger
 from hackagent.interfaces.cli.logging_setup import (
+    shown_level,
     setup_package_logging,
     suppress_noisy_libraries,
 )
@@ -35,22 +36,19 @@ class TestSetupPackageLoggingExtended(unittest.TestCase):
     def test_info_level_from_env(self):
         """Test INFO level from environment variable."""
         setup_package_logging()
-        logger = logging.getLogger("hackagent")
-        self.assertEqual(logger.level, logging.INFO)
+        self.assertEqual(shown_level(), logging.INFO)
 
     @patch.dict(os.environ, {"HACKAGENT_LOG_LEVEL": "ERROR"})
     def test_error_level_from_env(self):
         """Test ERROR level from environment variable."""
         setup_package_logging()
-        logger = logging.getLogger("hackagent")
-        self.assertEqual(logger.level, logging.ERROR)
+        self.assertEqual(shown_level(), logging.ERROR)
 
     @patch.dict(os.environ, {"HACKAGENT_LOG_LEVEL": "INVALID_LEVEL"})
     def test_invalid_level_defaults_to_warning(self):
         """Test invalid level string falls back to WARNING."""
         setup_package_logging()
-        logger = logging.getLogger("hackagent")
-        self.assertEqual(logger.level, logging.WARNING)
+        self.assertEqual(shown_level(), logging.WARNING)
 
     def test_setup_sets_noisy_library_levels(self):
         """suppress_noisy_libraries silences the given loggers (opt-in since Fix 2)."""

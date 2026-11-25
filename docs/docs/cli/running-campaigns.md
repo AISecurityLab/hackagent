@@ -124,31 +124,39 @@ hackagent campaign run campaign.yaml
 
 Before the first attack, the command checks that every Ollama server, and every
 vLLM server, the campaign names is up and lists the model the campaign asks
-for. Then it prints a line as each attack starts and finishes, and a summary:
+for. Then it prints the campaign's own lines: as it starts, as each attack
+starts and finishes, and how it ended, with a line per attack:
 
 ```text
-▶ flipattack started
-✓ flipattack finished
-
-Campaign First run succeeded
-┏━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━┓
-┃ Attack     ┃ Attempts ┃ Successes ┃ Error ┃
-┡━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━┩
-│ flipattack │        1 │         1 │       │
-└────────────┴──────────┴───────────┴───────┘
-Output → ./logs/runs
+campaign First run · started · loading goals and models
+flipattack started · 1 goal · run 3f2a9c1e
+flipattack finished · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 3.0s
+campaign First run succeeded · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 1 attack · 3.4s · output → ./logs/runs
+summary · flipattack · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken)
 ```
 
-**Attempts** is how many prompts were sent to the target. **Successes** is how many
-the judges called a jailbreak. **Error** is set when an attack stopped early.
-"Succeeded" in the title means every attack ran to the end, not that any
-jailbreak was found.
+A goal is jailbroken when the judges called any attempt at it a jailbreak, as
+the results pages count it; an attempt is a prompt sent to the target, and
+the attempts are counted too. "Succeeded" means every attack ran to the end
+with no attempt failing, not that any jailbreak was found. An attack that
+stopped early says why, as an error.
+
+With `-vv` the log says all of it, and more: what the campaign resolved to,
+the judge audit's table, each goal's result, and after the closing line a
+line per attack and the most common attempt errors:
+
+```text
+11-23 10:02:12 INFO    campaign · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
+…
+11-23 10:02:15 INFO    campaign First run succeeded · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 1 attack · 3.4s · output → ./logs/runs
+11-23 10:02:15 INFO    summary · flipattack · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken)
+```
 
 ### Rehearse with `--dry-run`
 
-`--dry-run` resolves the campaign and prints the summary without attacking. It
-skips the server check, writes no files and records nothing, so it is safe to
-run anywhere.
+`--dry-run` resolves the campaign and logs what it found without attacking.
+It skips the server check, writes no files and records nothing, so it is safe
+to run anywhere.
 
 ### Follow what an attack does
 
@@ -175,37 +183,45 @@ side and their lines interleave. Then what happened: a decision (`stopped`,
 `panel: mitigated`, with its score), or a call by its role (`target`,
 `attacker`, `scorer`, `on_topic`). Each goal ends with a `result:` line.
 
-These lines go to stderr, so `--json` output on stdout stays parseable. In a
-terminal they are drawn in colour, one colour per attack; in a file, a Slurm
-job or a pipe, each record is one plain line, as above, so it can be grepped.
+These lines go to stderr, so `--json` output on stdout stays parseable. Each
+record is one line, as above, so it can be grepped. In a terminal, and in the
+TUI's campaign run view, the line is coloured as a log viewer colours it: the
+time dimmed, the level by severity, each attack in its own colour, verdicts
+picked out. In a file, a Slurm job or a pipe it is plain. The words are the
+same everywhere, and a run executed for the platform sends the same lines to
+the run page's activity log: every interface shows the one log the run
+writes, each at a level of its own:
+
+| Interface | Shows |
+|---|---|
+| The terminal (stderr) | Warnings, or what `-v`, `-vv`, `-vvv` ask for |
+| The TUI's run view | `INFO` and above, or `DEBUG` with `-vvv` |
+| The run page's activity log | `INFO` and above |
+| `run.log` in the run's folder | `INFO` and above |
+
+Without `-vv`, the campaign's own lines (each attack starting and finishing,
+how the campaign ended) still show, on stdout.
 
 `-vv` never prints a prompt or a reply, only decisions, counts and scores.
 `-vvv` quotes the first 100 characters of what each call returned, which can be
-harmful text. These lines stay on your machine: a run executed for the platform
-does not send them to its activity log.
+harmful text. Those lines stay on your machine: nothing below `INFO` reaches
+the activity log, and nothing at `INFO` or above quotes model text.
 
 `HACKAGENT_LOG_LEVEL=INFO` or `DEBUG` does the same as `-vv` or `-vvv`, and wins
-when both are set.
+when both are set. Both set what the terminal shows; the other interfaces
+keep their own levels.
 
 ### Machine-readable output
 
-`--json` prints one JSON object per line: an event as the run loads its goals
-and models, and as each attack and goal progresses, then the summary.
+`--json` prints the run's summary as one JSON object on stdout, once the run
+ends; the log still goes to stderr:
 
 ```text
-{"event": "campaign_started", "campaign": "First run"}
-{"event": "goals_loaded", "goals": 1}
-{"event": "models_resolved", "attacks": 1, "judges": 1, "models": 2}
-{"event": "preflight_started", "models": 2}
-{"event": "preflight_finished", "models": 2}
-{"event": "attack_started", "attack": "flipattack", "run_id": "055b4734-…", "expected_goals": 1}
-{"event": "goal_finished", "attack": "flipattack", "run_id": "055b4734-…", "goal_index": 0, "goals": 1, "success": true, "attempts": 1, "successful": 1, "errors": [], "elapsed_s": 76.3}
-{"event": "attack_finished", "attack": "flipattack", "run_id": "055b4734-…", "error": null, "attempts": 1, "successful": 1, "elapsed_s": 76.4}
-{"campaign": "First run", "run_id": "87275163-…", "campaign_run_id": "72b85d8f-…", "dry_run": false, "succeeded": true, "attempt_errors": 0, "audit_passed": null, "attacks": [{"name": "flipattack", "run_id": "055b4734-…", "attempts": 1, "successes": 1, "error": null}], "outputs": ["logs/runs/87275163-…/campaign.yaml", "logs/runs/87275163-…/results.json", "logs/runs/87275163-…/traces.jsonl"], "output_directory": "./logs/runs"}
+{"campaign": "First run", "run_id": "87275163-…", "campaign_run_id": "72b85d8f-…", "dry_run": false, "succeeded": true, "attempt_errors": 0, "audit_passed": null, "attacks": [{"name": "flipattack", "run_id": "055b4734-…", "attempts": 1, "successes": 1, "error": null}], "outputs": ["logs/runs/87275163-…/campaign.yaml", "logs/runs/87275163-…/results.json", "logs/runs/87275163-…/traces.jsonl", "logs/runs/87275163-…/run.log"], "output_directory": "./logs/runs"}
 ```
 
-The last line is the one to parse in a script: `succeeded`, `attempt_errors`,
-the per-attack counts, and the files written.
+Parse it in a script for `succeeded`, `attempt_errors`, the per-attack
+counts, and the files written.
 
 ### Exit codes
 
@@ -248,8 +264,12 @@ Every run that is not a dry run leaves results in two places.
 logs/runs/87275163-d2c9-49ed-a584-448defd446a8/
 ├── campaign.yaml    the campaign as it ran, every default written out
 ├── results.json     every attempt: goal, prompt, reply, verdict
-└── traces.jsonl     every model call per attempt
+├── traces.jsonl     every model call per attempt
+└── run.log          the run's log at INFO, as a file has it, whatever -v said
 ```
+
+`run.log` is there even when the run fails before it attacks, so the reason it
+stopped stays with the run.
 
 [What a run leaves behind](../concepts/how-a-run-works.md#what-a-run-leaves-behind)
 explains each file. To repeat a run exactly, run its `campaign.yaml`.
