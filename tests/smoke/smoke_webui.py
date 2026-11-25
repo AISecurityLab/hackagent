@@ -45,11 +45,11 @@ from pathlib import Path
 PAGES = [
     "/",
     "/agents",
-    "/attacks",
-    "/secrets",
-    "/stats",
-    "/api-keys",
-    "/profile",
+    "/campaigns",
+    "/runs",
+    "/credentials",
+    "/usage",
+    "/settings",
 ]
 
 STARTUP_TIMEOUT = 60.0
@@ -164,7 +164,7 @@ def drive(base: str) -> list[str]:
             print(f"  {path:<20} {status}")
 
         try:
-            page.goto(base + "/stats", wait_until="networkidle")
+            page.goto(base + "/runs", wait_until="networkidle")
             page.get_by_role("link", name="smoke-campaign", exact=True).click()
             page.get_by_role("region", name="Campaign outcomes").wait_for()
             coverage = page.get_by_role("region", name="Goal by attack outcomes")
