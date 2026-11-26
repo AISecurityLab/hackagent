@@ -61,6 +61,16 @@ Instantiate everything `spec` describes.
 Gateway credentials come from `settings`, resolved once if omitted.
 An explicit model connection `api_key` takes precedence.
 
+#### ready\_line
+
+```python
+def ready_line(resolved: ResolvedCampaign) -> str
+```
+
+What resolving found, in a sentence: ``1 model ready · 1 attack: stac
+· 0 judges · guardrails off · classifier off · escalate off``. The run
+logs it, and `hackagent campaign validate` prints it.
+
 #### resolve\_attack
 
 ```python

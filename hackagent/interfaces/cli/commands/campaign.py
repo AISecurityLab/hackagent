@@ -13,15 +13,19 @@ before a run starts; ``schema`` prints the campaign format as JSON Schema. Both 
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
+from hackagent.interfaces.checks import issue_markup, ready_markup, to_fix_markup
 from hackagent.interfaces.cli.utils import display_error, display_success, handle_errors
+from hackagent.interfaces.palette import FAILED, paint
 
 console = Console()
 
@@ -116,12 +120,11 @@ def _prepare(
     plain dict ``wait_for_servers`` reads.
     """
     from hackagent.orchestrator.campaign import (
-        CampaignSpec,
         apply_endpoint_overrides,
-        load_campaign,
+        campaign_issues,
     )
 
-    values = load_campaign(Path(file)).model_dump(mode="json")
+    values = _load_or_report(Path(file)).model_dump(mode="json")
     try:
         apply_endpoint_overrides(values, overrides)
     except ValueError as exc:
@@ -137,10 +140,12 @@ def _prepare(
         }
     if output_directory:
         execution.setdefault("output", {})["directory"] = output_directory
-    try:
-        return CampaignSpec.model_validate(values), values
-    except Exception as exc:
-        raise click.ClickException(f"Invalid campaign: {exc}") from exc
+    spec, issues = campaign_issues(values)
+    if spec is None:
+        # The options given made the file invalid (an override, a count).
+        _report(issues)
+        raise SystemExit(1)
+    return spec, values
 
 
 @campaign.command()
@@ -273,25 +278,43 @@ def run(
 @click.argument("file", default="campaign.yaml", type=click.Path(dir_okay=False))
 @handle_errors
 def validate(file: str) -> None:
-    """Resolve a campaign (goals, models, judges) without attacking it."""
-    from hackagent.orchestrator.campaign import (
-        load_campaign,
-        resolution_summary,
-        resolve_campaign,
-    )
+    """Check a campaign as the TUI does, then resolve it (goals, models,
+    judges) without attacking it."""
+    from hackagent.interfaces.cli.logging_setup import shown_level
+    from hackagent.orchestrator.campaign import ready_line, resolve_campaign
 
+    spec = _load_or_report(Path(file))
     try:
-        spec = load_campaign(Path(file))
         resolved = resolve_campaign(spec, settings=_runtime_settings())
     except Exception as exc:
-        display_error(f"Invalid campaign: {exc}")
+        console.print(f"{paint('✗', FAILED)} campaign rejected: {escape(str(exc))}")
         raise SystemExit(1) from exc
+    # What resolving found, unless the log has just said it (at INFO).
+    console.print(
+        ready_markup("" if shown_level() <= logging.INFO else ready_line(resolved))
+    )
 
-    table = Table(title=f"Campaign: {spec.campaign.name}", show_header=False)
-    for label, value in resolution_summary(resolved).items():
-        table.add_row(label, value)
-    console.print(table)
-    display_success("Campaign is valid.")
+
+def _load_or_report(path: Path) -> Any:
+    """The campaign at ``path``, or each problem with it printed as the TUI
+    shows it, and exit 1."""
+    from hackagent.core.credentials import CredentialError
+    from hackagent.orchestrator.campaign import CampaignInvalid, load_campaign
+
+    try:
+        return load_campaign(path)
+    except CampaignInvalid as exc:
+        _report(exc.issues)
+    except (CredentialError, FileNotFoundError, ValueError) as exc:
+        console.print(f"{paint('✗', FAILED)} {escape(str(exc))}")
+    raise SystemExit(1)
+
+
+def _report(issues: Any) -> None:
+    """Each problem, then how many there are to fix."""
+    for issue in issues:
+        console.print(issue_markup(issue))
+    console.print(to_fix_markup(len(issues)))
 
 
 @campaign.command()

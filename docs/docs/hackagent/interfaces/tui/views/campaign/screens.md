@@ -55,6 +55,14 @@ The builder owns the run and keeps every line it has produced; this
 screen renders them. Leaving does not stop anything — the run carries on
 and reopening replays what was missed.
 
+#### write
+
+```python
+def write(markup: str) -> None
+```
+
+Show a line, after every line logged before it.
+
 ## HelpScreen Objects
 
 ```python

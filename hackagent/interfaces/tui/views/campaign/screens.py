@@ -10,7 +10,6 @@ from collections.abc import Iterable
 from typing import Any, Callable, Mapping, Optional, Sequence
 
 from rich.markup import escape
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -26,7 +25,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
-from hackagent.interfaces.palette import ACCENT, NAME, SECONDARY
+from hackagent.interfaces.examples import example_rows
 from hackagent.interfaces.tui.frame import FramedScreen
 from hackagent.interfaces.tui.keys import key
 
@@ -99,73 +98,13 @@ class ExampleScreen(FramedScreen[Optional[Path]]):
         self.dismiss(self._examples.get(str(event.option.id)))
 
 
-#: How the example tree is drawn: its guides, folders and subfolders, the
-#: campaigns in them, and what each campaign is for.
-_GUIDE, _FOLDER, _CAMPAIGN, _ABOUT = (
-    SECONDARY,
-    f"bold {ACCENT}",
-    f"bold {NAME}",
-    SECONDARY,
-)
-
-
 def _example_tree(examples: Mapping[str, Path]) -> list[Option]:
-    """The examples as the folders and subfolders they are in, every folder
-    open: a folder is a heading (it cannot be chosen), a campaign a choice
-    of two lines, its name and its own description. Folders first, both in
-    name order."""
-    from hackagent import examples as examples_catalog
-
-    nested: dict[str, Any] = {}
-    for name, path in examples.items():
-        *folders, leaf = name.split("/")
-        level = nested
-        for folder in folders:
-            level = level.setdefault(folder, {})
-        level[leaf] = name
-
-    options: list[Option] = []
-
-    def add(level: Mapping[str, Any], indent: str, depth: int) -> None:
-        top = depth == 0
-        folders = sorted(k for k, v in level.items() if isinstance(v, dict))
-        leaves = sorted(k for k, v in level.items() if not isinstance(v, dict))
-        entries = [(folder, True) for folder in folders] + [
-            (leaf, False) for leaf in leaves
-        ]
-        for position, (entry, is_folder) in enumerate(entries):
-            last = position == len(entries) - 1
-            branch = "" if top else ("└─ " if last else "├─ ")
-            below = indent + ("" if top else ("   " if last else "│  "))
-            if is_folder:
-                options.append(
-                    Option(
-                        Text.assemble(
-                            (indent + branch, _GUIDE),
-                            (f"{entry}/", _FOLDER),
-                        ),
-                        disabled=True,
-                    )
-                )
-                add(level[entry], below, depth + 1)
-                continue
-            name = level[entry]
-            about = examples_catalog.describe(examples[name])
-            options.append(
-                Option(
-                    Text.assemble(
-                        (indent + branch, _GUIDE),
-                        (entry, _CAMPAIGN),
-                        "\n",
-                        (below, _GUIDE),
-                        (about, _ABOUT),
-                    ),
-                    id=name,
-                )
-            )
-
-    add(nested, "", 0)
-    return options
+    """The examples' tree (:func:`~hackagent.interfaces.examples.example_rows`)
+    as choices: a folder is a heading, a campaign a choice."""
+    return [
+        Option(text, id=name, disabled=name is None)
+        for name, text in example_rows(examples)
+    ]
 
 
 class ResultsScreen(FramedScreen[None]):

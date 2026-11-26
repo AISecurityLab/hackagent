@@ -78,7 +78,7 @@ hackagent campaign schema [OPTIONS]
 
 ### `hackagent campaign validate`
 
-Resolve a campaign (goals, models, judges) without attacking it.
+Check a campaign as the TUI does, then resolve it (goals, models, judges) without attacking it.
 
 ```text
 hackagent campaign validate [OPTIONS] [FILE]

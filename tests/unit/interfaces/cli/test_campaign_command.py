@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from hackagent.interfaces.cli.main import cli
@@ -59,26 +60,36 @@ def _resolved(spec: CampaignSpec | None = None):
         attacks=(SimpleNamespace(name="baseline"),),
         panel=None,
         classifier=None,
+        probes=(SimpleNamespace(name="target"),),
     )
 
 
-def test_validate_reports_the_resolved_plan():
-    runner = CliRunner()
+def _validate_with_log_at(level: int) -> str:
     with (
         patch("hackagent.orchestrator.campaign.load_campaign", return_value=_spec()),
         patch(
             "hackagent.orchestrator.campaign.resolve_campaign",
             return_value=_resolved(),
         ),
+        patch("hackagent.interfaces.cli.logging_setup.shown_level", return_value=level),
     ):
-        result = runner.invoke(campaign, ["validate", "campaign.yaml"])
-
+        result = CliRunner().invoke(campaign, ["validate", "campaign.yaml"])
     assert result.exit_code == 0, result.output
-    assert "valid" in result.output.lower()
-    # Every row of the shared resolution summary, the builder shows too.
-    assert "baseline" in result.output
-    assert "Goals" in result.output and "3" in result.output
-    assert "Guardrails" in result.output and "Escalate" in result.output
+    return result.output
+
+
+def test_validate_reports_the_resolved_plan():
+    output = _validate_with_log_at(logging.WARNING)
+
+    # The builder's "ready to run", and what resolving found, as the run logs it.
+    assert output.startswith("✓ ready to run · ")
+    assert "1 attack: baseline" in output
+    assert "guardrails off" in output and "escalate off" in output
+
+
+def test_validate_does_not_repeat_what_the_log_just_said():
+    """At INFO the log has the "campaign · … ready" line already."""
+    assert _validate_with_log_at(logging.INFO) == "✓ ready to run\n"
 
 
 def test_validate_reports_a_broken_campaign():
@@ -289,3 +300,31 @@ def test_campaign_run_gateway_without_api_key_fails(monkeypatch):
     assert result.exit_code != 0
     assert "hackagent config set --api-key" in result.output
     run_campaign.assert_not_called()
+
+
+def test_validate_says_what_to_fix_as_the_builder_does(tmp_path):
+    """Each problem where it is, then how many: the builder's words, not a
+    validation library's report."""
+    from hackagent.interfaces.checks import issue_markup, to_fix_markup
+    from hackagent.orchestrator.campaign import campaign_issues
+    from rich.text import Text
+
+    values = {
+        "version": 1,
+        "campaign": {"name": "bad"},
+        "dataset": {"source": {"type": "inline", "goals": ["a"]}},
+        "target": {"name": "x", "connection": {"provider": "ollama", "type": "OLLAMA"}},
+        "attacks": [{"name": "flipatack"}],
+        "evaluation": {"judges": []},
+    }
+    path = tmp_path / "bad.yaml"
+    path.write_text(yaml.safe_dump(values))
+
+    result = CliRunner().invoke(campaign, ["validate", str(path)])
+
+    assert result.exit_code == 1
+    _, issues = campaign_issues(values)
+    expected = [Text.from_markup(issue_markup(issue)).plain for issue in issues]
+    expected.append(Text.from_markup(to_fix_markup(len(issues))).plain)
+    assert " ".join(result.output.split()) == " ".join(" ".join(expected).split())
+    assert "validation error" not in result.output

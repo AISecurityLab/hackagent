@@ -9,15 +9,6 @@ The draft stores only what the user set; everything else is the schema&#x27;s
 default, shown by the form but never written. Validation reports issues by
 document path so the form can put each one on its row.
 
-## Issue Objects
-
-```python
-@dataclass(frozen=True)
-class Issue()
-```
-
-A validation problem at a document path.
-
 ## CampaignDraft Objects
 
 ```python
@@ -49,4 +40,13 @@ def delete(path: Path, *, keep: int = 1) -> bool
 ```
 
 Remove `path`, then the mappings it leaves empty below `path[:keep]`.
+
+#### validate
+
+```python
+def validate() -> tuple[Optional[CampaignSpec], tuple[Issue, ...]]
+```
+
+The draft&#x27;s spec when there is nothing to fix, else what to fix:
+the same check every interface makes (:func:`campaign_issues`).
 

@@ -467,7 +467,8 @@ class TestWelcomeDestinations:
             leaf = options[rag + 1]
             assert leaf.id == name
             first, second = leaf.prompt.plain.split("\n")
-            assert first == "   └─ h4rm3l-corpbot"
+            # With what it needs running, as the CLI's listing says it too.
+            assert first == "   └─ h4rm3l-corpbot  (starts agent_server.py)"
             assert second.strip() == examples_catalog.describe(path)
             # Folders and subfolders are headings, all in one colour.
             colours = set()

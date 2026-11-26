@@ -45,10 +45,10 @@ settings are read before the command runs.
 
 | Message | Cause | Fix |
 |---|---|---|
-| `Invalid campaign: Campaign file does not exist: campaign.yaml` | No file name was given and there is no `campaign.yaml` here, or the path is wrong. | Pass the file: `hackagent campaign run my-campaign.yaml`. |
-| `Invalid campaign: … Unknown attack 'flipatack'. Available: …` | An attack name is misspelled or does not exist. | Use a name from the list, or from `hackagent campaign list`. |
-| `Invalid campaign: N validation errors for CampaignSpec` | A field is missing, misspelled or has the wrong type. Each error names the field path, such as `attacks.0`. | Check the field in [Campaign files](./campaign-files/index.md). The [JSON Schema](./running-campaigns.md#find-attacks-and-goals) catches these as you type. |
-| `Invalid campaign: API key: environment variable 'NAME' is missing or empty.` | A model's `api_key` is `"${NAME}"` and that variable is unset. `validate` and `run` both build every model, which reads its key. | Export `NAME` in the shell you run from. |
+| `✗ Campaign file does not exist: campaign.yaml` | No file name was given and there is no `campaign.yaml` here, or the path is wrong. | Pass the file: `hackagent campaign run my-campaign.yaml`. |
+| `✗ attacks.0: Unknown attack 'flipatack'. Available: …` | An attack name is misspelled or does not exist. | Use a name from the list, or from `hackagent campaign list`. |
+| `✗ <field path>: …`, then `✗ N to fix` | A field is missing, misspelled or has the wrong type. Each line names the field's path, such as `attacks.0`, as the terminal UI marks it. | Check the field in [Campaign files](./campaign-files/index.md). The [JSON Schema](./running-campaigns.md#find-attacks-and-goals) catches these as you type. |
+| `✗ campaign rejected: API key: environment variable 'NAME' is missing or empty.` | A model's `api_key` is `"${NAME}"` and that variable is unset. `validate` and `run` both build every model, which reads its key. | Export `NAME` in the shell you run from. |
 | `… No module named 'datasets'` | The campaign uses a Hugging Face dataset and the `hf` extra is not installed. | `pip install 'hackagent[hf]'`. |
 
 `hackagent campaign validate` does not check the storage key, so a file with

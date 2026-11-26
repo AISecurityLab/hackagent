@@ -15,7 +15,6 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Optional
@@ -332,32 +331,10 @@ def _ollama_models_in(campaign_path: Path) -> dict[str, str]:
     return found
 
 
-@dataclass(frozen=True)
-class _Target:
-    """A server an example attacks, which this command can start for you."""
-
-    script: str
-    port: int
-    label: str
-
-
-#: Examples whose target is a local server, by the folder holding the campaign.
-_TARGETS: dict[str, _Target] = {
-    "openai_sdk/pc_tool_sandbox": _Target("agent.py", 5001, "PC Tool agent"),
-    "openai_sdk/db_tool_sandbox": _Target("agent.py", 5002, "DB Tool agent"),
-    "openai_sdk/rag": _Target("agent_server.py", 8000, "Corporate policy RAG agent"),
-    "langchain/rag": _Target("agent_server.py", 8000, "LangChain RAG agent"),
-}
-
-#: Examples whose target this command will not start, and what to run instead.
-_MANUAL_TARGETS: dict[str, str] = {
-    "google_adk/jailbreak_eval": (
-        "cd hackagent/examples/google_adk && adk api_server --port 8000 ."
-    ),
-    "google_adk/multi_tool_agent": (
-        "cd hackagent/examples/google_adk && adk api_server --port 8000 ."
-    ),
-}
+# What an example needs running before it, kept with the examples.
+_Target = examples_catalog.Target
+_TARGETS = examples_catalog.TARGETS
+_MANUAL_TARGETS = examples_catalog.MANUAL_TARGETS
 
 
 def _resolve_example_name(name: str) -> tuple[str, Path]:
@@ -490,29 +467,18 @@ def examples():
 @handle_errors
 def list_examples():
     """📋 List every example campaign."""
-    import textwrap
-
     found = examples_catalog.campaign_files()
     if not found:
         raise click.ClickException(
             f"No examples found under {examples_catalog.EXAMPLES_DIR}"
         )
 
+    from hackagent.interfaces.examples import example_rows
+
     console.print(f"[bold]{len(found)} examples[/bold]\n")
-    for name, path in found.items():
-        folder = name.rsplit("/", 1)[0] if "/" in name else ""
-        target = _TARGETS.get(folder)
-        if target is not None:
-            needs = f"  [yellow](starts {target.script})[/yellow]"
-        elif folder in _MANUAL_TARGETS:
-            needs = "  [yellow](needs adk api_server)[/yellow]"
-        else:
-            needs = ""
-        console.print(f"[cyan]{name}[/cyan]{needs}")
-        # Wrapped by hand rather than in a table: the longest name is 48
-        # characters, which leaves a table no room for the description.
-        for line in textwrap.wrap(examples_catalog.describe(path), width=72):
-            console.print(f"  [dim]{line}[/dim]")
+    # The tree the TUI's picker shows, line for line.
+    for _, row in example_rows(found):
+        console.print(row)
     console.print(
         "\n[dim]Run one with:[/dim] hackagent examples run <name>\n"
         "[dim]Or copy it here to edit:[/dim] hackagent examples copy <name>\n"

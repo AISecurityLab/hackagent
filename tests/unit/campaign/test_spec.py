@@ -8,10 +8,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from hackagent.attacks.techniques.registry import ATTACKS, get_attack_class
 from hackagent.core.contracts import AgentType
+from hackagent.orchestrator.campaign import CampaignInvalid
 from hackagent.orchestrator.campaign import load_campaign
 from hackagent.orchestrator.campaign.spec import StorageSpec
 
@@ -204,8 +204,10 @@ def test_missing_file_is_reported(tmp_path):
     ],
 )
 def test_invalid_campaigns_are_rejected(values, message):
-    with pytest.raises(ValidationError, match=message):
+    """Each problem where it is, as every interface states it."""
+    with pytest.raises(CampaignInvalid, match=message) as rejected:
         load_campaign(values)
+    assert rejected.value.issues
 
 
 def test_agent_type_is_case_insensitive():

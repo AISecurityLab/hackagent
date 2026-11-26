@@ -53,6 +53,7 @@ from hackagent.interfaces.tui.keys import key
 from hackagent.core.credentials import CredentialError
 from hackagent.core.logging import capture
 from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.interfaces.checks import issue_markup, ready_markup, to_fix_markup
 from hackagent.interfaces.cli.logging_setup import log_markup, shown_level
 from hackagent.orchestrator.campaign import CampaignSpec
 
@@ -604,9 +605,7 @@ class CampaignBuilder(Container):
                 continue
             if any(issue_matches(root, issue.loc) for root in deeper):
                 continue
-            where = ".".join(str(part) for part in issue.loc[len(node.root) :])
-            prefix = f"{escape(where)}: " if where else ""
-            lines.append(f"✗ {prefix}{escape(issue.message)}")
+            lines.append(issue_markup(issue, relative_to=node.root))
         for widget in self.query(".panel-issues"):
             assert isinstance(widget, Static)
             widget.update("\n".join(lines))
@@ -616,9 +615,7 @@ class CampaignBuilder(Container):
         name = self._path.name if self._path else "untitled campaign"
         dirty = " [$warning]●[/] [dim]modified[/dim]" if self._is_dirty() else ""
         count = len(self._issues)
-        state = (
-            f"[$error]✗ {count} to fix[/]" if count else "[$success]✓ ready to run[/]"
-        )
+        state = to_fix_markup(count) if count else ready_markup()
         running = (
             "  [$accent]▶ running[/] [dim]· ctrl+r to watch[/dim]"
             if self._campaign_running

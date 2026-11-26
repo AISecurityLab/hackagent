@@ -30,6 +30,11 @@ from hackagent.orchestrator.campaign.gateway import (
     is_gateway,
     key_envs,
 )
+from hackagent.orchestrator.campaign.check import (
+    CampaignInvalid,
+    Issue,
+    campaign_issues,
+)
 from hackagent.orchestrator.campaign.loader import load_campaign
 from hackagent.orchestrator.campaign.overrides import (
     EndpointOverrides,
@@ -42,6 +47,7 @@ from hackagent.orchestrator.campaign.overrides import (
 from hackagent.orchestrator.campaign.preflight import PreflightError, preflight
 from hackagent.orchestrator.campaign.resolve import (
     ResolvedCampaign,
+    ready_line,
     resolution_summary,
     resolve_campaign,
 )
@@ -59,6 +65,10 @@ from hackagent.orchestrator.campaign.runner import (
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 __all__ = [
+    "CampaignInvalid",
+    "Issue",
+    "campaign_issues",
+    "ready_line",
     "GATEWAY_ATTACKER",
     "GATEWAY_JUDGE",
     "GATEWAY_KEY_ENV",

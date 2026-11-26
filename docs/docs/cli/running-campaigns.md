@@ -22,18 +22,26 @@ hackagent examples list
 ```text
 24 examples
 
-claude/flipattack-claude
-  FlipAttack against a local Claude Code, judged on the Anthropic API.
+claude/
+├─ flipattack-claude
+│  FlipAttack against a local Claude Code, judged on the Anthropic API.
+└─ flipattack-ollama
+   FlipAttack against a local Claude Code, judged by a local model.
 ...
-ollama/flipattack-local
-  FlipAttack over ten HarmBench goals, judged by a local model.
-ollama/h4rm3l-demo
-  h4rm3l over five HarmBench goals against a local Ollama model.
+ollama/
+├─ flipattack-local
+│  FlipAttack over ten HarmBench goals, judged by a local model.
+├─ h4rm3l-demo
+│  h4rm3l over five HarmBench goals against a local Ollama model.
 ...
+
 Run one with: hackagent examples run <name>
 Or copy it here to edit: hackagent examples copy <name>
 A name's last part is enough when it is unique.
 ```
+
+It is the tree the terminal UI's "Start from an example" shows, with what an
+example needs running besides HackAgent, such as `(starts agent.py)`.
 
 Copy one into the current folder to make it your own:
 
@@ -85,29 +93,25 @@ hackagent campaign validate campaign.yaml
 
 `validate` loads the goals and builds every model, judge and guardrail the file
 names, then stops. It attacks nothing. Building a model reads its key, so the
-variables the file's `api_key` references name must be set. A good file prints what it resolved:
+variables the file's `api_key` references name must be set. It checks the file
+as the terminal UI's builder does, in the same words. A good file is ready to
+run, and says what it resolved:
 
 ```text
-    Campaign: First run
-┌────────────┬────────────┐
-│ Goals      │ 1          │
-│ Attacks    │ flipattack │
-│ Judges     │ 1          │
-│ Guardrails │ off        │
-│ Classifier │ off        │
-│ Escalate   │ off        │
-└────────────┴────────────┘
-✅ Campaign is valid.
+✓ ready to run · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
 ```
 
-A bad one names the problem and exits with code 1:
+With `-vv` the log already says what resolving found, so the result is just
+`✓ ready to run`.
+
+A bad one names each problem where it is, then how many there are, and exits
+with code 1; `campaign run` reports a bad file the same way:
 
 ```text
-❌ Invalid campaign: 2 validation errors for CampaignSpec
-attacks.0
-  Value error, Unknown attack 'flipatack'. Available: advprefix, autodan_turbo, baseline, bon,
+✗ attacks.0: Unknown attack 'flipatack'. Available: advprefix, autodan_turbo, baseline, bon,
 cipherchat, crescendo, fc, flipattack, h4rm3l, mml, pair, pap, rag, repo_injection, stac,
 static_template, tap, tfc, tool_output_ipi, toolhijacker.
+✗ 1 to fix
 ```
 
 Without a file name, both `validate` and `run` use `campaign.yaml` in the

@@ -13,10 +13,53 @@ and because the examples are the ones that know where they are.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 #: The folder this module is in, which is the one holding the examples.
 EXAMPLES_DIR = Path(__file__).resolve().parent
+
+
+@dataclass(frozen=True)
+class Target:
+    """A server an example attacks, which ``hackagent examples run`` can
+    start for you."""
+
+    script: str
+    port: int
+    label: str
+
+
+#: Examples whose target is a local server, by the folder holding the campaign.
+TARGETS: dict[str, Target] = {
+    "openai_sdk/pc_tool_sandbox": Target("agent.py", 5001, "PC Tool agent"),
+    "openai_sdk/db_tool_sandbox": Target("agent.py", 5002, "DB Tool agent"),
+    "openai_sdk/rag": Target("agent_server.py", 8000, "Corporate policy RAG agent"),
+    "langchain/rag": Target("agent_server.py", 8000, "LangChain RAG agent"),
+}
+
+#: Examples whose target is not started for you, and what to run instead.
+MANUAL_TARGETS: dict[str, str] = {
+    "google_adk/jailbreak_eval": (
+        "cd hackagent/examples/google_adk && adk api_server --port 8000 ."
+    ),
+    "google_adk/multi_tool_agent": (
+        "cd hackagent/examples/google_adk && adk api_server --port 8000 ."
+    ),
+}
+
+
+def needs(name: str) -> str:
+    """What the example ``name`` needs running besides HackAgent, in a few
+    words: ``starts agent.py``, ``needs adk api_server``, or ``""``."""
+    folder = name.rsplit("/", 1)[0] if "/" in name else ""
+    target: Optional[Target] = TARGETS.get(folder)
+    if target is not None:
+        return f"starts {target.script}"
+    if folder in MANUAL_TARGETS:
+        return "needs adk api_server"
+    return ""
 
 
 def campaign_files() -> dict[str, Path]:
@@ -56,4 +99,13 @@ def resolve(name: str) -> tuple[str, Path]:
     raise LookupError(f"No example named '{name}'.")
 
 
-__all__ = ["EXAMPLES_DIR", "campaign_files", "describe", "resolve"]
+__all__ = [
+    "EXAMPLES_DIR",
+    "MANUAL_TARGETS",
+    "TARGETS",
+    "Target",
+    "campaign_files",
+    "describe",
+    "needs",
+    "resolve",
+]
