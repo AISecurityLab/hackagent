@@ -146,11 +146,8 @@ def outcome(broken: int, goals: int, status: str, recorded: int) -> str:
     if not recorded:
         return paint("nothing recorded", SECONDARY)
     total = goals or recorded
-    if broken:
-        return paint(
-            f"{broken} of {total} goals jailbroken", VERDICT_STYLES["jailbroken"]
-        )
-    return paint(f"0 of {total} goals jailbroken", PASSED)
+    said = f"{broken} of {total} {'goal' if total == 1 else 'goals'} jailbroken"
+    return paint(said, VERDICT_STYLES["jailbroken"] if broken else PASSED)
 
 
 def outcome_of(runs: Sequence[Any], counted: Mapping[str, Counts], status: str) -> str:

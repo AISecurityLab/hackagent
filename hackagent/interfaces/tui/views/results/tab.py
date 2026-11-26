@@ -85,7 +85,6 @@ class ResultsTab(ResultsExportMixin, BaseTab):
     def __init__(self, cli_config: CLIConfig, **kwargs: Any) -> None:
         super().__init__(cli_config, **kwargs)
         self.results_data: list[Any] = []
-        self.selected_result: Optional[Any] = None
         self._campaigns: list[Any] = []
         self._agent_map: dict[str, str] = {}
         self._attack_map: dict[str, str] = {}
@@ -354,7 +353,9 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         # Which store this is, and that there is another one, are part of
         # reading the list: runs recorded in an account that is down would
         # otherwise look as though they never happened.
-        said = [f"{len(campaigns)} campaigns"]
+        said = [
+            f"{len(campaigns)} {'campaign' if len(campaigns) == 1 else 'campaigns'}"
+        ]
         if source:
             said.append(escape(source))
         if switch := self._switch_hint(problems):

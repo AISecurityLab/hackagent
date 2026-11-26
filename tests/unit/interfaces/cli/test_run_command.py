@@ -59,7 +59,7 @@ def test_invalid_key_message_exit_2(store):
     result = _invoke(RUN_ID)
     assert result.exit_code == 2
     assert "Your API key is not valid" in result.output
-    assert "hackagent config set --api-key" in result.output
+    assert "export HACKAGENT_API_KEY" in result.output
     store.get_run_detail.assert_not_called()
 
 

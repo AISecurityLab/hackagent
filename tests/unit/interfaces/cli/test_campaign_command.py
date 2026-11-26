@@ -298,7 +298,7 @@ def test_campaign_run_gateway_without_api_key_fails(monkeypatch):
         result = CliRunner().invoke(campaign, ["run", "campaign.yaml", "--dry-run"])
 
     assert result.exit_code != 0
-    assert "hackagent config set --api-key" in result.output
+    assert "export HACKAGENT_API_KEY" in result.output
     run_campaign.assert_not_called()
 
 

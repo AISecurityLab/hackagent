@@ -7,8 +7,6 @@ HackAgent CLI Main Entry Point
 Main command-line interface for HackAgent security testing toolkit.
 """
 
-import os
-
 import click
 from rich.markup import escape
 from rich.traceback import install
@@ -51,7 +49,8 @@ from hackagent.interfaces.cli.utils import (
 )
 
 # Install rich traceback handler for better error display
-install(show_locals=True)
+# Never show locals: they can hold API keys and request headers.
+install(show_locals=False)
 
 
 class _CLIGroup(click.Group):
@@ -120,10 +119,6 @@ class _CLIGroup(click.Group):
 @click.pass_context
 def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
     ctx.ensure_object(dict)
-
-    # Set debug mode based on environment variable
-    if os.getenv("HACKAGENT_DEBUG"):
-        os.environ["HACKAGENT_DEBUG"] = "1"
 
     # Initialize CLI configuration
     try:
@@ -273,13 +268,16 @@ def doctor(ctx):
     """Check the setup for common problems.
 
     Says what is missing, and how to fix it: what the terminal app's Setup
-    screen shows.
+    screen shows. Exits with code 1 when a check failed; warnings alone
+    leave it at 0.
     """
     from hackagent.interfaces.setup import report_markup, setup_report
 
     sections, verdict = setup_report(ctx.obj["config"])
     for line in report_markup(sections, verdict):
         console.print(line)
+    if any(check.kind == "failed" for section in sections for check in section.checks):
+        ctx.exit(1)
 
 
 cli.add_command(campaign_cmd.campaign)

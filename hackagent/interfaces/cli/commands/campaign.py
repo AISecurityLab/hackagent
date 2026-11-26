@@ -84,7 +84,7 @@ def _endpoint_options(func):
             "--attacker-endpoint",
             "--decorator-endpoint",
             "attacker_endpoint",
-            help="Repoint attack role models.",
+            help="Repoint attack role models (also: --decorator-endpoint).",
         ),
         click.option(
             "--output-directory",
@@ -96,12 +96,42 @@ def _endpoint_options(func):
             type=click.IntRange(min=1),
             help="Set attack/target/judge concurrency alike.",
         ),
-        click.option("--wait-for-ollama", type=float, default=0.0, show_default=True),
-        click.option("--ollama-pid", type=int),
-        click.option("--wait-for-server", type=float, default=0.0, show_default=True),
-        click.option("--server-pid", type=int),
-        click.option("--judge-server-pid", type=int),
-        click.option("--attacker-server-pid", type=int),
+        click.option(
+            "--wait-for-ollama",
+            type=float,
+            default=0.0,
+            show_default=True,
+            metavar="SECONDS",
+            help="Wait this long for Ollama to answer before giving up.",
+        ),
+        click.option(
+            "--ollama-pid",
+            type=int,
+            help="Stop waiting if this Ollama process exits.",
+        ),
+        click.option(
+            "--wait-for-server",
+            type=float,
+            default=0.0,
+            show_default=True,
+            metavar="SECONDS",
+            help="Wait this long for OpenAI-compatible servers to answer.",
+        ),
+        click.option(
+            "--server-pid",
+            type=int,
+            help="Stop waiting if the target's server process exits.",
+        ),
+        click.option(
+            "--judge-server-pid",
+            type=int,
+            help="Stop waiting if the judges' server process exits.",
+        ),
+        click.option(
+            "--attacker-server-pid",
+            type=int,
+            help="Stop waiting if the attack models' server process exits.",
+        ),
     ]
     for option in reversed(options):
         func = option(func)
@@ -226,8 +256,8 @@ def run(
         spec = bind_gateway(spec, gateway_url)
         if uses_gateway(spec) and not gateway_key:
             raise Failed(
-                "This campaign uses the HackAgent gateway; set an API key with: "
-                "hackagent config set --api-key"
+                "This campaign uses the HackAgent gateway, which needs an API "
+                "key: export HACKAGENT_API_KEY=<key>"
             )
         if gateway_key:
             # The selected key, never one already in the environment: the

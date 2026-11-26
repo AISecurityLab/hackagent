@@ -412,5 +412,5 @@ async def test_campaigns_show_before_their_results_are_read(tmp_path: Path):
 
         held.set()
         await _read(app, pilot)
-        assert "1 of 1 goals jailbroken" in campaign.label.plain
+        assert "1 of 1 goal jailbroken" in campaign.label.plain
         assert "a goal" in attack.children[0].label.plain

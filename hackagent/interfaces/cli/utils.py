@@ -22,6 +22,9 @@ from hackagent.core.settings import tls_error_hint
 from hackagent.interfaces.palette import console as themed
 
 console = themed()
+#: Where warnings and failures go, so that ``--json`` output on stdout stays
+#: parseable whatever happens.
+errors = themed(stderr=True)
 
 
 class Failed(click.ClickException):
@@ -65,7 +68,7 @@ def handle_errors(func):
 
 def _traceback_when_debugging() -> None:
     if console._environ.get("HACKAGENT_DEBUG"):
-        console.print(Traceback())
+        errors.print(Traceback())
 
 
 def load_config_file(path: str) -> Dict[str, Any]:
@@ -100,13 +103,13 @@ def display_success(message: str) -> None:
 
 
 def display_warning(message: str) -> None:
-    """``! message``: worth knowing, not a failure."""
-    console.print(f"[warning]![/warning] {message}")
+    """``! message``: worth knowing, not a failure. Written to stderr."""
+    errors.print(f"[warning]![/warning] {message}")
 
 
 def display_error(message: str) -> None:
-    """``✗ message``: something that failed."""
-    console.print(f"[failed]✗[/failed] {message}")
+    """``✗ message``: something that failed. Written to stderr."""
+    errors.print(f"[failed]✗[/failed] {message}")
 
 
 def display_info(message: str) -> None:
