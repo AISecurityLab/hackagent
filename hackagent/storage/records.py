@@ -124,7 +124,10 @@ class CampaignRunRecord(BaseModel):
 class CampaignRecord(BaseModel):
     """A campaign saved from the dashboard: a spec without target and execution.
 
-    The target comes from the agent's config when the campaign is launched.
+    ``target`` is the agent's config as it was when the campaign was saved,
+    and is what the campaign attacks when launched. Agents are named by their
+    model, so a later run of the same model at another endpoint reconfigures
+    the agent; the campaign keeps its own copy so it is not repointed.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -134,6 +137,7 @@ class CampaignRecord(BaseModel):
     description: str
     agent_id: UUID
     spec: Dict[str, Any]
+    target: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 

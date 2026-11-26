@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     description TEXT NOT NULL DEFAULT '',
     agent_id    TEXT NOT NULL REFERENCES agents(id),
     spec_json   TEXT NOT NULL DEFAULT '{}',
+    target_json TEXT,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
@@ -535,6 +536,18 @@ class LocalBackend:
         self._conn.execute("DROP INDEX IF EXISTS idx_traces_result")
         columns = {
             row[1]
+            for row in self._conn.execute("PRAGMA table_info(campaigns)").fetchall()
+        }
+        if "target_json" not in columns:
+            self._conn.execute("ALTER TABLE campaigns ADD COLUMN target_json TEXT")
+            # Saved before targets were kept: freeze the target each would
+            # launch against today, so no later run can repoint it.
+            self._conn.execute(
+                "UPDATE campaigns SET target_json = (SELECT metadata_json "
+                "FROM agents WHERE agents.id = campaigns.agent_id)"
+            )
+        columns = {
+            row[1]
             for row in self._conn.execute("PRAGMA table_info(goal_outcomes)").fetchall()
         }
         for column in _REVIEW_COUNT_COLUMNS:
@@ -893,22 +906,34 @@ class LocalBackend:
     # ── Saved campaign ────────────────────────────────────────────────────────
 
     def create_campaign(
-        self, name: str, description: str, agent_id: UUID, spec: Dict[str, Any]
+        self,
+        name: str,
+        description: str,
+        agent_id: UUID,
+        spec: Dict[str, Any],
+        target: Optional[Dict[str, Any]] = None,
     ) -> CampaignRecord:
-        """Save a dashboard campaign and return it."""
+        """Save a dashboard campaign and return it.
+
+        ``target`` is the model it attacks, kept with the campaign; ``None``
+        keeps the agent's config as it is now.
+        """
         campaign_id = uuid.uuid4()
         now = _now_str()
         with self._write():
+            if target is None:
+                target = self._agent_config(agent_id)
             self._conn.execute(
-                "INSERT INTO campaigns "
-                "(id, name, description, agent_id, spec_json, created_at, updated_at) "
-                "VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO campaigns (id, name, description, agent_id, "
+                "spec_json, target_json, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
                 (
                     str(campaign_id),
                     name,
                     description,
                     str(agent_id),
                     json.dumps(spec),
+                    json.dumps(target),
                     now,
                     now,
                 ),
@@ -922,21 +947,37 @@ class LocalBackend:
         description: str,
         agent_id: UUID,
         spec: Dict[str, Any],
+        target: Optional[Dict[str, Any]] = None,
     ) -> CampaignRecord:
         """Replace a saved campaign's name, description, agent and spec.
+
+        With ``target`` ``None``, the campaign keeps the target it was saved
+        with while its agent stays the same, and takes the new agent's
+        config when the agent changes: a run that has since reconfigured an
+        agent of the same name does not repoint the campaign.
 
         Raises:
             RuntimeError: When no such campaign exists.
         """
         with self._write():
+            if target is None:
+                row = self._conn.execute(
+                    "SELECT agent_id, target_json FROM campaigns WHERE id=?",
+                    (str(campaign_id),),
+                ).fetchone()
+                if row and row["agent_id"] == str(agent_id) and row["target_json"]:
+                    target = json.loads(row["target_json"])
+                else:
+                    target = self._agent_config(agent_id)
             cursor = self._conn.execute(
                 "UPDATE campaigns SET name=?, description=?, agent_id=?, spec_json=?, "
-                "updated_at=? WHERE id=?",
+                "target_json=?, updated_at=? WHERE id=?",
                 (
                     name,
                     description,
                     str(agent_id),
                     json.dumps(spec),
+                    json.dumps(target),
                     _now_str(),
                     str(campaign_id),
                 ),
@@ -991,6 +1032,14 @@ class LocalBackend:
         if cursor.rowcount == 0:
             raise RuntimeError(f"LocalBackend: Campaign {campaign_id} not found")
 
+    def _agent_config(self, agent_id: UUID) -> Optional[Dict[str, Any]]:
+        """The agent's config as it is now; ``None`` for no such agent.
+        Called with the lock held."""
+        row = self._conn.execute(
+            "SELECT metadata_json FROM agents WHERE id=? LIMIT 1", (str(agent_id),)
+        ).fetchone()
+        return json.loads(row["metadata_json"] or "{}") if row else None
+
     @staticmethod
     def _row_to_campaign(row: sqlite3.Row) -> CampaignRecord:
         return CampaignRecord(
@@ -999,6 +1048,7 @@ class LocalBackend:
             description=row["description"],
             agent_id=UUID(row["agent_id"]),
             spec=json.loads(row["spec_json"] or "{}"),
+            target=json.loads(row["target_json"]) if row["target_json"] else None,
             created_at=_to_dt(row["created_at"]),
             updated_at=_to_dt(row["updated_at"]),
         )
