@@ -337,10 +337,21 @@ Modified clicks open the same page in another tab. Links use `conversation_attac
 separately from the attack filter, so opening one attack does not narrow the table's columns.
 Goals appear in goal-number order within each subcategory.
 
+In local campaign coverage, each attack's evaluated goal outcomes appear while
+other goals are still running. Pending evaluations and errors remain unresolved.
+The pooled campaign verdict stays unresolved until the campaign finishes unless
+an attack has already jailbroken that goal.
+
 **Success progression** follows goal coverage. Two aligned violin panels compare
 attempts and time to first jailbreak, using only successful goals. Attack labels
 show successful/tested counts; each panel shows measured/successful counts.
 Sparse samples use dots and ranges instead of an artificial density.
+
+Time to first jailbreak measures per-goal execution through the earliest
+successful target response. It includes rewriting and intervening judging, but
+excludes local concurrency-slot waits, final judging, and shared run preparation.
+Server-side queueing remains included. Legacy queue-inclusive clocks are not
+substituted when execution timing is unavailable.
 
 For any attack with multiple recorded attempts for at least one goal, including
 static attacks such as StaticTemplate, cumulative step curves show the percentage of all tested

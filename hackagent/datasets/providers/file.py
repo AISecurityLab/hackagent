@@ -189,9 +189,9 @@ class FileDatasetProvider(DatasetProvider):
         # Optionally shuffle
         if shuffle:
             records = records.copy()
-            if seed is not None:
-                random.seed(seed)
-            random.shuffle(records)
+            # A private generator: seeding the global one would change every
+            # other user of ``random`` in the process (TAP's pruning, MML).
+            random.Random(seed).shuffle(records)
 
         goals = []
         count = 0

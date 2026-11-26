@@ -100,9 +100,8 @@ class UrlJsonDatasetProvider(DatasetProvider):
         if shuffle:
             # Create a copy so we don't modify the cached dataset in place
             dataset = list(dataset)
-            if seed is not None:
-                random.seed(seed)
-            random.shuffle(dataset)
+            # A private generator, so the global ``random`` is left alone.
+            random.Random(seed).shuffle(dataset)
 
         goals = []
         self.last_extracted_extras = []

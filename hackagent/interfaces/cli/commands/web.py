@@ -150,8 +150,9 @@ def web(ctx, host, port, db_path, force_local, no_browser):
 
     The terminal app's Dashboard screen serves it with the same options.
 
-    With ``--backend remote``, the dashboard shows your hosted HackAgent data;
-    the key stays in this process and is never exposed to the browser. With
+    With hackagent --backend remote web, the dashboard shows your hosted
+    HackAgent data; the key stays in this process and is never exposed to
+    the browser. With
     the default local backend, it shows the runs recorded in your local
     database, and campaigns you launch from it run on this machine.
 

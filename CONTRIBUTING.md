@@ -28,7 +28,7 @@ This project and everyone participating in it is governed by the [HackAgent Code
 
 ## Getting Started
 
-Before you begin, make sure you have set up your development environment as described in the [Development](#development-setup) section below and in the main [README.md](README.md#development).
+Before you begin, make sure you have set up your development environment as described in the [Development Setup](#development-setup) section below.
 
 ## How Can I Contribute?
 
@@ -146,6 +146,22 @@ To set up your environment for local development:
 We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
 
 Commit messages should be structured as follows:
+
+```
+<type>(<optional scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+`type` is one of `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`,
+`ci` or `chore` (Dependabot uses `bump`). The scope names the part of the
+package touched, such as `cli`, `tui`, `reporting` or `attacks`. For example:
+
+```
+fix(cli): send warnings and failures to stderr, so --json stays parseable
+```
 
 ### Python Styleguide
 

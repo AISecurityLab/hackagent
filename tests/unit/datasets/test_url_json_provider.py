@@ -153,36 +153,32 @@ class TestUrlJsonDatasetProvider(unittest.TestCase):
                 ],
             )
 
-    def test_load_goals_shuffle_uses_seed_and_shuffle(self):
-        """Test shuffle path uses random.seed and random.shuffle."""
-        payload = json.dumps(
-            [
-                {"query": "Goal A"},
-                {"query": "Goal B"},
-            ]
-        )
+    def test_load_goals_shuffle_is_seeded_and_leaves_global_random_alone(self):
+        """The same seed gives the same order, without reseeding ``random``."""
+        import random
 
-        with (
-            patch(
+        payload = json.dumps([{"query": f"Goal {i}"} for i in range(20)])
+
+        def load(seed):
+            with patch(
                 "hackagent.datasets.providers.url_json.urllib.request.urlopen",
                 return_value=_MockHTTPResponse(payload),
-            ),
-            patch("hackagent.datasets.providers.url_json.random.seed") as mock_seed,
-            patch(
-                "hackagent.datasets.providers.url_json.random.shuffle"
-            ) as mock_shuffle,
-        ):
-            provider = UrlJsonDatasetProvider(
-                {
-                    "url": "https://example.com/shuffle.json",
-                    "goal_field": "query",
-                }
-            )
+            ):
+                provider = UrlJsonDatasetProvider(
+                    {
+                        "url": "https://example.com/shuffle.json",
+                        "goal_field": "query",
+                    }
+                )
+                return provider.load_goals(shuffle=True, seed=seed)
 
-            provider.load_goals(shuffle=True, seed=123)
-
-            mock_seed.assert_called_once_with(123)
-            mock_shuffle.assert_called_once()
+        random.seed(7)
+        expected_next = random.random()
+        random.seed(7)
+        first, second = load(123), load(123)
+        self.assertEqual(random.random(), expected_next)
+        self.assertEqual(first, second)
+        self.assertNotEqual(first, [f"Goal {i}" for i in range(20)])
 
     def test_load_goals_skips_invalid_records_with_warning(self):
         """Test records without goal fields are skipped and warned."""

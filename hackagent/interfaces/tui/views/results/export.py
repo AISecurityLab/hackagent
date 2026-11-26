@@ -1,173 +1,108 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""CSV / JSON export actions for the results tab."""
+"""CSV / JSON export actions for the results tab: one row per goal tried."""
 
-from datetime import datetime
+import csv
 import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from hackagent.interfaces.results import verdict_of
+
+#: The columns of an export, in order: where the goal was tried, then what
+#: came of it and the evidence for it.
+FIELDS = (
+    "campaign",
+    "target",
+    "attack",
+    "run_id",
+    "result_id",
+    "goal",
+    "verdict",
+    "reply",
+    "judges_notes",
+    "created_at",
+)
 
 
 class ResultsExportMixin:
     """Export helpers for :class:`~hackagent.interfaces.tui.views.results.tab.ResultsTab`."""
 
-    def _export_results_csv(self) -> None:
-        """Export results to CSV file."""
-        try:
-            import csv
-            from pathlib import Path
+    def _export_rows(self) -> tuple[list[dict[str, Any]], int]:
+        """A row for each result read so far, and how many attack runs are
+        still being read."""
+        campaigns = {str(campaign.id): campaign for campaign in self._campaigns}
+        rows: list[dict[str, Any]] = []
+        pending = 0
+        for run in self.results_data:
+            items = self._results_of_run.get(str(run.id))
+            if items is None:
+                pending += 1
+                continue
+            campaign = campaigns.get(str(getattr(run, "campaign_run_id", "")))
+            for result in items:
+                metadata = getattr(result, "metadata", None) or {}
+                created = getattr(result, "created_at", None)
+                rows.append(
+                    {
+                        "campaign": getattr(campaign, "name", "") or "",
+                        "target": self._agent_map.get(
+                            str(getattr(campaign, "agent_id", "")), ""
+                        ),
+                        "attack": self._attack_map.get(
+                            str(getattr(run, "attack_id", "")), ""
+                        ),
+                        "run_id": str(run.id),
+                        "result_id": str(result.id),
+                        "goal": getattr(result, "goal", "") or "",
+                        "verdict": verdict_of(result),
+                        "reply": str(metadata.get("response") or ""),
+                        "judges_notes": getattr(result, "evaluation_notes", "") or "",
+                        "created_at": created.isoformat()
+                        if isinstance(created, datetime)
+                        else str(created or ""),
+                    }
+                )
+        return rows, pending
 
-            if not self.results_data:
-                self.notify("No results to export", severity="warning")
-                return
-
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"hackagent_results_{timestamp}.csv"
-            filepath = Path.cwd() / filename
-
-            # Write CSV
-            with open(filepath, "w", newline="") as csvfile:
-                fieldnames = [
-                    "ID",
-                    "Agent",
-                    "Attack Type",
-                    "Status",
-                    "Created",
-                    "Duration",
-                ]
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-                writer.writeheader()
-                for result in self.results_data:
-                    # Get status
-                    status = "Unknown"
-                    if hasattr(result, "evaluation_status"):
-                        status_val = result.evaluation_status
-                        status = (
-                            status_val.value
-                            if hasattr(status_val, "value")
-                            else str(status_val)
-                        )
-
-                    # Get created date
-                    created = "Unknown"
-                    if hasattr(result, "created_at") and result.created_at:
-                        created = str(result.created_at)
-
-                    # Calculate duration
-                    duration = "N/A"
-                    if hasattr(result, "run") and result.run:
-                        run = result.run
-                        if (
-                            hasattr(run, "started_at")
-                            and run.started_at
-                            and hasattr(run, "completed_at")
-                            and run.completed_at
-                        ):
-                            try:
-                                if isinstance(run.started_at, datetime) and isinstance(
-                                    run.completed_at, datetime
-                                ):
-                                    delta = run.completed_at - run.started_at
-                                    duration = f"{delta.total_seconds():.1f}s"
-                            except Exception:
-                                pass
-
-                    writer.writerow(
-                        {
-                            "ID": str(result.id),
-                            "Agent": getattr(result, "agent_name", "Unknown"),
-                            "Attack Type": getattr(result, "attack_type", "Unknown"),
-                            "Status": status,
-                            "Created": created,
-                            "Duration": duration,
-                        }
-                    )
-
+    def _export(self, suffix: str) -> None:
+        rows, pending = self._export_rows()
+        if not rows:
             self.notify(
-                f"Exported {len(self.results_data)} results to {filename}",
-                severity="information",
+                "Results are still being read; try again in a moment"
+                if pending
+                else "No results to export",
+                severity="warning",
             )
+            return
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = Path.cwd() / f"hackagent_results_{stamp}.{suffix}"
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as handle:
+                if suffix == "csv":
+                    writer = csv.DictWriter(handle, fieldnames=FIELDS)
+                    writer.writeheader()
+                    writer.writerows(rows)
+                else:
+                    json.dump(
+                        {"exported_at": datetime.now().isoformat(), "results": rows},
+                        handle,
+                        indent=2,
+                    )
+        except OSError as error:
+            self.notify(f"Export failed: {error}", severity="error")
+            return
+        said = f"Exported {len(rows)} {'result' if len(rows) == 1 else 'results'} to {path.name}"
+        if pending:
+            said += f" ({pending} attack runs still being read are not in it)"
+        self.notify(said, severity="information")
 
-        except Exception as e:
-            self.notify(f"Export failed: {e}", severity="error")
+    def _export_results_csv(self) -> None:
+        """Export every goal tried, with its verdict and reply, to CSV."""
+        self._export("csv")
 
     def _export_results_json(self) -> None:
-        """Export results to JSON file."""
-        try:
-            from pathlib import Path
-
-            if not self.results_data:
-                self.notify("No results to export", severity="warning")
-                return
-
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"hackagent_results_{timestamp}.json"
-            filepath = Path.cwd() / filename
-
-            # Convert results to dict
-            results_list = []
-            for result in self.results_data:
-                result_dict = {
-                    "id": str(result.id),
-                    "agent_name": getattr(result, "agent_name", None),
-                    "attack_type": getattr(result, "attack_type", None),
-                    "created_at": str(result.created_at)
-                    if hasattr(result, "created_at")
-                    else None,
-                }
-
-                # Add status
-                if hasattr(result, "evaluation_status"):
-                    status_val = result.evaluation_status
-                    result_dict["status"] = (
-                        status_val.value
-                        if hasattr(status_val, "value")
-                        else str(status_val)
-                    )
-
-                # Add run information
-                if hasattr(result, "run") and result.run:
-                    result_dict["run"] = {
-                        "id": str(result.run.id) if hasattr(result.run, "id") else None,
-                        "status": str(result.run.status)
-                        if hasattr(result.run, "status")
-                        else None,
-                        "started_at": str(result.run.started_at)
-                        if hasattr(result.run, "started_at")
-                        else None,
-                        "completed_at": str(result.run.completed_at)
-                        if hasattr(result.run, "completed_at")
-                        else None,
-                    }
-
-                # Add config and data if available
-                if hasattr(result, "attack_config"):
-                    result_dict["attack_config"] = result.attack_config
-                if hasattr(result, "data"):
-                    result_dict["data"] = result.data
-                if hasattr(result, "logs"):
-                    result_dict["logs"] = str(result.logs)
-
-                results_list.append(result_dict)
-
-            # Write JSON
-            with open(filepath, "w") as jsonfile:
-                json.dump(
-                    {
-                        "exported_at": datetime.now().isoformat(),
-                        "total_results": len(results_list),
-                        "results": results_list,
-                    },
-                    jsonfile,
-                    indent=2,
-                )
-
-            self.notify(
-                f"Exported {len(results_list)} results to {filename}",
-                severity="information",
-            )
-
-        except Exception as e:
-            self.notify(f"Export failed: {e}", severity="error")
+        """The same as :meth:`_export_results_csv`, as JSON."""
+        self._export("json")

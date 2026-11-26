@@ -7,7 +7,7 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.interfaces.cli import bootstrap
+from hackagent.interfaces.cli import bootstrap, utils
 
 try:
     import termios
@@ -78,6 +78,8 @@ class TestLaunchTuiDefault(unittest.TestCase):
         with (
             patch.object(bootstrap, "_display_welcome") as welcome,
             patch.object(bootstrap.console, "print") as printer,
+            # Warnings and failures go to stderr; read them in the same order.
+            patch.object(utils.errors, "print", new=printer),
         ):
             bootstrap._launch_tui_default(ctx)
 
@@ -109,6 +111,8 @@ class TestLaunchTuiDefault(unittest.TestCase):
         with (
             patch.dict(sys.modules, {"hackagent.interfaces.tui": None}),
             patch.object(bootstrap.console, "print") as printer,
+            # Warnings and failures go to stderr; read them in the same order.
+            patch.object(utils.errors, "print", new=printer),
         ):
             bootstrap._launch_tui_default(ctx)
 
@@ -129,6 +133,8 @@ class TestLaunchTuiDefault(unittest.TestCase):
             ),
             patch.object(bootstrap, "_patch_textual_terminal_queries"),
             patch.object(bootstrap.console, "print") as printer,
+            # Warnings and failures go to stderr; read them in the same order.
+            patch.object(utils.errors, "print", new=printer),
         ):
             bootstrap._launch_tui_default(ctx)
 
@@ -161,6 +167,8 @@ class TestDisplayWelcome(unittest.TestCase):
         with (
             patch("hackagent.interfaces.cli.banner.display_hackagent_splash") as splash,
             patch.object(bootstrap.console, "print") as printer,
+            # Warnings and failures go to stderr; read them in the same order.
+            patch.object(utils.errors, "print", new=printer),
         ):
             bootstrap._display_welcome()
 

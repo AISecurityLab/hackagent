@@ -52,15 +52,15 @@ hackagent campaign run [OPTIONS] [FILE]
 | `--ollama-endpoint` | option | no | Repoint every Ollama model. |
 | `--openai-endpoint` | option | no | Repoint the target and the judges sharing its endpoint. |
 | `--judge-endpoint` | option | no | Repoint the other OpenAI judges. |
-| `--attacker-endpoint`, `--decorator-endpoint` | option | no | Repoint attack role models. |
+| `--attacker-endpoint`, `--decorator-endpoint` | option | no | Repoint attack role models (also: --decorator-endpoint). |
 | `--output-directory` | option | no | Override where result files are written. |
 | `--concurrency` | option | no | Set attack/target/judge concurrency alike. |
-| `--wait-for-ollama` | option | no | Defaults to `0.0`. |
-| `--ollama-pid` | option | no |  |
-| `--wait-for-server` | option | no | Defaults to `0.0`. |
-| `--server-pid` | option | no |  |
-| `--judge-server-pid` | option | no |  |
-| `--attacker-server-pid` | option | no |  |
+| `--wait-for-ollama` | option | no | Wait this long for Ollama to answer before giving up. Defaults to `0.0`. |
+| `--ollama-pid` | option | no | Stop waiting if this Ollama process exits. |
+| `--wait-for-server` | option | no | Wait this long for OpenAI-compatible servers to answer. Defaults to `0.0`. |
+| `--server-pid` | option | no | Stop waiting if the target's server process exits. |
+| `--judge-server-pid` | option | no | Stop waiting if the judges' server process exits. |
+| `--attacker-server-pid` | option | no | Stop waiting if the attack models' server process exits. |
 
 ### `hackagent campaign schema`
 
@@ -260,7 +260,7 @@ hackagent results [OPTIONS] COMMAND [ARGS]...
 
 ### `hackagent results show`
 
-Show detailed information about a specific result
+Show one result: its goal, verdict, judges' notes and the reply.
 
 ```text
 hackagent results show [OPTIONS] RESULT_ID
@@ -269,6 +269,7 @@ hackagent results show [OPTIONS] RESULT_ID
 | Name | Kind | Required | Description |
 |---|---|---|---|
 | `RESULT_ID` | argument | yes |  |
+| `--json` | flag | no | Print the result as JSON. |
 
 ### `hackagent results summary`
 
@@ -282,6 +283,7 @@ hackagent results summary [OPTIONS]
 |---|---|---|---|
 | `--limit` | option | no | How many of the latest campaigns to show. Defaults to `10`. |
 | `--goals` | flag | no | List each attack's goals and verdicts. |
+| `--ids` | flag | no | With --goals, print each result's id, for: hackagent results show. |
 
 ## `hackagent run`
 

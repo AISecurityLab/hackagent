@@ -2,12 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-"""
-Results Commands
+"""Show what past runs found."""
 
-View and manage attack results.
-"""
-
+import json
 from datetime import datetime
 
 import click
@@ -31,10 +28,14 @@ def results():
 
 @results.command()
 @click.argument("result_id")
+@click.option("--json", "as_json", is_flag=True, help="Print the result as JSON.")
 @click.pass_context
 @handle_errors
-def show(ctx, result_id):
-    """Show detailed information about a specific result"""
+def show(ctx, result_id, as_json):
+    """Show one result: its goal, verdict, judges' notes and the reply.
+
+    Find RESULT_ID with: hackagent results summary --goals --ids
+    """
 
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
@@ -45,8 +46,11 @@ def show(ctx, result_id):
         session = HackAgent(cli_config.settings)
         with console.status(f"Fetching result {result_id}…"):
             result = session.result(result_id)
-            audit = _campaign_audit(session, result)
+            audit = None if as_json else _campaign_audit(session, result)
 
+        if as_json:
+            click.echo(json.dumps(_result_json(result), indent=2))
+            return
         _display_result_details(result)
         if audit:
             _display_audit(audit)
@@ -85,53 +89,39 @@ def _display_audit(audit) -> None:
 
 
 def _display_result_details(result) -> None:
-    """Display detailed information about a result"""
+    """The goal, the verdict and the evidence for it: what the target said."""
+    from hackagent.interfaces import results as said
 
-    # Basic info table
-    table = Table(title="Result", show_header=True, header_style="heading")
+    table = Table(title="Result", show_header=False)
     table.add_column("Property", style="accent")
-    table.add_column("Value")
-
+    table.add_column("Value", overflow="fold")
     table.add_row("ID", str(result.id))
-
-    if hasattr(result, "agent_name"):
-        table.add_row("Agent", result.agent_name)
-
-    if hasattr(result, "attack_type"):
-        table.add_row("Attack Type", result.attack_type)
-
-    if hasattr(result, "evaluation_status"):
-        status = result.evaluation_status
-        if hasattr(status, "value"):
-            status = status.value
-        table.add_row("Status", str(status))
-
-    # Format dates
-    if hasattr(result, "created_at") and result.created_at:
-        try:
-            if isinstance(result.created_at, datetime):
-                created = result.created_at.strftime("%Y-%m-%d %H:%M:%S")
-            else:
-                created = str(result.created_at)
-        except (AttributeError, ValueError, TypeError):
-            created = str(result.created_at)
-        table.add_row("Created", created)
-
+    table.add_row("Run", str(getattr(result, "run_id", "") or "—"))
+    table.add_row("Verdict", said.verdict_of(result))
+    created = getattr(result, "created_at", None)
+    if isinstance(created, datetime):
+        table.add_row("Recorded", created.strftime("%Y-%m-%d %H:%M:%S"))
     console.print(table)
 
-    # Show additional data if available
-    if hasattr(result, "data") and result.data:
-        display_heading("Data")
-        try:
-            import json
+    display_heading("Goal")
+    console.print(str(getattr(result, "goal", "") or "—"), markup=False)
+    notes = str(getattr(result, "evaluation_notes", "") or "").strip()
+    if notes:
+        display_heading("Judges' notes")
+        console.print(notes, style="secondary", markup=False)
+    metadata = getattr(result, "metadata", None) or {}
+    reply = str(metadata.get("response") or "").strip()
+    display_heading("Reply")
+    console.print(reply or "nothing recorded", style="secondary", markup=False)
 
-            if isinstance(result.data, dict):
-                data_str = json.dumps(result.data, indent=2)
-            else:
-                data_str = str(result.data)
-            console.print(data_str, style="secondary", markup=False)
-        except (json.JSONDecodeError, TypeError, AttributeError):
-            console.print(str(result.data), style="secondary", markup=False)
+
+def _result_json(result) -> dict:
+    """The result as JSON: every recorded field, ids and dates as strings."""
+    from hackagent.interfaces import results as said
+
+    data = result.model_dump(mode="json") if hasattr(result, "model_dump") else {}
+    data["verdict"] = said.verdict_of(result)
+    return data
 
 
 @results.command()
@@ -143,9 +133,14 @@ def _display_result_details(result) -> None:
     help="How many of the latest campaigns to show.",
 )
 @click.option("--goals", is_flag=True, help="List each attack's goals and verdicts.")
+@click.option(
+    "--ids",
+    is_flag=True,
+    help="With --goals, print each result's id, for: hackagent results show.",
+)
 @click.pass_context
 @handle_errors
-def summary(ctx, limit, goals):
+def summary(ctx, limit, goals, ids):
     """Show what the latest campaigns found.
 
     Each campaign, then each of its attacks, as the terminal app's Results
@@ -198,5 +193,7 @@ def summary(ctx, limit, goals):
             items = found[str(run.id)]
             for result in items[: said.MAX_GOALS]:
                 console.print(f"    {said.goal_line(result)}")
+                if ids:
+                    console.print(f"    [secondary]{' ' * 12}{result.id}[/secondary]")
             if more := said.more_line(said.MAX_GOALS, len(items)):
                 console.print(f"    {more}")

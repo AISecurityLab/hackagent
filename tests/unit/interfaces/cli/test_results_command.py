@@ -38,16 +38,24 @@ def _config():
 
 
 def _result(**overrides):
+    """A result as both backends return it."""
+    from hackagent.storage.records import ResultRecord
+
+    when = datetime(2026, 1, 2, 3, 4, 5)
     data = {
         "id": uuid4(),
-        "agent_name": "weather-bot",
-        "attack_type": "pair",
-        "evaluation_status": EvalStatus.SUCCESSFUL_JAILBREAK,
-        "created_at": datetime(2026, 1, 2, 3, 4, 5),
-        "data": {"overall_majority_vote_asr": 0.8, "overall_fleiss_kappa": 0.4},
+        "run_id": uuid4(),
+        "goal": "Find the weather in Paris",
+        "goal_index": 0,
+        "evaluation_status": EvalStatus.SUCCESSFUL_JAILBREAK.value,
+        "evaluation_notes": "the judges agreed",
+        "evaluation_metrics": {},
+        "metadata": {"response": "It is sunny"},
+        "created_at": when,
+        "updated_at": when,
     }
     data.update(overrides)
-    return SimpleNamespace(**data)
+    return ResultRecord(**data)
 
 
 _AUDIT = {
@@ -85,17 +93,11 @@ class TestDisplayResultDetails(unittest.TestCase):
             _display_result_details(result)
         printed = buffer.getvalue()
         self.assertIn(str(result.id), printed)
-        self.assertIn("weather-bot", printed)
-        self.assertIn("SUCCESSFUL_JAILBREAK", printed)
+        self.assertIn("Find the weather in Paris", printed)
+        self.assertIn("jailbroken", printed)
         self.assertIn("2026-01-02 03:04:05", printed)
-        self.assertIn("overall_majority_vote_asr", printed)
-
-    def test_non_dict_data_is_stringified(self):
-        result = _result(data="plain-notes")
-        with patch("hackagent.interfaces.cli.commands.results.console") as console:
-            _display_result_details(result)
-        printed = " ".join(str(call) for call in console.print.call_args_list)
-        self.assertIn("plain-notes", printed)
+        self.assertIn("the judges agreed", printed)
+        self.assertIn("It is sunny", printed)
 
 
 class TestResultsCommands(unittest.TestCase):
@@ -113,7 +115,7 @@ class TestResultsCommands(unittest.TestCase):
             )
         self.assertEqual(result.exit_code, 0, result.output)
         backend.get_result.assert_called_once()
-        self.assertIn("weather-bot", result.output)
+        self.assertIn("Find the weather in Paris", result.output)
 
     def test_show_renders_the_campaign_judge_audit(self):
         runner = CliRunner()
@@ -186,6 +188,15 @@ class TestResultsCommands(unittest.TestCase):
         self.assertIn("newer", printed.output)
         self.assertNotIn("older", printed.output)
         self.assertIn("jailbroken  goal of newer", printed.output)
+        self.assertNotIn(str(found.id), printed.output)
+
+        with patch("hackagent.client._open_store", return_value=store):
+            with_ids = CliRunner().invoke(
+                results,
+                ["summary", "--limit", "1", "--goals", "--ids"],
+                obj={"config": _config()},
+            )
+        self.assertIn(str(found.id), with_ids.output)
         # Line for line what the tree says, without its colours.
         session = HackAgent(_config().settings, backend=store)
         [newer] = [c for c in session.campaign_runs().items if c.name == "newer"]

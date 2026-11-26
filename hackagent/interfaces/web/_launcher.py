@@ -54,11 +54,12 @@ class _RecordingStore:
 
 
 def launch_spec(campaign: Any, agent: Any, output_root: Path) -> Dict[str, Any]:
-    """The full spec a saved campaign runs with: the agent's config as target,
-    local storage, and run files under ``output_root``."""
+    """The full spec a saved campaign runs with: the target it was saved
+    with (the agent's config, for a campaign saved before targets were
+    kept), local storage, and run files under ``output_root``."""
     spec = {
         **campaign.spec,
-        "target": agent.metadata,
+        "target": getattr(campaign, "target", None) or agent.metadata,
         "execution": {"output": {"directory": str(output_root)}},
     }
     meta = dict(spec.get("campaign") or {})

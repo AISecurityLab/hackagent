@@ -83,7 +83,9 @@ def test_cli_campaign_round_trips_through_http_sqlite_and_results(
             tmp_path, isolated_campaign_env, "results", "show", str(results[0].id)
         )
         assert str(results[0].id) in shown
-        assert "SUCCESSFUL_JAILBREAK" in shown
+        assert any(
+            "Verdict" in line and "jailbroken" in line for line in shown.splitlines()
+        )
     finally:
         store.close()
     folder = next((tmp_path / "runs").iterdir())

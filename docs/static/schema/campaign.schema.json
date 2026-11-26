@@ -995,7 +995,7 @@
         },
         "save_prompts": {
           "default": true,
-          "description": "Include the prompts sent to the target.",
+          "description": "Include the prompts sent to the target. When off, what attacks write down about an attempt (their metadata and trace artifacts, such as a poisoned tool description) keeps only its numbers and flags.",
           "title": "Save Prompts",
           "type": "boolean"
         },

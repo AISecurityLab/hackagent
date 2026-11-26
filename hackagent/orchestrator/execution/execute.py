@@ -18,10 +18,8 @@ campaign with remote storage.
 from __future__ import annotations
 
 import asyncio
-import os
 import signal
-from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import partial
 from types import FrameType
@@ -29,7 +27,13 @@ from typing import Any, Literal, Optional
 from uuid import UUID
 
 from hackagent.core.async_utils import run_coroutine_blocking
-from hackagent.core.credentials import env_reference, reference_name, resolve_api_key
+from hackagent.core.credentials import (
+    current_environment,
+    env_reference,
+    reference_name,
+    resolve_api_key,
+    run_environment,
+)
 from hackagent.core.logging import get_logger
 from hackagent.core.settings import (
     Settings,
@@ -116,7 +120,9 @@ def execute_run(
     ``store`` is authenticated with the key this executor runs with, such as
     the user's API key or a run token. ``gateway_key`` is the key gateway
     models use, and ``env`` the secret values the campaign reads; both are
-    set in the environment for the duration of the run only. A
+    readable as ``${VARIABLE}`` references for the duration of the run
+    only, in its own context: ``os.environ`` is not changed, so concurrent
+    runs cannot see or undo each other's. A
     ``KeyboardInterrupt`` finishes the run with ``interrupted_as`` and is
     then passed on. ``check`` is given the campaign before any model is built
     and returns why this executor won't run it, or None; a run it refuses
@@ -239,7 +245,7 @@ async def arun_remote_campaign(
         result: Optional[CampaignResult] = None
         error: Optional[BaseException] = None
         try:
-            with _environment(execution.environment):
+            with run_environment(execution.environment):
                 try:
                     result = await execution.campaign()
                 except (Exception, asyncio.CancelledError) as exc:
@@ -477,7 +483,7 @@ def _secrets(
         values.append(key)
         name = reference_name(key)
         if name is not None:
-            values.append(environment.get(name) or os.environ.get(name))
+            values.append(environment.get(name) or current_environment().get(name))
     return values
 
 
@@ -485,7 +491,7 @@ def _execute(execution: _Execution) -> ExecutionOutcome:
     result: Optional[CampaignResult] = None
     error: Optional[BaseException] = None
     try:
-        with _environment(execution.environment):
+        with run_environment(execution.environment):
             try:
                 result = run_coroutine_blocking(execution.campaign)
             except (Exception, asyncio.CancelledError) as exc:
@@ -647,21 +653,6 @@ class _HeldSignals:
                 handler(signum, None)
             elif handler == signal.SIG_DFL:
                 signal.raise_signal(signum)
-
-
-@contextmanager
-def _environment(values: Mapping[str, str]) -> Iterator[None]:
-    """Set ``values`` in ``os.environ``, then put back what was there."""
-    previous = {name: os.environ.get(name) for name in values}
-    try:
-        os.environ.update(values)
-        yield
-    finally:
-        for name, value in previous.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
 
 
 __all__ = [

@@ -103,3 +103,33 @@ def test_its_agent_is_stopped_when_it_never_starts(monkeypatch):
 
     assert result.exit_code != 0
     assert calls["stop"] == 1
+
+
+def test_the_child_run_gets_the_root_options(monkeypatch, tmp_path):
+    """``hackagent --backend remote -vv examples run X`` runs X with the same
+    backend and verbosity, not the defaults."""
+    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
+    calls = []
+    monkeypatch.setattr(
+        mod.subprocess,
+        "run",
+        lambda argv, **kwargs: calls.append(argv) or SimpleNamespace(returncode=0),
+    )
+
+    @click.group()
+    @click.option("--backend")
+    @click.option("--config-file")
+    @click.option("--base-url")
+    @click.option("--ca-bundle")
+    @click.option("-v", "--verbose", count=True)
+    def root(**_):
+        pass
+
+    @root.command()
+    def go():
+        mod._run_hackagent_cli_command(["campaign", "run", "x.yaml"])
+
+    result = CliRunner().invoke(root, ["--backend", "remote", "-vv", "go"])
+
+    assert result.exit_code == 0, result.output
+    assert calls[0][3:] == ["--backend", "remote", "-vv", "campaign", "run", "x.yaml"]

@@ -56,8 +56,7 @@ def connect(settings: Any) -> Any:
     except InvalidApiKey:
         store.close(close_client=True)
         raise Refused(
-            "Your API key is not valid. Set one with: "
-            "hackagent config set --api-key <key>",
+            "Your API key is not valid. Set one with: export HACKAGENT_API_KEY=<key>",
             INVALID_KEY,
         ) from None
     return store

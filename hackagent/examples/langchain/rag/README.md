@@ -15,13 +15,15 @@ Tests whether prompt injection can exfiltrate **CONFIDENTIAL** documents that we
 
 ```bash
 # 1. Install dependencies
-pip install hackagent openai flask
+pip install hackagent fastapi uvicorn httpx faiss-cpu pypdf \
+  langchain-classic langchain-community langchain-openai langchain-text-splitters
 
 # 2. Pull the model
 ollama pull Almawave/Velvet:2b
 
-# 3. Build the index and start the agent
-cd examples/langchain/rag
+# 3. Build the index and start the agent (from a checkout of this repository;
+#    `hackagent examples run advprefix-corpbot` starts the agent for you)
+cd hackagent/examples/langchain/rag
 python ingest.py
 python agent_server.py &
 

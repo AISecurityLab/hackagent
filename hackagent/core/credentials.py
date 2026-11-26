@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Annotated, Any, Mapping, Optional
+from collections import ChainMap
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Annotated, Any, Iterator, Mapping, Optional
 from urllib.parse import urlsplit
 
 from pydantic import ValidationInfo, WrapValidator, PlainSerializer
@@ -19,6 +22,36 @@ _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}\Z")
 #: checking a configuration where its variables are not set. Each reference
 #: is resolved when the client that uses it is built.
 REFERENCES_ONLY = {"credentials": "references"}
+
+
+#: Variables set for the run in this context only, read before
+#: ``os.environ``. Concurrent runs (the dashboard starts each in its own
+#: thread) each see their own; the process environment is never changed.
+_RUN_ENVIRONMENT: ContextVar[Mapping[str, str]] = ContextVar(
+    "run_environment", default={}
+)
+
+
+@contextmanager
+def run_environment(values: Mapping[str, str]) -> Iterator[None]:
+    """Make ``values`` readable as ``${VARIABLE}`` references in this
+    context, over what is already set, until the block ends.
+
+    Tasks and :func:`asyncio.to_thread` workers started inside the block
+    inherit them; other threads and the process environment do not.
+    """
+    token = _RUN_ENVIRONMENT.set({**_RUN_ENVIRONMENT.get(), **values})
+    try:
+        yield
+    finally:
+        _RUN_ENVIRONMENT.reset(token)
+
+
+def current_environment() -> Mapping[str, str]:
+    """The variables references resolve from here: this context's run
+    environment over ``os.environ``."""
+    overlay = _RUN_ENVIRONMENT.get()
+    return ChainMap(dict(overlay), os.environ) if overlay else os.environ
 
 
 class CredentialError(ValueError):
@@ -58,7 +91,7 @@ def resolve_api_key(
     Only platform connections opt into the HACKAGENT_API_KEY default. A
     selected reference or explicit empty value never falls back elsewhere.
     """
-    env = os.environ if env is None else env
+    env = current_environment() if env is None else env
     if api_key is None:
         if use_default and (required or (env.get(API_KEY_ENV) or "").strip()):
             api_key = "${" + API_KEY_ENV + "}"
@@ -191,6 +224,8 @@ def is_gateway_endpoint(endpoint: Optional[str], base_url: str) -> bool:
 
 
 __all__ = [
+    "current_environment",
+    "run_environment",
     "API_KEY_ENV",
     "ApiKey",
     "CredentialError",

@@ -333,7 +333,13 @@ class OutputSpec(_Spec):
         ),
     )
     save_prompts: bool = Field(
-        default=True, description="Include the prompts sent to the target."
+        default=True,
+        description=(
+            "Include the prompts sent to the target. When off, what attacks "
+            "write down about an attempt (their metadata and trace artifacts, "
+            "such as a poisoned tool description) keeps only its numbers and "
+            "flags."
+        ),
     )
     save_responses: bool = Field(
         default=True, description="Include the target's replies."

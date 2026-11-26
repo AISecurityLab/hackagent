@@ -64,7 +64,6 @@ remote storage can validate and still fail to run; see below.
 | `… exited before becoming ready; inspect server logs` | The process given with `--ollama-pid` or a `--…-server-pid` option stopped. | Read that server's logs. |
 | `Error: Invalid value: Ollama and OpenAI-compatible endpoint overrides cannot be combined` | `--ollama-endpoint` was given with `--openai-endpoint`, `--judge-endpoint` or `--attacker-endpoint`. Exits with code 2. | Use one kind per run. |
 | `Configuration Error: Remote campaign storage API key: environment variable 'HACKAGENT_API_KEY' is missing or empty.` | The campaign's `execution.storage.backend` is `remote` and no key is set. | Export `HACKAGENT_API_KEY`, or the variable the storage `api_key` names. |
-| `This campaign uses the HackAgent gateway; set an API key with: hackagent config set --api-key` | A model in the campaign uses the HackAgent gateway, which needs your platform key. `config set` has no `--api-key` option. | Export `HACKAGENT_API_KEY`. |
 | The summary title says `failed` and the exit code is `1` | An attack stopped early (its **Error** column says why), or some attempts failed to generate, reach the target or be judged. `attempt_errors` in the `--json` summary counts those. | Read the **Error** column, then the run's `results.json` and `traces.jsonl` for the failed attempts. |
 
 ## Reading results

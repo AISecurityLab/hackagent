@@ -14,7 +14,11 @@ from uuid import uuid4
 
 import pytest
 
-from hackagent.core.credentials import reference_name
+from hackagent.core.credentials import (
+    current_environment,
+    reference_name,
+    resolve_api_key,
+)
 from hackagent.models import ModelResponse, Reachability
 from hackagent.orchestrator.campaign.gateway import GATEWAY_KEY_ENV
 from hackagent.orchestrator.execution import AdoptedRunStore, execute
@@ -454,14 +458,18 @@ def test_interrupt_after_a_rejection_passes_on_without_finish(tmp_path, fake_hea
 # --- environment, agent, gateway ---------------------------------------------
 
 
-def test_env_injected_and_restored(tmp_path, monkeypatch):
+def test_env_is_read_by_the_run_without_touching_the_process_environment(
+    tmp_path, monkeypatch
+):
     monkeypatch.delenv("OPENAI_KEY", raising=False)
     monkeypatch.setenv(GATEWAY_KEY_ENV, "the-value-before")
-    seen = {}
+    seen, process = {}, {}
 
     def target_reply(_messages):
-        seen["OPENAI_KEY"] = os.environ.get("OPENAI_KEY")
-        seen[GATEWAY_KEY_ENV] = os.environ.get(GATEWAY_KEY_ENV)
+        seen["OPENAI_KEY"] = resolve_api_key("${OPENAI_KEY}")
+        seen[GATEWAY_KEY_ENV] = current_environment().get(GATEWAY_KEY_ENV)
+        process["OPENAI_KEY"] = os.environ.get("OPENAI_KEY")
+        process[GATEWAY_KEY_ENV] = os.environ.get(GATEWAY_KEY_ENV)
         return "a reply"
 
     target = model("target")
@@ -474,8 +482,53 @@ def test_env_injected_and_restored(tmp_path, monkeypatch):
 
     assert outcome.status == "COMPLETED"
     assert seen == {"OPENAI_KEY": "secret-for-test", GATEWAY_KEY_ENV: GATEWAY_KEY}
+    # Not even while it ran: another run in this process would see it.
+    assert process == {"OPENAI_KEY": None, GATEWAY_KEY_ENV: "the-value-before"}
     assert "OPENAI_KEY" not in os.environ
     assert os.environ[GATEWAY_KEY_ENV] == "the-value-before"
+
+
+def test_concurrent_runs_each_read_their_own_key(tmp_path, monkeypatch):
+    """Two runs overlapping in threads, as the dashboard starts them: each
+    reads its own key throughout, and neither undoes the other's."""
+    monkeypatch.delenv("OPENAI_KEY", raising=False)
+    both_started = threading.Barrier(2, timeout=10)
+    first_done = threading.Event()
+    seen: dict[str, list] = {"a": [], "b": []}
+
+    def reply_for(name):
+        def target_reply(_messages):
+            seen[name].append(resolve_api_key("${OPENAI_KEY}"))
+            if not seen[name][1:]:
+                both_started.wait()
+                if name == "b":
+                    # Still running after run "a" has ended.
+                    first_done.wait(timeout=10)
+                    seen[name].append(resolve_api_key("${OPENAI_KEY}"))
+            return "a reply"
+
+        return target_reply
+
+    def run(name):
+        target = model("target")
+        target["connection"]["api_key"] = "${OPENAI_KEY}"
+        execute_with(
+            stored_campaign(tmp_path / name, target=target),
+            builder=FakeBuilder(models(target=ScriptedModel(reply_for(name)))),
+            env={"OPENAI_KEY": f"key-{name}"},
+        )
+        if name == "a":
+            first_done.set()
+
+    threads = [threading.Thread(target=run, args=(name,)) for name in ("a", "b")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    assert set(seen["a"]) == {"key-a"}
+    assert set(seen["b"]) == {"key-b"} and len(seen["b"]) >= 2
+    assert "OPENAI_KEY" not in os.environ
 
 
 def test_env_restored_when_the_run_fails(tmp_path, monkeypatch):
@@ -628,7 +681,7 @@ def test_execute_spec_starts_the_run_on_the_storage_server(
 
     def build(config, *, retries=0):
         built.append(config)
-        seen["key"] = os.environ.get(GATEWAY_KEY_ENV)
+        seen["key"] = current_environment().get(GATEWAY_KEY_ENV)
         return fakes(config, retries=retries)
 
     judge = {**GW, "scoring": {"type": "harmbench"}}
@@ -1163,7 +1216,9 @@ def _run_with_a_leaky_library(tmp_path, logging):
     def leaky(line):
         if line.text.startswith("dataset · "):
             # A library logging the keys it was given, inside the run.
-            library.warning("using %s and %s", GATEWAY_KEY, os.environ["OPENAI_KEY"])
+            library.warning(
+                "using %s and %s", GATEWAY_KEY, resolve_api_key("${OPENAI_KEY}")
+            )
             seen.append(line.text)
 
     outcome, store, _ = execute_with(

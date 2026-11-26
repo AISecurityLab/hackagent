@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -84,7 +83,7 @@ def _endpoint_options(func):
             "--attacker-endpoint",
             "--decorator-endpoint",
             "attacker_endpoint",
-            help="Repoint attack role models.",
+            help="Repoint attack role models (also: --decorator-endpoint).",
         ),
         click.option(
             "--output-directory",
@@ -96,12 +95,42 @@ def _endpoint_options(func):
             type=click.IntRange(min=1),
             help="Set attack/target/judge concurrency alike.",
         ),
-        click.option("--wait-for-ollama", type=float, default=0.0, show_default=True),
-        click.option("--ollama-pid", type=int),
-        click.option("--wait-for-server", type=float, default=0.0, show_default=True),
-        click.option("--server-pid", type=int),
-        click.option("--judge-server-pid", type=int),
-        click.option("--attacker-server-pid", type=int),
+        click.option(
+            "--wait-for-ollama",
+            type=float,
+            default=0.0,
+            show_default=True,
+            metavar="SECONDS",
+            help="Wait this long for Ollama to answer before giving up.",
+        ),
+        click.option(
+            "--ollama-pid",
+            type=int,
+            help="Stop waiting if this Ollama process exits.",
+        ),
+        click.option(
+            "--wait-for-server",
+            type=float,
+            default=0.0,
+            show_default=True,
+            metavar="SECONDS",
+            help="Wait this long for OpenAI-compatible servers to answer.",
+        ),
+        click.option(
+            "--server-pid",
+            type=int,
+            help="Stop waiting if the target's server process exits.",
+        ),
+        click.option(
+            "--judge-server-pid",
+            type=int,
+            help="Stop waiting if the judges' server process exits.",
+        ),
+        click.option(
+            "--attacker-server-pid",
+            type=int,
+            help="Stop waiting if the attack models' server process exits.",
+        ),
     ]
     for option in reversed(options):
         func = option(func)
@@ -182,6 +211,7 @@ def run(
         show_run,
         suppress_noisy_libraries,
     )
+    from hackagent.core.credentials import run_environment
     from hackagent.core.settings import Settings
     from hackagent.orchestrator.campaign import (
         GATEWAY_KEY_ENV,
@@ -216,6 +246,8 @@ def run(
     # campaign is recorded with its gateway markers. A dry run never
     # touches remote storage.
     tracked = storage.backend == "remote" and not spec.execution.dry_run
+    #: What the run's ``${VARIABLE}`` references read besides the environment.
+    run_env: dict[str, str] = {}
     if not tracked:
         if storage.backend == "remote":
             gateway_url = storage.base_url or settings.base_url
@@ -226,13 +258,13 @@ def run(
         spec = bind_gateway(spec, gateway_url)
         if uses_gateway(spec) and not gateway_key:
             raise Failed(
-                "This campaign uses the HackAgent gateway; set an API key with: "
-                "hackagent config set --api-key"
+                "This campaign uses the HackAgent gateway, which needs an API "
+                "key: export HACKAGENT_API_KEY=<key>"
             )
         if gateway_key:
             # The selected key, never one already in the environment: the
             # gateway models were just bound to the selected server.
-            os.environ[GATEWAY_KEY_ENV] = gateway_key
+            run_env[GATEWAY_KEY_ENV] = gateway_key
 
     setup_package_logging()
     suppress_noisy_libraries("httpx", "httpcore", "LiteLLM")
@@ -254,7 +286,7 @@ def run(
         except (ValueError, RuntimeError) as exc:
             raise Failed(str(exc)) from exc
 
-    with show_run(as_json):
+    with show_run(as_json), run_environment(run_env):
         if tracked:
             outcome = execute_spec(spec, settings=settings)
         else:

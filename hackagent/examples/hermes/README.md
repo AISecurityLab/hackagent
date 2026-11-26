@@ -40,17 +40,17 @@ Then run:
 
 ### How the target is wired
 
-    agent = HackAgent(
-        name="hermes",
-        endpoint="http://localhost",  # ignored
-        agent_type="hermes",
-        adapter_operational_config={
-            "name": "hermes-4-70b",  # passed to `hermes -m`
-            "binary": "hermes",
-        },
-    )
+    target:
+      name: hermes-4-70b        # passed to `hermes -m`
+      connection:
+        provider: local
+        type: HERMES
+      options:
+        binary: hermes
 
-| Config key | Maps to | Default |
+`name` is the target's own; every other key below goes under `options`.
+
+| Key | Maps to | Default |
 |---|---|---|
 | `name` (required) | `-m <model>` | — |
 | `binary` | argv[0], checked with `shutil.which` at construction. `ollama` starts Hermes with `ollama launch hermes --model <name>` | `hermes` |
@@ -70,10 +70,10 @@ Unlike Claude Code, Hermes is stateful: it keeps long-term memory in `~/.hermes/
 
 The adapter therefore defaults to isolation:
 
-- `--ignore-user-config` is always passed unless you explicitly set `"ignore_user_config": False`, so the target uses defaults plus `.env` credentials only and never reads `~/.hermes/config.yaml`.
+- `--ignore-user-config` is always passed unless you set `ignore_user_config: false` under `options`, so the target uses defaults plus `.env` credentials only and never reads `~/.hermes/config.yaml`.
 - Through Ollama (`binary: ollama`) `--ignore-user-config` is off by default: `ollama launch hermes` writes the model into `~/.hermes/config.yaml`, so Hermes has to read it. Isolate the run with a dedicated `hermes profile` instead.
 - `-r`/`--resume` and `-c`/`--continue` are never passed, so every attack turn is a fresh session.
-- `"safe_mode": True` opts into `--safe-mode` for maximum isolation (all customizations disabled).
+- `safe_mode: true` opts into `--safe-mode` for maximum isolation (all customizations disabled).
 - `--source` is not passed by default: recent Hermes versions accept it only under `hermes chat`, not with `-z`. Set `source` if your version takes it.
 
 For stronger separation still, point `cwd` at a scratch directory and/or run the target under a dedicated `hermes profile` so the operator's real profile, memory and skills are never touched.

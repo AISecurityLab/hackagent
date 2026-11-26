@@ -36,10 +36,33 @@ from hackagent import examples as examples_catalog
 from hackagent import resolve_ollama_base_url
 
 
+def _root_options() -> list[str]:
+    """The root options this command was given (``--backend``, ``-v``, …),
+    to pass on to a child ``hackagent`` so it reads and writes the same way."""
+    context = click.get_current_context(silent=True)
+    if context is None:
+        return []
+    params = context.find_root().params
+    forwarded: list[str] = []
+    for name in ("config_file", "backend", "base_url", "ca_bundle"):
+        if params.get(name):
+            forwarded += [f"--{name.replace('_', '-')}", str(params[name])]
+    if params.get("verbose"):
+        forwarded.append("-" + "v" * int(params["verbose"]))
+    return forwarded
+
+
 def _run_hackagent_cli_command(args: list[str]) -> None:
-    """Run a HackAgent CLI command as a Python module in the current env."""
+    """Run a HackAgent CLI command as a Python module in the current env,
+    with the root options this one was given."""
     result = subprocess.run(
-        [sys.executable, "-m", "hackagent.interfaces.cli.main", *args],
+        [
+            sys.executable,
+            "-m",
+            "hackagent.interfaces.cli.main",
+            *_root_options(),
+            *args,
+        ],
         check=False,
     )
     if result.returncode != 0:
