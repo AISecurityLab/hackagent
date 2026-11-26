@@ -37,6 +37,9 @@ KEYS: dict[str, Key] = {
     "run": Key("ctrl+r", "Run", "run the campaign"),
     "stop": Key("f3", "Stop", "stop the run after the current step"),
     "save": Key("ctrl+s", "Save", "save the campaign to a file"),
+    "save_settings": Key(
+        "ctrl+s", "Save settings", "save them to the configuration file"
+    ),
     "open_file": Key("ctrl+o", "Open file", "open a campaign file"),
     "edit_yaml": Key("f4", "Edit YAML", "edit the whole campaign in $EDITOR"),
     "reset": Key("ctrl+t", "Reset field", "put the field back to its default"),
@@ -46,6 +49,10 @@ KEYS: dict[str, Key] = {
     "export_csv": Key("ctrl+e", "Export CSV", "export the results as CSV"),
     "export_json": Key("ctrl+j", "Export JSON", "export the results as JSON"),
     "copy": Key("ctrl+y", "Copy", "copy the run's log, or the selection"),
+    "sample": Key("enter", "Sample", "load some of the dataset's goals"),
+    "browse": Key("o", "Open in browser", "open the dashboard in a browser"),
+    "serve": Key("ctrl+r", "Serve", "serve the dashboard with these options"),
+    "stop_serving": Key("f3", "Stop serving", "stop the dashboard"),
     "quit": Key("q", "Quit", "leave HackAgent"),
 }
 

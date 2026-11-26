@@ -10,6 +10,11 @@ Expanding it shows its attacks, and expanding an attack shows the goals it
 tried and how each went. One screen, no panes: a terminal is narrow, and a
 second pane halves the width of the one thing being read.
 
+Opening it never waits for the store. Campaigns and their attacks are read
+first, on a thread of their own, and drawn at once; each attack&#x27;s results
+are read after, newest campaign first, and its counts filled in as they
+arrive. An attack&#x27;s goals become nodes only when it is expanded.
+
 A run lives where its campaign&#x27;s `execution.storage` put it, which is the
 account or this machine. The view opens on whichever has runs, names it, and
 reads the other on `s`: the store being shown is a choice, never a guess
@@ -23,14 +28,6 @@ class ResultsTab(ResultsExportMixin, BaseTab)
 
 Campaigns, their attacks, and the goals each attack tried.
 
-#### MAX\_GOALS\_SHOWN
-
-Goals listed under one attack before the rest are summarised.
-
-#### MAX\_REPLY\_LINES
-
-Lines of the target&#x27;s reply shown under a goal.
-
 #### refresh\_data
 
 ```python
@@ -43,6 +40,9 @@ Until a store is chosen, this looks for one with runs in it: an
 account that cannot be reached, or that has nothing, is no reason to
 show an empty screen while this machine holds what was just run.
 Once `s` has chosen one, that is the one read, empty or not.
+
+The reading happens on a thread of its own (:meth:`_load`): what is
+on screen stays until there is something to replace it.
 
 #### action\_switch\_store
 

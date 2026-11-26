@@ -329,68 +329,14 @@ def tui(ctx):
 def doctor(ctx):
     """Check the setup for common problems.
 
-    Says what is missing, and how to fix it.
+    Says what is missing, and how to fix it: what the terminal app's Setup
+    screen shows.
     """
-    cli_config: CLIConfig = ctx.obj["config"]
+    from hackagent.interfaces.setup import report_markup, setup_report
 
-    from hackagent import HackAgent
-
-    # Diagnostics only read settings. A throwaway backend keeps doctor from
-    # opening SQLite or the remote API, which would create the local database
-    # before the "database exists" check.
-    report = HackAgent(cli_config.settings, backend=object()).doctor()
-
-    display_heading("Configuration")
-    if report.config_exists:
-        display_success("Configuration file found")
-    else:
-        display_warning("No configuration file")
-        display_hint("Create one", "hackagent init")
-
-    display_heading("Storage")
-    display_info(f"Backend: {cli_config.backend}")
-    if report.db_exists:
-        display_success("Local database found")
-    else:
-        display_warning("No local database yet: the first run creates it")
-
-    display_heading("API key")
-    if report.api_key_set:
-        display_success("API key set")
-    else:
-        display_warning("API key not set: export HACKAGENT_API_KEY")
-
-    display_heading("Dependencies")
-    if report.pandas_available:
-        display_success("pandas")
-    else:
-        display_error("pandas not found")
-        display_hint("Install it", "pip install pandas")
-    if report.yaml_available:
-        display_success("PyYAML")
-    else:
-        display_warning("PyYAML not found (optional)")
-        display_hint("Install it", "pip install pyyaml")
-    if report.graphviz_dot:
-        display_success(
-            f"Graphviz [secondary]{escape(str(report.graphviz_dot))}[/secondary]"
-        )
-    elif report.graphviz_error:
-        display_warning(
-            "Could not check for Graphviz: "
-            f"[secondary]{escape(str(report.graphviz_error))}[/secondary]"
-        )
-    else:
-        display_warning("Graphviz not found (needed only for FC-Attack)")
-
-    console.print()
-    if not report.issues:
-        display_success("Ready to use HackAgent")
-    else:
-        count = len(report.issues)
-        display_warning(f"{count} {'issue' if count == 1 else 'issues'} to address")
-        display_hint("Set up again", "hackagent init")
-        display_hint("Change one setting", "hackagent config set")
+    sections, verdict = setup_report(ctx.obj["config"])
+    for line in report_markup(sections, verdict):
+        console.print(line)
 
 
 cli.add_command(campaign_cmd.campaign)

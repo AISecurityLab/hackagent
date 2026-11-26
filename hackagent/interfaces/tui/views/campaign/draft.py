@@ -54,15 +54,13 @@ class Plan:
         return None if self.goals is None else self.goals * self.attacks
 
 
-class CampaignDraft:
-    """A mutable campaign document with path-based access."""
+class Document:
+    """A document of mappings and lists, read and written by path: what a
+    form's rows (:class:`~.form.FieldRow`) edit. The builder's is a
+    campaign; the Settings and Dashboard screens have one of their own."""
 
-    def __init__(self, document: Optional[dict[str, Any]] = None) -> None:
-        self.data: dict[str, Any] = copy.deepcopy(
-            DEFAULT_DOCUMENT if document is None else document
-        )
-
-    # -- document access ------------------------------------------------
+    def __init__(self, data: Optional[dict[str, Any]] = None) -> None:
+        self.data: dict[str, Any] = copy.deepcopy(data or {})
 
     def get(self, path: Path) -> tuple[bool, Any]:
         """``(found, value)`` at ``path``."""
@@ -110,6 +108,15 @@ class CampaignDraft:
             else:
                 break
         return True
+
+
+class CampaignDraft(Document):
+    """A mutable campaign document with path-based access."""
+
+    def __init__(self, document: Optional[dict[str, Any]] = None) -> None:
+        self.data: dict[str, Any] = copy.deepcopy(
+            DEFAULT_DOCUMENT if document is None else document
+        )
 
     def items(self, path: Path) -> list[Any]:
         found, value = self.get(path)
@@ -170,4 +177,4 @@ class CampaignDraft:
         )
 
 
-__all__ = ["CampaignDraft", "DEFAULT_DOCUMENT", "Issue", "Plan"]
+__all__ = ["Document", "CampaignDraft", "DEFAULT_DOCUMENT", "Issue", "Plan"]

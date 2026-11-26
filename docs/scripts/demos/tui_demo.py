@@ -72,8 +72,11 @@ async def _story(app: Any, pilot: Any, film: Film, gate: Gate) -> None:
     await pilot.pause()
     film.snap(1800)
 
-    # Start from an example.
-    await pilot.press("tab")
+    # A campaign, from an example.
+    await pilot.press("enter")
+    await pilot.pause()
+    film.snap(900)
+    await pilot.press("down")
     await pilot.pause()
     film.snap(700)
     await pilot.press("enter")
@@ -156,7 +159,7 @@ async def _shown(app: Any, pilot: Any) -> None:
     builder = _builder(app)
     for _ in range(100):
         await pilot.pause(0.05)
-        if builder._incoming.empty():
+        if builder._feed.incoming.empty():
             break
     builder._drain(limit=None)
     await pilot.pause()

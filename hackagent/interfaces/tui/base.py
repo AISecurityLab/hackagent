@@ -8,36 +8,9 @@ Base class for all TUI tabs with common functionality.
 """
 
 import httpx
-from textual.app import ComposeResult
 from textual.containers import Container
-from textual.widgets import Static
 
 from hackagent.interfaces.cli.config import CLIConfig
-
-
-class HackAgentHeader(Container):
-    """Custom header with ASCII logo"""
-
-    DEFAULT_CSS = """
-    HackAgentHeader {
-        width: 100%;
-        height: 7;
-        padding: 0 1;
-    }
-
-    HackAgentHeader Static {
-        color: $brand;
-        text-style: bold;
-        width: 100%;
-        content-align: center middle;
-    }
-    """
-
-    def compose(self) -> ComposeResult:
-        from hackagent.interfaces.brand import BANNER
-
-        # Coloured by the CSS above: $brand, as on the welcome screen.
-        yield Static(BANNER)
 
 
 class BaseTab(Container):
@@ -109,23 +82,24 @@ class BaseTab(Container):
         """
         from rich.markup import escape
 
+        from hackagent.interfaces.palette import ACCENT, FAILED, SECONDARY, paint
+
+        mark = paint("✗", FAILED)
         if isinstance(error, httpx.TimeoutException):
-            return f"[red]Timeout:[/red] {context} took too long"
+            return f"{mark} {escape(context)} took too long"
         elif isinstance(error, httpx.HTTPStatusError):
             if error.response.status_code == 401:
                 return (
-                    "[red]Authentication Failed[/red]\n\n"
-                    "[yellow]Your API key is invalid or expired[/yellow]\n\n"
-                    "[cyan]To fix:[/cyan]\n"
-                    "Export a valid key in HACKAGENT_API_KEY\n\n"
-                    "[dim]Press F5 to retry after updating[/dim]"
+                    f"{mark} Your API key is invalid or expired\n"
+                    f"  {paint('Set a valid one:', SECONDARY)} "
+                    f"{paint('export HACKAGENT_API_KEY=...', ACCENT)}\n"
+                    f"{paint('f5 retries after updating it', SECONDARY)}"
                 )
             else:
-                return f"[red]HTTP {error.response.status_code}:[/red] {context} failed"
+                return f"{mark} {escape(context)} failed: HTTP {error.response.status_code}"
         else:
             # Escape error message to prevent Rich markup issues
-            error_text = escape(str(error))
-            return f"[red]Error:[/red] {error_text}"
+            return f"{mark} {escape(str(error))}"
 
     def refresh_data(self) -> None:
         """Refresh tab data from API.

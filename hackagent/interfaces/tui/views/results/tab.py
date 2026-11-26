@@ -8,6 +8,11 @@ Expanding it shows its attacks, and expanding an attack shows the goals it
 tried and how each went. One screen, no panes: a terminal is narrow, and a
 second pane halves the width of the one thing being read.
 
+Opening it never waits for the store. Campaigns and their attacks are read
+first, on a thread of their own, and drawn at once; each attack's results
+are read after, newest campaign first, and its counts filled in as they
+arrive. An attack's goals become nodes only when it is expanded.
+
 A run lives where its campaign's ``execution.storage`` put it, which is the
 account or this machine. The view opens on whichever has runs, names it, and
 reads the other on ``s``: the store being shown is a choice, never a guess
@@ -18,72 +23,37 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Callable, Optional
-from uuid import UUID
 
+from rich.markup import escape
 from textual.app import ComposeResult
 from textual.widgets import Static, Tree
 from textual.widgets.tree import TreeNode
 
-from hackagent.evaluation.audit import AuditReport
 from hackagent.core.settings import Mode, Settings
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.audit import audit_summary
-from hackagent.orchestrator.campaign.audit import format_report
 from hackagent.interfaces.tui.base import BaseTab
 from hackagent.interfaces.palette import (
-    ACCENT,
-    PASSED,
     SECONDARY,
-    UNDECIDED,
-    VERDICT_STYLES,
     paint,
 )
 from hackagent.interfaces.tui.frame import title_bar
 from hackagent.interfaces.tui.keys import key
-from hackagent.interfaces.tui.theme import (
-    MITIGATED,
-    VULNERABLE,
-    classify_evaluation_status,
-)
 from hackagent.interfaces.tui.views.results.export import ResultsExportMixin
-from hackagent.interfaces.tui.views.results.formatters import (
-    _coerce_datetime,
-    _escape,
+from hackagent.interfaces.results import (
+    MAX_GOALS,
+    attack_line,
+    audit_lines,
+    campaign_line,
+    count,
+    goal_line,
+    more_line,
+    newest_first,
+    read_outline,
+    read_results,
+    reply_lines,
+    runs_of,
 )
-
-
-def _ago(value: Any) -> str:
-    """How long ago, in the words someone would use out loud."""
-    when = _coerce_datetime(value)
-    if when is None:
-        return "—"
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
-    seconds = (datetime.now(timezone.utc) - when).total_seconds()
-    if seconds < 90:
-        return "just now"
-    for size, limit, suffix in ((60, 60, "m"), (3600, 24, "h"), (86400, 7, "d")):
-        count = int(seconds // size)
-        if count < limit:
-            return f"{count}{suffix} ago"
-    return when.strftime("%d %b")
-
-
-def _outcome(broken: int, goals: int, status: str, recorded: int) -> str:
-    """What came of it, or why nothing did."""
-    state = (status or "").upper()
-    if state in {"FAILED", "CANCELLED"} and not recorded:
-        return paint("did not finish", UNDECIDED)
-    if not recorded:
-        return paint("nothing recorded", SECONDARY)
-    total = goals or recorded
-    if broken:
-        return paint(
-            f"{broken} of {total} goals jailbroken", VERDICT_STYLES["jailbroken"]
-        )
-    return paint(f"0 of {total} goals jailbroken", PASSED)
 
 
 @dataclass(frozen=True)
@@ -112,11 +82,6 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         key("export_json"),
     ]
 
-    #: Goals listed under one attack before the rest are summarised.
-    MAX_GOALS_SHOWN = 40
-    #: Lines of the target's reply shown under a goal.
-    MAX_REPLY_LINES = 6
-
     def __init__(self, cli_config: CLIConfig, **kwargs: Any) -> None:
         super().__init__(cli_config, **kwargs)
         self.results_data: list[Any] = []
@@ -124,6 +89,8 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         self._campaigns: list[Any] = []
         self._agent_map: dict[str, str] = {}
         self._attack_map: dict[str, str] = {}
+        #: ``(jailbroken, mitigated, recorded)`` of each attack run whose
+        #: results were read; a run missing here is still being counted.
         self._result_counts: dict[str, tuple] = {}
         #: Where the runs on screen come from, as the title bar says it.
         self.said = ""
@@ -134,6 +101,13 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         #: True once the user picked a store, after which the view stays
         #: there — an empty account they asked for is an answer.
         self._store_chosen = False
+        #: Which read is current: a read started before the last refresh
+        #: or switch draws nothing.
+        self._generation = 0
+        #: The tree's node of each attack run, and of each campaign with
+        #: its runs, to relabel as counts arrive.
+        self._run_nodes: dict[str, TreeNode[Any]] = {}
+        self._campaign_nodes: dict[str, tuple[TreeNode[Any], Any, list[Any]]] = {}
 
     def compose(self) -> ComposeResult:
         tree: Tree[Any] = Tree("runs", id="results-tree")
@@ -168,6 +142,9 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         account that cannot be reached, or that has nothing, is no reason to
         show an empty screen while this machine holds what was just run.
         Once ``s`` has chosen one, that is the one read, empty or not.
+
+        The reading happens on a thread of its own (:meth:`_load`): what is
+        on screen stays until there is something to replace it.
         """
         stores = self._stores()
         if self._store_chosen:
@@ -176,22 +153,71 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             stores = [
                 store for store in stores if store.label == self._store_label
             ] or stores[:1]
+        self._generation += 1
+        generation = self._generation
+        self._say(paint("reading…", SECONDARY))
+        self.run_worker(
+            lambda: self._load(generation, stores),
+            thread=True,
+            exclusive=True,
+            group="results-read",
+        )
+
+    def _current(self, generation: int) -> bool:
+        return generation == self._generation and self.is_attached
+
+    def _load(self, generation: int, stores: list["_Store"]) -> None:
+        """Read the stores in turn, on the worker's thread: the outline of
+        the first with campaigns, then its results run by run."""
         problems: list[tuple[str, str]] = []
-        empty: Optional[_Store] = None
+        empty: Optional[tuple["_Store", dict[str, Any]]] = None
         for store in stores:
             try:
-                loaded = self._read(store.open())
+                session = store.open()
+                loaded = self._read(session)
             except Exception as exc:
                 problems.append((store.label, str(exc)))
                 continue
-            if loaded["campaigns"] or empty is None:
-                self._apply(loaded)
             if loaded["campaigns"]:
-                self._show(store.label, problems)
+                self._from_thread(
+                    self._outlined, generation, loaded, store.label, problems
+                )
+                self._count(generation, session, loaded)
                 return
-            empty = empty or store
+            empty = empty or (store, loaded)
         if empty is not None:
-            self._show(empty.label, problems)
+            self._from_thread(
+                self._outlined, generation, empty[1], empty[0].label, problems
+            )
+            return
+        self._from_thread(self._unreadable, generation, problems, stores)
+
+    def _from_thread(self, callback: Callable[..., Any], *args: Any) -> None:
+        """Run ``callback`` on the app's thread, unless the app has gone."""
+        try:
+            self.app.call_from_thread(callback, *args)
+        except Exception:  # the view closed while reading: nothing to draw
+            pass
+
+    def _outlined(
+        self,
+        generation: int,
+        loaded: dict[str, Any],
+        source: str,
+        problems: Sequence[tuple[str, str]],
+    ) -> None:
+        if not self._current(generation):
+            return
+        self._apply(loaded)
+        self._show(source, problems)
+
+    def _unreadable(
+        self,
+        generation: int,
+        problems: Sequence[tuple[str, str]],
+        stores: Sequence["_Store"],
+    ) -> None:
+        if not self._current(generation):
             return
         # Whatever was on screen came from a store that is not being shown
         # any more; leaving it there would credit those runs to this one.
@@ -200,9 +226,46 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         self._store_label = stores[0].label if stores else None
         switch = self._switch_hint(problems)
         self._say(
-            f"[$error]could not read results: {_escape(said)}[/]"
+            f"[$error]could not read results: {escape(said)}[/]"
             + (f" · {switch}" if switch else "")
         )
+
+    def _count(self, generation: int, session: Any, loaded: dict[str, Any]) -> None:
+        """Read each attack run's results, newest campaign first, and hand
+        them to the view one run at a time."""
+        recency = {
+            str(campaign.id): str(getattr(campaign, "created_at", ""))
+            for campaign in loaded["campaigns"]
+        }
+        runs = sorted(
+            loaded["runs"],
+            key=lambda run: recency.get(str(getattr(run, "campaign_run_id", "")), ""),
+            reverse=True,
+        )
+        for run in runs:
+            if generation != self._generation:
+                return
+            items = read_results(session, run)
+            self._from_thread(self._counted, generation, str(run.id), items)
+
+    def _counted(self, generation: int, run_id: str, items: list[Any]) -> None:
+        """One attack run's results arrived: count them, relabel its line
+        and its campaign's, and list its goals if it is open."""
+        if not self._current(generation):
+            return
+        self._results_of_run[run_id] = items
+        self._result_counts[run_id] = count(items)
+        node = self._run_nodes.get(run_id)
+        if node is None:
+            return
+        run = node.data[1]
+        node.set_label(self._attack_label(run))
+        if node.is_expanded:
+            self._list_goals(node)
+        campaign_id = str(getattr(run, "campaign_run_id", "") or "")
+        if campaign_id in self._campaign_nodes:
+            parent, campaign, runs = self._campaign_nodes[campaign_id]
+            parent.set_label(self._campaign_label(campaign, runs))
 
     def _show(self, source: str, problems: Sequence[tuple[str, str]]) -> None:
         """Draw what was read, and say what could not be."""
@@ -226,7 +289,7 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             return ""
         failed = {label for label, _ in problems}
         unread = " (could not be read)" if others[0] in failed else ""
-        return f"s: {_escape(others[0])}{unread}"
+        return f"s: {escape(others[0])}{unread}"
 
     def action_switch_store(self) -> None:
         """Read the other store — the account, or this machine."""
@@ -244,49 +307,11 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         self.refresh_data()
 
     def _read(self, session: Any) -> dict[str, Any]:
-        """Everything the tree needs from one store, or an exception.
-
-        Nothing is assigned until the whole read succeeds, so a store that
-        fails halfway cannot leave half of its runs on screen.
-        """
-        campaigns = list(session.campaign_runs(page=1, page_size=200).items)
-        runs = list(session.runs(page=1, page_size=200).items)
-        attacks = {
-            str(attack.id): str(attack.type)
-            for attack in session.attacks(page=1, page_size=500).items
-        }
-        agents = {
-            str(agent.id): agent.name
-            for agent in session.agents(page=1, page_size=500).items
-        }
-        counts: dict[str, tuple] = {}
-        results: dict[str, list[Any]] = {}
-        for run in runs:
-            try:
-                run_id = run.id if isinstance(run.id, UUID) else UUID(str(run.id))
-                items = list(
-                    session.results(run_id=run_id, page=1, page_size=500).items
-                )
-            except Exception:
-                items = []
-            results[str(run.id)] = items
-            outcomes = [
-                classify_evaluation_status(getattr(r, "evaluation_status", None))
-                for r in items
-            ]
-            counts[str(run.id)] = (
-                sum(1 for o in outcomes if o is VULNERABLE),
-                sum(1 for o in outcomes if o is MITIGATED),
-                len(items),
-            )
-        return {
-            "campaigns": campaigns,
-            "runs": runs,
-            "attacks": attacks,
-            "agents": agents,
-            "counts": counts,
-            "results": results,
-        }
+        """The outline of one store, or an exception: nothing is assigned
+        until the whole read succeeds, so a store that fails halfway cannot
+        leave half of its runs on screen. The results are read after, by
+        :meth:`_count`."""
+        return read_outline(session)
 
     def _clear(self) -> None:
         """Show nothing: no store answered, so nothing can be attributed."""
@@ -296,8 +321,6 @@ class ResultsTab(ResultsExportMixin, BaseTab):
                 "runs": [],
                 "attacks": {},
                 "agents": {},
-                "counts": {},
-                "results": {},
             }
         )
         self.query_one("#results-tree", Tree).clear()
@@ -307,48 +330,24 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         self.results_data = loaded["runs"]
         self._attack_map = loaded["attacks"]
         self._agent_map = loaded["agents"]
-        self._result_counts = loaded["counts"]
-        self._results_of_run = loaded["results"]
+        self._result_counts = {}
+        self._results_of_run = {}
 
     # -- the tree ------------------------------------------------------------
-
-    def _runs_of(self, campaign_id: str) -> list[Any]:
-        return [
-            run
-            for run in self.results_data
-            if str(getattr(run, "campaign_run_id", "") or "") == campaign_id
-        ]
-
-    def _totals_of(self, runs: list[Any]) -> tuple[int, int, int]:
-        """``(jailbroken, goals, recorded)`` over these attack runs."""
-        broken = recorded = goals = 0
-        for run in runs:
-            vulnerable, _mitigated, total = self._result_counts.get(
-                str(run.id), (0, 0, 0)
-            )
-            broken += vulnerable
-            recorded += total
-            config = getattr(run, "run_config", None) or {}
-            try:
-                goals += int(config.get("expected_total_goals") or 0)
-            except (TypeError, ValueError):
-                pass
-        return broken, goals, recorded
 
     def _build_tree(
         self, source: str = "", problems: Sequence[tuple[str, str]] = ()
     ) -> None:
         tree = self.query_one("#results-tree", Tree)
         tree.clear()
-        campaigns = sorted(
-            self._campaigns,
-            key=lambda c: str(getattr(c, "created_at", "")),
-            reverse=True,
-        )
+        self._run_nodes.clear()
+        self._campaign_nodes.clear()
+        campaigns = newest_first(self._campaigns)
         self.query_one("#results-empty", Static).display = not campaigns
         for campaign in campaigns:
-            runs = self._runs_of(str(campaign.id))
+            runs = runs_of(self.results_data, campaign)
             node = tree.root.add(self._campaign_label(campaign, runs), expand=False)
+            self._campaign_nodes[str(campaign.id)] = (node, campaign, runs)
             self._add_audit(node, getattr(campaign, "audit", None))
             for run in runs:
                 self._add_attack(node, run)
@@ -357,7 +356,7 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         # otherwise look as though they never happened.
         said = [f"{len(campaigns)} campaigns"]
         if source:
-            said.append(_escape(source))
+            said.append(escape(source))
         if switch := self._switch_hint(problems):
             said.append(switch)
         self._say(" · ".join(said))
@@ -370,86 +369,54 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             bar.show(context=markup)
 
     def _campaign_label(self, campaign: Any, runs: list[Any]) -> str:
-        broken, goals, recorded = self._totals_of(runs)
-        name = _escape(str(getattr(campaign, "name", None) or "untitled"))
-        target = self._agent_map.get(str(getattr(campaign, "agent_id", "")), "")
-        when = _ago(getattr(campaign, "created_at", None))
-        trailer = f" · {_escape(target)}" if target else ""
-        outcome = _outcome(broken, goals, getattr(campaign, "status", ""), recorded)
-        label = f"[b]{name}[/b] · {when}{trailer}   {outcome}"
-        audit = getattr(campaign, "audit", None)
-        if audit:
-            try:
-                label += f"   {audit_summary(audit)}"
-            except (TypeError, ValueError):
-                pass  # a malformed audit leaves the label without its summary
-        return label
+        return campaign_line(campaign, runs, self._result_counts, self._agent_map)
 
     def _add_audit(self, parent: TreeNode[Any], audit: Any) -> None:
         """The judge audit qualifies every attack of the campaign, so it sits first."""
-        if not audit:
+        said = audit_lines(audit)
+        if said is None:
             return
-        try:
-            report = AuditReport.model_validate(dict(audit))
-        except (TypeError, ValueError):
-            return
-        node = parent.add(f"{paint('judge audit', ACCENT)} · {audit_summary(report)}")
-        for line in format_report(report).splitlines():
-            node.add_leaf(f"[dim]{_escape(line)}[/dim]")
+        line, table = said
+        node = parent.add(line)
+        for row in table:
+            node.add_leaf(row)
+
+    def _attack_label(self, run: Any) -> str:
+        return attack_line(run, self._result_counts, self._attack_map)
 
     def _add_attack(self, parent: TreeNode[Any], run: Any) -> None:
-        broken, goals, recorded = self._totals_of([run])
-        name = self._attack_map.get(str(getattr(run, "attack_id", "")), "attack")
-        outcome = _outcome(broken, goals, getattr(run, "status", ""), recorded)
-        results = self._results_of_run.get(str(run.id), [])
-        node = parent.add(f"{_escape(str(name)):<16}{outcome}", expand=False)
-        for result in results[: self.MAX_GOALS_SHOWN]:
-            goal = node.add(self._goal_label(result), expand=False)
-            for line in self._reply_lines(result):
-                goal.add_leaf(line)
-        if len(results) > self.MAX_GOALS_SHOWN:
-            node.add_leaf(
-                f"[dim]…{len(results) - self.MAX_GOALS_SHOWN} more, "
-                "export for the rest[/dim]"
-            )
-
-    def _goal_label(self, result: Any) -> str:
-        outcome = classify_evaluation_status(getattr(result, "evaluation_status", None))
-        # The goal is what the attack was trying to get, which is what makes
-        # the line worth reading; the prompt it built is in the export.
-        goal = str(getattr(result, "goal", "") or "").replace("\n", " ")
-        if len(goal) > 58:
-            goal = goal[:55] + "…"
-        verdict = (
-            f"[{VULNERABLE.color}]jailbroken[/{VULNERABLE.color}]"
-            if outcome is VULNERABLE
-            else f"[{MITIGATED.color}]held[/{MITIGATED.color}]"
-            if outcome is MITIGATED
-            else "[dim]not scored[/dim]"
+        """The attack's line; its goals are listed when it is opened."""
+        node = parent.add(
+            self._attack_label(run),
+            data=("run", run),
+            expand=False,
+            allow_expand=True,
         )
-        return f"{verdict}  [dim]{_escape(goal)}[/dim]"
+        self._run_nodes[str(run.id)] = node
 
-    def _reply_lines(self, result: Any) -> list[str]:
-        """What the target actually said, wrapped to a few readable lines.
+    def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
+        data = event.node.data
+        if isinstance(data, tuple) and data and data[0] == "run":
+            self._list_goals(event.node)
 
-        One level deeper than the verdict, because the verdict is a claim and
-        this is the evidence for it.
-        """
-        import textwrap
-
-        metadata = getattr(result, "metadata", None) or {}
-        reply = str(metadata.get("response") or "").strip()
-        if not reply:
-            notes = str(getattr(result, "evaluation_notes", "") or "").strip()
-            reply = notes or "nothing recorded"
-        wrapped = textwrap.wrap(reply.replace("\n", " "), width=86)
-        lines = [
-            f"[dim]{_escape(line)}[/dim]" for line in wrapped[: self.MAX_REPLY_LINES]
-        ]
-        if len(wrapped) > self.MAX_REPLY_LINES:
-            # Appended after escaping, or the ellipsis brackets escape too.
-            lines.append("[dim]…[/dim]")
-        return lines
+    def _list_goals(self, node: TreeNode[Any]) -> None:
+        """The goals an attack tried, under its line, once its results are
+        read; until then, that they are being read."""
+        run = node.data[1]
+        results = self._results_of_run.get(str(run.id))
+        node.remove_children()
+        if results is None:
+            node.add_leaf(paint("reading its goals…", SECONDARY))
+            return
+        if not results:
+            node.add_leaf(paint("no goals recorded", SECONDARY))
+            return
+        for result in results[:MAX_GOALS]:
+            goal = node.add(goal_line(result), expand=False)
+            for line in reply_lines(result):
+                goal.add_leaf(line)
+        if more := more_line(MAX_GOALS, len(results)):
+            node.add_leaf(more)
 
     # -- keys ----------------------------------------------------------------
 

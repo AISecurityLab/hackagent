@@ -18,6 +18,7 @@ from hackagent.interfaces.cli.utils import (
     Failed,
     console,
     display_heading,
+    display_info,
     display_warning,
     handle_errors,
 )
@@ -135,208 +136,67 @@ def _display_result_details(result) -> None:
 
 @results.command()
 @click.option(
-    "--status",
-    type=click.Choice(["pending", "running", "completed", "failed"]),
-    help="Filter by status",
+    "--limit",
+    default=10,
+    show_default=True,
+    type=click.IntRange(min=1),
+    help="How many of the latest campaigns to show.",
 )
-@click.option("--agent", help="Filter by agent name")
-@click.option("--attack-type", help="Filter by attack type")
-@click.option("--days", default=7, help="Number of days to include (default: 7)")
+@click.option("--goals", is_flag=True, help="List each attack's goals and verdicts.")
 @click.pass_context
 @handle_errors
-def summary(ctx, status, agent, attack_type, days):
-    """Show summary statistics of attack results"""
+def summary(ctx, limit, goals):
+    """Show what the latest campaigns found.
+
+    Each campaign, then each of its attacks, as the terminal app's Results
+    shows them; with --goals, the goals each attack tried and how each went.
+    """
+    from hackagent import HackAgent
+    from hackagent.interfaces import results as said
 
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
+    session = HackAgent(cli_config.settings)
+    with console.status("Reading results…"):
+        outline = said.read_outline(session)
+        campaigns = said.newest_first(outline["campaigns"])[:limit]
+        shown = {str(campaign.id) for campaign in campaigns}
+        runs = [
+            run
+            for run in outline["runs"]
+            if str(getattr(run, "campaign_run_id", "") or "") in shown
+        ]
+        found = {str(run.id): said.read_results(session, run) for run in runs}
+    counted = {run_id: said.count(items) for run_id, items in found.items()}
 
-    try:
-        from hackagent import HackAgent
-
-        session = HackAgent(cli_config.settings)
-        result_items = []
-        page = 1
-        with console.status("Analysing results…"):
-            while True:
-                page_data = session.results(page=page, page_size=200)
-                result_items.extend(page_data.items)
-                if len(result_items) >= page_data.total:
-                    break
-                page += 1
-
-        # Filter by date range
-        from datetime import datetime, timedelta
-
-        cutoff_date = datetime.now() - timedelta(days=days)
-
-        filtered_results = []
-        for result in result_items:
-            if hasattr(result, "created_at") and result.created_at:
-                try:
-                    created_date = result.created_at
-                    if isinstance(created_date, str):
-                        created_date = datetime.fromisoformat(
-                            created_date.replace("Z", "+00:00")
-                        )
-                    if created_date >= cutoff_date:
-                        filtered_results.append(result)
-                except (ValueError, TypeError, AttributeError):
-                    filtered_results.append(result)  # Include if date parsing fails
-            else:
-                filtered_results.append(result)
-
-        # Apply status / agent / attack-type filters
-        if status or agent or attack_type:
-            temp_results = []
-            for result in filtered_results:
-                if status and hasattr(result, "evaluation_status"):
-                    ev = result.evaluation_status
-                    ev_val = ev.value if hasattr(ev, "value") else str(ev)
-                    if status.upper() not in ev_val.upper():
-                        continue
-                if (
-                    agent
-                    and hasattr(result, "agent_name")
-                    and agent.lower() not in result.agent_name.lower()
-                ):
-                    continue
-                if (
-                    attack_type
-                    and hasattr(result, "attack_type")
-                    and attack_type.lower() not in result.attack_type.lower()
-                ):
-                    continue
-                temp_results.append(result)
-            filtered_results = temp_results
-
-        # Generate statistics
-        stats = _generate_result_statistics(filtered_results, days)
-        _display_result_summary(stats)
-
-    except Exception as e:
-        raise Failed(f"Failed to generate summary: {e}")
-
-
-def _generate_result_statistics(results, days: int) -> dict:
-    """Generate statistics from results list"""
-    total_results = len(results)
-
-    # Count by status, agent, attack type
-    status_counts = {}
-    agent_counts = {}
-    attack_counts = {}
-
-    # For new metrics
-    majority_vote_sum = 0.0
-    fleiss_kappa_sum = 0.0
-    metrics_count = 0  # Number of results with valid metrics
-
-    for result in results:
-        # Status statistics
-        if hasattr(result, "evaluation_status"):
-            status = result.evaluation_status
-            if hasattr(status, "value"):
-                status = status.value
-            else:
-                status = str(status)
-            status_counts[status] = status_counts.get(status, 0) + 1
-
-        # Agent statistics
-        if hasattr(result, "agent_name"):
-            agent = result.agent_name
-            agent_counts[agent] = agent_counts.get(agent, 0) + 1
-
-        # Attack type statistics
-        if hasattr(result, "attack_type"):
-            attack = result.attack_type
-            attack_counts[attack] = attack_counts.get(attack, 0) + 1
-
-        # Collect metrics if available
-        if hasattr(result, "data") and result.data:
-            data = result.data
-            if "overall_majority_vote_asr" in data:
-                majority_vote_sum += data["overall_majority_vote_asr"]
-            if "overall_fleiss_kappa" in data:
-                fleiss_kappa_sum += data["overall_fleiss_kappa"]
-            metrics_count += 1
-
-    # Compute averages
-    avg_majority_vote_asr = (
-        majority_vote_sum / metrics_count if metrics_count > 0 else 0.0
+    total = len(outline["campaigns"])
+    if not total:
+        display_info("No campaign recorded here yet.")
+        return
+    display_heading(
+        f"{len(campaigns)} of {total} campaigns"
+        if total > len(campaigns)
+        else f"{total} {'campaign' if total == 1 else 'campaigns'}"
     )
-    avg_fleiss_kappa = fleiss_kappa_sum / metrics_count if metrics_count > 0 else 0.0
-
-    return {
-        "period_days": days,
-        "total_results": total_results,
-        "status_breakdown": status_counts,
-        "agent_breakdown": agent_counts,
-        "attack_type_breakdown": attack_counts,
-        "avg_majority_vote_asr": avg_majority_vote_asr,
-        "avg_fleiss_kappa": avg_fleiss_kappa,
-        "generated_at": str(datetime.now()),
-    }
-
-
-def _display_result_summary(stats: dict) -> None:
-    """Display result statistics summary"""
-    display_heading(f"Results of the last {stats['period_days']} days")
-    total = stats["total_results"]
-    console.print(f"{total} {'result' if total == 1 else 'results'}")
-
-    # Status breakdown
-    if stats["status_breakdown"]:
-        display_heading("By status")
-        status_table = Table(show_header=True, header_style="heading")
-        status_table.add_column("Status", style="accent")
-        status_table.add_column("Count", justify="right")
-        status_table.add_column("Share", justify="right")
-
-        for status, count in stats["status_breakdown"].items():
-            percentage = (
-                (count / stats["total_results"]) * 100
-                if stats["total_results"] > 0
-                else 0
+    for campaign in campaigns:
+        console.print()
+        console.print(
+            said.campaign_line(
+                campaign,
+                said.runs_of(runs, campaign),
+                counted,
+                outline["agents"],
             )
-            status_table.add_row(status, str(count), f"{percentage:.1f}%")
-
-        console.print(status_table)
-
-    # Top agents
-    if stats["agent_breakdown"]:
-        display_heading("By agent")
-        agent_table = Table(show_header=True, header_style="heading")
-        agent_table.add_column("Agent", style="accent")
-        agent_table.add_column("Count", justify="right")
-
-        # Sort by count and show top 5
-        sorted_agents = sorted(
-            stats["agent_breakdown"].items(), key=lambda x: x[1], reverse=True
         )
-        for agent, count in sorted_agents[:5]:
-            agent_table.add_row(agent, str(count))
-
-        console.print(agent_table)
-
-    # Attack types
-    if stats["attack_type_breakdown"]:
-        display_heading("By attack")
-        attack_table = Table(show_header=True, header_style="heading")
-        attack_table.add_column("Attack", style="accent")
-        attack_table.add_column("Count", justify="right")
-
-        for attack_type, count in stats["attack_type_breakdown"].items():
-            attack_table.add_row(attack_type, str(count))
-
-        console.print(attack_table)
-
-    # NEW: Show average metrics
-    display_heading("Average evaluation metrics")
-    metrics_table = Table(show_header=True, header_style="heading")
-    metrics_table.add_column("Metric", style="accent")
-    metrics_table.add_column("Average", justify="right")
-
-    metrics_table.add_row("Majority Vote ASR", f"{stats['avg_majority_vote_asr']:.3f}")
-    metrics_table.add_row("Fleiss' Kappa", f"{stats['avg_fleiss_kappa']:.3f}")
-
-    console.print(metrics_table)
+        audit = said.audit_lines(getattr(campaign, "audit", None))
+        if audit is not None:
+            console.print(f"  {audit[0]}")
+        for run in said.runs_of(runs, campaign):
+            console.print(f"  {said.attack_line(run, counted, outline['attacks'])}")
+            if not goals:
+                continue
+            items = found[str(run.id)]
+            for result in items[: said.MAX_GOALS]:
+                console.print(f"    {said.goal_line(result)}")
+            if more := said.more_line(said.MAX_GOALS, len(items)):
+                console.print(f"    {more}")

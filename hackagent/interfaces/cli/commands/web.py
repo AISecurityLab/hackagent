@@ -12,7 +12,6 @@ from the dashboard run on this machine, in this process.
 """
 
 import os
-from pathlib import Path
 import signal
 import socket
 import subprocess
@@ -22,6 +21,8 @@ import webbrowser
 
 import click
 from rich.markup import escape
+
+from hackagent.interfaces.dashboard import HOST, PORT, option_help
 
 from hackagent.interfaces.cli.utils import (
     console,
@@ -114,28 +115,28 @@ def _open_browser_when_up(url: str, host: str, port: int, timeout: float = 15.0)
 @click.command("web")
 @click.option(
     "--host",
-    default="127.0.0.1",
+    default=HOST,
     show_default=True,
-    help="Host to bind the dashboard server.",
+    help=option_help("host"),
 )
 @click.option(
     "--port",
-    default=7860,
+    default=PORT,
     show_default=True,
     type=int,
-    help="Port to run the dashboard server on.",
+    help=option_help("port"),
 )
 @click.option(
     "--db-path",
     default=None,
-    help="SQLite database path (default: ~/.local/share/hackagent/hackagent.db).",
+    help=option_help("db_path"),
 )
 @click.option(
     "--local",
     "force_local",
     is_flag=True,
     default=False,
-    help="Read from the local database even when the remote backend is configured.",
+    help=option_help("local"),
 )
 @click.option(
     "--no-browser",
@@ -146,6 +147,8 @@ def _open_browser_when_up(url: str, host: str, port: int, timeout: float = 15.0)
 @click.pass_context
 def web(ctx, host, port, db_path, force_local, no_browser):
     """Open the web dashboard.
+
+    The terminal app's Dashboard screen serves it with the same options.
 
     With ``--backend remote``, the dashboard shows your hosted HackAgent data;
     the key stays in this process and is never exposed to the browser. With
@@ -159,53 +162,36 @@ def web(ctx, host, port, db_path, force_local, no_browser):
       hackagent web --local            # force the local backend
       hackagent web --no-browser       # skip opening a browser tab
     """
-    from dataclasses import replace
-
-    from hackagent import HackAgent
-    from hackagent.core.settings import Mode
     from hackagent.interfaces.cli.config import CLIConfig
+    from hackagent.interfaces.dashboard import about, open_dashboard
 
+    cli_config: CLIConfig = ctx.obj["config"]
     try:
-        from hackagent.interfaces.web import MissingBundleError, create_app
+        from hackagent.interfaces.web import MissingBundleError
+
+        dashboard = open_dashboard(
+            cli_config.settings,
+            host=host,
+            port=port,
+            db_path=db_path,
+            force_local=force_local,
+        )
     except ImportError as exc:
         display_error(f"The dashboard needs its dependencies: {exc}")
         display_hint("Install them", "pip install 'hackagent[web]'")
         ctx.exit(1)
         return
-
-    cli_config: CLIConfig = ctx.obj["config"]
-    settings = cli_config.settings
-    if force_local:
-        settings = replace(settings, backend=Mode.LOCAL)
-    if db_path:
-        resolved_db = (
-            db_path if db_path == ":memory:" else str(Path(db_path).expanduser())
-        )
-        settings = replace(settings, db_path=resolved_db)
-    session = HackAgent(settings)
-
-    try:
-        app = create_app(session, hosts=[host])
     except MissingBundleError as exc:
-        session.close()
         display_error(escape(str(exc)))
         ctx.exit(1)
         return
-
-    url = f"http://{host}:{port}"
+    session, app, url = dashboard.session, dashboard.app, dashboard.url
 
     console.print()
     console.print("[heading]HackAgent dashboard[/heading]")
     console.print(f"  [accent]{url}[/accent]")
-    if session.settings.mode is Mode.REMOTE:
-        console.print("  [secondary]backend[/secondary]  remote")
-        console.print(
-            f"  [secondary]API[/secondary]      {escape(str(app.config['HACKAGENT_TARGET']))}"
-        )
-    else:
-        resolved_db = db_path or "~/.local/share/hackagent/hackagent.db"
-        console.print("  [secondary]backend[/secondary]  local")
-        console.print(f"  [secondary]database[/secondary] {escape(str(resolved_db))}")
+    for label, value in about(dashboard):
+        console.print(f"  [secondary]{label:<8}[/secondary] {escape(value)}")
     console.print()
     console.print("  [secondary]ctrl+c to stop[/secondary]\n")
 

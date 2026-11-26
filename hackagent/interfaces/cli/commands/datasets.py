@@ -36,11 +36,9 @@ def datasets():
 
 def _source_for_preset(config: Dict[str, Any]) -> str:
     """Return a short source locator for a preset config."""
-    if "path" in config and config["path"]:
-        return str(config["path"])
-    if "url" in config and config["url"]:
-        return str(config["url"])
-    return "—"
+    from hackagent.interfaces.datasets import source_of
+
+    return source_of(config)
 
 
 def _filter_presets(
@@ -106,25 +104,12 @@ def list_cmd(provider: Optional[str], query: Optional[str], as_json: bool):
         console.print_json(data=payload)
         return
 
-    table = Table(
-        title=f"Dataset Presets ({len(filtered)})",
-        show_header=True,
-        header_style="heading",
-    )
-    table.add_column("Name", style="name", no_wrap=True)
-    table.add_column("Provider")
-    table.add_column("Source", style="secondary", overflow="fold")
-    table.add_column("Description", overflow="fold")
+    from hackagent.interfaces.datasets import preset_rows
 
-    for name, config in filtered.items():
-        table.add_row(
-            name,
-            str(config.get("provider", "—")),
-            _source_for_preset(config),
-            str(config.get("description", "No description")),
-        )
-
-    console.print(table)
+    console.print(f"[heading]{len(filtered)} dataset presets[/heading]\n")
+    # The list the TUI's Datasets screen shows, line for line.
+    for _, row in preset_rows(filtered):
+        console.print(row)
     console.print()
     display_hint("About one", "hackagent datasets show NAME")
     display_hint("Some of its goals", "hackagent datasets sample NAME")
@@ -231,6 +216,6 @@ def sample_cmd(
     console.print(listed)
 
     console.print()
-    display_hint(
-        "In a campaign", f"dataset: {{source: {{type: preset, name: {preset}}}}}"
-    )
+    from hackagent.interfaces.datasets import in_a_campaign
+
+    display_hint("In a campaign", in_a_campaign(preset))

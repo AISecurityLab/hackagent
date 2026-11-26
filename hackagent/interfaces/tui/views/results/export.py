@@ -85,12 +85,12 @@ class ResultsExportMixin:
                     )
 
             self.notify(
-                f"✅ Exported {len(self.results_data)} results to {filename}",
+                f"Exported {len(self.results_data)} results to {filename}",
                 severity="information",
             )
 
         except Exception as e:
-            self.notify(f"❌ Export failed: {str(e)}", severity="error")
+            self.notify(f"Export failed: {e}", severity="error")
 
     def _export_results_json(self) -> None:
         """Export results to JSON file."""
@@ -165,9 +165,9 @@ class ResultsExportMixin:
                 )
 
             self.notify(
-                f"✅ Exported {len(results_list)} results to {filename}",
+                f"Exported {len(results_list)} results to {filename}",
                 severity="information",
             )
 
         except Exception as e:
-            self.notify(f"❌ Export failed: {str(e)}", severity="error")
+            self.notify(f"Export failed: {e}", severity="error")

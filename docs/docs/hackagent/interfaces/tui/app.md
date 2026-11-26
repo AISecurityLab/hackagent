@@ -76,6 +76,14 @@ def show_welcome() -> None
 
 Offer the ways in, and take the one chosen.
 
+#### on\_unmount
+
+```python
+def on_unmount() -> None
+```
+
+Stop the dashboard this app served, if it did.
+
 #### action\_help
 
 ```python

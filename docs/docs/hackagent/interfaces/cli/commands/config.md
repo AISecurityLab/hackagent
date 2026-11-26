@@ -20,29 +20,24 @@ Show and change the CLI&#x27;s settings.
 
 ```python
 @config.command()
-@click.option(
-    "--backend",
-    type=click.Choice(["local", "remote"]),
-    help=
-    "Default storage backend (remote reads the key from HACKAGENT_API_KEY)",
-)
-@click.option("--base-url", help="HackAgent API base URL")
+@click.option("--backend",
+              type=click.Choice(["local", "remote"]),
+              help=_setting("backend"))
+@click.option("--base-url", help=_setting("base_url"))
 @click.option(
     "--ca-bundle",
     type=click.Path(exists=True, dir_okay=True),
-    help="CA bundle (PEM) trusted for the HackAgent API",
+    help=_setting("ca_bundle"),
 )
-@click.option(
-    "--verbose",
-    type=str,
-    help="Default verbosity level: 0/error, 1/warning, 2/info, 3/debug",
-)
+@click.option("--verbose", type=str, help=_setting("verbose"))
 @click.pass_context
 @handle_errors
 def set(ctx, backend, base_url, ca_bundle, verbose)
 ```
 
 Set storage, API location, CA bundle and verbosity defaults
+
+The terminal app&#x27;s Settings screen changes the same settings.
 
 #### show
 

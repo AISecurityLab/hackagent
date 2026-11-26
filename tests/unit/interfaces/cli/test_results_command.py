@@ -5,16 +5,16 @@
 
 from hackagent.core.settings import Settings
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from click.testing import CliRunner
+from rich.text import Text
 
 from hackagent.interfaces.cli.commands.results import (
     _display_result_details,
-    _generate_result_statistics,
     results,
 )
 from hackagent.core.contracts import EvalStatus
@@ -70,39 +70,6 @@ _AUDIT = {
         }
     ],
 }
-
-
-class TestGenerateResultStatistics(unittest.TestCase):
-    def test_empty_results(self):
-        stats = _generate_result_statistics([], days=7)
-        self.assertEqual(stats["total_results"], 0)
-        self.assertEqual(stats["avg_majority_vote_asr"], 0.0)
-        self.assertEqual(stats["avg_fleiss_kappa"], 0.0)
-        self.assertEqual(stats["period_days"], 7)
-
-    def test_aggregates_status_agent_attack_and_metrics(self):
-        results_list = [
-            _result(),
-            _result(
-                agent_name="other-bot",
-                attack_type="tap",
-                evaluation_status="FAILED_JAILBREAK",
-                data={"overall_majority_vote_asr": 0.2, "overall_fleiss_kappa": 0.0},
-            ),
-            _result(
-                evaluation_status=SimpleNamespace(value="NOT_EVALUATED"),
-                data=None,
-            ),
-        ]
-        stats = _generate_result_statistics(results_list, days=3)
-        self.assertEqual(stats["total_results"], 3)
-        self.assertEqual(stats["status_breakdown"]["SUCCESSFUL_JAILBREAK"], 1)
-        self.assertEqual(stats["status_breakdown"]["FAILED_JAILBREAK"], 1)
-        self.assertEqual(stats["status_breakdown"]["NOT_EVALUATED"], 1)
-        self.assertEqual(stats["agent_breakdown"]["weather-bot"], 2)
-        self.assertEqual(stats["attack_type_breakdown"]["pair"], 2)
-        self.assertAlmostEqual(stats["avg_majority_vote_asr"], 0.5)
-        self.assertAlmostEqual(stats["avg_fleiss_kappa"], 0.2)
 
 
 class TestDisplayResultDetails(unittest.TestCase):
@@ -180,35 +147,56 @@ class TestResultsCommands(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("Failed to fetch result", result.output)
 
-    def test_summary_filters_by_agent_and_days(self):
-        runner = CliRunner()
-        now = datetime.now()
-        page = SimpleNamespace(
-            items=[
-                _result(created_at=now, agent_name="keep-me"),
-                _result(
-                    created_at=now - timedelta(days=30),
-                    agent_name="keep-me",
-                    attack_type="tap",
-                ),
-                _result(created_at=now, agent_name="skip-me"),
-            ],
-            total=3,
+    def test_summary_says_what_the_terminal_app_s_results_say(self):
+        """Each campaign and its attacks, in the words and colours of the
+        TUI's Results tree, the latest first and as many as asked for."""
+        from hackagent import HackAgent
+        from hackagent.interfaces.results import attack_line, campaign_line, count
+        from hackagent.storage.local import LocalBackend
+
+        store = LocalBackend(db_path=":memory:")
+        agent = store.create_or_update_agent(
+            "target", {"connection": {"type": "OPENAI_SDK", "endpoint": "http://h/v1"}}
         )
-        backend = MagicMock()
-        backend.list_results.return_value = page
-        with (
-            patch("hackagent.client._open_store", return_value=backend),
-        ):
-            result = runner.invoke(
+        attack = store.create_attack(
+            attack_type="baseline",
+            agent_id=agent.id,
+            organization=store.get_context().org_id,
+            configuration={},
+        )
+        for name in ("older", "newer"):
+            campaign = store.start_campaign(agent.id, {"campaign": {"name": name}})
+            run = store.create_run(
+                attack.id, agent.id, {"expected_total_goals": 1}, campaign.id
+            )
+            found = store.create_result(run.id, f"goal of {name}", 0, {}, {})
+            store.update_result(
+                found.id, evaluation_status=EvalStatus.SUCCESSFUL_JAILBREAK.value
+            )
+
+        with patch("hackagent.client._open_store", return_value=store):
+            printed = CliRunner().invoke(
                 results,
-                ["summary", "--days", "7", "--agent", "keep"],
+                ["summary", "--limit", "1", "--goals"],
                 obj={"config": _config()},
             )
-        self.assertEqual(result.exit_code, 0, result.output)
-        self.assertIn("\n1 result\n", result.output)
-        self.assertIn("keep-me", result.output)
-        self.assertNotIn("skip-me", result.output)
+
+        self.assertEqual(printed.exit_code, 0, printed.output)
+        self.assertIn("1 of 2 campaigns", printed.output)
+        self.assertIn("newer", printed.output)
+        self.assertNotIn("older", printed.output)
+        self.assertIn("jailbroken  goal of newer", printed.output)
+        # Line for line what the tree says, without its colours.
+        session = HackAgent(_config().settings, backend=store)
+        [newer] = [c for c in session.campaign_runs().items if c.name == "newer"]
+        [run] = [r for r in session.runs().items if r.campaign_run_id == newer.id]
+        counted = {str(run.id): count(session.results(run_id=run.id).items)}
+        for markup in (
+            campaign_line(newer, [run], counted, {str(agent.id): "target"}),
+            attack_line(run, counted, {str(attack.id): "baseline"}),
+        ):
+            plain = Text.from_markup(markup).plain
+            self.assertIn(" ".join(plain.split()), " ".join(printed.output.split()))
 
 
 if __name__ == "__main__":

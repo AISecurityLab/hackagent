@@ -40,8 +40,7 @@ _DIALOG_CSS = """
 """
 
 
-#: How many of a run's lines the run view keeps and shows: the latest.
-RUN_LINES = 5000
+from hackagent.interfaces.tui.run_feed import RUN_LINES  # noqa: E402
 
 
 class ExampleScreen(FramedScreen[Optional[Path]]):
@@ -151,9 +150,12 @@ class RunScreen(FramedScreen[None]):
         title: str,
         lines: Sequence[str],
         stop: Callable[[], None],
+        context: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.TITLE_TEXT = f"Run · {escape(title)}"
+        if context is not None:
+            self.CONTEXT_TEXT = context
         #: The lines to show once mounted: those logged before the screen
         #: opened, then any written before it mounted, in that order.
         self._pending: Optional[list[str]] = list(lines)

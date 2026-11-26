@@ -40,7 +40,7 @@ Or copy it here to edit: hackagent examples copy <name>
 A name's last part is enough when it is unique.
 ```
 
-It is the tree the terminal UI's "Start from an example" shows, with what an
+It is the tree the terminal UI shows under Campaign → From an example, with what an
 example needs running besides HackAgent, such as `(starts agent.py)`.
 
 Copy one into the current folder to make it your own:
@@ -299,8 +299,8 @@ The run then fails before it starts if the key is missing.
 ## Read the results
 
 ```bash
-hackagent results summary              # last 7 days, by status
-hackagent results summary --days 30 --attack-type flipattack
+hackagent results summary              # the latest campaigns and their attacks
+hackagent results summary --goals      # and each goal, jailbroken or mitigated
 hackagent results show RESULT_ID       # one result in detail
 hackagent tui                          # browse them in the terminal app
 hackagent web                          # browse them in the dashboard

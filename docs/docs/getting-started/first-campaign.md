@@ -126,8 +126,8 @@ Results are written twice: a folder per run under `./logs/runs/` (the campaign
 that ran and its results as JSON), and a local database you can browse later.
 
 ```bash
-hackagent results summary  # recent runs, by status and attack
-hackagent tui              # the same results in a terminal app
+hackagent results summary  # the latest campaigns, as the terminal app lists them
+hackagent tui              # the same results, to open goal by goal
 ```
 
 A run reaches the HackAgent platform when the campaign asks for it, which

@@ -34,7 +34,7 @@ from hackagent.interfaces.cli.logging_setup import (
     LogLineHandler,
     RunStatusHandler,
 )
-from hackagent.interfaces.tui.views.campaign.builder import _RunLog
+from hackagent.interfaces.tui.run_feed import RunLog as _RunLog
 from hackagent.orchestrator.campaign import run_campaign
 from hackagent.orchestrator.execution.activity import ActivityRelay
 from tests.unit.campaign.fakes import FakeBuilder, ScriptedModel, campaign, goals

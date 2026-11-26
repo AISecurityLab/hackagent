@@ -40,7 +40,7 @@ def _open_store(
     raise_on_unexpected_status: bool,
 ) -> Any:
     if backend is not None:
-        logger.info(
+        logger.debug(
             "HackAgent using caller-provided backend %s", type(backend).__name__
         )
         return backend

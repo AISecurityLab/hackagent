@@ -31,80 +31,49 @@ def config():
     """Show and change the CLI's settings."""
 
 
+def _setting(key: str) -> str:
+    """What a setting is for, as its option's help."""
+    from hackagent.interfaces.setup import SETTINGS
+
+    return next(setting.help for setting in SETTINGS if setting.key == key)
+
+
 @config.command()
 @click.option(
-    "--backend",
-    type=click.Choice(["local", "remote"]),
-    help="Default storage backend (remote reads the key from HACKAGENT_API_KEY)",
+    "--backend", type=click.Choice(["local", "remote"]), help=_setting("backend")
 )
-@click.option("--base-url", help="HackAgent API base URL")
+@click.option("--base-url", help=_setting("base_url"))
 @click.option(
     "--ca-bundle",
     type=click.Path(exists=True, dir_okay=True),
-    help="CA bundle (PEM) trusted for the HackAgent API",
+    help=_setting("ca_bundle"),
 )
-@click.option(
-    "--verbose",
-    type=str,
-    help="Default verbosity level: 0/error, 1/warning, 2/info, 3/debug",
-)
+@click.option("--verbose", type=str, help=_setting("verbose"))
 @click.pass_context
 @handle_errors
 def set(ctx, backend, base_url, ca_bundle, verbose):
-    """Set storage, API location, CA bundle and verbosity defaults"""
+    """Set storage, API location, CA bundle and verbosity defaults
+
+    The terminal app's Settings screen changes the same settings.
+    """
+    from hackagent.interfaces.setup import change_settings
 
     cli_config: CLIConfig = ctx.obj["config"]
-
-    updated = False
-
-    if backend:
-        cli_config.set_user_override("backend", backend)
-        updated = True
-        if cli_config.should_show_info():
-            display_success(f"Storage backend updated to: {backend}")
-
-    if base_url:
-        cli_config.set_user_override("base_url", base_url)
-        updated = True
-        if cli_config.should_show_info():
-            display_success(f"Base URL updated to: {base_url}")
-
-    if ca_bundle:
-        from pathlib import Path
-
-        cli_config.set_user_override("ca_bundle", str(Path(ca_bundle).resolve()))
-        updated = True
-        if cli_config.should_show_info():
-            display_success(f"CA bundle updated to: {cli_config.ca_bundle}")
-
-    if verbose is not None:
-        from hackagent.interfaces.cli.config import VERBOSITY_LEVELS, VERBOSITY_NAMES
-
-        try:
-            verbose_int = int(verbose)
-            if 0 <= verbose_int <= 3:
-                cli_config.set_user_override("verbose", verbose_int)
-                updated = True
-                if cli_config.verbose > 0:
-                    display_success(
-                        f"Verbosity level updated to: {verbose_int} ({VERBOSITY_NAMES[verbose_int]})"
-                    )
-            else:
-                display_info("Verbosity level must be between 0 and 3")
-        except ValueError:
-            verbose_lower = verbose.lower()
-            if verbose_lower in VERBOSITY_LEVELS:
-                verbose_int = VERBOSITY_LEVELS[verbose_lower]
-                cli_config.set_user_override("verbose", verbose_int)
-                updated = True
-                if cli_config.verbose > 0:
-                    display_success(
-                        f"Verbosity level updated to: {verbose_int} ({VERBOSITY_NAMES[verbose_int]})"
-                    )
-            else:
-                display_warning(
-                    f"Invalid verbosity level. Use: 0-3 or {', '.join(VERBOSITY_LEVELS.keys())}"
-                )
+    changed, refused = change_settings(
+        cli_config,
+        {
+            "backend": backend,
+            "base_url": base_url,
+            "ca_bundle": ca_bundle,
+            "verbose": verbose,
+        },
+    )
+    for problem in refused:
+        display_warning(problem)
+    if cli_config.should_show_info() or cli_config.verbose > 0:
+        for change in changed:
+            display_success(change)
+    updated = bool(changed)
 
     if updated:
         cli_config.save()

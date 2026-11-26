@@ -17,30 +17,28 @@ from the dashboard run on this machine, in this process.
 @click.command("web")
 @click.option(
     "--host",
-    default="127.0.0.1",
+    default=HOST,
     show_default=True,
-    help="Host to bind the dashboard server.",
+    help=option_help("host"),
 )
 @click.option(
     "--port",
-    default=7860,
+    default=PORT,
     show_default=True,
     type=int,
-    help="Port to run the dashboard server on.",
+    help=option_help("port"),
 )
 @click.option(
     "--db-path",
     default=None,
-    help=
-    "SQLite database path (default: ~/.local/share/hackagent/hackagent.db).",
+    help=option_help("db_path"),
 )
 @click.option(
     "--local",
     "force_local",
     is_flag=True,
     default=False,
-    help=
-    "Read from the local database even when the remote backend is configured.",
+    help=option_help("local"),
 )
 @click.option(
     "--no-browser",
@@ -53,6 +51,8 @@ def web(ctx, host, port, db_path, force_local, no_browser)
 ```
 
 Open the web dashboard.
+
+The terminal app&#x27;s Dashboard screen serves it with the same options.
 
 With `--backend remote`, the dashboard shows your hosted HackAgent data;
 the key stays in this process and is never exposed to the browser. With

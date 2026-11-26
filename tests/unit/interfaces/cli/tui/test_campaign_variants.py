@@ -179,7 +179,7 @@ class TestTheTagSurvivesEditing:
 
     async def _dataset_panel(self, app, pilot) -> CampaignBuilder:
         await pilot.pause()
-        await pilot.press("enter")  # leave the welcome screen
+        await pilot.press("enter", "enter")  # Campaign, then New
         await pilot.pause()
         builder = app.query_one(CampaignBuilder)
         for _ in range(20):

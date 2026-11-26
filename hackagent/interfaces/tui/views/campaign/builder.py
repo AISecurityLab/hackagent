@@ -15,8 +15,6 @@ as ``hackagent campaign run`` writes it, coloured.
 from __future__ import annotations
 
 import copy
-from collections import deque
-from queue import Empty, SimpleQueue
 import logging
 import os
 import shlex
@@ -54,18 +52,14 @@ from hackagent.core.credentials import CredentialError
 from hackagent.core.logging import capture
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.checks import issue_markup, ready_markup, to_fix_markup
-from hackagent.interfaces.cli.logging_setup import log_markup, shown_level
+from hackagent.interfaces.cli.logging_setup import shown_level
+from hackagent.interfaces.tui.run_feed import DRAIN_BATCH, DRAIN_S, RunFeed
 from hackagent.orchestrator.campaign import CampaignSpec
 
 from .draft import CampaignDraft, Issue
 from .form import FieldRow
 from .outline import Group, Node, Outline, build_outline, issue_matches
-from .screens import RUN_LINES, ConfirmScreen, PathScreen, RunScreen
-
-#: How often the run view draws what the run logged, in seconds, and at most
-#: how many lines each time.
-_DRAIN_S = 0.1
-_DRAIN_BATCH = 500
+from .screens import ConfirmScreen, PathScreen, RunScreen
 
 
 class CampaignBuilder(Container):
@@ -134,12 +128,9 @@ class CampaignBuilder(Container):
         self._timer: Optional[Timer] = None
         self._campaign_running = False
         self._cancel = Event()
-        #: The current run's latest lines, so the run view can be left and
-        #: reopened without losing them; the oldest go past RUN_LINES.
-        self._run_lines: deque[str] = deque(maxlen=RUN_LINES)
-        #: What the run's log handler hands the view, from the run's thread:
-        #: drained on the UI's, so logging never waits for a repaint.
-        self._incoming: SimpleQueue[str] = SimpleQueue()
+        #: The current run's log: kept, so the run view can be left and
+        #: reopened without losing it.
+        self._feed = RunFeed()
         self._snapshot: Optional[CampaignSpec] = None
 
     def start_from(self, template: Any) -> None:
@@ -252,7 +243,7 @@ class CampaignBuilder(Container):
             yield VerticalScroll(id="form")
 
     def on_mount(self) -> None:
-        self.set_interval(_DRAIN_S, self._drain)
+        self.set_interval(DRAIN_S, self._drain)
         # Tab from the outline should land on the first field, not the scroller.
         self.query_one("#form").can_focus = False
         # Nor on the run controls, which sit between them in the left pane:
@@ -333,37 +324,28 @@ class CampaignBuilder(Container):
     # -- panels ------------------------------------------------------------
 
     @property
+    def _run_lines(self) -> Any:
+        """The current run's latest lines."""
+        return self._feed.lines
+
+    @property
     def _run_screen(self) -> Optional[RunScreen]:
         """The run view, when it is the screen on top."""
-        screen = self.app.screen if self.app.screen_stack else None
-        return screen if isinstance(screen, RunScreen) else None
+        return self._feed.showing(self.app)
 
     def _log(self, markup: str) -> None:
         """Record a line of the run, and show it if anyone is watching."""
-        self._run_lines.append(markup)
-        screen = self._run_screen
-        if screen is not None:
-            screen.write(markup)
+        self._feed.log(self.app, markup)
 
-    def _drain(self, limit: Optional[int] = _DRAIN_BATCH) -> None:
+    def _drain(self, limit: Optional[int] = DRAIN_BATCH) -> None:
         """Show what the run's log handed over since the last look, at most
-        ``limit`` lines (all of them with ``None``), so a burst of lines
-        never holds the screen for long."""
-        taken = 0
-        while limit is None or taken < limit:
-            try:
-                markup = self._incoming.get_nowait()
-            except Empty:
-                return
-            self._log(markup)
-            taken += 1
+        ``limit`` lines (all of them with ``None``)."""
+        self._feed.drain(self.app, limit)
 
     def _watch_run(self) -> None:
         """Open the run view on whatever the run has produced so far."""
-        if self._run_screen is not None:
-            return
         title = self._snapshot.campaign.name if self._snapshot else "Run"
-        self.app.push_screen(RunScreen(title, self._run_lines, self.action_stop))
+        self._feed.watch(self.app, title, self.action_stop)
 
     async def _show(self, node: Optional[Node], *, force: bool = False) -> None:
         if node is None or (node == self._node and not force):
@@ -906,7 +888,7 @@ class CampaignBuilder(Container):
         self._campaign_running = True
         self._cancel.clear()
         self._sync_run_controls()
-        self._run_lines.clear()
+        self._feed.clear()
         self._note(
             logging.INFO,
             "campaign · running a snapshot: edits from now on apply to the next run",
@@ -930,7 +912,7 @@ class CampaignBuilder(Container):
         self.app.call_from_thread(
             self._note, logging.INFO, "campaign · checking goals, models and judges"
         )
-        with capture(_RunLog(self._incoming), min(shown_level(), logging.INFO)):
+        with capture(self._feed.handler(), min(shown_level(), logging.INFO)):
             try:
                 resolved = resolve_campaign(spec, settings=self.cli_config.settings)
             except Exception as exc:
@@ -964,23 +946,12 @@ class CampaignBuilder(Container):
 
     def _note(self, level: int, message: str) -> None:
         """A line of the view's own, written as a line of the run's log."""
-        self._log(
-            log_markup(
-                logging.makeLogRecord(
-                    {
-                        "name": __name__,
-                        "levelno": level,
-                        "levelname": logging.getLevelName(level),
-                        "msg": message,
-                    }
-                )
-            )
-        )
+        self._feed.note(self.app, level, message)
 
     def _finish(self, level: Optional[int] = None, message: str = "") -> None:
         """End the run; ``message`` says why it ended early, if it did."""
         # The run's last lines come before how it ended.
-        self._drain(limit=None)
+        self._feed.drain(self.app, limit=None)
         self._campaign_running = False
         if level is not None:
             self._note(level, message)
@@ -999,25 +970,6 @@ class CampaignBuilder(Container):
 
     def refresh_data(self) -> None:
         self._validate()
-
-
-class _RunLog(logging.Handler):
-    """The run view's handler of the run's log: each line, written as the CLI
-    writes it to a file and coloured as a log viewer colours it.
-
-    It only queues them for the view, which draws them on its own thread:
-    the run never waits for the screen.
-    """
-
-    def __init__(self, queue: SimpleQueue[str]) -> None:
-        super().__init__()
-        self.queue = queue
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            self.queue.put(log_markup(record))
-        except Exception:
-            self.handleError(record)
 
 
 __all__ = ["CampaignBuilder"]

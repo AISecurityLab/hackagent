@@ -45,7 +45,7 @@ is listed in [Commands](./commands.md), with all its options.
 | [`hackagent config`](./commands.md#hackagent-config) | Show, set, validate, import and reset settings. See [Configuration](./configuration.md). |
 | [`hackagent init`](./commands.md#hackagent-init) | Answer a few questions and save a config file. |
 | [`hackagent doctor`](./commands.md#hackagent-doctor) | Check your setup. |
-| [`hackagent tui`](./commands.md#hackagent-tui) | Open the terminal app, which builds, checks and runs a campaign. |
+| [`hackagent tui`](./commands.md#hackagent-tui) | Open the terminal app: build, check and run a campaign, and from its menu the results, datasets, queued runs, the dashboard and the settings. |
 | [`hackagent version`](./commands.md#hackagent-version) | Print the version and the config file path. |
 
 Options such as `--backend` and `--config-file` belong to `hackagent` itself, so

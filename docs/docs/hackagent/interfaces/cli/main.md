@@ -63,7 +63,8 @@ def doctor(ctx)
 
 Check the setup for common problems.
 
-Says what is missing, and how to fix it.
+Says what is missing, and how to fix it: what the terminal app&#x27;s Setup
+screen shows.
 
 #### main
 

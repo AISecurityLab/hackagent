@@ -32,7 +32,7 @@ class TestDatasetsCommand(unittest.TestCase):
         result = self.runner.invoke(datasets, ["list"])
         self.assertEqual(result.exit_code, 0)
         self.assertIn(self.known_preset, result.output)
-        self.assertIn("Dataset Presets", result.output)
+        self.assertIn("dataset presets", result.output)
 
     def test_list_json_output(self):
         result = self.runner.invoke(datasets, ["list", "--json"])

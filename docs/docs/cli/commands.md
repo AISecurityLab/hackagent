@@ -330,7 +330,7 @@ hackagent results show [OPTIONS] RESULT_ID
 
 ### `hackagent results summary`
 
-Show summary statistics of attack results
+Show what the latest campaigns found.
 
 ```text
 hackagent results summary [OPTIONS]
@@ -338,10 +338,8 @@ hackagent results summary [OPTIONS]
 
 | Name | Kind | Required | Description |
 |---|---|---|---|
-| `--status` | option | no | Filter by status |
-| `--agent` | option | no | Filter by agent name |
-| `--attack-type` | option | no | Filter by attack type |
-| `--days` | option | no | Number of days to include (default: 7) Defaults to `7`. |
+| `--limit` | option | no | How many of the latest campaigns to show. Defaults to `10`. |
+| `--goals` | flag | no | List each attack's goals and verdicts. |
 
 ## `hackagent run`
 

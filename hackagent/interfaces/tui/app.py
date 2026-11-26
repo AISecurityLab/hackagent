@@ -20,10 +20,8 @@ from textual.widgets import Footer
 
 from hackagent.interfaces.tui.keys import key
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.tui.theme import css_variables
-from hackagent.interfaces.tui.views.agents import AgentsTab
+from hackagent.interfaces.tui.theme import css_variables, hackagent_theme
 from hackagent.interfaces.tui.views.campaign import CampaignBuilder
-from hackagent.interfaces.tui.views.config import ConfigTab
 from hackagent.interfaces.tui.views.results import ResultsTab
 
 
@@ -59,7 +57,27 @@ _ABOUT = {
     "RunScreen": "The run's log, as it happens. Leaving does not stop the run.",
     "ResultsScreen": "Every campaign recorded, its attacks, and each goal's verdict.",
     "ExampleScreen": "The example campaigns, by folder. One opens in the builder.",
-    "WelcomeScreen": "The ways in: build a campaign, start from an example, open one.",
+    "WelcomeScreen": (
+        "What HackAgent does: a campaign to build and run, past results, the "
+        "dataset presets, runs queued from the dashboard, the dashboard "
+        "itself, and the setup."
+    ),
+    "DatasetsScreen": (
+        "The dataset presets (hackagent datasets). Enter loads a few goals of "
+        "the highlighted one."
+    ),
+    "SettingsScreen": (
+        "The settings hackagent config set changes, and whether HackAgent is "
+        "ready to use (hackagent doctor). ctrl+s saves them."
+    ),
+    "QueuedRunsScreen": (
+        "Runs queued from the dashboard for a local machine (hackagent run). "
+        "Enter claims the highlighted one and runs it here."
+    ),
+    "DashboardScreen": (
+        "The web dashboard, with the options of hackagent web. ctrl+r serves "
+        "it; it stays served until f3 or until you leave HackAgent."
+    ),
 }
 
 
@@ -88,7 +106,7 @@ class HackAgentTUI(App):
 
     TITLE = "HackAgent"
     SUB_TITLE = "Build a campaign, check it, run it"
-    VIEWS = ("campaign", "results", "agents", "config")
+    VIEWS = ("campaign", "results")
 
     BINDINGS = [
         # Not a priority binding: a text field must be able to receive 'q'.
@@ -116,7 +134,10 @@ class HackAgentTUI(App):
         self.view = initial_tab if initial_tab in self.VIEWS else "campaign"
         self.initial_tab = self.view
         self.initial_data = initial_data or {}
-        self.dark = True
+        self.register_theme(hackagent_theme())
+        self.theme = "hackagent"
+        #: The web dashboard, while the Dashboard screen has it served.
+        self.dashboard: Any = None
 
     def get_css_variables(self) -> dict[str, str]:
         """Expose the HackAgent brand palette as CSS variables."""
@@ -135,10 +156,6 @@ class HackAgentTUI(App):
         """
         if self.view == "results":
             yield ResultsTab(self.cli_config)
-        elif self.view == "agents":
-            yield AgentsTab(self.cli_config)
-        elif self.view == "config":
-            yield ConfigTab(self.cli_config)
         else:
             yield CampaignBuilder(self.cli_config, initial_data=self.initial_data)
         yield Footer()
@@ -157,27 +174,66 @@ class HackAgentTUI(App):
 
     def show_welcome(self) -> None:
         """Offer the ways in, and take the one chosen."""
+        from hackagent.interfaces.tui.views import home
+        from hackagent.interfaces.tui.views.campaign.welcome import (
+            DASHBOARD,
+            DATASETS,
+            QUEUED,
+            RESULTS,
+            SETTINGS,
+            WelcomeScreen,
+        )
+
+        def _back(_: Any = None) -> None:
+            self.show_welcome()
+
+        def _chose(destination: str | None) -> None:
+            if destination == RESULTS:
+                self._show_results()
+            elif destination == DATASETS:
+                self.push_screen(home.DatasetsScreen(), _back)
+            elif destination == QUEUED:
+                self._show_queued()
+            elif destination == DASHBOARD:
+                self.push_screen(home.DashboardScreen(self.cli_config), _back)
+            elif destination == SETTINGS:
+                self.push_screen(home.SettingsScreen(self.cli_config), _back)
+            else:
+                self._start(destination or "build")
+
+        self.push_screen(WelcomeScreen(), _chose)
+
+    def _start(self, start: str | None) -> None:
+        """Open the builder on the campaign chosen to start from: a new one,
+        an example, or a file; back to the welcome screen when none was."""
         from hackagent.interfaces.tui.views.campaign.welcome import (
             BUILD,
             EXAMPLE,
             OPEN,
-            RESULTS,
-            WelcomeScreen,
             starting_point,
         )
 
-        def _chose(destination: str | None) -> None:
-            builder = self.query_one(CampaignBuilder)
-            if destination == EXAMPLE:
-                self._pick_example()
-            elif destination == OPEN:
-                self._open_campaign()
-            elif destination == RESULTS:
-                self._show_results()
-            elif destination == BUILD or destination is None:
-                builder.start_from(starting_point())
+        if start == EXAMPLE:
+            self._pick_example()
+        elif start == OPEN:
+            self._open_campaign()
+        elif start == BUILD:
+            self.query_one(CampaignBuilder).start_from(starting_point())
+        else:
+            self.show_welcome()
 
-        self.push_screen(WelcomeScreen(), _chose)
+    def _show_queued(self) -> None:
+        """Runs queued from the dashboard, run here; then back to the menu."""
+        from hackagent.interfaces.tui.views.home import QueuedRunsScreen
+
+        self.push_screen(
+            QueuedRunsScreen(self.cli_config), lambda _: self.show_welcome()
+        )
+
+    def on_unmount(self) -> None:
+        """Stop the dashboard this app served, if it did."""
+        if self.dashboard is not None:
+            self.dashboard.stop()
 
     def _open_campaign(self) -> None:
         """Ask for a path and open it.

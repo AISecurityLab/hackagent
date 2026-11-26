@@ -11,16 +11,13 @@ progress back to the server so the dashboard shows it live.
 from __future__ import annotations
 
 import json
-import os
 import signal
 import sys
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
-from uuid import UUID
 
 import click
 
-from hackagent._version import get_version
 from hackagent.interfaces.cli.logging_setup import show_run
 from hackagent.interfaces.cli.utils import (
     console,
@@ -31,9 +28,7 @@ from hackagent.interfaces.cli.utils import (
     display_warning,
     handle_errors,
 )
-
-EXIT_REFUSED = 1
-EXIT_INVALID_KEY = 2
+from hackagent.interfaces.queued import REFUSED as EXIT_REFUSED
 
 
 def _fail(message: str, code: int = EXIT_REFUSED) -> None:
@@ -72,64 +67,19 @@ def ask_before_cancelling(confirm=None) -> Iterator[None]:
         signal.signal(signal.SIGINT, previous)
 
 
-def _check_key(store: Any) -> None:
-    from hackagent.storage import InvalidApiKey
-
-    try:
-        store.check_key()
-    except InvalidApiKey:
-        _fail(
-            "Your API key is not valid. Set one with: "
-            "hackagent config set --api-key <key>",
-            EXIT_INVALID_KEY,
-        )
-
-
-def _refuse_unless_runnable(detail: dict[str, Any]) -> None:
-    status = detail.get("status")
-    if detail.get("executor") != "local":
-        _fail(
-            f"This run executes on '{detail.get('executor')}', not on a local "
-            "machine, so it cannot be run here."
-        )
-    if status != "PENDING":
-        _fail(f"This run is {status}; only a queued (PENDING) run can be started.")
-    if detail.get("claimed_by"):
-        _fail(f"This run was already claimed by {detail['claimed_by']}.")
-
-
-def _check_sdk_version(run_config: dict[str, Any]) -> None:
-    from packaging.version import InvalidVersion, Version
-
-    needed = run_config.get("sdk_version")
-    if not needed:
-        return
-    try:
-        have, want = Version(get_version()), Version(str(needed))
-    except InvalidVersion:
-        return
-    if have < want:
-        _fail(f"This run needs hackagent {needed} or newer: pip install -U hackagent")
-    if have > want:
-        display_warning(
-            f"This run was queued with hackagent {needed}; you have {have}."
-        )
-
-
-def _check_environment(spec: Any) -> None:
-    from hackagent.orchestrator.campaign.gateway import key_envs
-
-    missing = sorted(key_envs(spec) - os.environ.keys())
-    if missing:
-        display_error("Set these variables with your model keys, then run again:")
-        for name in missing:
-            click.echo(f"export {name}=...")
-        raise SystemExit(EXIT_REFUSED)
+def _refuse(refused: Any) -> None:
+    """Say why the run is refused, and exit with its code."""
+    display_error(str(refused))
+    for name in refused.missing:
+        click.echo(f"export {name}=...")
+    raise SystemExit(refused.code)
 
 
 def _choose_run(store: Any, as_json: bool) -> Optional[str]:
     """List the queued local runs; return the one the user picks, if any."""
-    runs = store.list_queued_local_runs()
+    from hackagent.interfaces.queued import queued_runs
+
+    runs = queued_runs(store)
     interactive = sys.stdin.isatty() and sys.stdout.isatty() and not as_json
     if as_json:
         click.echo(json.dumps(runs))
@@ -161,53 +111,36 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
 
     Without RUN_ID, lists the queued runs of your organization.
     """
-    from hackagent.orchestrator.execution import execute_run
-    from hackagent.orchestrator.execution.execute import executable_spec
+    from hackagent.interfaces import queued
     from hackagent.storage import RunNotClaimable
-    from hackagent.storage.remote import RemoteBackend, _local_executor
 
     config = ctx.obj["config"]
     config.require_remote()
     settings = config.settings
 
-    store = RemoteBackend.connect(
-        settings.base_url, settings.api_key, verify=settings.verify
-    )
     try:
-        _check_key(store)
+        store = queued.connect(settings)
+    except queued.Refused as refused:
+        _refuse(refused)
+    try:
         if run_id is None:
             run_id = _choose_run(store, as_json)
             if run_id is None:
                 return
         try:
-            run_uuid = UUID(run_id)
-        except ValueError:
-            _fail(f"'{run_id}' is not a run id.")
+            ready = queued.prepare(store, run_id, settings)
+        except queued.Refused as refused:
+            _refuse(refused)
+        for warning in ready.warnings:
+            display_warning(warning)
+        run_uuid = ready.run_id
 
-        detail = store.get_run_detail(run_uuid)
-        _refuse_unless_runnable(detail)
-        run_config = detail.get("run_config") or {}
-        _check_sdk_version(run_config)
-        try:
-            spec = executable_spec(run_config["campaign_config"], settings.base_url)
-        except Exception as exc:
-            _fail(f"This run's campaign cannot be loaded: {exc}")
-        _check_environment(spec)
-
-        if settings.dashboard_url and not as_json:
-            display_hint(
-                "Follow it", f"{settings.dashboard_url}/attacks?runId={run_uuid}"
-            )
+        follow = queued.follow_url(settings, run_uuid)
+        if follow and not as_json:
+            display_hint("Follow it", follow)
         try:
             with ask_before_cancelling(), show_run(as_json):
-                outcome = execute_run(
-                    store,
-                    run_uuid,
-                    base_url=settings.base_url,
-                    gateway_key=settings.api_key,
-                    claimed_by=_local_executor(),
-                    settings=settings,
-                )
+                outcome = queued.execute(store, ready, settings)
         except RunNotClaimable as exc:
             _fail(exc.note)
         except KeyboardInterrupt:

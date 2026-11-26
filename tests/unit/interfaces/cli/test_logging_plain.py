@@ -6,6 +6,8 @@ message; a trace record's message is a breadcrumb."""
 
 from __future__ import annotations
 
+from hackagent.interfaces.palette import LEVEL_STYLES, VERDICT_STYLES
+
 import logging
 import re
 
@@ -73,9 +75,9 @@ def test_a_coloured_line_reads_as_the_file_s_line():
     assert text.plain == PlainFormatter().format(info)
     styles = _styles(text)
     assert (text.plain[:14], "dim") in styles
-    assert ("INFO", "green") in styles
+    assert ("INFO", LEVEL_STYLES["INFO"]) in styles
     assert ("baseline", logging_setup._attack_style("baseline")) in styles
-    assert ("jailbroken", "bold red") in styles
+    assert ("jailbroken", VERDICT_STYLES["jailbroken"]) in styles
 
 
 def test_a_line_s_level_sets_its_colour():
@@ -83,7 +85,7 @@ def test_a_line_s_level_sets_its_colour():
     warning.levelno, warning.levelname = logging.WARNING, "WARNING"
     text = log_text(warning)
 
-    assert ("WARNING", "yellow") in _styles(text)
+    assert ("WARNING", LEVEL_STYLES["WARNING"]) in _styles(text)
     assert "[bold]bracket[/bold]" in text.plain
 
 
@@ -98,7 +100,7 @@ def test_a_line_s_level_sets_its_colour():
 def test_none_jailbroken_is_not_picked_out(message):
     """A count of none is no news, however it is counted."""
     text = log_text(record("hackagent.runner", message))
-    [(span)] = [s for s in text.spans if str(s.style) == "bold red"]
+    [(span)] = [s for s in text.spans if str(s.style) == VERDICT_STYLES["jailbroken"]]
     assert text.plain[span.start - 3 : span.end] == "10 jailbroken"
 
 
