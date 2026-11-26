@@ -1,0 +1,100 @@
+name: Demo recordings
+
+# The README and the docs show the terminal UI as a GIF. It is recorded from
+# code (docs/scripts/demos/), so it can follow every change instead of being
+# re-recorded by hand. After something lands on stage, record it again; when
+# a frame changed, push the new GIF to a disposable demos/update branch and
+# open (or update) a PR against stage. When nothing changed, nothing is
+# pushed: the GIF carries a hash of its frames.
+
+on:
+  push:
+    branches: [stage]
+    paths:
+      - "hackagent/**"
+      - "docs/scripts/demos/**"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+concurrency:
+  # Only the latest stage matters: a newer push records over an older one.
+  group: demo-recordings
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.10.11"
+  DEMOS_HEAD: demos/update
+
+jobs:
+  record:
+    name: Record the demos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+          uv run playwright install --with-deps chromium
+
+      - name: Record the terminal UI
+        run: uv run python docs/scripts/demos/tui_demo.py
+
+      - name: Check whether a GIF changed
+        id: changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/static/gifs; then
+            echo "Every demo is up to date."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --stat -- docs/static/gifs
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update the demos PR
+        if: steps.changed.outputs.changed == 'true'
+        env:
+          # org policy blocks github.token from opening PRs, as for promotion.
+          GH_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::PROMOTE_GITHUB_TOKEN secret is not set; it opens the demos PR."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${DEMOS_HEAD}"
+          git add docs/static/gifs
+          git commit -m "docs: record the demos again" \
+            -m "Recorded from ${GITHUB_SHA} by docs/scripts/demos/."
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
+            "HEAD:refs/heads/${DEMOS_HEAD}"
+          existing="$(gh pr list --repo "${REPO}" --base stage \
+            --head "${DEMOS_HEAD}" --state open --json number --jq '.[0].number // empty')"
+          body="The demos, recorded again from ${GITHUB_SHA}: an interface they show changed. Recorded by \`docs/scripts/demos/\`; nothing here is edited by hand."
+          if [[ -n "${existing}" ]]; then
+            gh pr edit "${existing}" --repo "${REPO}" --body "${body}"
+            echo "Updated PR #${existing}."
+          else
+            gh pr create --repo "${REPO}" --base stage --head "${DEMOS_HEAD}" \
+              --title "docs: record the demos again" --body "${body}"
+          fi
