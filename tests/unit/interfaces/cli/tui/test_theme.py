@@ -1,128 +1,135 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for the shared TUI theme and terminology module."""
+"""One palette and one vocabulary, in every interface.
 
+The colours are the palette's (``hackagent/interfaces/palette.py``), as
+values: no interface names a colour of its own, so nothing looks one way in
+a terminal and another in the TUI. A result is called what the log calls
+it. Messages are marked ✓ ✗ !, never with an emoji.
+"""
+
+import re
+from pathlib import Path
+
+import pytest
+
+import hackagent.interfaces as interfaces
+from hackagent.interfaces import palette
 from hackagent.interfaces.tui import theme
 
+ROOT = Path(interfaces.__file__).parent
 
-class TestOutcomeVocabulary:
-    """Evaluation outcomes use a single, defender-polarity vocabulary."""
+#: Where colours are defined: the palette, and the TUI's frame reds.
+_DEFINED = {"palette.py", "tui/theme.py"}
 
-    def test_successful_jailbreak_is_vulnerable(self) -> None:
-        assert theme.classify_evaluation_status("SUCCESSFUL_JAILBREAK") is (
-            theme.VULNERABLE
-        )
+#: A colour named in markup (``[red]``, ``[bold cyan]``), in a style
+#: (``style="green"``), or as a value (``#ff0000``).
+_COLOUR = re.compile(
+    r"\[/?(?:bold |dim |italic |b |reverse )*"
+    r"(?:red|green|yellow|cyan|magenta|blue|white|black|bright_\w+|dark_\w+)[\] ]"
+    r"|style=\"(?:bold |dim )*(?:red|green|yellow|cyan|magenta|blue|white)"
+    r"|#[0-9a-fA-F]{6}\b"
+)
 
-    def test_failed_jailbreak_is_mitigated(self) -> None:
-        assert theme.classify_evaluation_status("FAILED_JAILBREAK") is theme.MITIGATED
-
-    def test_error_is_errored(self) -> None:
-        assert theme.classify_evaluation_status("ERROR") is theme.ERRORED
-
-    def test_unknown_and_none_are_not_evaluated(self) -> None:
-        assert theme.classify_evaluation_status(None) is theme.NOT_EVALUATED
-        assert theme.classify_evaluation_status("NOT_EVALUATED") is (
-            theme.NOT_EVALUATED
-        )
-        assert theme.classify_evaluation_status("something else") is (
-            theme.NOT_EVALUATED
-        )
-
-    def test_enum_like_status_is_unwrapped(self) -> None:
-        class _Status:
-            value = "SUCCESSFUL_JAILBREAK"
-
-        assert theme.classify_evaluation_status(_Status()) is theme.VULNERABLE
-
-    def test_vulnerable_is_red_and_mitigated_is_green(self) -> None:
-        """A vulnerability must never be painted green, and vice versa."""
-        assert theme.VULNERABLE.color == "red"
-        assert theme.MITIGATED.color == "green"
-
-    def test_render_wraps_label_in_its_own_colour(self) -> None:
-        rendered = theme.VULNERABLE.render()
-        assert rendered.startswith("[red]")
-        assert rendered.endswith("[/red]")
-        assert "Vulnerable" in rendered
-
-    def test_css_classes_are_unique(self) -> None:
-        classes = [outcome.css_class for outcome in theme.OUTCOMES]
-        assert len(set(classes)) == len(classes)
-        assert all(css.startswith("-") for css in classes)
+#: An emoji: pictographs, and the symbols the CLI once used as marks.
+_EMOJI = re.compile("[\U0001f300-\U0001faff☀-⛿✅❌ℹ⏳⏸️]")
 
 
-class TestRunStateVocabulary:
-    """Run lifecycle states map onto a single set of icons and colours."""
-
-    def test_known_states(self) -> None:
-        assert theme.classify_run_status("COMPLETED") is theme.RUN_COMPLETED
-        assert theme.classify_run_status("running") is theme.RUN_RUNNING
-        assert theme.classify_run_status("FAILED") is theme.RUN_FAILED
-        assert theme.classify_run_status("PENDING") is theme.RUN_PENDING
-
-    def test_unknown_and_none(self) -> None:
-        assert theme.classify_run_status(None) is theme.RUN_UNKNOWN
-        assert theme.classify_run_status("whatever") is theme.RUN_UNKNOWN
-
-    def test_render_icon_is_colour_wrapped(self) -> None:
-        assert theme.RUN_RUNNING.render_icon() == (
-            f"[{theme.RUN_RUNNING.color}]{theme.RUN_RUNNING.icon}"
-            f"[/{theme.RUN_RUNNING.color}]"
-        )
-
-
-class TestCssVariables:
-    """The brand palette is exposed once, as Textual CSS variables."""
-
-    def test_variables_cover_the_palette(self) -> None:
-        variables = theme.css_variables()
-        assert variables["brand"] == theme.BRAND_RED
-        assert variables["brand-dark"] == theme.BRAND_RED_DARK
-        assert variables["brand-darker"] == theme.BRAND_RED_DARKER
-        assert variables["brand-hover"] == theme.BRAND_RED_HOVER
-        assert variables["brand-text"] == theme.TEXT_ON_BRAND
-        assert variables["brand-text-muted"] == theme.TEXT_MUTED
-
-    def test_app_exposes_brand_variables_and_uses_no_raw_hex(self) -> None:
-        import re
-
-        from hackagent.interfaces.cli.config import CLIConfig
-        from hackagent.interfaces.tui.app import HackAgentTUI
-
-        app = HackAgentTUI(CLIConfig())
-        variables = app.get_css_variables()
-        assert variables["brand"] == theme.BRAND_RED
-        assert variables["brand-dark"] == theme.BRAND_RED_DARK
-        # Brand colours are referenced through the palette, not re-declared.
-        assert not re.search(r"#[0-9a-fA-F]{6}", HackAgentTUI.CSS)
-
-
-def test_updated_screens_use_the_shared_palette():
-    """The redesigned screens draw their colours from the shared palette."""
-    import re
-    from pathlib import Path
-
-    import hackagent.interfaces.tui as tui
-
-    literal = re.compile(
-        r"\[/?(?:bold |dim |italic |b )*(?:red|green|yellow|cyan|magenta|blue|white"
-        r"|bright_\w+)[\] ]|style=\"(?:bold )?(?:red|green|yellow|cyan|magenta|blue)"
-    )
-    root = Path(tui.__file__).parent
-    screens = [
-        "app.py",
-        "frame.py",
-        "keys.py",
-        "views/campaign/builder.py",
-        "views/campaign/screens.py",
-        "views/campaign/welcome.py",
-        "views/results/tab.py",
+def _sources() -> list[Path]:
+    return [
+        path
+        for path in sorted(ROOT.rglob("*.py"))
+        if str(path.relative_to(ROOT)) not in _DEFINED
+        # The web dashboard is its own app, styled by its own build.
+        and "web" not in path.relative_to(ROOT).parts
     ]
-    found = [
-        f"{path.relative_to(Path(tui.__file__).parent)}:{number}"
-        for path in (root / name for name in screens)
+
+
+def _found(pattern: re.Pattern[str]) -> list[str]:
+    return [
+        f"{path.relative_to(ROOT)}:{number}: {line.strip()}"
+        for path in _sources()
         for number, line in enumerate(path.read_text().splitlines(), 1)
-        if literal.search(line)
+        if pattern.search(line)
     ]
-    assert found == []
+
+
+def test_no_interface_names_a_colour_of_its_own():
+    assert _found(_COLOUR) == []
+
+
+def test_no_interface_marks_a_message_with_an_emoji():
+    # safe_stdio's docstring names the characters it keeps printable.
+    assert [
+        line for line in _found(_EMOJI) if not line.startswith("cli/safe_stdio.py")
+    ] == []
+
+
+def test_every_palette_colour_is_a_value_not_a_name():
+    """A name is drawn as each terminal's theme decides; a value is not."""
+    styles = [
+        *palette.LEVEL_STYLES.values(),
+        *palette.VERDICT_STYLES.values(),
+        *palette.TAG_STYLES,
+        palette.PASSED,
+        palette.FAILED,
+        palette.UNDECIDED,
+        palette.ACCENT,
+        palette.NAME,
+        palette.WARNING,
+        palette.BRAND,
+    ]
+    colours = [word for style in styles for word in style.split()]
+    assert all(
+        word.startswith("#") or word in {"bold", "reverse", "dim"} for word in colours
+    ), colours
+
+
+def test_no_attack_tag_reads_as_a_verdict():
+    verdicts = {palette.PASSED, palette.FAILED, palette.UNDECIDED, palette.BRAND}
+    assert not verdicts & set(palette.TAG_STYLES)
+
+
+def test_the_tui_theme_is_the_palette():
+    built = theme.hackagent_theme()
+    assert (built.accent, built.success, built.warning, built.error) == (
+        palette.ACCENT,
+        palette.PASSED,
+        palette.WARNING,
+        palette.FAILED,
+    )
+
+
+def test_the_app_draws_in_its_theme_and_the_brand_reds():
+    from hackagent.interfaces.cli.config import CLIConfig
+    from hackagent.interfaces.tui.app import HackAgentTUI
+
+    app = HackAgentTUI(CLIConfig())
+    variables = app.get_css_variables()
+    assert app.theme == "hackagent"
+    assert variables["brand"] == palette.BRAND
+    assert variables["brand-dark"] == theme.BRAND_RED_DARK
+    assert not re.search(r"#[0-9a-fA-F]{6}", HackAgentTUI.CSS)
+
+
+@pytest.mark.parametrize(
+    ("status", "notes", "word"),
+    [
+        ("SUCCESSFUL_JAILBREAK", None, "jailbroken"),
+        ("FAILED_JAILBREAK", None, "mitigated"),
+        ("PASSED_CRITERIA", None, "mitigated"),
+        ("ERROR_AGENT_RESPONSE", None, "error"),
+        ("FAILED_JAILBREAK", "attack failed with exception: boom", "error"),
+        ("NOT_EVALUATED", None, "no verdict"),
+        (None, None, "no verdict"),
+    ],
+)
+def test_a_result_is_called_what_the_log_calls_it(status, notes, word):
+    from types import SimpleNamespace
+
+    from hackagent.interfaces.results import verdict_of
+
+    result = SimpleNamespace(evaluation_status=status, evaluation_notes=notes)
+    assert verdict_of(result) == word
+    assert word in palette.VERDICT_STYLES

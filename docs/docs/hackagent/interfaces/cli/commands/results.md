@@ -14,7 +14,7 @@ View and manage attack results.
 def results()
 ```
 
-📊 View and manage attack results
+Show what past runs found.
 
 #### show
 
@@ -33,19 +33,22 @@ Show detailed information about a specific result
 ```python
 @results.command()
 @click.option(
-    "--status",
-    type=click.Choice(["pending", "running", "completed", "failed"]),
-    help="Filter by status",
+    "--limit",
+    default=10,
+    show_default=True,
+    type=click.IntRange(min=1),
+    help="How many of the latest campaigns to show.",
 )
-@click.option("--agent", help="Filter by agent name")
-@click.option("--attack-type", help="Filter by attack type")
-@click.option("--days",
-              default=7,
-              help="Number of days to include (default: 7)")
+@click.option("--goals",
+              is_flag=True,
+              help="List each attack's goals and verdicts.")
 @click.pass_context
 @handle_errors
-def summary(ctx, status, agent, attack_type, days)
+def summary(ctx, limit, goals)
 ```
 
-Show summary statistics of attack results
+Show what the latest campaigns found.
+
+Each campaign, then each of its attacks, as the terminal app&#x27;s Results
+shows them; with --goals, the goals each attack tried and how each went.
 

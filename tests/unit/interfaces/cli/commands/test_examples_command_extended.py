@@ -476,7 +476,7 @@ class TestWebExample(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         cli.assert_not_called()
         run_campaign.assert_not_called()
-        self.assertIn("tap-site-chatbot.yaml", result.output)
+        self.assertIn("hackagent examples copy web/tap-site-chatbot", result.output)
         self.assertIn("hackagent campaign run", result.output)
 
     def test_every_command_it_suggests_exists(self):
@@ -519,8 +519,20 @@ class TestExampleDiscovery(unittest.TestCase):
         result = self.runner.invoke(ex.list_examples, [])
 
         self.assertEqual(result.exit_code, 0, result.output)
-        for name in examples_catalog.campaign_files():
-            self.assertIn(name, result.output)
+        for name, path in examples_catalog.campaign_files().items():
+            # In the tree of its folders, as the TUI's picker shows it.
+            self.assertIn(name.rsplit("/", 1)[-1], result.output)
+            self.assertIn(examples_catalog.describe(path)[:40], result.output)
+
+    def test_the_listing_is_the_tui_s_tree_line_for_line(self):
+        from hackagent.interfaces.examples import example_rows
+
+        result = self.runner.invoke(ex.list_examples, [])
+        tree = "\n".join(
+            text.plain for _, text in example_rows(examples_catalog.campaign_files())
+        )
+
+        self.assertIn(tree, result.output)
 
     def test_a_unique_last_part_is_enough_to_name_an_example(self):
         key, path = ex._resolve_example_name("h4rm3l-demo")

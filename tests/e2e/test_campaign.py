@@ -17,7 +17,9 @@ from hackagent.storage.local import LocalBackend
 pytestmark = pytest.mark.e2e
 
 
-def cli(tmp_path, env, *args, expected_exit=0):
+def cli(tmp_path, env, *args, expected_exit=0, stderr=False):
+    """What the command printed on stdout; with ``stderr``, on stderr too,
+    where a failure is said."""
     result = subprocess.run(
         [
             sys.executable,
@@ -36,7 +38,7 @@ def cli(tmp_path, env, *args, expected_exit=0):
         timeout=45,
     )
     assert result.returncode == expected_exit, result.stdout + result.stderr
-    return result.stdout
+    return result.stdout + (result.stderr if stderr else "")
 
 
 def test_cli_campaign_round_trips_through_http_sqlite_and_results(
@@ -124,7 +126,13 @@ def test_cli_preflight_failure_records_the_model_error_without_an_attack(
     path = tmp_path / "campaign.yaml"
     path.write_text(yaml.safe_dump(campaign_values))
     output = cli(
-        tmp_path, isolated_campaign_env, "campaign", "run", str(path), expected_exit=1
+        tmp_path,
+        isolated_campaign_env,
+        "campaign",
+        "run",
+        str(path),
+        expected_exit=1,
+        stderr=True,
     )
     assert "Preflight failed" in output and "target" in output
     assert len(completion_server.calls("target")) == 1

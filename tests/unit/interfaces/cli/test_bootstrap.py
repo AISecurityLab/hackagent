@@ -87,7 +87,6 @@ class TestLaunchTuiDefault(unittest.TestCase):
             str(call.args[0]) for call in printer.call_args_list if call.args
         )
         self.assertIn("Configuration not complete", printed)
-        self.assertIn("hackagent init", printed)
 
     def test_valid_configuration_runs_the_tui_app(self):
         ctx, config = self._ctx()
@@ -117,7 +116,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
         printed = " ".join(
             str(call.args[0]) for call in printer.call_args_list if call.args
         )
-        self.assertIn("TUI dependencies not installed", printed)
+        self.assertIn("needs its dependencies", printed)
         self.assertIn("pip install 'hackagent[tui]'", printed)
 
     def test_tui_startup_failure_exits_with_cli_hint(self):
@@ -137,7 +136,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
         printed = " ".join(
             str(call.args[0]) for call in printer.call_args_list if call.args
         )
-        self.assertIn("TUI failed to start", printed)
+        self.assertIn("failed to start", printed)
         self.assertIn("no tty", printed)
 
     def test_app_run_failure_is_also_handled(self):
@@ -156,19 +155,22 @@ class TestLaunchTuiDefault(unittest.TestCase):
 
 
 class TestDisplayWelcome(unittest.TestCase):
-    def test_welcome_renders_splash_and_getting_started_panel(self):
+    def test_welcome_is_the_splash_and_the_way_to_start(self):
+        from hackagent.interfaces.brand import QUICK_START
+
         with (
             patch("hackagent.interfaces.cli.banner.display_hackagent_splash") as splash,
             patch.object(bootstrap.console, "print") as printer,
         ):
             bootstrap._display_welcome()
 
-        splash.assert_called_once_with()
-        printer.assert_called_once()
-        panel = printer.call_args.args[0]
-        self.assertIn("HackAgent CLI", str(panel.title))
-        self.assertIn("hackagent init", panel.renderable)
-        self.assertIn("hackagent web", panel.renderable)
+        splash.assert_called_once_with(bootstrap.console)
+        printed = " ".join(
+            str(call.args[0]) for call in printer.call_args_list if call.args
+        )
+        self.assertIn("hackagent init", printed)
+        for _, command in QUICK_START:
+            self.assertIn(command, printed)
 
 
 if __name__ == "__main__":

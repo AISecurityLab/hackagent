@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Production formatters and a mounted ResultsTab preserve untrusted text."""
+"""The results wording and a mounted ResultsTab preserve untrusted text."""
 
 from types import SimpleNamespace
 
@@ -11,14 +11,8 @@ from textual.app import App, ComposeResult
 from textual.widgets import Tree
 
 from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.interfaces.results import campaign_line, goal_line, reply_lines
 from hackagent.interfaces.tui.views.results import ResultsTab
-from hackagent.interfaces.tui.views.results.formatters.summaries import (
-    _format_result_summary,
-)
-from hackagent.interfaces.tui.views.results.formatters.text import (
-    _format_chat_message,
-    _format_message_content,
-)
 from hackagent.storage.local import LocalBackend
 
 
@@ -38,22 +32,31 @@ STRINGS = [
 ]
 
 
+def _result(content):
+    return SimpleNamespace(
+        goal=content,
+        metadata={"response": content},
+        evaluation_status="SUCCESSFUL_JAILBREAK",
+        evaluation_notes=None,
+    )
+
+
 @pytest.mark.parametrize("content", STRINGS)
 @pytest.mark.parametrize(
-    "formatter",
+    "words",
     [
-        _format_message_content,
-        lambda content: _format_chat_message({"role": "user", "content": content}),
-        lambda content: _format_result_summary(
-            SimpleNamespace(
-                goal=content, metadata={}, evaluation_status="NOT_EVALUATED"
-            ),
-            1,
+        lambda content: goal_line(_result(content)),
+        lambda content: " ".join(reply_lines(_result(content), width=200)),
+        lambda content: campaign_line(
+            SimpleNamespace(id="c", name=content, agent_id="a", created_at=None),
+            [],
+            {},
+            {"a": content},
         ),
     ],
 )
-def test_real_formatters_preserve_literal_user_content(content, formatter):
-    assert content in Text.from_markup(formatter(content)).plain
+def test_the_results_wording_keeps_user_text_literal(content, words):
+    assert content in Text.from_markup(words(content)).plain
 
 
 class ResultsApp(App):
@@ -96,13 +99,17 @@ async def test_results_tree_reads_and_renders_markup_from_sqlite(tmp_path, monke
     async with app.run_test(size=(120, 40)) as pilot:
         tab = app.query_one(ResultsTab)
         tab.refresh_data()
+        # Read on a thread of its own; the goals are listed when opened.
+        await app.workers.wait_for_complete()
+        await pilot.pause()
         tree = tab.query_one(Tree)
         assert len(tree.root.children) == 1, str(tab.said)
         [campaign_node] = tree.root.children
         [attack_node] = campaign_node.children
-        [goal_node] = attack_node.children
         campaign_node.expand()
         attack_node.expand()
+        await pilot.pause()
+        [goal_node] = attack_node.children
         goal_node.expand()
         await pilot.pause()
         assert name in campaign_node.label.plain

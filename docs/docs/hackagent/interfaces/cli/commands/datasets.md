@@ -14,7 +14,7 @@ Browse built-in dataset presets and sample goals for evals.
 def datasets()
 ```
 
-📚 Browse and sample dataset presets
+Browse and sample dataset presets.
 
 #### list\_cmd
 

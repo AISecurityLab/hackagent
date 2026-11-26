@@ -3,12 +3,13 @@
 
 """Default TUI launch, welcome screen and terminal compatibility patches."""
 
-from rich.console import Console
-from rich.panel import Panel
-
 from hackagent.interfaces.cli.config import CLIConfig
-
-console = Console()
+from hackagent.interfaces.cli.utils import (
+    console,
+    display_error,
+    display_hint,
+    display_warning,
+)
 
 
 def _patch_textual_terminal_queries() -> None:
@@ -36,14 +37,10 @@ def _launch_tui_default(ctx):
         # Try to validate configuration
         cli_config.validate()
     except ValueError:
-        # If validation fails, show welcome message instead
-        console.print("[yellow]⚠️ Configuration not complete.[/yellow]")
+        # Not set up yet: say what HackAgent is and how to start, instead.
+        display_warning("Configuration not complete.")
         console.print()
         _display_welcome()
-        console.print()
-        console.print(
-            "[cyan]Run '[bold]hackagent init[/bold]' to get started, or '[bold]hackagent --help[/bold]' for more options.[/cyan]"
-        )
         return
 
     try:
@@ -55,40 +52,22 @@ def _launch_tui_default(ctx):
         app.run()
 
     except ImportError as e:
-        console.print(f"[bold red]❌ TUI dependencies not installed: {e}[/bold red]")
-        console.print("\n[cyan]💡 Install with:[/cyan]")
-        console.print("  pip install 'hackagent[tui]'")
+        display_error(f"The terminal app needs its dependencies: {e}")
+        display_hint("Install them", "pip install 'hackagent[tui]'")
         ctx.exit(1)
     except Exception as e:
-        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
-        console.print("\n[cyan]You can still use CLI commands:[/cyan]")
-        console.print("  hackagent --help")
+        display_error(f"The terminal app failed to start: {e}")
+        display_hint("Every command still works", "hackagent --help")
         ctx.exit(1)
 
 
 def _display_welcome():
-    """Display welcome message and basic usage info"""
-
-    # Display HackAgent splash
+    """The logo, and how to start: setting up, then a first campaign."""
+    from hackagent.interfaces.brand import QUICK_START
     from hackagent.interfaces.cli.banner import display_hackagent_splash
 
-    display_hackagent_splash()
-
-    welcome_text = """[bold cyan]Welcome to HackAgent CLI![/bold cyan] 🔍
-
-[green]A powerful toolkit for testing AI agent security through automated attacks.[/green]
-
-[bold yellow]🚀 Getting Started:[/bold yellow]
-  1. Configure preferences:    [cyan]hackagent init[/cyan]
-  2. Launch full-screen TUI:   [cyan]hackagent[/cyan] (default) or [cyan]hackagent tui[/cyan]
-  3. List available agents:    [cyan]hackagent agent list[/cyan]
-  4. Run a campaign:           [cyan]hackagent campaign run --help[/cyan]
-  5. View results:             [cyan]hackagent results list[/cyan]
-  6. Open web dashboard:       [cyan]hackagent web[/cyan]
-
-[bold blue]💡 Need help?[/bold blue] Use '[cyan]hackagent --help[/cyan]' or '[cyan]hackagent COMMAND --help[/cyan]'"""
-
-    panel = Panel(
-        welcome_text, title="🔍 HackAgent CLI", border_style="red", padding=(1, 2)
-    )
-    console.print(panel)
+    display_hackagent_splash(console)
+    display_hint("Set up", "hackagent init")
+    for what, command in QUICK_START:
+        display_hint(what, command)
+    display_hint("Every command", "hackagent --help")

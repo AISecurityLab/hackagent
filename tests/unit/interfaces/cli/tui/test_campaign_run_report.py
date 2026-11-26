@@ -249,7 +249,10 @@ class TestTheRun:
         assert "elsewhere" not in log
         # Coloured: the level by severity, the attack in its own colour.
         [started] = [m for m, line in zip(markup, lines) if "baseline started" in line]
-        assert "[green]INFO[/green]" in started
+        from hackagent.interfaces.palette import LEVEL_STYLES
+
+        info = LEVEL_STYLES["INFO"]
+        assert f"[{info}]INFO[/{info}]" in started
         assert f"[{_attack_style('baseline')}]baseline[/" in started
 
 

@@ -10,7 +10,6 @@ from pathlib import Path
 
 from hackagent.attacks.techniques.multi_turn.stac.environment import builtin_chain
 from hackagent.client import catalog_entries
-from hackagent.interfaces.tui.views.results.formatters.traces import _format_trace_block
 from hackagent.models import ModelResponse
 from hackagent.orchestrator.campaign import load_campaign, run_campaign
 from hackagent.orchestrator.campaign.results import trace_payload
@@ -63,15 +62,11 @@ def test_stac_campaign_persists_execution_verdict_and_tool_timeline(tmp_path):
     ]
     assert len(tools) == 3
     for tool in tools:
-        payload = trace_payload(tool, OutputSpec())
-        rendered = _format_trace_block(1, "TOOL_CALL", payload, "")
-        assert "TOOL CHAIN" in rendered
-        assert tool.data["request"]["name"] in rendered
-        assert "State after" in rendered
+        recorded = json.dumps(trace_payload(tool, OutputSpec()))
+        assert tool.data["request"]["name"] in recorded
+        assert "state_after" in recorded
     verification = next(n for n in attempt.trace if n.label == "chain-verification")
-    assert "verified" in _format_trace_block(
-        1, "OTHER", trace_payload(verification, OutputSpec()), ""
-    )
+    assert trace_payload(verification, OutputSpec())["data"]["success"] is True
     trace_file = next(path for path in result.outputs if path.name == "traces.jsonl")
     assert "state_after" in trace_file.read_text()
     rows = json.loads(
@@ -94,8 +89,8 @@ def test_timeline_respects_prompt_and_response_retention():
         },
     )
     payload = trace_payload(node, OutputSpec(save_prompts=False, save_responses=False))
+    # Neither the request nor the reply is kept.
     assert payload["data"] == {"role": "tool"}
-    assert "<not retained>" in _format_trace_block(1, "TOOL_CALL", payload, "")
 
 
 def test_stac_is_discoverable_with_valid_form_schema():

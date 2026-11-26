@@ -8,102 +8,76 @@ Manage HackAgent CLI configuration settings.
 """
 
 import click
-from rich.console import Console
 from rich.table import Table
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.core.settings import Source
-from hackagent.interfaces.cli.utils import display_info, display_success, handle_errors
+from hackagent.interfaces.cli.utils import (
+    Failed,
+    console,
+    display_error,
+    display_hint,
+    display_info,
+    display_success,
+    display_warning,
+    handle_errors,
+)
 from hackagent import resolve_remote_base_url
 from hackagent.core.settings import tls_error_hint
-
-console = Console()
 
 
 @click.group()
 def config():
-    """🔧 Manage HackAgent CLI configuration"""
-    pass
+    """Show and change the CLI's settings."""
+
+
+def _setting(key: str) -> str:
+    """What a setting is for, as its option's help."""
+    from hackagent.interfaces.setup import SETTINGS
+
+    return next(setting.help for setting in SETTINGS if setting.key == key)
 
 
 @config.command()
 @click.option(
-    "--backend",
-    type=click.Choice(["local", "remote"]),
-    help="Default storage backend (remote reads the key from HACKAGENT_API_KEY)",
+    "--backend", type=click.Choice(["local", "remote"]), help=_setting("backend")
 )
-@click.option("--base-url", help="HackAgent API base URL")
+@click.option("--base-url", help=_setting("base_url"))
 @click.option(
     "--ca-bundle",
     type=click.Path(exists=True, dir_okay=True),
-    help="CA bundle (PEM) trusted for the HackAgent API",
+    help=_setting("ca_bundle"),
 )
-@click.option(
-    "--verbose",
-    type=str,
-    help="Default verbosity level: 0/error, 1/warning, 2/info, 3/debug",
-)
+@click.option("--verbose", type=str, help=_setting("verbose"))
 @click.pass_context
 @handle_errors
 def set(ctx, backend, base_url, ca_bundle, verbose):
-    """Set storage, API location, CA bundle and verbosity defaults"""
+    """Set storage, API location, CA bundle and verbosity defaults
+
+    The terminal app's Settings screen changes the same settings.
+    """
+    from hackagent.interfaces.setup import change_settings
 
     cli_config: CLIConfig = ctx.obj["config"]
-
-    updated = False
-
-    if backend:
-        cli_config.set_user_override("backend", backend)
-        updated = True
-        if cli_config.should_show_info():
-            display_success(f"Storage backend updated to: {backend}")
-
-    if base_url:
-        cli_config.set_user_override("base_url", base_url)
-        updated = True
-        if cli_config.should_show_info():
-            display_success(f"Base URL updated to: {base_url}")
-
-    if ca_bundle:
-        from pathlib import Path
-
-        cli_config.set_user_override("ca_bundle", str(Path(ca_bundle).resolve()))
-        updated = True
-        if cli_config.should_show_info():
-            display_success(f"CA bundle updated to: {cli_config.ca_bundle}")
-
-    if verbose is not None:
-        from hackagent.interfaces.cli.config import VERBOSITY_LEVELS, VERBOSITY_NAMES
-
-        try:
-            verbose_int = int(verbose)
-            if 0 <= verbose_int <= 3:
-                cli_config.set_user_override("verbose", verbose_int)
-                updated = True
-                if cli_config.verbose > 0:
-                    display_success(
-                        f"Verbosity level updated to: {verbose_int} ({VERBOSITY_NAMES[verbose_int]})"
-                    )
-            else:
-                display_info("Verbosity level must be between 0 and 3")
-        except ValueError:
-            verbose_lower = verbose.lower()
-            if verbose_lower in VERBOSITY_LEVELS:
-                verbose_int = VERBOSITY_LEVELS[verbose_lower]
-                cli_config.set_user_override("verbose", verbose_int)
-                updated = True
-                if cli_config.verbose > 0:
-                    display_success(
-                        f"Verbosity level updated to: {verbose_int} ({VERBOSITY_NAMES[verbose_int]})"
-                    )
-            else:
-                display_info(
-                    f"Invalid verbosity level. Use: 0-3 or {', '.join(VERBOSITY_LEVELS.keys())}"
-                )
+    changed, refused = change_settings(
+        cli_config,
+        {
+            "backend": backend,
+            "base_url": base_url,
+            "ca_bundle": ca_bundle,
+            "verbose": verbose,
+        },
+    )
+    for problem in refused:
+        display_warning(problem)
+    if cli_config.should_show_info() or cli_config.verbose > 0:
+        for change in changed:
+            display_success(change)
+    updated = bool(changed)
 
     if updated:
         cli_config.save()
-        display_success("✅ Configuration saved")
+        display_success("Configuration saved")
     else:
         display_info("No configuration changes made")
 
@@ -116,12 +90,10 @@ def show(ctx):
 
     cli_config: CLIConfig = ctx.obj["config"]
 
-    table = Table(
-        title="HackAgent Configuration", show_header=True, header_style="bold cyan"
-    )
-    table.add_column("Setting", style="cyan")
-    table.add_column("Value", style="green")
-    table.add_column("Source", style="dim")
+    table = Table(title="Configuration", show_header=True, header_style="heading")
+    table.add_column("Setting", style="accent")
+    table.add_column("Value")
+    table.add_column("Source", style="secondary")
 
     api_key_display = "Set" if cli_config.api_key else "Not set"
     api_key_source = cli_config.source_of("api_key")
@@ -162,14 +134,14 @@ def reset(ctx, confirm):
 
     if not confirm:
         if not click.confirm(
-            "⚠️ This will reset all configuration to defaults. Continue?"
+            "This will reset all configuration to defaults. Continue?"
         ):
             display_info("Configuration reset cancelled")
             return
 
     if cli_config.default_config_path.exists():
         cli_config.default_config_path.unlink()
-        display_success("✅ Configuration reset to defaults")
+        display_success("Configuration reset to defaults")
         if cli_config.should_show_info():
             display_info(
                 "API keys are read from environment variables (HACKAGENT_API_KEY by default)"
@@ -195,7 +167,7 @@ def validate(ctx):
 
         session = HackAgent(cli_config.settings)
         spinner = (
-            console.status("[bold green]Testing API connection...")
+            console.status("Testing the API connection…")
             if cli_config.should_show_info()
             else nullcontext()
         )
@@ -203,25 +175,25 @@ def validate(ctx):
             status_code = session.check_connection()
 
         if status_code == 200:
-            display_success("✅ Configuration valid - API connection successful")
+            display_success("Configuration valid, and the API answers")
         else:
-            console.print(
-                f"[yellow]⚠️ Configuration valid but API connection issue: Status {status_code}"
+            display_warning(
+                f"Configuration valid, but the API answered with status {status_code}"
             )
 
     except ValueError as e:
-        console.print(f"[red]❌ Configuration validation failed: {e}")
-        console.print("\n[cyan]💡 Quick fixes:")
-        console.print("  • Set API key: export HACKAGENT_API_KEY=...")
-        console.print(
-            f"  • Set base URL: hackagent config set --base-url {resolve_remote_base_url()}"
+        display_error(f"Configuration not valid: {e}")
+        display_hint("Set the API key", "export HACKAGENT_API_KEY=...")
+        display_hint(
+            "Set the API location",
+            f"hackagent config set --base-url {resolve_remote_base_url()}",
         )
-        raise click.ClickException("Configuration validation failed")
+        raise Failed("Configuration not valid") from e
     except Exception as e:
-        console.print(f"[yellow]⚠️ Could not test API connection: {e}")
+        display_warning(f"Could not test the API connection: {e}")
         hint = tls_error_hint(e)
         if hint:
-            console.print(f"[yellow]{hint}")
+            display_info(hint)
         display_info(
             "Configuration appears valid, but API connection could not be tested"
         )
@@ -268,11 +240,11 @@ def import_config(ctx, config_file):
 
         if updated_fields:
             cli_config.save()
-            display_success(f"✅ Configuration imported: {', '.join(updated_fields)}")
+            display_success(f"Configuration imported: {', '.join(updated_fields)}")
             if cli_config.should_show_info():
                 display_info(f"Saved to: {cli_config.default_config_path}")
         else:
             display_info("No valid configuration found in file")
 
     except Exception as e:
-        raise click.ClickException(f"Failed to import configuration: {e}")
+        raise Failed(f"Failed to import configuration: {e}") from e

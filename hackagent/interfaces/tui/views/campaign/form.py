@@ -14,12 +14,14 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Input, Select, Static, Switch, TextArea
 
-from .draft import CampaignDraft
+from .draft import Document
 from .schema import FieldDef, Path
 
 
 class FieldRow(Horizontal):
-    """Edits the value at ``root + field.path``; empty means the default."""
+    """Edits the value at ``root + field.path`` of a :class:`~.draft.Document`
+    (the builder's campaign, the Settings or the Dashboard screen's own);
+    empty means the default. Every form of the TUI is made of these."""
 
     DEFAULT_CSS = """
     FieldRow { height: auto; margin-bottom: 1; }
@@ -53,7 +55,7 @@ class FieldRow(Horizontal):
         self,
         field: FieldDef,
         root: Path,
-        draft: CampaignDraft,
+        draft: Document,
         box: Path = (),
     ) -> None:
         super().__init__()

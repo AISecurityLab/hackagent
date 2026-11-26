@@ -238,7 +238,7 @@ class TestConfigValidate(unittest.TestCase):
         self.assertEqual(settings.api_key, cfg.api_key)
         self.assertEqual(settings.base_url, cfg.base_url)
         session.check_connection.assert_called_once()
-        self.assertIn("API connection successful", result.output)
+        self.assertIn("✓ Configuration valid, and the API answers", result.output)
 
     def test_non_200_status_is_surfaced_without_failing(self):
         cfg = _cli_config()
@@ -266,7 +266,7 @@ class TestConfigValidate(unittest.TestCase):
         result, _, _ = self._run(cfg, probe_side_effect=OSError("network down"))
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("Could not test API connection", result.output)
+        self.assertIn("! Could not test the API connection", result.output)
 
 
 class TestConfigImport(unittest.TestCase):

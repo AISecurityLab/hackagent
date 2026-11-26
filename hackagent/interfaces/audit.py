@@ -8,9 +8,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from rich.markup import escape
 
 from hackagent.evaluation.audit import AuditReport
+from hackagent.interfaces.palette import (
+    ACCENT,
+    FAILED,
+    PASSED,
+    SECONDARY,
+    UNDECIDED,
+    paint,
+)
 from hackagent.orchestrator.campaign.audit import format_report
 
 
@@ -19,13 +26,13 @@ def audit_markup(value: AuditReport | Mapping[str, Any]) -> str:
 
     report = _report(value)
     state = {
-        True: "[bold green]passed[/bold green]",
-        False: "[bold red]FAILED[/bold red]",
-        None: "[bold yellow]not graded[/bold yellow]",
+        True: paint("passed", f"bold {PASSED}"),
+        False: paint("FAILED", f"bold {FAILED}"),
+        None: paint("not graded", f"bold {UNDECIDED}"),
     }[report.passed]
     return (
-        f"[bold cyan]▌ Judge audit[/bold cyan] · {state}\n"
-        f"[dim]{escape(format_report(report))}[/dim]"
+        f"{paint('▌ Judge audit', f'bold {ACCENT}')} · {state}\n"
+        f"{paint(format_report(report), SECONDARY)}"
     )
 
 
@@ -40,9 +47,9 @@ def audit_summary(value: AuditReport | Mapping[str, Any]) -> str:
 
     report = _report(value)
     state = {
-        True: "[green]judges passed[/green]",
-        False: "[red]judges FAILED[/red]",
-        None: "[yellow]judges not graded[/yellow]",
+        True: paint("judges passed", PASSED),
+        False: paint("judges FAILED", FAILED),
+        None: paint("judges not graded", UNDECIDED),
     }[report.passed]
     parts = [state]
     if report.judges:

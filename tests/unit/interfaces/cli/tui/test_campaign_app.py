@@ -105,14 +105,11 @@ def _logo_rows(app) -> list[str]:
 
 class TestShell:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("initial_tab", ["agents", "config", "results"])
-    async def test_standalone_views_remain_available(self, cli_config, initial_tab):
-        from hackagent.interfaces.tui.views import AgentsTab, ConfigTab, ResultsTab
+    async def test_the_results_view_opens_on_its_own(self, cli_config):
+        from hackagent.interfaces.tui.views import ResultsTab
 
-        view = {"agents": AgentsTab, "config": ConfigTab, "results": ResultsTab}[
-            initial_tab
-        ]
-        app = HackAgentTUI(cli_config, initial_tab=initial_tab)
+        view = ResultsTab
+        app = HackAgentTUI(cli_config, initial_tab="results")
         with patch.object(view, "on_mount", return_value=None):
             async with app.run_test(size=WIDE) as pilot:
                 await pilot.pause()
@@ -124,7 +121,7 @@ class TestShell:
         app = HackAgentTUI(cli_config)
         async with app.run_test(size=WIDE) as pilot:
             await pilot.pause()
-            await pilot.press("enter")
+            await pilot.press("enter", "enter")
             await pilot.pause()
             rows = _rendered(app)
 
@@ -215,23 +212,35 @@ class TestWelcome:
 
     @pytest.mark.asyncio
     async def test_every_choice_lands_somewhere_different(self, cli_config):
-        """The screen once had four buttons into the same editor. Not again."""
+        """The screen once had three buttons into the same editor. Not again:
+        one entry per thing to do."""
+        from hackagent.interfaces.tui.views.campaign.welcome import MENU
+
         app = HackAgentTUI(cli_config)
         async with app.run_test(size=WIDE) as pilot:
             await pilot.pause()
-            buttons = list(app.screen.query(Button))
-            destinations = {button.id for button in buttons}
+            menu = app.screen.query_one("#menu", OptionList)
+            destinations = [
+                menu.get_option_at_index(i).id for i in range(menu.option_count)
+            ]
 
-            # One button per destination: no two land in the same place.
-            assert len(destinations) == len(buttons)
-            assert destinations == {"build", "example", "open", "results"}
+        assert len(set(destinations)) == len(destinations)
+        assert destinations == [destination for destination, _, _ in MENU]
+        assert set(destinations) == {
+            "campaign",
+            "results",
+            "datasets",
+            "queued",
+            "dashboard",
+            "settings",
+        }
 
     @pytest.mark.asyncio
     async def test_starting_lands_in_a_runnable_builder(self, cli_config):
         app = HackAgentTUI(cli_config)
         async with app.run_test(size=WIDE) as pilot:
             await pilot.pause()
-            await pilot.press("enter")
+            await pilot.press("enter", "enter")
             await pilot.pause()
 
             assert not isinstance(app.screen, WelcomeScreen)
@@ -370,18 +379,38 @@ class TestWelcomeDestinations:
         await pilot.pause()
 
     @pytest.mark.asyncio
-    async def test_it_offers_four_ways_in(self, cli_config):
+    async def test_a_campaign_starts_new_from_an_example_or_from_a_file(
+        self, cli_config
+    ):
+        """The three ways into the builder are one entry, asked after."""
         app = HackAgentTUI(cli_config)
         async with app.run_test(size=WIDE) as pilot:
             await pilot.pause()
-            labels = {str(button.label) for button in app.screen.query(Button)}
+            await pilot.press("enter")
+            await pilot.pause()
+            # The same screen, the logo kept: the menu is the campaign's now.
+            assert isinstance(app.screen, WelcomeScreen)
+            assert len(_logo_rows(app)) == len(LOGO_LINES)
+            menu = app.screen.query_one("#menu", OptionList)
+            assert str(menu.border_title) == "Campaign"
+            assert [
+                menu.get_option_at_index(i).id for i in range(menu.option_count)
+            ] == [
+                "build",
+                "example",
+                "open",
+            ]
 
-        assert labels == {
-            "Build your own campaign",
-            "Start from an example",
-            "Open a campaign file",
-            "Show results",
-        }
+            # Back is back to the first menu, on the entry it left.
+            await pilot.press("escape")
+            await pilot.pause()
+            assert isinstance(app.screen, WelcomeScreen)
+            assert menu.get_option_at_index(menu.highlighted).id == "campaign"
+            assert not menu.border_title
+
+            await pilot.press("enter", "down", "enter")
+            await pilot.pause()
+            assert isinstance(app.screen, ExampleScreen)
 
     @pytest.mark.asyncio
     async def test_build_lands_in_a_runnable_builder(self, cli_config):
@@ -467,7 +496,8 @@ class TestWelcomeDestinations:
             leaf = options[rag + 1]
             assert leaf.id == name
             first, second = leaf.prompt.plain.split("\n")
-            assert first == "   └─ h4rm3l-corpbot"
+            # With what it needs running, as the CLI's listing says it too.
+            assert first == "   └─ h4rm3l-corpbot  (starts agent_server.py)"
             assert second.strip() == examples_catalog.describe(path)
             # Folders and subfolders are headings, all in one colour.
             colours = set()
@@ -582,7 +612,7 @@ class TestResultsReadAsSentences:
     def test_time_is_said_the_way_people_say_it(self):
         from datetime import datetime, timedelta, timezone
 
-        from hackagent.interfaces.tui.views.results.tab import _ago
+        from hackagent.interfaces.results import ago as _ago
 
         now = datetime.now(timezone.utc)
         assert _ago(now - timedelta(seconds=10)) == "just now"
@@ -592,14 +622,14 @@ class TestResultsReadAsSentences:
         assert _ago(None) == "—"
 
     def test_an_outcome_is_a_sentence_not_a_ratio(self):
-        from hackagent.interfaces.tui.views.results.tab import _outcome
+        from hackagent.interfaces.results import outcome as _outcome
 
         assert "5 of 5 goals jailbroken" in _outcome(5, 5, "COMPLETED", 5)
         assert "0 of 10 goals jailbroken" in _outcome(0, 10, "COMPLETED", 10)
 
     def test_a_campaign_that_never_ran_says_so(self):
         """It used to show 0/0, which reads as a clean result."""
-        from hackagent.interfaces.tui.views.results.tab import _outcome
+        from hackagent.interfaces.results import outcome as _outcome
 
         assert "did not finish" in _outcome(0, 0, "FAILED", 0)
         assert "nothing recorded" in _outcome(0, 0, "COMPLETED", 0)
@@ -610,7 +640,7 @@ class TestRunView:
 
     async def _builder(self, app, pilot):
         await pilot.pause()
-        await pilot.press("enter")
+        await pilot.press("enter", "enter")
         await pilot.pause()
         return app.query_one(CampaignBuilder)
 
@@ -718,7 +748,7 @@ class TestKeysThatMustNotBeShadowed:
         app = HackAgentTUI(cli_config)
         async with app.run_test(size=WIDE) as pilot:
             await pilot.pause()
-            await pilot.press("enter")  # into the builder
+            await pilot.press("enter", "enter")  # Campaign, then New
             await pilot.pause()
             # Focus a text field directly: this is about what a focused
             # editor swallows, not about where Tab happens to land. On a slow
@@ -751,7 +781,7 @@ class TestPanelsAreBoxed:
 
     async def _panel(self, app, pilot, root) -> CampaignBuilder:
         await pilot.pause()
-        await pilot.press("enter")  # leave the welcome screen
+        await pilot.press("enter", "enter")  # Campaign, then New
         await pilot.pause()
         builder = app.query_one(CampaignBuilder)
         for _ in range(15):
@@ -833,7 +863,7 @@ async def test_a_field_row_being_torn_down_can_still_refresh(cli_config):
     app = HackAgentTUI(cli_config)
     async with app.run_test(size=WIDE) as pilot:
         await pilot.pause()
-        await pilot.press("enter")
+        await pilot.press("enter", "enter")
         await pilot.pause()
         row = app.screen.query(FieldRow).first()
         await row.remove_children()
@@ -846,6 +876,7 @@ class TestKeys:
     def test_every_screen_binds_its_keys_from_the_table(self):
         from hackagent.interfaces.tui import app as app_module
         from hackagent.interfaces.tui.keys import known
+        from hackagent.interfaces.tui.views import home
         from hackagent.interfaces.tui.views.campaign import builder, screens, welcome
         from hackagent.interfaces.tui.views.results import tab
 
@@ -854,6 +885,10 @@ class TestKeys:
             builder.CampaignBuilder,
             welcome.WelcomeScreen,
             tab.ResultsTab,
+            home.DatasetsScreen,
+            home.SettingsScreen,
+            home.DashboardScreen,
+            home.QueuedRunsScreen,
             *(
                 cls
                 for cls in vars(screens).values()

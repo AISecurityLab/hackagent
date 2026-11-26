@@ -7,14 +7,6 @@ Base Tab Class
 
 Base class for all TUI tabs with common functionality.
 
-## HackAgentHeader Objects
-
-```python
-class HackAgentHeader(Container)
-```
-
-Custom header with ASCII logo
-
 ## BaseTab Objects
 
 ```python

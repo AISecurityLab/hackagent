@@ -100,14 +100,7 @@ This resolves everything — goals, models, judges — and attacks nothing. It i
 the fastest way to catch a typo or a wrong endpoint:
 
 ```text
-      Campaign: First run
- Goals       1
- Attacks     flipattack
- Judges      1
- Guardrails  off
- Classifier  off
- Escalate    off
-✅ Campaign is valid.
+✓ ready to run · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
 ```
 
 ## 3. Run it
@@ -133,8 +126,8 @@ Results are written twice: a folder per run under `./logs/runs/` (the campaign
 that ran and its results as JSON), and a local database you can browse later.
 
 ```bash
-hackagent results summary  # recent runs, by status and attack
-hackagent tui              # the same results in a terminal app
+hackagent results summary  # the latest campaigns, as the terminal app lists them
+hackagent tui              # the same results, to open goal by goal
 ```
 
 A run reaches the HackAgent platform when the campaign asks for it, which

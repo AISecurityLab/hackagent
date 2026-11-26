@@ -142,19 +142,25 @@ def resolve_campaign(
         ),
     )
     resolved = replace(resolved, probes=model_probes(spec, models, embedders))
-    rows = resolution_summary(resolved)
-    logger.info(
-        "campaign · %s ready · %s: %s · %s · guardrails %s · classifier %s"
-        " · escalate %s",
-        _count(len(resolved.probes), "model"),
-        _count(len(resolved.attacks), "attack"),
-        rows["Attacks"],
-        _count(len(spec.evaluation.judges), "judge"),
-        rows["Guardrails"],
-        rows["Classifier"],
-        rows["Escalate"],
-    )
+    logger.info("campaign · %s", ready_line(resolved))
     return resolved
+
+
+def ready_line(resolved: ResolvedCampaign) -> str:
+    """What resolving found, in a sentence: ``1 model ready · 1 attack: stac
+    · 0 judges · guardrails off · classifier off · escalate off``. The run
+    logs it, and ``hackagent campaign validate`` prints it."""
+    rows = resolution_summary(resolved)
+    return " · ".join(
+        [
+            f"{_count(len(resolved.probes), 'model')} ready",
+            f"{_count(len(resolved.attacks), 'attack')}: {rows['Attacks']}",
+            _count(len(resolved.spec.evaluation.judges), "judge"),
+            f"guardrails {rows['Guardrails']}",
+            f"classifier {rows['Classifier']}",
+            f"escalate {rows['Escalate']}",
+        ]
+    )
 
 
 def _count(number: int, noun: str) -> str:
@@ -311,6 +317,7 @@ __all__ = [
     "ResolvedAttack",
     "ResolvedCampaign",
     "build_panel",
+    "ready_line",
     "resolution_summary",
     "resolve_attack",
     "resolve_campaign",

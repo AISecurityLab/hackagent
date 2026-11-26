@@ -15,10 +15,10 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 import yaml
-from pydantic import ValidationError
+from hackagent.orchestrator.campaign.check import Issue, campaign_issues
 
 from hackagent.orchestrator.campaign import CampaignSpec
-from hackagent.core.credentials import CredentialError, validate_file_credentials
+from hackagent.core.credentials import validate_file_credentials
 
 from .schema import Path
 
@@ -44,14 +44,6 @@ _SECTION_ORDER = tuple(CampaignSpec.model_fields)
 
 
 @dataclass(frozen=True)
-class Issue:
-    """A validation problem at a document path."""
-
-    loc: Path
-    message: str
-
-
-@dataclass(frozen=True)
 class Plan:
     goals: Optional[int]
     attacks: int
@@ -62,15 +54,13 @@ class Plan:
         return None if self.goals is None else self.goals * self.attacks
 
 
-class CampaignDraft:
-    """A mutable campaign document with path-based access."""
+class Document:
+    """A document of mappings and lists, read and written by path: what a
+    form's rows (:class:`~.form.FieldRow`) edit. The builder's is a
+    campaign; the Settings and Dashboard screens have one of their own."""
 
-    def __init__(self, document: Optional[dict[str, Any]] = None) -> None:
-        self.data: dict[str, Any] = copy.deepcopy(
-            DEFAULT_DOCUMENT if document is None else document
-        )
-
-    # -- document access ------------------------------------------------
+    def __init__(self, data: Optional[dict[str, Any]] = None) -> None:
+        self.data: dict[str, Any] = copy.deepcopy(data or {})
 
     def get(self, path: Path) -> tuple[bool, Any]:
         """``(found, value)`` at ``path``."""
@@ -119,6 +109,15 @@ class CampaignDraft:
                 break
         return True
 
+
+class CampaignDraft(Document):
+    """A mutable campaign document with path-based access."""
+
+    def __init__(self, document: Optional[dict[str, Any]] = None) -> None:
+        self.data: dict[str, Any] = copy.deepcopy(
+            DEFAULT_DOCUMENT if document is None else document
+        )
+
     def items(self, path: Path) -> list[Any]:
         found, value = self.get(path)
         return value if found and isinstance(value, list) else []
@@ -157,70 +156,9 @@ class CampaignDraft:
     # -- validation -----------------------------------------------------
 
     def validate(self) -> tuple[Optional[CampaignSpec], tuple[Issue, ...]]:
-        credential_issues = self._credential_issues(self.data)
-        if credential_issues:
-            return None, tuple(credential_issues)
-        issues = list(self._attack_issues())
-        try:
-            spec: Optional[CampaignSpec] = CampaignSpec.model_validate(self.data)
-        except ValidationError as exc:
-            spec = None
-            for error in exc.errors(include_url=False):
-                message = str(error.get("msg") or "Invalid value")
-                if message == "Field required":
-                    message = "required"
-                issues.append(
-                    Issue(
-                        tuple(error.get("loc") or ()),
-                        message.removeprefix("Value error, "),
-                    )
-                )
-        return (spec if not issues else None), tuple(issues)
-
-    @staticmethod
-    def _credential_issues(value: Any, path: Path = ()) -> list[Issue]:
-        issues = []
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key in {"api_key", "api_key_env"}:
-                    try:
-                        validate_file_credentials({key: child})
-                    except CredentialError as exc:
-                        issues.append(Issue((*path, key), str(exc)))
-                else:
-                    issues.extend(CampaignDraft._credential_issues(child, (*path, key)))
-        elif isinstance(value, list):
-            for index, child in enumerate(value):
-                issues.extend(CampaignDraft._credential_issues(child, (*path, index)))
-        return issues
-
-    def _attack_issues(self) -> list[Issue]:
-        """What campaign resolution would reject: bad parameters, missing roles."""
-        from hackagent.attacks.techniques.registry import ATTACKS, get_attack_class
-
-        issues = []
-        for index, attack in enumerate(self.items(("attacks",))):
-            name = attack.get("name") if isinstance(attack, dict) else None
-            if name not in ATTACKS:
-                continue
-            params = get_attack_class(name).params_type
-            root = ("attacks", index)
-            try:
-                params.model_validate(attack.get("parameters") or {})
-            except ValidationError as exc:
-                for error in exc.errors(include_url=False):
-                    issues.append(
-                        Issue(
-                            root + ("parameters", *tuple(error.get("loc") or ())),
-                            str(error.get("msg") or "Invalid value"),
-                        )
-                    )
-            roles = attack.get("roles") or {}
-            for role in sorted(params.REQUIRED_ROLES - set(roles)):
-                issues.append(
-                    Issue(root + ("roles", role), f"{name} requires the {role} model")
-                )
-        return issues
+        """The draft's spec when there is nothing to fix, else what to fix:
+        the same check every interface makes (:func:`campaign_issues`)."""
+        return campaign_issues(self.data)
 
     def plan(self) -> Plan:
         found, goals = self.get(("dataset", "source", "goals"))
@@ -239,4 +177,4 @@ class CampaignDraft:
         )
 
 
-__all__ = ["CampaignDraft", "DEFAULT_DOCUMENT", "Issue", "Plan"]
+__all__ = ["Document", "CampaignDraft", "DEFAULT_DOCUMENT", "Issue", "Plan"]

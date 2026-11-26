@@ -4,7 +4,6 @@
 """Tests for the CLI banner."""
 
 import unittest
-from unittest.mock import patch
 
 from hackagent.interfaces.cli.banner import display_hackagent_splash
 
@@ -12,17 +11,19 @@ from hackagent.interfaces.cli.banner import display_hackagent_splash
 class TestDisplayHackagentSplash(unittest.TestCase):
     """Test display_hackagent_splash function."""
 
-    def test_splash_does_not_raise(self):
-        """Test that splash display does not raise exceptions."""
-        # Capture console output
+    def test_the_splash_is_the_logo_and_the_tagline(self):
+        """The logo and the tagline the TUI's welcome screen shows."""
         from io import StringIO
-        from rich.console import Console
+
+        from hackagent.interfaces.brand import BANNER, TAGLINE
+        from hackagent.interfaces.palette import console
 
         buffer = StringIO()
-        console = Console(file=buffer, width=120)
-        with patch("hackagent.interfaces.cli.banner.Console", return_value=console):
-            display_hackagent_splash()
-        # Just ensure it ran without error
+        display_hackagent_splash(console(file=buffer, width=120))
+
+        printed = buffer.getvalue()
+        assert BANNER in printed
+        assert TAGLINE in printed
 
 
 if __name__ == "__main__":

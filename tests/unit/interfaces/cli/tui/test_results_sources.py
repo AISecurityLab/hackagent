@@ -102,8 +102,22 @@ async def _shown(tab: ResultsTab, *, switches: int = 0) -> tuple[list[str], str]
         tab.refresh_data()
         for _ in range(switches):
             tab.action_switch_store()
-        await pilot.pause()
+        await _read(app, pilot)
         return _state(tab)
+
+
+async def _read(app, pilot) -> None:
+    """Wait for the tab's reading, done on a thread of its own, and for
+    what it hands the view to be drawn."""
+    from textual.worker import WorkerState
+
+    # Not ``wait_for_complete``: a read replaced by a newer one (switching
+    # store) is cancelled, which it reports as an error.
+    busy = (WorkerState.PENDING, WorkerState.RUNNING)
+    while any(worker.state in busy for worker in app.workers):
+        await pilot.pause(0.02)
+    await pilot.pause()
+    await pilot.pause()
 
 
 @pytest.mark.asyncio
@@ -317,9 +331,9 @@ async def test_the_key_reaches_the_view_with_the_tree_focused(
         await pilot.pause()
         tab.refresh_data()
         tab.query_one("#results-tree").focus()
-        await pilot.pause()
+        await _read(app, pilot)
         await pilot.press("s")
-        await pilot.pause()
+        await _read(app, pilot)
         labels, hint = _state(tab)
 
     assert any("on my laptop" in label for label in labels)
@@ -358,3 +372,45 @@ def test_local_backend_with_key_only_offers_the_local_store(account_config):
     account_config.settings = replace(account_config.settings, backend=Mode.LOCAL)
     tab = ResultsTab(account_config)
     assert [store.label for store in tab._stores()] == ["this machine"]
+
+
+@pytest.mark.asyncio
+async def test_campaigns_show_before_their_results_are_read(tmp_path: Path):
+    """Opening the view waits for no attack's results: its line says it is
+    being counted, then says what came of it, and its goals are listed when
+    it is opened."""
+    import threading
+
+    config = MagicMock(spec=CLIConfig)
+    config.settings = Settings.resolve(
+        backend="local", db_path=":memory:", env={}, config_path="/nonexistent"
+    )
+    held = threading.Event()
+    session = _session(str(tmp_path / "local.db"), campaign="slow store")
+    real = session.results
+
+    def results(**kwargs):
+        held.wait(10)
+        return real(**kwargs)
+
+    session.results = results
+    tab = ResultsTab(config)
+    tab.local_client = lambda: session
+
+    app = _Host(tab)
+    async with app.run_test(size=(120, 24)) as pilot:
+        # Mounting the view starts the read.
+        while not tab.query_one("#results-tree").root.children:
+            await pilot.pause(0.02)
+        [campaign] = tab.query_one("#results-tree").root.children
+        [attack] = campaign.children
+        assert "counting…" in campaign.label.plain
+        campaign.expand()
+        attack.expand()
+        await pilot.pause()
+        assert "reading its goals" in attack.children[0].label.plain
+
+        held.set()
+        await _read(app, pilot)
+        assert "1 of 1 goals jailbroken" in campaign.label.plain
+        assert "a goal" in attack.children[0].label.plain

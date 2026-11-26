@@ -5,10 +5,6 @@ title: hackagent.interfaces.tui.views.campaign.screens
 
 The screens the builder opens: the run view, and small dialogs.
 
-#### RUN\_LINES
-
-How many of a run&#x27;s lines the run view keeps and shows: the latest.
-
 ## ExampleScreen Objects
 
 ```python
@@ -54,6 +50,14 @@ A running campaign, with the whole terminal to show it.
 The builder owns the run and keeps every line it has produced; this
 screen renders them. Leaving does not stop anything — the run carries on
 and reopening replays what was missed.
+
+#### write
+
+```python
+def write(markup: str) -> None
+```
+
+Show a line, after every line logged before it.
 
 ## HelpScreen Objects
 

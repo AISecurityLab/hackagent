@@ -76,6 +76,14 @@ def show_welcome() -> None
 
 Offer the ways in, and take the one chosen.
 
+#### on\_unmount
+
+```python
+def on_unmount() -> None
+```
+
+Stop the dashboard this app served, if it did.
+
 #### action\_help
 
 ```python
@@ -128,7 +136,7 @@ Show error notification with X mark.
 def show_warning(message: str) -> None
 ```
 
-Show warning notification with warning sign.
+Show a warning, marked `!` as the CLI marks one.
 
 #### show\_info
 
@@ -136,5 +144,5 @@ Show warning notification with warning sign.
 def show_info(message: str) -> None
 ```
 
-Show info notification with info icon.
+Show a message in passing, unmarked as the CLI says one.
 

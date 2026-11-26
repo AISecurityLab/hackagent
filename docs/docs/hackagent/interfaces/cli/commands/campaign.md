@@ -18,7 +18,7 @@ before a run starts; `schema` prints the campaign format as JSON Schema. Both bu
 def campaign() -> None
 ```
 
-🎯 Run declarative campaign files (campaign.yaml).
+Check and run campaign files (campaign.yaml).
 
 #### list\_attacks
 
@@ -68,7 +68,8 @@ Run a campaign file against its (or overridden) model servers.
 def validate(file: str) -> None
 ```
 
-Resolve a campaign (goals, models, judges) without attacking it.
+Check a campaign as the TUI does, then resolve it (goals, models,
+judges) without attacking it.
 
 #### schema
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
+from pydantic import ValidationError
 
 from hackagent.core.credentials import (
     REFERENCES_ONLY,
@@ -13,6 +14,11 @@ from hackagent.core.credentials import (
     validate_file_credentials,
 )
 
+from hackagent.orchestrator.campaign.check import (
+    CampaignInvalid,
+    campaign_issues,
+    issues_from,
+)
 from hackagent.orchestrator.campaign.spec import CampaignSpec
 
 
@@ -30,8 +36,9 @@ def load_campaign(source: str | Path | Mapping[str, Any]) -> CampaignSpec:
 
     Raises:
         FileNotFoundError: When the path is not a file.
-        ValueError: When the YAML cannot be parsed, is not a mapping, or
-            fails validation (``pydantic.ValidationError`` is a subclass).
+        ValueError: When the YAML cannot be parsed or is not a mapping.
+        CampaignInvalid: When it does not validate (a ``ValueError``): its
+            ``issues`` say what is wrong, each where it is.
         CredentialError: When a file contains a literal API key.
 
     Example:
@@ -57,9 +64,14 @@ def load_campaign(source: str | Path | Mapping[str, Any]) -> CampaignSpec:
                 raise ValueError("Could not parse campaign YAML.") from None
     if not isinstance(data, dict):
         raise ValueError("Campaign document must contain a YAML mapping.")
-    return CampaignSpec.model_validate(
-        prepare_credentials(data, from_file=not isinstance(source, Mapping))
-    )
+    try:
+        return CampaignSpec.model_validate(
+            prepare_credentials(data, from_file=not isinstance(source, Mapping))
+        )
+    except ValidationError as exc:
+        # The problems as every interface states them, each where it is.
+        _, issues = campaign_issues(data)
+        raise CampaignInvalid(issues or issues_from(exc)) from None
 
 
 def load_stored_campaign(data: Mapping[str, Any]) -> CampaignSpec:
