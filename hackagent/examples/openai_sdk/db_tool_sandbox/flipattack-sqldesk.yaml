@@ -3,7 +3,7 @@
 # SQLDesk is a sandboxed assistant with database tools and a policy against
 # returning credentials. Can FlipAttack get them out of it anyway?
 #
-#   hackagent examples db-tool        # starts the agent, then runs this
+#   hackagent examples run flipattack-sqldesk   # starts the agent, then runs this
 #
 # or, by hand:
 #   python agent.py &                 # seeds the database and serves on :5002

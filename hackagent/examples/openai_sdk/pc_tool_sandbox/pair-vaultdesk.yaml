@@ -3,7 +3,7 @@
 # VaultDesk is a sandboxed desktop assistant with file tools and a folder it
 # has been told not to touch. Can PAIR talk it into reading that folder?
 #
-#   hackagent examples pc-tool        # starts the agent, then runs this
+#   hackagent examples run pair-vaultdesk   # starts the agent, then runs this
 #
 # or, by hand:
 #   export OPENROUTER_API_KEY=...
