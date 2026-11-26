@@ -84,7 +84,7 @@ def test_non_secret_settings_follow_argument_environment_file_order(
     ca_bundle = str(tmp_path / "ca.pem")
     path.write_text(
         json.dumps(
-            {"base_url": "https://file.test", "verbose": 2, "ca_bundle": ca_bundle}
+            {"base_url": "https://file.test", "verbosity": 2, "ca_bundle": ca_bundle}
         )
     )
     monkeypatch.setenv("HACKAGENT_BASE_URL", "https://env.test")
@@ -98,15 +98,28 @@ def test_non_secret_settings_follow_argument_environment_file_order(
 
 
 @pytest.mark.parametrize(
-    "value,level", [(0, "ERROR"), (1, "WARNING"), (2, "INFO"), (3, "DEBUG")]
+    "written,count",
+    [
+        ({"verbosity": 2}, 2),
+        ({"verbosity": 9}, 3),
+        # A file from before verbosity was a count of -v: debug is a -v,
+        # anything quieter the default.
+        ({"verbose": 3}, 1),
+        ({"verbose": 1}, 0),
+        ({}, 0),
+    ],
 )
-def test_verbosity_helpers(tmp_path, value, level):
-    config = CLIConfig(config_file=tmp_path / "absent")
-    config.verbose = value
-    assert config.get_verbosity_name() == level
-    assert config.should_show_info() is (value >= 2)
-    assert config.should_show_warning() is (value >= 1)
-    assert config.should_show_debug() is (value >= 3)
+def test_verbosity_is_a_count_of_v(tmp_path, written, count):
+    import json
+
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(written))
+    config = CLIConfig(config_file=path)
+    assert config.verbose == config.verbosity == count
+    config.set_user_override("verbosity", 2)
+    config.save(str(path))
+    assert json.loads(path.read_text())["verbosity"] == 2
+    assert "verbose" not in json.loads(path.read_text())
 
 
 def test_invalid_json_is_reported_without_parser_input(tmp_path):

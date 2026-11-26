@@ -7,7 +7,6 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import click
@@ -18,23 +17,13 @@ from hackagent.interfaces.cli.commands import examples as ex
 from hackagent.interfaces.cli.commands.examples import (
     _ensure_ollama_models,
     _get_installed_ollama_models,
-    _get_repo_root,
     _is_ollama_running,
-    _load_ollama_demo_module,
-    _preflight_ollama_requirements,
-    _resolve_example_dir,
     _run_hackagent_cli_command,
-    _run_python_script,
     _start_background_python,
     _stop_background_process,
     _wait_for_tcp_port,
-    db_tool,
     examples,
-    ollama,
-    pc_tool,
-    quick_evaluation,
-    rag_example,
-    web_example,
+    run_example,
 )
 
 
@@ -44,71 +33,12 @@ def _completed(returncode=0, stdout="", stderr=""):
     )
 
 
-class TestRepoLayoutHelpers(unittest.TestCase):
-    def test_repo_root_contains_the_package(self):
-        root = _get_repo_root()
-
-        self.assertTrue((root / "hackagent").is_dir())
-
-    def test_example_directory_is_resolved(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            example = Path(tmp) / "examples" / "demo"
-            example.mkdir(parents=True)
-            (example / "demo.py").write_text("")
-
-            with patch.object(ex, "_get_repo_root", return_value=Path(tmp)):
-                resolved = _resolve_example_dir("demo", required_files=("demo.py",))
-
-        self.assertEqual(resolved, example)
-
-    def test_missing_required_files_are_reported(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / "examples" / "demo").mkdir(parents=True)
-
-            with patch.object(ex, "_get_repo_root", return_value=Path(tmp)):
-                with self.assertRaises(click.ClickException) as ctx:
-                    _resolve_example_dir("demo", required_files=("demo.py",))
-
-        self.assertIn("Required files", str(ctx.exception))
-        # Compare with POSIX separators so Windows `demo\demo.py` still matches.
-        self.assertIn(
-            (Path("demo") / "demo.py").as_posix(),
-            str(ctx.exception).replace("\\", "/"),
-        )
-
-    def test_missing_directory_lists_the_candidates(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(ex, "_get_repo_root", return_value=Path(tmp)):
-                with self.assertRaises(click.ClickException) as ctx:
-                    _resolve_example_dir("nowhere")
-
-        self.assertIn("not found", str(ctx.exception))
-
-
 class TestScriptRunners(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.script = Path(self.tmp.name) / "run.py"
         self.script.write_text("print('hi')")
-
-    def test_script_is_run_from_its_own_directory(self):
-        with patch("subprocess.run", return_value=_completed()) as run:
-            _run_python_script(self.script, env={"A": "B"})
-
-        self.assertEqual(run.call_args.kwargs["cwd"], str(self.script.parent))
-        self.assertEqual(run.call_args.kwargs["env"], {"A": "B"})
-
-    def test_missing_script_is_reported(self):
-        with self.assertRaises(click.ClickException):
-            _run_python_script(Path(self.tmp.name) / "missing.py")
-
-    def test_failing_script_is_reported(self):
-        with patch("subprocess.run", return_value=_completed(returncode=3)):
-            with self.assertRaises(click.ClickException) as ctx:
-                _run_python_script(self.script)
-
-        self.assertIn("exit code 3", str(ctx.exception))
 
     def test_cli_command_is_invoked_as_a_module(self):
         with patch("subprocess.run", return_value=_completed()) as run:
@@ -294,86 +224,21 @@ class TestEnsureOllamaModels(unittest.TestCase):
         self.assertIn("disk full", str(ctx.exception))
 
 
-class TestPreflightOllamaRequirements(unittest.TestCase):
-    def test_missing_binary_is_reported(self):
-        with patch("shutil.which", return_value=None):
-            with self.assertRaises(click.ClickException) as ctx:
-                _preflight_ollama_requirements({})
-
-        self.assertIn("Ollama is not installed", str(ctx.exception))
-
-    def test_unreachable_server_is_reported(self):
-        with (
-            patch("shutil.which", return_value="/usr/bin/ollama"),
-            patch.object(ex, "_is_ollama_running", return_value=False),
-        ):
-            with self.assertRaises(click.ClickException) as ctx:
-                _preflight_ollama_requirements({})
-
-        self.assertIn("not reachable", str(ctx.exception))
-
-    def test_required_models_are_ensured(self):
-        demo_cfg = {
-            "agent": {
-                "endpoint": "http://localhost:11434",
-                "adapter_operational_config": {"name": "target-model"},
-            },
-            "attack_config": {"judge": {"identifier": "judge-model"}},
-        }
-
-        with (
-            patch("shutil.which", return_value="/usr/bin/ollama"),
-            patch.object(ex, "_is_ollama_running", return_value=True) as running,
-            patch.object(ex, "_ensure_ollama_models") as ensure,
-        ):
-            _preflight_ollama_requirements(demo_cfg)
-
-        self.assertEqual(running.call_args.args[0], "http://localhost:11434")
-        self.assertEqual(
-            ensure.call_args.args[0],
-            {"target": "target-model", "judge": "judge-model"},
-        )
-
-
-class TestLoadOllamaDemoModule(unittest.TestCase):
-    def test_unloadable_spec_raises(self):
-        with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/tmp")),
-            patch("importlib.util.spec_from_file_location", return_value=None),
-        ):
-            with self.assertRaises(RuntimeError):
-                _load_ollama_demo_module()
-
-    def test_module_is_executed_and_returned(self):
-        spec = MagicMock()
-        module = SimpleNamespace()
-
-        with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/tmp")),
-            patch("importlib.util.spec_from_file_location", return_value=spec),
-            patch("importlib.util.module_from_spec", return_value=module),
-        ):
-            loaded = _load_ollama_demo_module()
-
-        spec.loader.exec_module.assert_called_once_with(module)
-        self.assertIs(loaded, module)
-
-
 class TestOllamaCommand(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
         self.config = MagicMock()
 
-    def test_it_preflights_then_runs_the_campaign(self):
+    def test_an_ollama_example_preflights_then_runs(self):
+        """What `examples ollama` did, `examples run` does for any of them."""
         with (
-            patch.object(ex, "_resolve_example_dir", return_value=Path("/ex")),
             patch.object(ex, "_preflight_ollama_campaign") as preflight,
             patch.object(ex, "_run_campaign_file") as run_campaign,
         ):
-            result = self.runner.invoke(ollama, [], obj={"config": self.config})
+            result = self.runner.invoke(run_example, ["ollama/h4rm3l-demo"])
 
         self.assertEqual(result.exit_code, 0, result.output)
-        campaign = Path("/ex/h4rm3l-demo.yaml")
+        campaign = examples_catalog.campaign_files()["ollama/h4rm3l-demo"]
         preflight.assert_called_once_with(campaign)
         run_campaign.assert_called_once_with(campaign)
 
@@ -439,39 +304,13 @@ attacks: [{name: flipattack}]
             path.unlink()
 
 
-class TestNamedExampleCommands(unittest.TestCase):
-    """The named commands are aliases: each points at one example."""
-
-    def setUp(self):
-        self.runner = CliRunner()
-
-    def _alias(self, command) -> str:
-        with patch.object(ex, "_run_example") as run_example:
-            result = self.runner.invoke(command, [])
-        self.assertEqual(result.exit_code, 0, result.output)
-        return run_example.call_args.args[0]
-
-    def test_each_alias_names_an_example_that_exists(self):
-        aliases = {
-            quick_evaluation: "openai_sdk/quick_evaluation/h4rm3l-granite",
-            pc_tool: "openai_sdk/pc_tool_sandbox/pair-vaultdesk",
-            db_tool: "openai_sdk/db_tool_sandbox/flipattack-sqldesk",
-            rag_example: "rag/indirect-injection",
-        }
-        found = examples_catalog.campaign_files()
-        for command, expected in aliases.items():
-            with self.subTest(command=command.name):
-                self.assertEqual(self._alias(command), expected)
-                self.assertIn(expected, found)
-
-
 class TestWebExample(unittest.TestCase):
     def test_it_attacks_nothing_and_points_at_the_campaign_to_edit(self):
         with (
             patch.object(ex, "_run_hackagent_cli_command") as cli,
             patch.object(ex, "_run_campaign_file") as run_campaign,
         ):
-            result = CliRunner().invoke(web_example, [])
+            result = CliRunner().invoke(run_example, ["web/tap-site-chatbot"])
 
         self.assertEqual(result.exit_code, 0, result.output)
         cli.assert_not_called()
@@ -487,12 +326,9 @@ class TestWebExample(unittest.TestCase):
 
 
 class TestExamplesGroup(unittest.TestCase):
-    def test_group_exposes_every_example(self):
-        result = CliRunner().invoke(examples, ["--help"])
-
-        self.assertEqual(result.exit_code, 0)
-        for name in ("ollama", "quick-evaluation", "pc-tool", "db-tool", "rag", "web"):
-            self.assertIn(name, result.output)
+    def test_one_command_runs_every_example(self):
+        """No command per example: `examples run NAME` runs any of them."""
+        self.assertEqual(set(examples.commands), {"list", "copy", "run"})
 
 
 if __name__ == "__main__":

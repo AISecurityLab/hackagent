@@ -19,7 +19,7 @@ export OPENROUTER_API_KEY="..."
 ## Run from CLI
 
 ```bash
-hackagent examples quick-evaluation
+hackagent examples run openai_sdk/quick_evaluation/h4rm3l-granite
 ```
 
 This command launches the same attack defined in `h4rm3l-granite.yaml`.

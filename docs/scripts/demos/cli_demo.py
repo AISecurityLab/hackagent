@@ -97,8 +97,20 @@ def _as_hackagent(argv: Sequence[str]) -> int:
     tui.preload()
     import hackagent.interfaces.cli.main as entry
 
+    import asyncio
+
+    # Nothing here waits for a storyboard, so nothing needs a thread: every
+    # model call is answered at once, and the work the run hands a worker
+    # thread (a call, a write to the store) is done in place, on its loop.
+    # Threads would finish in their own order, and the goals' lines with
+    # them; on one loop, there is one order.
     gate = Gate()
     gate.release_all()
+
+    async def in_place(function: Any, /, *args: Any, **kwargs: Any) -> Any:
+        return function(*args, **kwargs)
+
+    asyncio.to_thread = in_place  # type: ignore[assignment]
     sys.argv = ["hackagent", *argv]
     with tui._models(gate), _no_servers(), frozen_clock(), fixed_ids(), steady_clock():
         try:

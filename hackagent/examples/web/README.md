@@ -30,7 +30,7 @@ ollama pull Librellama/gemma4:e2b-Uncensored   # uncensored → won't refuse to 
 ## Run it
 
 `tap-site-chatbot.yaml` is a campaign file: copy it, set the site in it, check
-it, run it. `hackagent examples web` prints where the bundled copy is. The
+it, run it. `hackagent examples run web/tap-site-chatbot` says how to copy it and what to set. The
 attacker and judge run on local Ollama, so no API key is needed.
 
 ```bash

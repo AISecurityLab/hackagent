@@ -475,7 +475,7 @@ class LocalBackend:
         self._conn.commit()
         self._lock = threading.Lock()
         self._context: Optional[OrganizationContext] = None
-        logger.info(f"LocalBackend initialised at {self._db_path}")
+        logger.debug(f"LocalBackend initialised at {self._db_path}")
 
     def _upgrade_schema(self) -> None:
         """Apply additive migrations required by older local databases."""

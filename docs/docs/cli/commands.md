@@ -18,8 +18,6 @@ Every command the `hackagent` executable offers. Run any of them with `--help` t
 | `hackagent init` | Set up HackAgent for the first time. |
 | `hackagent results` | Show what past runs found. |
 | `hackagent run` | Run a campaign queued from the dashboard on this machine. |
-| `hackagent tui` | Open the terminal app: build, check and run a campaign. |
-| `hackagent version` | Show the version, and where the configuration is. |
 | `hackagent web` | Open the web dashboard. |
 
 ## `hackagent campaign`
@@ -133,7 +131,7 @@ hackagent config set [OPTIONS]
 | `--backend` | option | no | Default storage backend (remote reads the key from HACKAGENT_API_KEY) |
 | `--base-url` | option | no | HackAgent API base URL |
 | `--ca-bundle` | option | no | CA bundle (PEM) trusted for the HackAgent API |
-| `--verbose` | option | no | Default verbosity level: 0/error, 1/warning, 2/info, 3/debug |
+| `--verbosity` | option | no | How much the log says, as many -v: 0 the run's log (the default), 1 every model call too, 2 other libraries' messages too, 3 everything |
 
 ### `hackagent config show`
 
@@ -141,14 +139,6 @@ Show current configuration
 
 ```text
 hackagent config show [OPTIONS]
-```
-
-### `hackagent config validate`
-
-Validate current configuration
-
-```text
-hackagent config validate [OPTIONS]
 ```
 
 ## `hackagent datasets`
@@ -232,52 +222,12 @@ hackagent examples copy [OPTIONS] NAME [DESTINATION]
 | `DESTINATION` | argument | no |  |
 | `--force` | flag | no | Overwrite a file that is already there. |
 
-### `hackagent examples db-tool`
-
-Run the DB Tool sandbox example: start agent, then launch attack.
-
-```text
-hackagent examples db-tool [OPTIONS]
-```
-
 ### `hackagent examples list`
 
 List every example campaign.
 
 ```text
 hackagent examples list [OPTIONS]
-```
-
-### `hackagent examples ollama`
-
-Run the Ollama h4rm3l demo via CLI (no TUI).
-
-```text
-hackagent examples ollama [OPTIONS]
-```
-
-### `hackagent examples pc-tool`
-
-Run the PC Tool sandbox example: start agent, then launch attack.
-
-```text
-hackagent examples pc-tool [OPTIONS]
-```
-
-### `hackagent examples quick-evaluation`
-
-Run the OpenRouter quick evaluation example (h4rm3l).
-
-```text
-hackagent examples quick-evaluation [OPTIONS]
-```
-
-### `hackagent examples rag`
-
-Run the RAG indirect-injection example.
-
-```text
-hackagent examples rag [OPTIONS]
 ```
 
 ### `hackagent examples run`
@@ -291,14 +241,6 @@ hackagent examples run [OPTIONS] NAME
 | Name | Kind | Required | Description |
 |---|---|---|---|
 | `NAME` | argument | yes |  |
-
-### `hackagent examples web`
-
-Show how to red-team a website chatbot you are authorized to test.
-
-```text
-hackagent examples web [OPTIONS]
-```
 
 ## `hackagent init`
 
@@ -353,22 +295,6 @@ hackagent run [OPTIONS] [RUN_ID]
 |---|---|---|---|
 | `RUN_ID` | argument | no |  |
 | `--json` | flag | no | Print the run's outcome as JSON on stdout. |
-
-## `hackagent tui`
-
-Open the terminal app: build, check and run a campaign.
-
-```text
-hackagent tui [OPTIONS]
-```
-
-## `hackagent version`
-
-Show the version, and where the configuration is.
-
-```text
-hackagent version [OPTIONS]
-```
 
 ## `hackagent web`
 

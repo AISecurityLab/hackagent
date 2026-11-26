@@ -132,7 +132,7 @@ async def test_settings_show_the_checks(cli_config):
     from hackagent.interfaces.setup import Check, Section
 
     cli_config.backend, cli_config.base_url = "local", "https://api.test"
-    cli_config.ca_bundle, cli_config.verbose = None, 1
+    cli_config.ca_bundle, cli_config.verbosity = None, 0
     report = (
         (Section("Dependencies", (Check("failed", "pandas not found"),)),),
         Check("warning", "1 issue to address", fix=("Set up again", "hackagent init")),
@@ -154,7 +154,7 @@ async def test_settings_save_what_changed_as_config_set_does(cli_config):
     from hackagent.interfaces.setup import Check
 
     cli_config.backend, cli_config.base_url = "local", "https://api.test"
-    cli_config.ca_bundle, cli_config.verbose = None, 1
+    cli_config.ca_bundle, cli_config.verbosity = None, 0
     app = HackAgentTUI(cli_config)
     with patch(
         "hackagent.interfaces.setup.setup_report",
@@ -164,7 +164,7 @@ async def test_settings_save_what_changed_as_config_set_does(cli_config):
             await _open(app, pilot, "settings")
             # The builder's rows: the key, the value, whether it is edited.
             _editor(app.screen, "backend").value = "remote"
-            _editor(app.screen, "verbose").value = "3"
+            _editor(app.screen, "verbosity").value = "3"
             await pilot.pause()
             assert "edited" in str(app.screen.rows()["backend"]._state.content)
             await pilot.press("ctrl+s")
@@ -173,7 +173,7 @@ async def test_settings_save_what_changed_as_config_set_does(cli_config):
     # Only what changed, then saved once, as ``hackagent config set`` does.
     assert [call.args for call in cli_config.set_user_override.call_args_list] == [
         ("backend", "remote"),
-        ("verbose", 3),
+        ("verbosity", 3),
     ]
     cli_config.save.assert_called_once()
 
@@ -185,6 +185,13 @@ async def test_a_log_level_saved_applies_to_the_open_app(cli_config, monkeypatch
     from hackagent.interfaces.cli.logging_setup import shown_level
     from hackagent.interfaces.setup import Check
 
+    # apply_verbosity keeps the count for suppress_noisy_libraries, and at
+    # -vvv opens the root logger: neither may outlast this test.
+    import hackagent.interfaces.cli.logging_setup as logging_setup
+
+    monkeypatch.setattr(logging_setup, "_verbosity", logging_setup._verbosity)
+    monkeypatch.setattr(logging.getLogger(), "level", logging.getLogger().level)
+
     monkeypatch.delenv("HACKAGENT_LOG_LEVEL", raising=False)
     cli_handler = logging.NullHandler(logging.WARNING)
     cli_handler.hackagent_cli = True
@@ -192,10 +199,12 @@ async def test_a_log_level_saved_applies_to_the_open_app(cli_config, monkeypatch
     monkeypatch.setattr(package, "handlers", [cli_handler])
     monkeypatch.setattr(package, "level", logging.DEBUG)
     cli_config.backend, cli_config.base_url = "local", "https://api.test"
-    cli_config.ca_bundle, cli_config.verbose = None, 1
+    cli_config.ca_bundle, cli_config.verbosity = None, 0
 
     def saved_level(key, value):
         setattr(cli_config, key, value)
+        if key == "verbosity":
+            cli_config.verbose = value
 
     cli_config.set_user_override.side_effect = saved_level
     app = HackAgentTUI(cli_config)
@@ -205,7 +214,7 @@ async def test_a_log_level_saved_applies_to_the_open_app(cli_config, monkeypatch
     ):
         async with app.run_test(size=WIDE) as pilot:
             await _open(app, pilot, "settings")
-            _editor(app.screen, "verbose").value = "3"
+            _editor(app.screen, "verbosity").value = "3"
             await pilot.pause()
             await pilot.press("ctrl+s")
             await _settle(app, pilot)

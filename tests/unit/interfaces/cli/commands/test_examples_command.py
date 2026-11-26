@@ -9,26 +9,6 @@ import click
 from click.testing import CliRunner
 
 
-def test_extract_ollama_models_from_judges_and_embedder():
-    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
-
-    cfg = {
-        "agent": {"adapter_operational_config": {"name": "target-model"}},
-        "attack_config": {
-            "attacker": {"identifier": "attacker-model"},
-            "judges": [{"identifier": "judge-model"}],
-            "embedder": {"identifier": "embedder-model"},
-        },
-    }
-
-    models = mod._extract_ollama_models_from_demo_cfg(cfg)
-
-    assert models["target"] == "target-model"
-    assert models["attacker"] == "attacker-model"
-    assert models["judge"] == "judge-model"
-    assert models["embedder"] == "embedder-model"
-
-
 def test_normalize_aliases_and_presence_checks():
     mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
@@ -54,24 +34,7 @@ def test_run_hackagent_cli_command_raises_on_failure(monkeypatch):
         assert "Command failed" in str(exc)
 
 
-def test_resolve_example_dir_with_required_files(monkeypatch, tmp_path):
-    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
-
-    base = tmp_path / "repo"
-    example_dir = base / "examples" / "openai_sdk" / "db_tool_sandbox"
-    example_dir.mkdir(parents=True)
-    (example_dir / "agent.py").write_text("print('agent')\n", encoding="utf-8")
-    (example_dir / "hack.py").write_text("print('hack')\n", encoding="utf-8")
-
-    monkeypatch.setattr(mod, "_get_repo_root", lambda: base)
-
-    resolved = mod._resolve_example_dir(
-        "openai_sdk/db_tool_sandbox", required_files=("agent.py", "hack.py")
-    )
-    assert resolved == example_dir
-
-
-def test_db_tool_command_starts_the_agent_then_runs_the_campaign(monkeypatch):
+def test_running_an_example_starts_its_agent_then_runs_the_campaign(monkeypatch):
     mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
     class _FakeProc:
@@ -99,19 +62,16 @@ def test_db_tool_command_starts_the_agent_then_runs_the_campaign(monkeypatch):
     monkeypatch.setattr(mod, "_stop_background_process", _fake_stop)
 
     runner = CliRunner()
-    result = runner.invoke(mod.examples, ["db-tool"])
+    result = runner.invoke(
+        mod.examples, ["run", "openai_sdk/db_tool_sandbox/flipattack-sqldesk"]
+    )
 
     assert result.exit_code == 0, result.output
     assert calls == {"stop": 1, "wait": 1, "run": 1}
 
 
-def test_db_tool_command_stops_process_when_wait_fails(monkeypatch, tmp_path):
+def test_its_agent_is_stopped_when_it_never_starts(monkeypatch):
     mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
-
-    example_dir = tmp_path / "openai_sdk" / "db_tool_sandbox"
-    example_dir.mkdir(parents=True)
-    (example_dir / "agent.py").write_text("print('agent')\n", encoding="utf-8")
-    (example_dir / "hack.py").write_text("print('hack')\n", encoding="utf-8")
 
     class _FakeProc:
         def poll(self):
@@ -119,9 +79,6 @@ def test_db_tool_command_stops_process_when_wait_fails(monkeypatch, tmp_path):
 
     calls = {"stop": 0}
 
-    monkeypatch.setattr(
-        mod, "_resolve_example_dir", lambda *args, **kwargs: example_dir
-    )
     monkeypatch.setattr(
         mod, "_start_background_python", lambda *args, **kwargs: _FakeProc()
     )
@@ -132,7 +89,7 @@ def test_db_tool_command_stops_process_when_wait_fails(monkeypatch, tmp_path):
             click.ClickException("not ready")
         ),
     )
-    monkeypatch.setattr(mod, "_run_python_script", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "_run_campaign_file", lambda *args, **kwargs: None)
 
     def _fake_stop(*args, **kwargs):
         calls["stop"] += 1
@@ -140,7 +97,9 @@ def test_db_tool_command_stops_process_when_wait_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_stop_background_process", _fake_stop)
 
     runner = CliRunner()
-    result = runner.invoke(mod.examples, ["db-tool"])
+    result = runner.invoke(
+        mod.examples, ["run", "openai_sdk/db_tool_sandbox/flipattack-sqldesk"]
+    )
 
     assert result.exit_code != 0
     assert calls["stop"] == 1

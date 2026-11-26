@@ -69,12 +69,18 @@ from hackagent.core.logging import (
 
 #: ``-v`` count to log level: the default shows warnings, ``-vv`` what the
 #: attacks decide, ``-vvv`` every call they make.
-_VERBOSITY_LEVELS = {
-    0: logging.ERROR,
-    1: logging.WARNING,
-    2: logging.INFO,
-    3: logging.DEBUG,
+#: What the terminal shows by the number of ``-v``: HackAgent's own log,
+#: and every other library's. With none, the run's log from INFO, as every
+#: interface shows it.
+_VERBOSITY_LEVELS: dict[int, tuple[int, int]] = {
+    0: (logging.INFO, logging.WARNING),
+    1: (logging.DEBUG, logging.WARNING),
+    2: (logging.DEBUG, logging.INFO),
+    3: (logging.DEBUG, logging.DEBUG),
 }
+
+#: The number of ``-v`` in effect, for :func:`suppress_noisy_libraries`.
+_verbosity = 0
 
 
 def _attack_style(attack: str) -> str:
@@ -192,8 +198,9 @@ class RunStatusHandler(logging.Handler):
 
 @contextmanager
 def show_run(as_json: bool, logger_name: str = "hackagent") -> Iterator[None]:
-    """Show on stdout the campaign's own lines the log hides, unless stdout
-    is for ``--json``, which prints only the run's summary at the end."""
+    """Show on stdout the campaign's own lines the log hides, when
+    ``HACKAGENT_LOG_LEVEL`` keeps it above INFO, unless stdout is for
+    ``--json``, which prints only the run's summary at the end."""
     shown = shown_level(logger_name)
     if as_json or shown <= logging.INFO:
         yield
@@ -224,23 +231,36 @@ def shown_level(logger_name: str = "hackagent") -> int:
 
 
 def apply_verbosity(verbose: Optional[int], logger_name: str = "hackagent") -> None:
-    """Set what the CLI's log shows from the ``-v`` count: its handler's
-    level, which leaves every other handler of the run its own.
+    """Set what the terminal shows from the number of ``-v``
+    (:data:`_VERBOSITY_LEVELS`): the CLI's handlers only, which leaves every
+    other handler of the run (the TUI's, run.log, the platform's) its own.
 
-    ``HACKAGENT_LOG_LEVEL``, when set, wins; so does an unset count.
+    ``HACKAGENT_LOG_LEVEL``, when set, wins for HackAgent's own log.
     """
-    if not isinstance(verbose, int) or os.getenv(f"{logger_name.upper()}_LOG_LEVEL"):
+    global _verbosity
+    if not isinstance(verbose, int):
         return
-    level = _VERBOSITY_LEVELS[max(0, min(verbose, max(_VERBOSITY_LEVELS)))]
+    _verbosity = max(0, min(verbose, max(_VERBOSITY_LEVELS)))
+    own, others = _VERBOSITY_LEVELS[_verbosity]
+    root = next(
+        (h for h in logging.getLogger().handlers if getattr(h, "hackagent_cli", False)),
+        None,
+    )
+    if root is not None:
+        root.setLevel(others)
+    if _verbosity >= 3:
+        logging.getLogger().setLevel(logging.DEBUG)
+    if os.getenv(f"{logger_name.upper()}_LOG_LEVEL"):
+        return
     handler = _cli_handler(logger_name)
     if handler is not None:
-        handler.setLevel(level)
+        handler.setLevel(own)
     else:
-        logging.getLogger(logger_name).setLevel(level)
+        logging.getLogger(logger_name).setLevel(own)
 
 
 def setup_package_logging(
-    logger_name: str = "hackagent", default_level_str: str = "WARNING"
+    logger_name: str = "hackagent", default_level_str: str = "INFO"
 ) -> logging.Logger:
     """Install the CLI's log handler on the specified logger, if not already set.
 
@@ -257,7 +277,7 @@ def setup_package_logging(
         log_level_env = os.getenv(
             f"{logger_name.upper()}_LOG_LEVEL", default_level_str
         ).upper()
-        level = getattr(logging, log_level_env, logging.WARNING)
+        level = getattr(logging, log_level_env, logging.INFO)
         package_logger.setLevel(logging.DEBUG)
 
         package_logger.addHandler(_handler(level))
@@ -329,5 +349,7 @@ def suppress_noisy_libraries(*names: str) -> None:
         >>> from hackagent.interfaces.cli.logging_setup import suppress_noisy_libraries
         >>> suppress_noisy_libraries("httpx", "litellm", "urllib3")
     """
+    if _verbosity >= 2:
+        return  # -vv asked for other libraries' messages
     for name in names:
         logging.getLogger(name).setLevel(logging.WARNING)

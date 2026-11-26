@@ -128,8 +128,8 @@ def test_cli_keeps_the_path_prefix(recorded, base_url, tmp_path):
                 "remote",
                 "--base-url",
                 base_url,
-                "config",
-                "validate",
+                # Its API check calls the API, as the run does.
+                "doctor",
             ],
         )
     assert result.exit_code == 0, result.output

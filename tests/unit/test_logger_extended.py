@@ -45,10 +45,10 @@ class TestSetupPackageLoggingExtended(unittest.TestCase):
         self.assertEqual(shown_level(), logging.ERROR)
 
     @patch.dict(os.environ, {"HACKAGENT_LOG_LEVEL": "INVALID_LEVEL"})
-    def test_invalid_level_defaults_to_warning(self):
-        """Test invalid level string falls back to WARNING."""
+    def test_invalid_level_falls_back_to_info(self):
+        """An unknown level name falls back to the default, INFO."""
         setup_package_logging()
-        self.assertEqual(shown_level(), logging.WARNING)
+        self.assertEqual(shown_level(), logging.INFO)
 
     def test_setup_sets_noisy_library_levels(self):
         """suppress_noisy_libraries silences the given loggers (opt-in since Fix 2)."""

@@ -38,8 +38,7 @@ settings are read before the command runs.
 | `Configuration Error: Invalid storage backend 'cloud' from …: expected 'local' or 'remote'` | `backend` in the file, `HACKAGENT_BACKEND` or `--backend` has another value. The message names where it came from. | Use `local` or `remote`. |
 | `CA bundle not found: …` | `--ca-bundle`, `REQUESTS_CA_BUNDLE`, `SSL_CERT_FILE` or `ca_bundle` names a file that does not exist. | Point it at the PEM file. See [CA bundle](./configuration.md#ca-bundle). |
 | `The server's TLS certificate is not trusted. …` | The API's certificate is signed by a CA outside your trust store, often a private CA or a proxy that intercepts TLS. | Configure a [CA bundle](./configuration.md#ca-bundle) that includes that CA. |
-| `Configuration valid but API connection issue: Status 401` | The API rejected your key. | Check `HACKAGENT_API_KEY` holds a current key. |
-| `Configuration valid but API connection issue: Status 0` | `hackagent config validate` on the local backend, where there is no API to call. | Nothing is wrong. Use `hackagent --backend remote config validate` to test the API. |
+| `✗ The API answered with status 401` (`hackagent doctor`) | The API rejected your key. | Check `HACKAGENT_API_KEY` holds a current key. |
 
 ## Campaign files
 

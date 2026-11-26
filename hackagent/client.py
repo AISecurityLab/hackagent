@@ -52,7 +52,8 @@ def _open_store(
                 "Remote storage requires a HackAgent platform API key."
             )
 
-        logger.info("HackAgent using remote backend → %s", settings.base_url)
+        # Detail: INFO is what a command or a run does, not how it stores.
+        logger.debug("HackAgent using remote backend → %s", settings.base_url)
         return RemoteBackend.connect(
             settings.base_url,
             settings.api_key,
@@ -62,7 +63,7 @@ def _open_store(
         )
     from hackagent.storage.local import LocalBackend
 
-    logger.info(
+    logger.debug(
         "HackAgent using local backend → %s. Pass backend='remote' "
         "(or set HACKAGENT_BACKEND=remote) to enable remote tracking.",
         settings.db_path,

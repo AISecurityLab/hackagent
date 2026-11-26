@@ -22,6 +22,7 @@ def quiet_log():
     level, handlers = package.level, list(package.handlers)
     cli = logging.NullHandler(logging.WARNING)
     cli.hackagent_cli = True
+    # Above INFO only when HACKAGENT_LOG_LEVEL says so: the default is INFO.
     package.handlers[:] = [cli]
     package.setLevel(logging.DEBUG)
     disabled = logging.root.manager.disable

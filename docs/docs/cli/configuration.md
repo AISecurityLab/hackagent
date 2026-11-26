@@ -29,7 +29,7 @@ Two settings differ:
   `api_key` entry, that entry decides which variable holds the key; otherwise
   the key is read from `HACKAGENT_API_KEY`. See [API keys](#api-keys).
 - **Verbosity** has no environment variable: `-v` beats the file, which beats
-  the default of 1 (warnings).
+  the default of 0 (the run's log, from `INFO`).
 
 `hackagent config show` prints each value and where it came from:
 
@@ -74,7 +74,7 @@ For example:
   "base_url": "https://hackagent.example.com",
   "api_key": "${HACKAGENT_API_KEY}",
   "ca_bundle": "/etc/ssl/certs/example-ca.pem",
-  "verbose": 1
+  "verbosity": 1
 }
 ```
 
@@ -89,8 +89,7 @@ You rarely need to edit the file by hand:
 | Command | What it does |
 |---|---|
 | `hackagent config show` | Prints every setting and its source. |
-| `hackagent config set --backend remote` | Saves one or more of `--backend`, `--base-url`, `--ca-bundle` and `--verbose`. |
-| `hackagent config validate` | Checks the settings and, on the remote backend, calls the API and reports whether it answered. |
+| `hackagent config set --backend remote` | Saves one or more of `--backend`, `--base-url`, `--ca-bundle` and `--verbosity`. |
 | `hackagent config import-config FILE` | Copies the settings from a JSON or YAML file into the config file. |
 | `hackagent config reset` | Deletes the config file, after asking. `--confirm` skips the question. |
 | `hackagent init` | Asks for the backend and verbosity, saves them, and offers to fetch Graphviz for FC-Attack. |
@@ -101,8 +100,12 @@ file. They never write a key value. They have no option for the database path
 and do not keep a `db_path` entry, so set the database path with
 `HACKAGENT_DB_PATH` instead.
 
-`config set --verbose` takes a number or a name: `0`/`error`, `1`/`warning`,
-`2`/`info`, `3`/`debug`.
+`verbosity` is how many `-v` apply when you give none: `0` the run's log
+(the default), `1` every model call too, `2` other libraries' messages too,
+`3` everything. A file written before it was a count says `verbose`, an old
+log level: `3` (debug) is read as `1`, anything quieter as `0`. The terminal
+app's Settings screen changes the same settings. `hackagent doctor` checks
+them.
 
 ## Global options
 
@@ -115,7 +118,7 @@ name. They apply to that one invocation and are not saved.
 | `--backend local\|remote` | Choose the storage backend. |
 | `--base-url URL` | Use this HackAgent API. |
 | `--ca-bundle PATH` | Trust this CA bundle for the API. The file must exist. |
-| `-v`, `-vv`, `-vvv` | Show more log messages: `-vv` adds what each attack decides, `-vvv` every model call it makes (see [Follow what an attack does](./running-campaigns.md#follow-what-an-attack-does)). `HACKAGENT_LOG_LEVEL` overrides it. |
+| `-v`, `-vv`, `-vvv` | Say more. Without one, the log shows from `INFO`, as every interface does: what each command and run does, each attack's decisions and verdicts. `-v` adds every model call (see [Follow what an attack does](./running-campaigns.md#follow-what-an-attack-does)), `-vv` other libraries' messages, `-vvv` everything, for debugging. `HACKAGENT_LOG_LEVEL` overrides HackAgent's own log. |
 | `--version` | Print the version and exit. |
 | `-h`, `--help` | Print help and exit. |
 
@@ -265,12 +268,11 @@ keep the prefix: the `/agent/` endpoint is requested at
 Check the API answers with:
 
 ```bash
-hackagent --backend remote config validate
+hackagent --backend remote doctor
 ```
 
-`Configuration valid - API connection successful` means the API answered with
-your key. On the local backend there is no API to call, and the command
-reports `API connection issue: Status 0`; that is expected.
+`✓ The API answers` means the API answered with your key. On the local backend
+there is no API to call, and `doctor` does not try.
 
 ## CA bundle
 

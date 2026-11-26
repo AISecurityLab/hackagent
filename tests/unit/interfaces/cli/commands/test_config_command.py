@@ -18,7 +18,6 @@ from hackagent.interfaces.cli.commands.config import (
     reset,
     set as set_cmd,
     show,
-    validate,
 )
 
 
@@ -39,8 +38,7 @@ def _cli_config(**overrides):
         config_path="/nonexistent",
         env={},
     )
-    cfg.verbose = overrides.get("verbose", 1)
-    cfg.should_show_info.return_value = overrides.get("show_info", True)
+    cfg.verbose = overrides.get("verbose", 0)
     cfg.source_of.return_value = overrides.get("source", "Environment variable")
     cfg.default_config_path = overrides.get(
         "path", MagicMock(spec=Path, **{"exists.return_value": True})
@@ -79,50 +77,24 @@ class TestConfigSet(unittest.TestCase):
         cfg.set_user_override.assert_any_call("base_url", "https://staging.example.com")
         self.assertIn("https://staging.example.com", result.output)
 
-    def test_numeric_verbosity_is_accepted(self):
-        result, cfg = self._invoke(["--verbose", "3"])
+    def test_verbosity_is_a_count_of_v(self):
+        result, cfg = self._invoke(["--verbosity", "3"])
 
-        cfg.set_user_override.assert_any_call("verbose", 3)
-        self.assertIn("DEBUG", result.output)
         self.assertEqual(result.exit_code, 0)
+        cfg.set_user_override.assert_any_call("verbosity", 3)
+        self.assertIn("everything", result.output)
 
-    def test_named_verbosity_is_mapped_to_its_level(self):
-        for name, level in (("error", 0), ("warning", 1), ("info", 2), ("debug", 3)):
-            with self.subTest(name=name):
-                result, cfg = self._invoke(["--verbose", name])
-                cfg.set_user_override.assert_any_call("verbose", level)
-                self.assertEqual(result.exit_code, 0)
-
-    def test_named_verbosity_is_case_insensitive(self):
-        result, cfg = self._invoke(["--verbose", "DEBUG"])
-
-        cfg.set_user_override.assert_any_call("verbose", 3)
-
-    def test_out_of_range_verbosity_is_rejected_without_saving(self):
-        result, cfg = self._invoke(["--verbose", "9"])
-
-        cfg.set_user_override.assert_not_called()
-        cfg.save.assert_not_called()
-        self.assertIn("must be between 0 and 3", result.output)
-
-    def test_unknown_verbosity_name_lists_valid_values(self):
-        result, cfg = self._invoke(["--verbose", "chatty"])
-
-        cfg.set_user_override.assert_not_called()
-        self.assertIn("Invalid verbosity level", result.output)
-        self.assertIn("debug", result.output)
-
-    def test_quiet_config_suppresses_success_messages(self):
-        cfg = _cli_config(show_info=False, verbose=0)
-        result, _ = self._invoke(["--backend", "remote", "--verbose", "0"], cfg=cfg)
-
-        self.assertNotIn("API key updated", result.output)
-        # The final save confirmation is unconditional.
-        self.assertIn("Configuration saved", result.output)
+    def test_a_verbosity_out_of_range_is_refused_without_saving(self):
+        for value in ("9", "debug"):
+            with self.subTest(value=value):
+                result, cfg = self._invoke(["--verbosity", value])
+                cfg.set_user_override.assert_not_called()
+                cfg.save.assert_not_called()
+                self.assertIn("a number from 0 to 3", result.output)
 
     def test_all_options_together_save_once(self):
         result, cfg = self._invoke(
-            ["--backend", "remote", "--base-url", "https://x", "--verbose", "2"]
+            ["--backend", "remote", "--base-url", "https://x", "--verbosity", "2"]
         )
 
         self.assertEqual(cfg.set_user_override.call_count, 3)
@@ -139,17 +111,19 @@ class TestConfigShow(unittest.TestCase):
         result = self.runner.invoke(show, [], obj={"config": cfg})
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("Set", result.output)
+        self.assertIn("set", result.output)
         self.assertNotIn("hk_secre", result.output)
         self.assertNotIn("secret_value", result.output)
-        self.assertIn("WARNING", result.output)
+        # By the keys `config set` and the file use.
+        for key in ("backend", "api_key", "base_url", "ca_bundle", "verbosity"):
+            self.assertIn(key, result.output)
 
     def test_unset_api_key_is_reported_as_not_set(self):
         cfg = _cli_config(api_key=None)
 
         result = self.runner.invoke(show, [], obj={"config": cfg})
 
-        self.assertIn("Not set", result.output)
+        self.assertIn("not set", result.output)
 
     def test_missing_config_file_hints_at_config_set(self):
         path = MagicMock(spec=Path)
@@ -159,14 +133,7 @@ class TestConfigShow(unittest.TestCase):
 
         result = self.runner.invoke(show, [], obj={"config": cfg})
 
-        self.assertIn("No configuration file found", result.output)
-
-    def test_info_output_suppressed_when_quiet(self):
-        cfg = _cli_config(show_info=False)
-
-        result = self.runner.invoke(show, [], obj={"config": cfg})
-
-        self.assertNotIn("Configuration file:", result.output)
+        self.assertIn("No configuration file at", result.output)
 
 
 class TestConfigReset(unittest.TestCase):
@@ -214,61 +181,6 @@ class TestConfigReset(unittest.TestCase):
         self.assertIn("No configuration file to reset", result.output)
 
 
-class TestConfigValidate(unittest.TestCase):
-    def setUp(self):
-        self.runner = CliRunner()
-
-    def _run(self, cfg, status_code=200, probe_side_effect=None):
-        session = MagicMock()
-        session.check_connection.return_value = status_code
-        if probe_side_effect is not None:
-            session.check_connection.side_effect = probe_side_effect
-        with patch("hackagent.HackAgent", return_value=session) as session_cls:
-            result = self.runner.invoke(validate, [], obj={"config": cfg})
-        return result, session, session_cls
-
-    def test_successful_probe_reports_valid_configuration(self):
-        cfg = _cli_config()
-
-        result, session, session_cls = self._run(cfg)
-
-        self.assertEqual(result.exit_code, 0)
-        cfg.validate.assert_called_once()
-        settings = session_cls.call_args.args[0]
-        self.assertEqual(settings.api_key, cfg.api_key)
-        self.assertEqual(settings.base_url, cfg.base_url)
-        session.check_connection.assert_called_once()
-        self.assertIn("✓ Configuration valid, and the API answers", result.output)
-
-    def test_non_200_status_is_surfaced_without_failing(self):
-        cfg = _cli_config()
-
-        result, _, _ = self._run(cfg, status_code=403)
-
-        self.assertEqual(result.exit_code, 0)
-        self.assertIn("403", result.output)
-
-    def test_invalid_configuration_raises_click_exception(self):
-        cfg = _cli_config()
-        cfg.validate.side_effect = ValueError("API key is required")
-
-        result, session, session_cls = self._run(cfg)
-
-        self.assertNotEqual(result.exit_code, 0)
-        session_cls.assert_not_called()
-        session.check_connection.assert_not_called()
-        self.assertIn("API key is required", result.output)
-        self.assertIn("HACKAGENT_API_KEY", result.output)
-
-    def test_connection_failure_is_a_warning_not_an_error(self):
-        cfg = _cli_config()
-
-        result, _, _ = self._run(cfg, probe_side_effect=OSError("network down"))
-
-        self.assertEqual(result.exit_code, 0)
-        self.assertIn("! Could not test the API connection", result.output)
-
-
 class TestConfigImport(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
@@ -290,14 +202,14 @@ class TestConfigImport(unittest.TestCase):
             {
                 "api_key": "${HACKAGENT_API_KEY}",
                 "base_url": "https://imported",
-                "verbose": 3,
+                "verbosity": 3,
             }
         )
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(cfg.api_key, "hk_imported")
         self.assertEqual(cfg.base_url, "https://imported")
-        self.assertEqual(cfg.verbose, 3)
+        cfg.set_user_override.assert_any_call("verbosity", 3)
         cfg.save.assert_called_once()
         for field in ("API key", "Base URL", "Verbosity"):
             self.assertIn(field, result.output)
@@ -344,7 +256,7 @@ class TestConfigGroup(unittest.TestCase):
         result = CliRunner().invoke(config_group, ["--help"])
 
         self.assertEqual(result.exit_code, 0)
-        for name in ("set", "show", "reset", "validate", "import-config"):
+        for name in ("set", "show", "reset", "import-config"):
             self.assertIn(name, result.output)
 
 

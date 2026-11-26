@@ -162,7 +162,7 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           ./dist/hackagent/hackagent --version
-          ./dist/hackagent/hackagent version
+          ./dist/hackagent/hackagent --help
           # Builds every model and attack, and sends nothing.
           ./dist/hackagent/hackagent campaign validate deploy/packaging/smoke-campaign.yaml
           # The dashboard must be inside the archive, not rebuilt at runtime.
@@ -189,8 +189,9 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & .\dist\hackagent\hackagent.exe --version
           if ($LASTEXITCODE -ne 0) { throw "hackagent --version exited $LASTEXITCODE" }
-          & .\dist\hackagent\hackagent.exe version
-          if ($LASTEXITCODE -ne 0) { throw "hackagent version exited $LASTEXITCODE" }
+          # The logo, under a cp1252 console.
+          & .\dist\hackagent\hackagent.exe --help
+          if ($LASTEXITCODE -ne 0) { throw "hackagent --help exited $LASTEXITCODE" }
           & .\dist\hackagent\hackagent.exe campaign validate deploy\packaging\smoke-campaign.yaml
           if ($LASTEXITCODE -ne 0) { throw "hackagent campaign validate exited $LASTEXITCODE" }
 

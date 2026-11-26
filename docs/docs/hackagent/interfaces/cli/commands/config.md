@@ -29,10 +29,10 @@ Show and change the CLI&#x27;s settings.
     type=click.Path(exists=True, dir_okay=True),
     help=_setting("ca_bundle"),
 )
-@click.option("--verbose", type=str, help=_setting("verbose"))
+@click.option("--verbosity", type=str, help=_setting("verbosity"))
 @click.pass_context
 @handle_errors
-def set(ctx, backend, base_url, ca_bundle, verbose)
+def set(ctx, backend, base_url, ca_bundle, verbosity)
 ```
 
 Set storage, API location, CA bundle and verbosity defaults
@@ -61,17 +61,6 @@ def reset(ctx, confirm)
 ```
 
 Reset configuration to defaults
-
-#### validate
-
-```python
-@config.command()
-@click.pass_context
-@handle_errors
-def validate(ctx)
-```
-
-Validate current configuration
 
 #### import\_config
 

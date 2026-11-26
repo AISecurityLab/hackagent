@@ -26,7 +26,6 @@ from hackagent.interfaces.cli.commands import (
 from hackagent.interfaces.cli.commands import config
 from hackagent.interfaces.cli.bootstrap import (
     _launch_tui_default,
-    _patch_textual_terminal_queries,
 )
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.cli.help_page import _help_option_callback
@@ -69,7 +68,13 @@ class _CLIGroup(click.Group):
         return name, command, remaining
 
 
-@click.group(cls=_CLIGroup, invoke_without_command=True, add_help_option=False)
+@click.group(
+    cls=_CLIGroup,
+    invoke_without_command=True,
+    add_help_option=False,
+    # -h as well as --help, on every command: Click hands these down.
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 @click.option(
     "--help",
     "-h",
@@ -102,7 +107,15 @@ class _CLIGroup(click.Group):
         "(or set REQUESTS_CA_BUNDLE / SSL_CERT_FILE)"
     ),
 )
-@click.option("--verbose", "-v", count=True, help="Increase verbosity (-v, -vv, -vvv)")
+@click.option(
+    "--verbose",
+    "-v",
+    count=True,
+    help=(
+        "Say more: -v every model call, -vv other libraries' messages too, "
+        "-vvv everything"
+    ),
+)
 @click.version_option(version=get_version(), prog_name="hackagent")
 @click.pass_context
 def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
@@ -111,10 +124,6 @@ def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
     # Set debug mode based on environment variable
     if os.getenv("HACKAGENT_DEBUG"):
         os.environ["HACKAGENT_DEBUG"] = "1"
-
-    # Set verbose level in environment for other modules
-    if verbose:
-        os.environ["HACKAGENT_VERBOSE"] = str(verbose)
 
     # Initialize CLI configuration
     try:
@@ -137,8 +146,7 @@ def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
     # -vv shows what attacks decide, -vvv every call they make; a count given
     # here or saved in the configuration file sets the log level.
     config = ctx.obj["config"]
-    if config.source_of("verbose") != "Default":
-        apply_verbosity(config.verbose)
+    apply_verbosity(config.verbose)
 
     # Launch TUI by default if no subcommand is provided
     if ctx.invoked_subcommand is None:
@@ -185,21 +193,15 @@ def init(ctx):
             "remote storage fails without it."
         )
 
-    display_heading("How much the log says")
-    console.print("  0  errors")
-    console.print("  1  warnings too (the default)")
-    console.print("  2  what the run does")
-    console.print("  3  everything, for debugging")
-    verbose_level = click.prompt(
-        "Default verbosity level",
-        type=int,
-        default=cli_config.verbose,
-    )
-    if not 0 <= verbose_level <= 3:
-        display_warning("Invalid verbosity level, using 1 (warnings)")
-        verbose_level = 1
+    from hackagent.interfaces.cli.config import MAX_VERBOSITY, VERBOSITY
 
-    cli_config.verbose = verbose_level
+    display_heading("How much the log says")
+    for count, said in VERBOSITY.items():
+        console.print(f"  {count}  {said}" + ("  (the default)" if not count else ""))
+    verbose_level = click.prompt(
+        "Verbosity", type=click.IntRange(0, MAX_VERBOSITY), default=cli_config.verbose
+    )
+    cli_config.set_user_override("verbose", verbose_level)
 
     try:
         cli_config.save()
@@ -251,8 +253,7 @@ def init(ctx):
                 "Ready: results stay on this machine "
                 "[secondary](~/.local/share/hackagent/hackagent.db)[/secondary]"
             )
-        if cli_config.should_show_info():
-            _next_steps()
+        _next_steps()
 
     except Exception as e:
         raise Failed(f"Setup failed: {e}") from e
@@ -263,64 +264,6 @@ def _next_steps() -> None:
     display_heading("Next")
     for what, command in (*QUICK_START, APP):
         display_hint(what, command)
-
-
-@cli.command()
-@click.pass_context
-@handle_errors
-def version(ctx):
-    """Show the version, and where the configuration is."""
-    from hackagent.interfaces.cli.banner import display_hackagent_splash
-
-    display_hackagent_splash(console)
-
-    cli_config: CLIConfig = ctx.obj["config"]
-    console.print(
-        f"[secondary]Config file:[/secondary] {escape(str(cli_config.default_config_path))}"
-    )
-    display_hint("Every command", "hackagent --help")
-
-
-@cli.command()
-@click.pass_context
-@handle_errors
-def tui(ctx):
-    """Open the terminal app: build, check and run a campaign.
-
-    The same as ``hackagent`` alone. Start from an example or open an
-    existing campaign.yaml; the app checks it as you type, and runs it.
-
-    \b
-    Keys:
-      F1      what this screen is, and every key
-      ctrl+r  run the campaign
-      ctrl+s  save it to a file
-      q       quit
-    """
-    cli_config: CLIConfig = ctx.obj["config"]
-
-    try:
-        # Validate configuration before launching TUI
-        cli_config.validate()
-    except ValueError as e:
-        display_error(f"Configuration error: {e}")
-        display_hint("Set it up", "hackagent init")
-        ctx.exit(1)
-
-    try:
-        from hackagent.interfaces.tui import HackAgentTUI
-
-        _patch_textual_terminal_queries()
-        app = HackAgentTUI(cli_config)
-        app.run()
-
-    except ImportError:
-        display_error("The terminal app needs its dependencies")
-        display_hint("Install them", "pip install 'hackagent[tui]'")
-        ctx.exit(1)
-    except Exception as e:
-        display_error(f"The terminal app failed to start: {e}")
-        ctx.exit(1)
 
 
 @cli.command()

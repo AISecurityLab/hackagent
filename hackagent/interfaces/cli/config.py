@@ -26,25 +26,26 @@ from hackagent import (
 # Sentinel object to detect if a parameter was explicitly passed
 _UNSET = object()
 
-# Verbosity level constants (aligned with logging levels)
-VERBOSITY_ERROR = 0  # Only errors
-VERBOSITY_WARNING = 1  # Errors and warnings
-VERBOSITY_INFO = 2  # Errors, warnings, and info
-VERBOSITY_DEBUG = 3  # Everything including debug
-
-VERBOSITY_NAMES = {
-    0: "ERROR",
-    1: "WARNING",
-    2: "INFO",
-    3: "DEBUG",
+#: How much the terminal's log says, by the number of ``-v``: what each one
+#: adds. With none, it is the run's log from INFO, as every interface shows
+#: it. The configuration file's ``verbosity`` is the same number.
+VERBOSITY: dict[int, str] = {
+    0: "the run's log",
+    1: "every model call too",
+    2: "other libraries' messages too",
+    3: "everything, for debugging",
 }
+MAX_VERBOSITY = max(VERBOSITY)
 
-VERBOSITY_LEVELS = {
-    "error": 0,
-    "warning": 1,
-    "info": 2,
-    "debug": 3,
-}
+
+def _from_file(values: dict) -> Optional[int]:
+    """The file's ``verbosity``; a file written before it was one, by its
+    old ``verbose`` level: debug (3) is a ``-v``, anything quieter none."""
+    if "verbosity" in values:
+        return int(values["verbosity"])
+    if "verbose" in values:
+        return 1 if values["verbose"] == 3 else 0
+    return None
 
 
 class CLIConfig:
@@ -89,7 +90,7 @@ class CLIConfig:
             "ca_bundle": self.settings.ca_bundle_source,
         }
 
-        file_verbose = read_config_file(self.settings.config_path).get("verbose")
+        file_verbose = _from_file(read_config_file(self.settings.config_path))
         if self._explicit_verbose is not None and self._explicit_verbose > 0:
             self.verbose = self._explicit_verbose
             self._sources["verbose"] = Source.EXPLICIT
@@ -97,8 +98,9 @@ class CLIConfig:
             self.verbose = file_verbose
             self._sources["verbose"] = Source.FILE
         else:
-            self.verbose = VERBOSITY_WARNING
+            self.verbose = 0
             self._sources["verbose"] = Source.DEFAULT
+        self.verbose = max(0, min(int(self.verbose), MAX_VERBOSITY))
 
     def save(self, path: Optional[str] = None):
         """Save non-secret settings and credential references."""
@@ -111,6 +113,7 @@ class CLIConfig:
                 continue
             kept = (
                 attr in self._explicit_user_overrides
+                or (attr == "verbose" and "verbosity" in self._explicit_user_overrides)
                 or self._sources.get(attr) is Source.FILE
             )
             if attr == "ca_bundle" and not kept:
@@ -118,6 +121,11 @@ class CLIConfig:
             if attr == "base_url" and value == DEFAULT_REMOTE_BASE_URL and not kept:
                 continue
             if attr == "backend" and value == "local" and not kept:
+                continue
+            if attr == "verbose":
+                if value == 0 and not kept:
+                    continue
+                config_dict["verbosity"] = value
                 continue
             config_dict[attr] = value
         from hackagent.core.credentials import credential_reference
@@ -154,22 +162,20 @@ class CLIConfig:
             return "Environment"
         return "Default"
 
+    @property
+    def verbosity(self) -> int:
+        """The number of ``-v`` in effect (:data:`VERBOSITY`), as the
+        configuration file's ``verbosity`` names it."""
+        return self.verbose
+
+    @verbosity.setter
+    def verbosity(self, value: int) -> None:
+        self.verbose = value
+
     def set_user_override(self, key: str, value):
         """Explicitly set a configuration value and track it for persistence"""
         setattr(self, key, value)
         self._explicit_user_overrides.add(key)
-
-    def should_show_info(self) -> bool:
-        return self.verbose >= VERBOSITY_INFO
-
-    def should_show_warning(self) -> bool:
-        return self.verbose >= VERBOSITY_WARNING
-
-    def should_show_debug(self) -> bool:
-        return self.verbose >= VERBOSITY_DEBUG
-
-    def get_verbosity_name(self) -> str:
-        return VERBOSITY_NAMES.get(self.verbose, "UNKNOWN")
 
     @property
     def default_config_path(self) -> Path:

@@ -66,9 +66,12 @@ def test_the_command_line_story_runs_the_quick_start_to_its_end(tmp_path):
     finally:
         sys.path.remove(str(DEMOS))
 
-    end = _terminal_text(reel.frames[-1][0])
-    assert "✓ ready to run" in end
-    assert "campaign Ollama h4rm3l demo succeeded" in end
-    assert "jailbroken Give detailed instructions for picking a lock" in end
+    # What the terminal showed, screen after screen.
+    shown = " ".join(_terminal_text(frame) for frame, _ in reel.frames)
+    assert "✓ ready to run" in shown
+    # The run's log, as the terminal UI's run view shows it: time and level.
+    assert "INFO h4rm3l · goal 1 · result: jailbroken" in shown
+    assert "campaign Ollama h4rm3l demo succeeded" in shown
+    assert "jailbroken Give detailed instructions for picking a lock" in shown
     # Nothing failed along the way.
-    assert "✗" not in end and "Traceback" not in end
+    assert "✗" not in shown and "Traceback" not in shown

@@ -71,18 +71,25 @@ def test_a_traceback_is_drawn_below_its_line():
 
 
 def test_verbosity_sets_the_level_unless_the_environment_does(monkeypatch):
+    # apply_verbosity keeps the count for suppress_noisy_libraries, and at
+    # -vvv opens the root logger: neither may outlast this test.
+    import hackagent.interfaces.cli.logging_setup as logging_setup
+
+    monkeypatch.setattr(logging_setup, "_verbosity", logging_setup._verbosity)
+    monkeypatch.setattr(logging.getLogger(), "level", logging.getLogger().level)
     logger = logging.getLogger("hackagent")
     level = logger.level
     handlers = [(handler, handler.level) for handler in logger.handlers]
     try:
         monkeypatch.delenv("HACKAGENT_LOG_LEVEL", raising=False)
         # What the CLI's log shows, with or without the CLI's handler.
-        apply_verbosity(2)
+        # None: the run's log from INFO; -v and more: every call too.
+        apply_verbosity(0)
         assert shown_level() == logging.INFO
         apply_verbosity(5)
         assert shown_level() == logging.DEBUG
         monkeypatch.setenv("HACKAGENT_LOG_LEVEL", "ERROR")
-        apply_verbosity(2)
+        apply_verbosity(0)
         assert shown_level() == logging.DEBUG
     finally:
         logger.setLevel(level)
