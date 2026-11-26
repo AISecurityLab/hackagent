@@ -33,6 +33,7 @@ from uuid import UUID
 from pydantic import AnyUrl
 
 from hackagent.storage._http.client import AuthenticatedClient
+from hackagent.storage._http.retry import RetryPolicy
 from hackagent.storage._http.api.agent import (
     agent_create,
     agent_list,
@@ -320,6 +321,10 @@ class RemoteBackend:
         ``base_url`` may carry a path prefix (``https://host/api``); every
         request is made relative to it. ``verify`` is the TLS verification
         setting, e.g. :attr:`Settings.verify` for a private CA bundle.
+
+        A request the server drops before answering (a closed keep-alive
+        connection, a restarting API) is sent again when that is safe; see
+        :class:`RetryPolicy`.
         """
         return cls(
             AuthenticatedClient(
@@ -329,6 +334,7 @@ class RemoteBackend:
                 prefix="Bearer",
                 raise_on_unexpected_status=raise_on_unexpected_status,
                 timeout=timeout,
+                retry=RetryPolicy(),
             )
         )
 
@@ -458,6 +464,42 @@ class RemoteBackend:
             raise RuntimeError(
                 f"RemoteBackend: {failures} background audit write(s) failed"
             )
+
+    def _settle_writes(self, status: str, run_notes: str) -> str:
+        """Wait for queued writes before a run ends; return its note.
+
+        Lost writes keep a run from ending COMPLETED (raises, see :meth:`flush`).
+        A FAILED or CANCELLED run still ends so, with the loss in its note: an
+        earlier lost write must not leave the run's end unrecorded.
+        """
+        if status == FinishStatusEnum.COMPLETED.value:
+            self.flush()
+            return run_notes
+        self._drain()
+        lost, note = self._with_losses(run_notes)
+        if lost:
+            logger.error("RemoteBackend: %s; the run ends %s", note, status)
+        return note
+
+    def _with_losses(self, note: str) -> tuple[int, str]:
+        """``(lost, note)``: the background writes lost so far, which are then
+        reported (once), and ``note`` with them."""
+        lost = self._take_failures()
+        if not lost:
+            return 0, note
+        loss = f"{lost} background audit write(s) failed"
+        return lost, f"{note} ({loss})" if note else loss
+
+    def _learn_result_ids(self, kept: bool) -> None:
+        """Tell the client's transport whether the server keeps result ids.
+
+        Kept on the transport, not the store: stores sharing the client (an
+        AdoptedRunStore and the backend that claimed its run) send through
+        the same transport.
+        """
+        policy = getattr(self._client, "retry", None)
+        if isinstance(policy, RetryPolicy):
+            policy.result_ids_kept = kept
 
     def _drain(self) -> None:
         """Block until every queued write has been attempted."""
@@ -770,8 +812,10 @@ class RemoteBackend:
             RuntimeError: When a queued write failed or the server refuses the update.
         """
         final = _is_final(status)
-        # Lost result writes surface before the run can end as COMPLETED.
-        self.flush()
+        if final:
+            run_notes = self._settle_writes(status, run_notes or "")
+        else:
+            self.flush()
         # The server merges run_config key by key, so the stored spec stays.
         patch: Dict[str, Any] = {}
         if audit is not None:
@@ -794,7 +838,7 @@ class RemoteBackend:
         if final:
             # Built from the finish response: finishing a campaign run revokes
             # its run token, so it may not be read back afterwards.
-            run = self.finish_run(campaign_run_id, status, run_notes or "")
+            run = self._send_finish(campaign_run_id, status, run_notes or "")
         if run is None:
             return self.get_campaign_run(campaign_run_id)
         return _campaign_record(run)
@@ -906,8 +950,7 @@ class RemoteBackend:
         """
         final = _is_final(status)
         if final:
-            # Lost result writes surface before the run can end as COMPLETED.
-            self.flush()
+            run_notes = self._settle_writes(status, run_notes or "")
         patch: Dict[str, Any] = {}
         if run_config is not None:
             patch["run_config"] = run_config
@@ -922,7 +965,7 @@ class RemoteBackend:
                     f"RemoteBackend: update_run {run_id} returned {resp.status_code}"
                 )
         if final:
-            self.finish_run(run_id, status, run_notes or "")
+            self._send_finish(run_id, status, run_notes or "")
         return RunRecord(
             id=run_id,
             attack_id=UUID("00000000-0000-0000-0000-000000000000"),
@@ -1173,8 +1216,28 @@ class RemoteBackend:
     def finish_run(self, run_id: UUID, status: str, note: str = "") -> Run:
         """End the run as COMPLETED, FAILED or CANCELLED, with ``note`` as its
         run notes, and return the finished run. Queued writes go first:
-        finishing a campaign run revokes its run token. Raises
-        :class:`ExecutorRejected` on 401 or 403."""
+        finishing a campaign run revokes its run token.
+
+        Writes lost so far are added to the note, and a run they leave
+        incomplete ends FAILED, not COMPLETED: the executor ends a cloud run
+        this way once all its attacks are over, so the losses are its own.
+        Raises :class:`ExecutorRejected` on 401 or 403.
+        """
+        if status not in _FINAL_STATUSES:
+            raise ValueError(f"RemoteBackend: {status!r} is not a final run status")
+        self._drain()
+        lost, note = self._with_losses(note)
+        if lost:
+            if status == FinishStatusEnum.COMPLETED.value:
+                status = FinishStatusEnum.FAILED.value
+            logger.error("RemoteBackend: %s; run %s ends %s", note, run_id, status)
+        return self._send_finish(run_id, status, note)
+
+    def _send_finish(self, run_id: UUID, status: str, note: str) -> Run:
+        """POST the run's end, after the queued writes. Losses are the
+        caller's to settle (see :meth:`_settle_writes`): a run ended from
+        :meth:`update_run` must not take the losses of another attack still
+        running on this store."""
         if status not in _FINAL_STATUSES:
             raise ValueError(f"RemoteBackend: {status!r} is not a final run status")
         self._drain()
@@ -1205,10 +1268,16 @@ class RemoteBackend:
     ) -> ResultRecord:
         """Create an unevaluated result on the server (synchronously, for its id).
 
+        The result carries an id of this client's, so a repeat of the request
+        (after a dropped connection) returns the stored result instead of a
+        second one. A server that picks its own id is used as before.
+
         Raises:
-            RuntimeError: When the server does not answer 201.
+            RuntimeError: When the server answers neither 201 nor 200.
         """
+        result_id = uuid.uuid4()
         body = ResultRequest(
+            id=result_id,
             run=run_id,
             goal=goal,
             goal_index=goal_index,
@@ -1217,8 +1286,10 @@ class RemoteBackend:
             agent_specific_data=agent_specific_data,
         )
         resp = result_create.sync_detailed(client=self._client, body=body)
-        if resp.status_code == 201 and resp.parsed:
+        # 200: stored by an earlier try of this same request.
+        if resp.status_code in (200, 201) and resp.parsed:
             r = resp.parsed
+            self._learn_result_ids(str(r.id) == str(result_id))
             return ResultRecord(
                 id=r.id,
                 run_id=run_id,
@@ -1510,7 +1581,8 @@ class RemoteBackend:
         resp = result_trace_create.sync_detailed(
             client=self._client, id=result_id, body=body
         )
-        if resp.status_code != 201:
+        # 200: the step was stored by an earlier try.
+        if resp.status_code not in (200, 201):
             raise RuntimeError(
                 f"RemoteBackend: create_trace for result {result_id} "
                 f"returned {resp.status_code}"
