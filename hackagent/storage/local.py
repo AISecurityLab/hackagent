@@ -23,9 +23,10 @@ import logging
 import sqlite3
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 from uuid import UUID
 
 from hackagent.reporting import (
@@ -477,6 +478,23 @@ class LocalBackend:
         self._context: Optional[OrganizationContext] = None
         logger.debug(f"LocalBackend initialised at {self._db_path}")
 
+    @contextmanager
+    def _write(self) -> Iterator[None]:
+        """Hold the lock for one write, and commit it whole or not at all.
+
+        A write is several statements (the row, then the tallies and the
+        campaign's version). Should any of them fail, the ones before it are
+        rolled back here; left pending, the next write's commit would make
+        them permanent.
+        """
+        with self._lock:
+            try:
+                yield
+            except BaseException:
+                self._conn.rollback()
+                raise
+            self._conn.commit()
+
     def _upgrade_schema(self) -> None:
         """Apply additive migrations required by older local databases."""
 
@@ -555,7 +573,7 @@ class LocalBackend:
         """
         if self._context is not None:
             return self._context
-        with self._lock:
+        with self._write():
             cur = self._conn.execute("SELECT id FROM local_context LIMIT 1")
             row = cur.fetchone()
             if row:
@@ -566,7 +584,6 @@ class LocalBackend:
                     "INSERT INTO local_context (id, user_id, created_at) VALUES (?,?,?)",
                     (str(org_id), "local", _now_str()),
                 )
-                self._conn.commit()
             self._context = OrganizationContext(org_id=org_id, user_id="local")
         return self._context
 
@@ -585,7 +602,7 @@ class LocalBackend:
         endpoint = str(connection.get("endpoint") or "")
         config_json = json.dumps(config)
 
-        with self._lock:
+        with self._write():
             row = self._conn.execute(
                 "SELECT id, created_at FROM agents WHERE name = ? LIMIT 1",
                 (name,),
@@ -616,7 +633,6 @@ class LocalBackend:
                         now,
                     ),
                 )
-            self._conn.commit()
 
         return AgentRecord(
             id=agent_id,
@@ -663,9 +679,8 @@ class LocalBackend:
 
     def delete_agent(self, agent_id: UUID) -> None:
         """Delete the agent row; a missing agent is not an error."""
-        with self._lock:
+        with self._write():
             self._conn.execute("DELETE FROM agents WHERE id = ?", (str(agent_id),))
-            self._conn.commit()
 
     def _row_to_agent(self, row, org_id: UUID) -> AgentRecord:
         return AgentRecord(
@@ -692,7 +707,7 @@ class LocalBackend:
         """Insert an attack row and return it."""
         attack_id = uuid.uuid4()
         now = _now_str()
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 "INSERT INTO attacks (id, type, agent_id, organization_id, config_json, created_at) VALUES (?,?,?,?,?,?)",
                 (
@@ -704,7 +719,6 @@ class LocalBackend:
                     now,
                 ),
             )
-            self._conn.commit()
         return AttackRecord(
             id=attack_id,
             type=attack_type,
@@ -748,7 +762,7 @@ class LocalBackend:
         campaign_run_id = uuid.uuid4()
         name = str((spec.get("campaign") or {}).get("name") or "Campaign")
         now = _now_str()
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 "INSERT INTO campaign_runs "
                 "(id, agent_id, name, campaign_config_json, status, created_at, updated_at) "
@@ -763,7 +777,6 @@ class LocalBackend:
                     now,
                 ),
             )
-            self._conn.commit()
         return CampaignRunRecord(
             id=campaign_run_id,
             agent_id=agent_id,
@@ -792,7 +805,7 @@ class LocalBackend:
             RuntimeError: When no such campaign run exists.
         """
         now = _now_str()
-        with self._lock:
+        with self._write():
             updates: Dict[str, Any] = {"updated_at": now}
             if status is not None:
                 updates["status"] = status
@@ -806,7 +819,6 @@ class LocalBackend:
                 [*updates.values(), str(campaign_run_id)],
             )
             self._bump([str(campaign_run_id)])
-            self._conn.commit()
             row = self._conn.execute(
                 "SELECT * FROM campaign_runs WHERE id=? LIMIT 1",
                 (str(campaign_run_id),),
@@ -854,13 +866,12 @@ class LocalBackend:
     def link_campaign_run(self, campaign_run_id: UUID, campaign_id: UUID) -> None:
         """Record that the dashboard launched a campaign run, and from which
         saved campaign. The launch stays recorded if the campaign is deleted."""
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 "UPDATE campaign_runs SET campaign_id=?, launched=1 WHERE id=?",
                 (str(campaign_id), str(campaign_run_id)),
             )
             self._bump([str(campaign_run_id)])
-            self._conn.commit()
 
     @staticmethod
     def _row_to_campaign_run(row: sqlite3.Row) -> CampaignRunRecord:
@@ -887,7 +898,7 @@ class LocalBackend:
         """Save a dashboard campaign and return it."""
         campaign_id = uuid.uuid4()
         now = _now_str()
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 "INSERT INTO campaigns "
                 "(id, name, description, agent_id, spec_json, created_at, updated_at) "
@@ -902,7 +913,6 @@ class LocalBackend:
                     now,
                 ),
             )
-            self._conn.commit()
         return self.get_campaign(campaign_id)
 
     def update_campaign(
@@ -918,7 +928,7 @@ class LocalBackend:
         Raises:
             RuntimeError: When no such campaign exists.
         """
-        with self._lock:
+        with self._write():
             cursor = self._conn.execute(
                 "UPDATE campaigns SET name=?, description=?, agent_id=?, spec_json=?, "
                 "updated_at=? WHERE id=?",
@@ -931,7 +941,6 @@ class LocalBackend:
                     str(campaign_id),
                 ),
             )
-            self._conn.commit()
         if cursor.rowcount == 0:
             raise RuntimeError(f"LocalBackend: Campaign {campaign_id} not found")
         return self.get_campaign(campaign_id)
@@ -968,7 +977,7 @@ class LocalBackend:
     def delete_campaign(self, campaign_id: UUID) -> None:
         """Delete a saved campaign; the runs launched from it are kept, and
         their reports, which name the campaign, change."""
-        with self._lock:
+        with self._write():
             self._bump(
                 row["id"]
                 for row in self._conn.execute(
@@ -979,7 +988,6 @@ class LocalBackend:
             cursor = self._conn.execute(
                 "DELETE FROM campaigns WHERE id=?", (str(campaign_id),)
             )
-            self._conn.commit()
         if cursor.rowcount == 0:
             raise RuntimeError(f"LocalBackend: Campaign {campaign_id} not found")
 
@@ -1010,7 +1018,7 @@ class LocalBackend:
         """
         run_id = uuid.uuid4()
         now = _now_str()
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 "INSERT INTO runs "
                 "(id, campaign_run_id, attack_id, agent_id, config_json, status, created_at, updated_at) "
@@ -1027,7 +1035,6 @@ class LocalBackend:
                 ),
             )
             self._bump([str(campaign_run_id) if campaign_run_id else None])
-            self._conn.commit()
         return RunRecord(
             id=run_id,
             campaign_run_id=campaign_run_id,
@@ -1053,7 +1060,7 @@ class LocalBackend:
         placeholder record carrying only the passed fields is returned.
         """
         now = _now_str()
-        with self._lock:
+        with self._write():
             updates: Dict[str, Any] = {"updated_at": now}
             if status is not None:
                 updates["status"] = status
@@ -1070,7 +1077,6 @@ class LocalBackend:
                     values,
                 )
                 self._bump([self._parent_of(str(run_id))])
-            self._conn.commit()
             row = self._conn.execute(
                 "SELECT * FROM runs WHERE id=? LIMIT 1", (str(run_id),)
             ).fetchone()
@@ -1201,7 +1207,7 @@ class LocalBackend:
     def delete_run(self, run_id: UUID) -> None:
         """Delete an attack run with its results, traces and per-goal tallies."""
         sid = str(run_id)
-        with self._lock:
+        with self._write():
             self._bump([self._parent_of(sid)])
             self._drop_tallies("id = ?", [sid])
             # traces → results → run
@@ -1211,12 +1217,11 @@ class LocalBackend:
             )
             self._conn.execute("DELETE FROM results WHERE run_id = ?", (sid,))
             self._conn.execute("DELETE FROM runs WHERE id = ?", (sid,))
-            self._conn.commit()
 
     def delete_attack(self, attack_id: UUID) -> None:
         """Delete an attack with its runs, results, traces and per-goal tallies."""
         sid = str(attack_id)
-        with self._lock:
+        with self._write():
             self._bump(
                 row["campaign_run_id"]
                 for row in self._conn.execute(
@@ -1237,7 +1242,6 @@ class LocalBackend:
             )
             self._conn.execute("DELETE FROM runs WHERE attack_id = ?", (sid,))
             self._conn.execute("DELETE FROM attacks WHERE id = ?", (sid,))
-            self._conn.commit()
 
     def count_result_buckets(self) -> dict:
         """Count all results by reporting bucket, human reviews applied.
@@ -1293,7 +1297,7 @@ class LocalBackend:
         metadata = {**request_payload, **agent_specific_data}
         if request_payload:
             metadata["request_payload"] = request_payload
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 """INSERT INTO results
                    (id, run_id, goal, goal_index, request_payload_json,
@@ -1313,7 +1317,6 @@ class LocalBackend:
             )
             self._refresh_outcome(str(run_id), goal_index)
             self._bump([self._parent_of(str(run_id))])
-            self._conn.commit()
         return ResultRecord(
             id=result_id,
             run_id=run_id,
@@ -1363,7 +1366,7 @@ class LocalBackend:
             if value is not None
         }
 
-        with self._lock:
+        with self._write():
             if response and agent_specific_data is None:
                 row = self._conn.execute(
                     "SELECT metadata_json FROM results WHERE id=? LIMIT 1",
@@ -1383,7 +1386,6 @@ class LocalBackend:
             if row:
                 self._refresh_outcome(row["run_id"], row["goal_index"])
                 self._bump([self._parent_of(row["run_id"])])
-            self._conn.commit()
         if row:
             return self._row_to_result(row)
         return ResultRecord(
@@ -1470,7 +1472,7 @@ class LocalBackend:
         """Insert a trace step and add it to its goal's usage tally."""
         trace_id = uuid.uuid4()
         now = _now_str()
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 "INSERT INTO traces (id, result_id, sequence, step_type, content_json, created_at) VALUES (?,?,?,?,?,?)",
                 (
@@ -1490,7 +1492,6 @@ class LocalBackend:
                     )
                 ]
             )
-            self._conn.commit()
         return TraceRecord(
             id=trace_id,
             result_id=result_id,
@@ -2227,7 +2228,7 @@ class LocalBackend:
         """
         now = _now_str()
         canvas_json = json.dumps(canvas)
-        with self._lock:
+        with self._write():
             row = None
             if draft_id:
                 row = self._conn.execute(
@@ -2247,7 +2248,6 @@ class LocalBackend:
                     "INSERT INTO attack_builder_drafts (id, name, canvas_json, created_at, updated_at) VALUES (?,?,?,?,?)",
                     (draft_id, name, canvas_json, now, now),
                 )
-            self._conn.commit()
         return {
             "id": draft_id,
             "name": name,
@@ -2275,11 +2275,10 @@ class LocalBackend:
 
     def delete_builder_draft(self, draft_id: str) -> None:
         """Delete a draft by id. No-op if it does not exist."""
-        with self._lock:
+        with self._write():
             self._conn.execute(
                 "DELETE FROM attack_builder_drafts WHERE id=?", (draft_id,)
             )
-            self._conn.commit()
 
     @staticmethod
     def _row_to_draft(row) -> Dict[str, Any]:
