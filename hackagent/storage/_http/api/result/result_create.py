@@ -31,6 +31,11 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Result | None:
+    if response.status_code == 200:
+        response_200 = Result.model_validate(response.json())
+
+        return response_200
+
     if response.status_code == 201:
         response_201 = Result.model_validate(response.json())
 

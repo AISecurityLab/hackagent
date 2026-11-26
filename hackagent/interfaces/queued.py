@@ -110,7 +110,7 @@ def follow_url(settings: Any, run_id: UUID) -> Optional[str]:
     """Where the dashboard shows the run, when it is known."""
     if not settings.dashboard_url:
         return None
-    return f"{settings.dashboard_url}/attacks?runId={run_id}"
+    return f"{settings.dashboard_url}/runs?run={run_id}"
 
 
 def _refuse_unless_runnable(detail: dict[str, Any]) -> None:

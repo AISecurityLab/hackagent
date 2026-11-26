@@ -45,11 +45,11 @@ from pathlib import Path
 PAGES = [
     "/",
     "/agents",
-    "/attacks",
-    "/secrets",
-    "/stats",
-    "/api-keys",
-    "/profile",
+    "/campaigns",
+    "/runs",
+    "/credentials",
+    "/usage",
+    "/settings",
 ]
 
 STARTUP_TIMEOUT = 60.0
@@ -164,32 +164,38 @@ def drive(base: str) -> list[str]:
             print(f"  {path:<20} {status}")
 
         try:
-            page.goto(base + "/stats", wait_until="networkidle")
+            page.goto(base + "/runs", wait_until="networkidle")
             page.get_by_role("link", name="smoke-campaign", exact=True).click()
             page.get_by_role("region", name="Campaign outcomes").wait_for()
             coverage = page.get_by_role("region", name="Goal by attack outcomes")
             coverage.get_by_role("button", name="Detail: Categories").click()
             page.get_by_role("radio", name="Goals", exact=True).click()
             page.keyboard.press("Escape")
-            # Each goal's TAP marker opens that goal's conversation in an overlay.
+            # Each goal's TAP marker opens that goal's page: its attempts and
+            # the conversation of one; "Back to campaign" returns.
             for index, verdict in ((0, "jailbroken"), (1, "mitigated")):
                 goal = f"smoke goal {index}"
                 row = coverage.get_by_role("row", name=goal, exact=False)
                 row.get_by_role("link", name=f"TAP: {verdict}", exact=False).click()
-                overlay = page.get_by_role("dialog", name=goal, exact=True)
-                overlay.get_by_role("heading", name="TAP", exact=True).wait_for()
-                conversation = overlay.get_by_role("region", name="Attack conversation")
+                goal_page = page.get_by_role("region", name=goal, exact=True)
+                goal_page.get_by_role("table", name="TAP attempts").wait_for()
+                conversation = goal_page.get_by_role(
+                    "region", name="Attempt conversation"
+                )
+                conversation.get_by_role("heading", name="TAP", exact=True).wait_for()
                 conversation.get_by_text(f"reply {index}", exact=True).wait_for()
-                overlay.get_by_role("button", name="Close", exact=True).click()
-                overlay.wait_for(state="hidden")
+                page.get_by_role("button", name="Back to campaign", exact=True).click()
+                goal_page.wait_for(state="hidden")
             page.get_by_role("region", name="Success progression").wait_for()
             page.get_by_role("region", name="Attack efficiency").wait_for()
             page.get_by_role("region", name="Campaign audit").get_by_text(
                 "No audit recorded for this execution.", exact=True
             ).wait_for()
-            page.get_by_role("group").filter(
-                has_text="Campaign configuration (YAML)"
-            ).get_by_text("smoke-campaign", exact=False).wait_for(state="attached")
+            config = page.get_by_role("region", name="Campaign configuration")
+            config.get_by_role(
+                "button", name="Campaign configuration (YAML)", exact=True
+            ).click()
+            config.get_by_text("smoke-campaign", exact=False).wait_for()
             print("  campaign investigation ok")
         except Exception as exc:  # noqa: BLE001 - reported, not raised
             failures.append(f"campaign investigation: {type(exc).__name__}: {exc}")
