@@ -26,6 +26,7 @@ from hackagent.core.settings import (
 from hackagent.models.config import ModelConfig
 from hackagent.orchestrator.campaign.results import (
     Attempt,
+    retained,
     trace_payload,
     trace_step_type,
 )
@@ -154,7 +155,7 @@ class RunTracker:
         if attempt.error is not None:
             details["error"] = attempt.error
         if attempt.metadata:
-            details["attack_metadata"] = dict(attempt.metadata)
+            details["attack_metadata"] = retained(attempt.metadata, self.output)
         if self.output.save_responses and attempt.response is not None:
             details["response"] = attempt.response.text
             details["decoded_response"] = attempt.decoded

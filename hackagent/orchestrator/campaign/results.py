@@ -138,6 +138,35 @@ class CampaignResult:
         )
 
 
+_DROPPED = object()
+
+
+def _without_text(value: Any) -> Any:
+    """``value`` with every string in it left out: numbers, flags and the
+    shape around them stay."""
+    if isinstance(value, str):
+        return _DROPPED
+    if isinstance(value, Mapping):
+        kept = {key: _without_text(item) for key, item in value.items()}
+        return {key: item for key, item in kept.items() if item is not _DROPPED}
+    if isinstance(value, (list, tuple)):
+        kept = [_without_text(item) for item in value]
+        return [item for item in kept if item is not _DROPPED]
+    return value
+
+
+def retained(data: Mapping[str, Any], output: OutputSpec) -> dict[str, Any]:
+    """What may be kept of what an attack wrote down about an attempt.
+
+    Attack metadata and trace artifacts hold what the attack wrote as well as
+    how it scored: a poisoned tool description, an injected document, the
+    task phrasings it sent. Which keys hold such text is up to each attack,
+    so with prompts not saved only the numbers and flags are kept, which is
+    all the reports read.
+    """
+    return dict(data) if output.save_prompts else _without_text(data)
+
+
 def attempt_row(attempt: Attempt, output: OutputSpec) -> dict[str, Any]:
     """Flat, JSON-safe view of an attempt, honouring prompt/response retention."""
     row: dict[str, Any] = {
@@ -157,7 +186,7 @@ def attempt_row(attempt: Attempt, output: OutputSpec) -> dict[str, Any]:
     if attempt.error is not None:
         row["error"] = attempt.error
     if attempt.metadata:
-        row["attack_metadata"] = dict(attempt.metadata)
+        row["attack_metadata"] = retained(attempt.metadata, output)
     row.update(eval_columns(attempt.verdict))
     return sanitize_for_json(row)
 
@@ -194,6 +223,8 @@ def trace_payload(node: TraceNode, output: OutputSpec) -> dict[str, Any]:
             data.pop("request", None)
         if not output.save_responses:
             data.pop("response", None)
+    elif node.node == "artifact":
+        data = retained(data, output)
     if data:
         payload["data"] = data
     if node.error is not None:
@@ -325,6 +356,7 @@ __all__ = [
     "AttackOutcome",
     "CampaignResult",
     "attempt_row",
+    "retained",
     "summary",
     "TRACE_SCHEMA_VERSION",
     "trace_payload",

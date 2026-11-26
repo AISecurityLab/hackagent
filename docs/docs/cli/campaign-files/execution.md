@@ -55,7 +55,7 @@ Files written for each run, next to the results stored in the database.
 | `directory` | string | `./logs/runs` | Folder where runs are written, each in a subfolder named after its run id. |
 | `run_id` | string | unset | Fixed id for the run. Leave unset to generate a new one each time. |
 | `formats` | list of one of `json`, `jsonl` | `["json"]` | File formats to write: `json` (one document) and/or `jsonl` (one line per attempt). |
-| `save_prompts` | boolean | `true` | Include the prompts sent to the target. |
+| `save_prompts` | boolean | `true` | Include the prompts sent to the target. When off, what attacks write down about an attempt (their metadata and trace artifacts, such as a poisoned tool description) keeps only its numbers and flags. |
 | `save_responses` | boolean | `true` | Include the target's replies. |
 | `save_traces` | boolean | `true` | Include the search traces of adaptive attacks (every call they made). |
 
