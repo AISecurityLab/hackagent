@@ -3,8 +3,10 @@
 
 """Record an interface of HackAgent as a GIF, from code.
 
-A demo is a storyboard (``tui_demo.py``): it drives the real app headless, and
-:class:`Film` snapshots the screen at each step it chooses. The models are
+A demo is a storyboard: ``tui_demo.py`` drives the real app headless and
+:class:`Film` snapshots the screen at each step it chooses; ``cli_demo.py`` runs
+the real commands and films the terminal (:func:`terminal_frame`);
+``dashboard_demo.py`` serves the real dashboard and films a browser. The models are
 scripted (:class:`DemoModel`) and every call waits at a :class:`Gate` the
 storyboard opens, so a run moves exactly as far as the storyboard says
 between two snapshots. The log's clock is frozen (:func:`frozen_clock`).
@@ -214,10 +216,23 @@ def steady_clock(step: float = 0.1) -> Iterator[None]:
 
 @dataclass
 class Film:
-    """The frames of a demo: an SVG of the screen, and how long it stays."""
+    """The frames of a demo: an SVG of the screen (or a PNG of a browser's
+    page), and how long it stays."""
 
-    app: Any
-    frames: list[tuple[str, int]] = field(default_factory=list)
+    app: Any = None
+    frames: list[tuple[Any, int]] = field(default_factory=list)
+    #: What each frame is hashed by, when not by itself: a browser's page by
+    #: what it shows rather than by its pixels, which a font update moves.
+    keys: list[str] = field(default_factory=list)
+
+    def add(self, frame: Any, hold_ms: int = HOLD_MS, key: str = "") -> None:
+        """Keep ``frame`` for ``hold_ms``; the last frame again is held longer."""
+        key = key or (frame if isinstance(frame, str) else "")
+        if self.frames and self.keys[-1] == key and key:
+            self.frames[-1] = (self.frames[-1][0], self.frames[-1][1] + hold_ms)
+            return
+        self.frames.append((frame, hold_ms))
+        self.keys.append(key)
 
     def snap(self, hold_ms: int = HOLD_MS) -> None:
         """Keep the screen as it is now for ``hold_ms``."""
@@ -227,19 +242,47 @@ class Film:
         for widget in self.app.query("*"):
             if isinstance(widget, (Input, TextArea)):
                 widget.cursor_blink = False
-        svg = self.app.export_screenshot(title="HackAgent")
-        if self.frames and self.frames[-1][0] == svg:
-            self.frames[-1] = (svg, self.frames[-1][1] + hold_ms)
-        else:
-            self.frames.append((svg, hold_ms))
+        self.add(self.app.export_screenshot(title="HackAgent"), hold_ms)
 
     def digest(self) -> str:
-        """A hash of every frame and how long it stays."""
+        """A hash of every frame (by its key) and how long it stays."""
         hashed = hashlib.sha256()
-        for svg, hold in self.frames:
-            hashed.update(svg.encode())
+        for (frame, hold), key in zip(self.frames, self.keys):
+            hashed.update(key.encode() if key else bytes(frame))
             hashed.update(str(hold).encode())
         return hashed.hexdigest()
+
+
+def terminal_frame(ansi: str, width: int, rows: int, title: str = "HackAgent") -> str:
+    """A terminal showing the last ``rows`` lines of ``ansi``, as an SVG drawn
+    the way the TUI's frames are (Rich's export, as Textual's)."""
+    from rich.console import Console
+    from rich.text import Text
+
+    import re
+
+    # Colours stay; any other control sequence (a cursor shown or hidden)
+    # draws nothing in a terminal, so it draws nothing here.
+    ansi = re.sub(r"\x1b\[[0-9;?]*[A-La-ln-z]", "", ansi)
+    console = Console(
+        width=width,
+        height=rows,
+        file=io.StringIO(),
+        force_terminal=True,
+        color_system="truecolor",
+        record=True,
+        legacy_windows=False,
+        safe_box=False,
+    )
+    # Wrapped at the terminal's edge, as a terminal does, then its last rows.
+    lines: list[Text] = []
+    for line in ansi.split("\n"):
+        lines.extend(Text.from_ansi(line).wrap(console, width) or [Text()])
+    lines = lines[-rows:]
+    lines += [Text()] * (rows - len(lines))
+    for line in lines:
+        console.print(line, overflow="crop", no_wrap=True)
+    return console.export_svg(title=title)
 
 
 # --- rendering ---------------------------------------------------------------
@@ -263,11 +306,13 @@ def _chromium(playwright: Any) -> Any:
         return playwright.chromium.launch(executable_path=found[-1])
 
 
-def _render(frames: Sequence[tuple[str, int]], scale: float) -> list[Any]:
-    """Each SVG frame as a Pillow image."""
+def _render(frames: Sequence[tuple[Any, int]], scale: float) -> list[Any]:
+    """Each frame as a Pillow image: an SVG drawn by Chromium, a PNG read."""
     from PIL import Image
     from playwright.sync_api import sync_playwright
 
+    if all(isinstance(frame, bytes) for frame, _ in frames):
+        return [Image.open(io.BytesIO(frame)).convert("RGB") for frame, _ in frames]
     images = []
     with sync_playwright() as playwright:
         browser = _chromium(playwright)
@@ -336,5 +381,6 @@ __all__ = [
     "frozen_clock",
     "recorded_digest",
     "steady_clock",
+    "terminal_frame",
     "write_gif",
 ]
