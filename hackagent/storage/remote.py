@@ -30,9 +30,11 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 from urllib.parse import quote
 from uuid import UUID
 
+import httpx
 from pydantic import AnyUrl
 
 from hackagent.storage._http.client import AuthenticatedClient
+from hackagent.storage._http.retry import RetryingTransport, repeatable_api_call
 from hackagent.storage._http.api.agent import (
     agent_create,
     agent_list,
@@ -320,8 +322,13 @@ class RemoteBackend:
         ``base_url`` may carry a path prefix (``https://host/api``); every
         request is made relative to it. ``verify`` is the TLS verification
         setting, e.g. :attr:`Settings.verify` for a private CA bundle.
+
+        A request the server drops before answering (a closed keep-alive
+        connection, a restarting API) is sent again when that is safe; see
+        :class:`RetryingTransport` and :meth:`_repeatable`.
         """
-        return cls(
+        transport = RetryingTransport(httpx.HTTPTransport(verify=verify))
+        backend = cls(
             AuthenticatedClient(
                 base_url=base_url.strip().rstrip("/"),
                 verify_ssl=verify,
@@ -329,8 +336,11 @@ class RemoteBackend:
                 prefix="Bearer",
                 raise_on_unexpected_status=raise_on_unexpected_status,
                 timeout=timeout,
+                httpx_args={"transport": transport},
             )
         )
+        transport.repeatable = backend._repeatable
+        return backend
 
     def check_connection(self) -> int:
         """Probe the API with this backend's credentials; return the HTTP status.
@@ -386,6 +396,9 @@ class RemoteBackend:
     def __init__(self, client: AuthenticatedClient) -> None:
         self._client = client
         self._context: Optional[OrganizationContext] = None  # cached
+        # Whether the server keeps the id this client gives a new result, so
+        # that sending POST /result again cannot create a second one.
+        self._result_ids_kept = False
 
         # Append-only writes (traces, result-status updates) are persistence
         # only — never read back during a run — so they are pushed onto a queue
@@ -407,6 +420,16 @@ class RemoteBackend:
         self._writer.start()
         # Safety net: flush anything still queued on interpreter exit.
         atexit.register(self.close)
+
+    def _repeatable(self, request: httpx.Request) -> bool:
+        """Whether ``request`` may be sent again after a dropped connection:
+        :func:`repeatable_api_call`, plus creating a result once the server
+        has shown it keeps the client's id."""
+        if request.method == "POST" and request.url.path.rstrip("/").endswith(
+            "/result"
+        ):
+            return self._result_ids_kept
+        return repeatable_api_call(request)
 
     # ── Async write queue ─────────────────────────────────────────────────────
 
@@ -458,6 +481,24 @@ class RemoteBackend:
             raise RuntimeError(
                 f"RemoteBackend: {failures} background audit write(s) failed"
             )
+
+    def _settle_writes(self, status: str, run_notes: str) -> str:
+        """Wait for queued writes before a run ends; return its note.
+
+        Lost writes keep a run from ending COMPLETED (raises, see :meth:`flush`).
+        A FAILED or CANCELLED run still ends so, with the loss in its note: an
+        earlier lost write must not leave the run's end unrecorded.
+        """
+        if status == FinishStatusEnum.COMPLETED.value:
+            self.flush()
+            return run_notes
+        self._drain()
+        lost = self._take_failures()
+        if not lost:
+            return run_notes
+        loss = f"{lost} background audit write(s) failed"
+        logger.error("RemoteBackend: %s; the run ends %s", loss, status)
+        return f"{run_notes} ({loss})" if run_notes else loss
 
     def _drain(self) -> None:
         """Block until every queued write has been attempted."""
@@ -770,8 +811,10 @@ class RemoteBackend:
             RuntimeError: When a queued write failed or the server refuses the update.
         """
         final = _is_final(status)
-        # Lost result writes surface before the run can end as COMPLETED.
-        self.flush()
+        if final:
+            run_notes = self._settle_writes(status, run_notes or "")
+        else:
+            self.flush()
         # The server merges run_config key by key, so the stored spec stays.
         patch: Dict[str, Any] = {}
         if audit is not None:
@@ -906,8 +949,7 @@ class RemoteBackend:
         """
         final = _is_final(status)
         if final:
-            # Lost result writes surface before the run can end as COMPLETED.
-            self.flush()
+            run_notes = self._settle_writes(status, run_notes or "")
         patch: Dict[str, Any] = {}
         if run_config is not None:
             patch["run_config"] = run_config
@@ -1205,10 +1247,16 @@ class RemoteBackend:
     ) -> ResultRecord:
         """Create an unevaluated result on the server (synchronously, for its id).
 
+        The result carries an id of this client's, so a repeat of the request
+        (after a dropped connection) returns the stored result instead of a
+        second one. A server that picks its own id is used as before.
+
         Raises:
-            RuntimeError: When the server does not answer 201.
+            RuntimeError: When the server answers neither 201 nor 200.
         """
+        result_id = uuid.uuid4()
         body = ResultRequest(
+            id=result_id,
             run=run_id,
             goal=goal,
             goal_index=goal_index,
@@ -1217,8 +1265,10 @@ class RemoteBackend:
             agent_specific_data=agent_specific_data,
         )
         resp = result_create.sync_detailed(client=self._client, body=body)
-        if resp.status_code == 201 and resp.parsed:
+        # 200: stored by an earlier try of this same request.
+        if resp.status_code in (200, 201) and resp.parsed:
             r = resp.parsed
+            self._result_ids_kept = str(r.id) == str(result_id)
             return ResultRecord(
                 id=r.id,
                 run_id=run_id,
@@ -1510,7 +1560,8 @@ class RemoteBackend:
         resp = result_trace_create.sync_detailed(
             client=self._client, id=result_id, body=body
         )
-        if resp.status_code != 201:
+        # 200: the step was stored by an earlier try.
+        if resp.status_code not in (200, 201):
             raise RuntimeError(
                 f"RemoteBackend: create_trace for result {result_id} "
                 f"returned {resp.status_code}"
