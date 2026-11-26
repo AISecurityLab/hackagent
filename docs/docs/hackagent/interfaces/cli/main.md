@@ -16,9 +16,9 @@ Main command-line interface for HackAgent security testing toolkit.
 def init(ctx)
 ```
 
-🚀 Initialize HackAgent CLI configuration
+Set up HackAgent for the first time.
 
-Interactive setup wizard for first-time users.
+Asks where results are kept and how much the log says, and saves it.
 
 #### version
 
@@ -29,7 +29,7 @@ Interactive setup wizard for first-time users.
 def version(ctx)
 ```
 
-📋 Show version information
+Show the version, and where the configuration is.
 
 #### tui
 
@@ -40,10 +40,10 @@ def version(ctx)
 def tui(ctx)
 ```
 
-🖥️ Launch the campaign builder
+Open the terminal app: build, check and run a campaign.
 
-Opens a full-screen app that builds a campaign, checks it as you type, and
-runs it. Start from a template or open an existing campaign.yaml.
+The same as `hackagent` alone. Start from an example or open an
+existing campaign.yaml; the app checks it as you type, and runs it.
 
 
 Keys:
@@ -61,9 +61,9 @@ Keys:
 def doctor(ctx)
 ```
 
-🔍 Diagnose common configuration issues
+Check the setup for common problems.
 
-Checks your setup and provides helpful troubleshooting information.
+Says what is missing, and how to fix it.
 
 #### main
 

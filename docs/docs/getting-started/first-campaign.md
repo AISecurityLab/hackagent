@@ -100,14 +100,7 @@ This resolves everything — goals, models, judges — and attacks nothing. It i
 the fastest way to catch a typo or a wrong endpoint:
 
 ```text
-      Campaign: First run
- Goals       1
- Attacks     flipattack
- Judges      1
- Guardrails  off
- Classifier  off
- Escalate    off
-✅ Campaign is valid.
+✓ ready to run · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
 ```
 
 ## 3. Run it

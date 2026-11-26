@@ -10,21 +10,21 @@ Every command the `hackagent` executable offers. Run any of them with `--help` t
 
 | Command | What it does |
 |---|---|
-| `hackagent campaign` | 🎯 Run declarative campaign files (campaign.yaml). |
-| `hackagent config` | 🔧 Manage HackAgent CLI configuration |
-| `hackagent datasets` | 📚 Browse and sample dataset presets |
-| `hackagent doctor` | 🔍 Diagnose common configuration issues |
-| `hackagent examples` | 🧪 Launch built-in examples from the CLI |
-| `hackagent init` | 🚀 Initialize HackAgent CLI configuration |
-| `hackagent results` | 📊 View and manage attack results |
+| `hackagent campaign` | Check and run campaign files (campaign.yaml). |
+| `hackagent config` | Show and change the CLI's settings. |
+| `hackagent datasets` | Browse and sample dataset presets. |
+| `hackagent doctor` | Check the setup for common problems. |
+| `hackagent examples` | List, copy and run the example campaigns. |
+| `hackagent init` | Set up HackAgent for the first time. |
+| `hackagent results` | Show what past runs found. |
 | `hackagent run` | Run a campaign queued from the dashboard on this machine. |
-| `hackagent tui` | 🖥️ Launch the campaign builder |
-| `hackagent version` | 📋 Show version information |
-| `hackagent web` | 🌐 Launch the web dashboard. |
+| `hackagent tui` | Open the terminal app: build, check and run a campaign. |
+| `hackagent version` | Show the version, and where the configuration is. |
+| `hackagent web` | Open the web dashboard. |
 
 ## `hackagent campaign`
 
-🎯 Run declarative campaign files (campaign.yaml).
+Check and run campaign files (campaign.yaml).
 
 ```text
 hackagent campaign [OPTIONS] COMMAND [ARGS]...
@@ -90,7 +90,7 @@ hackagent campaign validate [OPTIONS] [FILE]
 
 ## `hackagent config`
 
-🔧 Manage HackAgent CLI configuration
+Show and change the CLI's settings.
 
 ```text
 hackagent config [OPTIONS] COMMAND [ARGS]...
@@ -153,7 +153,7 @@ hackagent config validate [OPTIONS]
 
 ## `hackagent datasets`
 
-📚 Browse and sample dataset presets
+Browse and sample dataset presets.
 
 ```text
 hackagent datasets [OPTIONS] COMMAND [ARGS]...
@@ -204,7 +204,7 @@ hackagent datasets show [OPTIONS] PRESET
 
 ## `hackagent doctor`
 
-🔍 Diagnose common configuration issues
+Check the setup for common problems.
 
 ```text
 hackagent doctor [OPTIONS]
@@ -212,7 +212,7 @@ hackagent doctor [OPTIONS]
 
 ## `hackagent examples`
 
-🧪 Launch built-in examples from the CLI
+List, copy and run the example campaigns.
 
 ```text
 hackagent examples [OPTIONS] COMMAND [ARGS]...
@@ -220,7 +220,7 @@ hackagent examples [OPTIONS] COMMAND [ARGS]...
 
 ### `hackagent examples copy`
 
-📄 Copy an example campaign here, to edit and run as your own.
+Copy an example campaign here, to edit and run as your own.
 
 ```text
 hackagent examples copy [OPTIONS] NAME [DESTINATION]
@@ -242,7 +242,7 @@ hackagent examples db-tool [OPTIONS]
 
 ### `hackagent examples list`
 
-📋 List every example campaign.
+List every example campaign.
 
 ```text
 hackagent examples list [OPTIONS]
@@ -282,7 +282,7 @@ hackagent examples rag [OPTIONS]
 
 ### `hackagent examples run`
 
-▶ Run one example by name, starting its target if it has one.
+Run one example by name, starting its target if it has one.
 
 ```text
 hackagent examples run [OPTIONS] NAME
@@ -302,7 +302,7 @@ hackagent examples web [OPTIONS]
 
 ## `hackagent init`
 
-🚀 Initialize HackAgent CLI configuration
+Set up HackAgent for the first time.
 
 ```text
 hackagent init [OPTIONS]
@@ -310,7 +310,7 @@ hackagent init [OPTIONS]
 
 ## `hackagent results`
 
-📊 View and manage attack results
+Show what past runs found.
 
 ```text
 hackagent results [OPTIONS] COMMAND [ARGS]...
@@ -358,7 +358,7 @@ hackagent run [OPTIONS] [RUN_ID]
 
 ## `hackagent tui`
 
-🖥️ Launch the campaign builder
+Open the terminal app: build, check and run a campaign.
 
 ```text
 hackagent tui [OPTIONS]
@@ -366,7 +366,7 @@ hackagent tui [OPTIONS]
 
 ## `hackagent version`
 
-📋 Show version information
+Show the version, and where the configuration is.
 
 ```text
 hackagent version [OPTIONS]
@@ -374,7 +374,7 @@ hackagent version [OPTIONS]
 
 ## `hackagent web`
 
-🌐 Launch the web dashboard.
+Open the web dashboard.
 
 ```text
 hackagent web [OPTIONS]

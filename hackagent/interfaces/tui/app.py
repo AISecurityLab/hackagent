@@ -304,9 +304,9 @@ class HackAgentTUI(App):
         self.notify(f"✗ {message}", title="Error", severity="error")
 
     def show_warning(self, message: str) -> None:
-        """Show warning notification with warning sign."""
-        self.notify(f"⚠ {message}", title="Warning", severity="warning")
+        """Show a warning, marked ``!`` as the CLI marks one."""
+        self.notify(f"! {message}", title="Warning", severity="warning")
 
     def show_info(self, message: str) -> None:
-        """Show info notification with info icon."""
-        self.notify(f"ℹ {message}", title="Info", severity="information")
+        """Show a message in passing, unmarked as the CLI says one."""
+        self.notify(message, title="Info", severity="information")

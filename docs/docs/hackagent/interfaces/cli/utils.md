@@ -8,6 +8,15 @@ CLI Utilities
 Common utilities for the HackAgent CLI including error handling,
 formatting, and helper functions.
 
+## Failed Objects
+
+```python
+class Failed(click.ClickException)
+```
+
+A command that failed, said as every failure is: ``✗ what went
+wrong`, in the palette&#x27;s colour, rather than Click&#x27;s `Error:``.
+
 #### handle\_errors
 
 ```python
@@ -38,7 +47,7 @@ Display results in a formatted table
 def display_success(message: str) -> None
 ```
 
-Display success message with formatting
+`✓ message`: something done, or a check passed.
 
 #### display\_warning
 
@@ -46,7 +55,7 @@ Display success message with formatting
 def display_warning(message: str) -> None
 ```
 
-Display warning message with formatting
+`! message`: worth knowing, not a failure.
 
 #### display\_error
 
@@ -54,7 +63,7 @@ Display warning message with formatting
 def display_error(message: str) -> None
 ```
 
-Display error message with formatting
+`✗ message`: something that failed.
 
 #### display\_info
 
@@ -62,7 +71,23 @@ Display error message with formatting
 def display_info(message: str) -> None
 ```
 
-Display info message with formatting
+A message in passing.
+
+#### display\_heading
+
+```python
+def display_heading(title: str) -> None
+```
+
+A section&#x27;s title, with a blank line above it.
+
+#### display\_hint
+
+```python
+def display_hint(what: str, command: str) -> None
+```
+
+What to do next, and the command that does it.
 
 #### confirm\_action
 

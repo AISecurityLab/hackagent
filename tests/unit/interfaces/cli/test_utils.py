@@ -56,11 +56,25 @@ class TestErrorHandling:
         def failing_function():
             raise ApiError("server said no")
 
-        with patch.object(console, "print") as printed:
-            with pytest.raises(click.ClickException):
-                failing_function()
+        with pytest.raises(click.ClickException) as raised:
+            failing_function()
 
-        assert "API Error: server said no" in str(printed.call_args_list[0])
+        assert raised.value.format_message() == "API error: server said no"
+
+    def test_a_failure_is_said_once_as_every_failure_is(self, capsys):
+        """``✗ message``, and not Click's ``Error:`` after a line of ours."""
+        import click
+
+        @handle_errors
+        def failing_function():
+            raise ValueError("no such model")
+
+        with pytest.raises(click.ClickException) as raised:
+            failing_function()
+        raised.value.show()
+
+        err = capsys.readouterr().err
+        assert err.strip() == "✗ no such model"
 
     def test_handle_errors_debug_mode(self):
         """Test error handler shows traceback in debug mode"""

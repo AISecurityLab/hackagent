@@ -476,7 +476,7 @@ class TestWebExample(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         cli.assert_not_called()
         run_campaign.assert_not_called()
-        self.assertIn("tap-site-chatbot.yaml", result.output)
+        self.assertIn("hackagent examples copy web/tap-site-chatbot", result.output)
         self.assertIn("hackagent campaign run", result.output)
 
     def test_every_command_it_suggests_exists(self):

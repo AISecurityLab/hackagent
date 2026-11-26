@@ -10,7 +10,7 @@ Main command-line interface for HackAgent security testing toolkit.
 import os
 
 import click
-from rich.console import Console
+from rich.markup import escape
 from rich.traceback import install
 
 from hackagent._version import get_version
@@ -38,12 +38,21 @@ from hackagent.interfaces.cli.safe_stdio import (
     configure_safe_stdio,
     install_on_click_command,
 )
-from hackagent.interfaces.cli.utils import display_info, handle_errors
+from hackagent.interfaces.brand import APP, QUICK_START
+from hackagent.interfaces.cli.utils import (
+    Failed,
+    console,
+    display_error,
+    display_heading,
+    display_hint,
+    display_info,
+    display_success,
+    display_warning,
+    handle_errors,
+)
 
 # Install rich traceback handler for better error display
 install(show_locals=True)
-
-console = Console()
 
 
 class _CLIGroup(click.Group):
@@ -117,11 +126,11 @@ def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
             ca_bundle=ca_bundle,
         )
     except Exception as e:
-        console.print(f"[bold red]❌ Configuration Error: {e}")
+        display_error(f"Configuration error: {e}")
         if isinstance(e, CredentialError):
-            console.print(
-                "[dim]Set HACKAGENT_API_KEY or correct the api_key reference "
-                "in the configuration file.[/dim]"
+            display_info(
+                "Set HACKAGENT_API_KEY or correct the api_key reference "
+                "in the configuration file."
             )
         ctx.exit(1)
 
@@ -140,23 +149,14 @@ def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
 @click.pass_context
 @handle_errors
 def init(ctx):
-    """🚀 Initialize HackAgent CLI configuration
+    """Set up HackAgent for the first time.
 
-    Interactive setup wizard for first-time users.
+    Asks where results are kept and how much the log says, and saves it.
     """
-
-    # Show the awesome logo first
     from hackagent.interfaces.cli.banner import display_hackagent_splash
 
-    display_hackagent_splash()
+    display_hackagent_splash(console)
 
-    console.print("[bold cyan]🔧 HackAgent CLI Setup Wizard[/bold cyan]")
-    console.print(
-        "[green]Welcome! Let's get you set up for AI agent security testing.[/green]"
-    )
-    console.print()
-
-    # Check if config already exists
     cli_config: CLIConfig = ctx.obj["config"]
 
     if cli_config.default_config_path.exists():
@@ -167,50 +167,48 @@ def init(ctx):
         cli_config.reload()
 
     # Storage backend setup. API keys are never saved to the config file.
-    console.print("\n[cyan]☁️ Storage Backend[/cyan]")
-    console.print("[green]Local (default):[/green] results stay on this machine")
+    display_heading("Where results are kept")
+    console.print("  [accent]local[/accent]   on this machine (the default)")
     console.print(
-        "[green]Remote:[/green] results sync to the HackAgent platform; the API "
-        "key is read from the HACKAGENT_API_KEY environment variable"
+        "  [accent]remote[/accent]  on the HackAgent platform; the API key is "
+        "read from the HACKAGENT_API_KEY environment variable"
     )
 
     use_remote = click.confirm(
-        "Use remote storage (cloud sync)?",
+        "Use remote storage?",
         default=cli_config.backend == "remote",
     )
     cli_config.set_user_override("backend", "remote" if use_remote else "local")
     if use_remote and not cli_config.api_key:
-        console.print(
-            "[yellow]⚠️ HACKAGENT_API_KEY is not set. Export it before running: "
-            "remote storage fails without it.[/yellow]"
+        display_warning(
+            "HACKAGENT_API_KEY is not set. Export it before running: "
+            "remote storage fails without it."
         )
 
-    # Verbosity level setup
-    console.print("\n[cyan]🔊 Verbosity Level Configuration[/cyan]")
-    console.print("0 = ERROR (only errors)")
-    console.print("1 = WARNING (errors + warnings) [default]")
-    console.print("2 = INFO (errors + warnings + info)")
-    console.print("3 = DEBUG (all messages)")
+    display_heading("How much the log says")
+    console.print("  0  errors")
+    console.print("  1  warnings too (the default)")
+    console.print("  2  what the run does")
+    console.print("  3  everything, for debugging")
     verbose_level = click.prompt(
         "Default verbosity level",
         type=int,
         default=cli_config.verbose,
     )
     if not 0 <= verbose_level <= 3:
-        console.print("[yellow]⚠️ Invalid verbosity level, using 1 (WARNING)[/yellow]")
+        display_warning("Invalid verbosity level, using 1 (warnings)")
         verbose_level = 1
 
-    # Save configuration
     cli_config.verbose = verbose_level
 
     try:
         cli_config.save()
-        console.print("\n[bold green]✅ Configuration saved[/bold green]")
+        display_success("Configuration saved")
 
-        console.print("\n[cyan]🧩 FC-Attack Graphviz Setup[/cyan]")
-        console.print(
-            "[dim]Graphviz is needed only for FC-Attack image rendering. "
-            "tFC-Attack does not require it.[/dim]"
+        display_heading("Graphviz, for FC-Attack")
+        display_info(
+            "Graphviz is needed only to draw FC-Attack's images. "
+            "tFC-Attack does not need it."
         )
 
         try:
@@ -218,93 +216,79 @@ def init(ctx):
 
             existing_dot = ensure_graphviz(allow_download=False)
             if existing_dot:
-                console.print(
-                    f"[green]✅ Graphviz detected:[/green] [dim]{existing_dot}[/dim]"
+                display_success(
+                    f"Graphviz found [secondary]{escape(str(existing_dot))}[/secondary]"
                 )
-            else:
-                should_prefetch = click.confirm(
-                    "Graphviz not found. Download portable binaries now for FC-Attack?",
-                    default=True,
-                )
-
-                if should_prefetch:
-                    dot_path = ensure_graphviz(allow_download=True)
-                    if dot_path:
-                        console.print(
-                            f"[green]✅ Graphviz ready:[/green] [dim]{dot_path}[/dim]"
-                        )
-                    else:
-                        console.print(
-                            "[yellow]⚠️ Could not prepare Graphviz automatically. "
-                            "You can still use tFC-Attack or set "
-                            "HACKAGENT_GRAPHVIZ_DOT later.[/yellow]"
-                        )
-                else:
-                    console.print(
-                        "[dim]Skipped Graphviz prefetch. "
-                        "You can run FC-Attack setup later via HACKAGENT_GRAPHVIZ_DOT "
-                        "or by re-running init.[/dim]"
+            elif click.confirm(
+                "Graphviz not found. Download portable binaries now for FC-Attack?",
+                default=True,
+            ):
+                dot_path = ensure_graphviz(allow_download=True)
+                if dot_path:
+                    display_success(
+                        f"Graphviz ready [secondary]{escape(str(dot_path))}[/secondary]"
                     )
+                else:
+                    display_warning(
+                        "Could not prepare Graphviz. tFC-Attack still works, "
+                        "or set HACKAGENT_GRAPHVIZ_DOT later."
+                    )
+            else:
+                display_info(
+                    "Skipped. Set HACKAGENT_GRAPHVIZ_DOT, or run init again, "
+                    "when you need FC-Attack."
+                )
         except Exception as graphviz_exc:
-            console.print(
-                "[yellow]⚠️ Graphviz setup check failed during init:[/yellow] "
-                f"[dim]{graphviz_exc}[/dim]"
+            display_warning(
+                f"Could not check for Graphviz: [secondary]{escape(str(graphviz_exc))}[/secondary]"
             )
 
+        console.print()
         if cli_config.backend == "remote":
-            console.print(
-                "[bold green]✅ Setup complete![/bold green] "
-                "[dim](Remote mode enabled: runs can sync to the HackAgent platform)[/dim]"
-            )
+            display_success("Ready: results go to the HackAgent platform")
         else:
-            console.print(
-                "[bold green]✅ Setup complete![/bold green] "
-                "[dim](Local mode: results stored in ~/.local/share/hackagent/hackagent.db)[/dim]"
+            display_success(
+                "Ready: results stay on this machine "
+                "[secondary](~/.local/share/hackagent/hackagent.db)[/secondary]"
             )
         if cli_config.should_show_info():
-            console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
-            console.print("  [green]hackagent campaign run --help[/green]")
-            console.print("  [green]hackagent agent list[/green]")
+            _next_steps()
 
     except Exception as e:
-        console.print(f"[bold red]❌ Setup failed: {e}[/bold red]")
-        ctx.exit(1)
+        raise Failed(f"Setup failed: {e}") from e
+
+
+def _next_steps() -> None:
+    """The way through a first campaign, as ``hackagent --help`` shows it."""
+    display_heading("Next")
+    for what, command in (*QUICK_START, APP):
+        display_hint(what, command)
 
 
 @cli.command()
 @click.pass_context
 @handle_errors
 def version(ctx):
-    """📋 Show version information"""
-
-    # Display the awesome ASCII logo
+    """Show the version, and where the configuration is."""
     from hackagent.interfaces.cli.banner import display_hackagent_splash
 
-    display_hackagent_splash()
+    display_hackagent_splash(console)
 
-    console.print(f"[bold cyan]HackAgent CLI v{get_version()}[/bold cyan]")
-    console.print(
-        "[bold green]Python Security Testing Toolkit for AI Agents[/bold green]"
-    )
-    console.print()
-
-    # Show configuration status
     cli_config: CLIConfig = ctx.obj["config"]
-
-    console.print(f"[cyan]Config file:[/cyan] {cli_config.default_config_path}")
-
-    console.print()
-    console.print("[dim]For more information, run: hackagent --help")
+    console.print(
+        f"[secondary]Config file:[/secondary] {escape(str(cli_config.default_config_path))}"
+    )
+    display_hint("Every command", "hackagent --help")
 
 
 @cli.command()
 @click.pass_context
 @handle_errors
 def tui(ctx):
-    """🖥️ Launch the campaign builder
+    """Open the terminal app: build, check and run a campaign.
 
-    Opens a full-screen app that builds a campaign, checks it as you type, and
-    runs it. Start from a template or open an existing campaign.yaml.
+    The same as ``hackagent`` alone. Start from an example or open an
+    existing campaign.yaml; the app checks it as you type, and runs it.
 
     \b
     Keys:
@@ -319,9 +303,8 @@ def tui(ctx):
         # Validate configuration before launching TUI
         cli_config.validate()
     except ValueError as e:
-        console.print(f"[bold red]❌ Configuration Error: {e}[/bold red]")
-        console.print("\n[cyan]💡 Quick fix:[/cyan]")
-        console.print("  Run '[green]hackagent init[/green]' to set up configuration")
+        display_error(f"Configuration error: {e}")
+        display_hint("Set it up", "hackagent init")
         ctx.exit(1)
 
     try:
@@ -332,12 +315,11 @@ def tui(ctx):
         app.run()
 
     except ImportError:
-        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
-        console.print("\n[cyan]💡 Install with:[/cyan]")
-        console.print("  pip install textual")
+        display_error("The terminal app needs its dependencies")
+        display_hint("Install them", "pip install 'hackagent[tui]'")
         ctx.exit(1)
     except Exception as e:
-        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
+        display_error(f"The terminal app failed to start: {e}")
         ctx.exit(1)
 
 
@@ -345,13 +327,10 @@ def tui(ctx):
 @click.pass_context
 @handle_errors
 def doctor(ctx):
-    """🔍 Diagnose common configuration issues
+    """Check the setup for common problems.
 
-    Checks your setup and provides helpful troubleshooting information.
+    Says what is missing, and how to fix it.
     """
-    console.print("[bold cyan]🔍 HackAgent CLI Diagnostics")
-    console.print()
-
     cli_config: CLIConfig = ctx.obj["config"]
 
     from hackagent import HackAgent
@@ -361,66 +340,57 @@ def doctor(ctx):
     # before the "database exists" check.
     report = HackAgent(cli_config.settings, backend=object()).doctor()
 
-    console.print("[cyan]📋 Configuration File")
+    display_heading("Configuration")
     if report.config_exists:
-        console.print("[green]✅ Configuration file exists")
+        display_success("Configuration file found")
     else:
-        console.print("[yellow]⚠️ No configuration file found")
-        console.print("   💡 Run 'hackagent init' to create one")
+        display_warning("No configuration file")
+        display_hint("Create one", "hackagent init")
 
-    console.print("\n[cyan]💾 Local Storage")
+    display_heading("Storage")
+    display_info(f"Backend: {cli_config.backend}")
     if report.db_exists:
-        console.print("[green]✅ Local database exists")
+        display_success("Local database found")
     else:
-        console.print("[yellow]⚠️ No local database yet (will be created on first run)")
+        display_warning("No local database yet: the first run creates it")
 
-    console.print("\n[cyan]🗄️ Storage Backend")
-    console.print(f"[green]{cli_config.backend}")
-
-    console.print("\n[cyan]🔐 API Key")
+    display_heading("API key")
     if report.api_key_set:
-        console.print("[green]✅ API key is set")
+        display_success("API key set")
     else:
-        console.print("[yellow]⚠️ API key not set (export HACKAGENT_API_KEY)")
+        display_warning("API key not set: export HACKAGENT_API_KEY")
 
-    console.print("\n[cyan]📦 Dependencies")
+    display_heading("Dependencies")
     if report.pandas_available:
-        console.print("[green]✅ pandas available")
+        display_success("pandas")
     else:
-        console.print("[red]❌ pandas not found")
-        console.print("   💡 Install with: pip install pandas")
-
+        display_error("pandas not found")
+        display_hint("Install it", "pip install pandas")
     if report.yaml_available:
-        console.print("[green]✅ PyYAML available")
+        display_success("PyYAML")
     else:
-        console.print("[yellow]⚠️ PyYAML not found (optional)")
-        console.print("   💡 Install with: pip install pyyaml")
-
-    console.print("\n[cyan]🧩 Graphviz")
+        display_warning("PyYAML not found (optional)")
+        display_hint("Install it", "pip install pyyaml")
     if report.graphviz_dot:
-        console.print(
-            f"[green]✅ Graphviz detected:[/green] [dim]{report.graphviz_dot}[/dim]"
+        display_success(
+            f"Graphviz [secondary]{escape(str(report.graphviz_dot))}[/secondary]"
         )
     elif report.graphviz_error:
-        console.print(
-            f"[yellow]⚠️ Graphviz check failed:[/yellow] [dim]{report.graphviz_error}[/dim]"
+        display_warning(
+            "Could not check for Graphviz: "
+            f"[secondary]{escape(str(report.graphviz_error))}[/secondary]"
         )
     else:
-        console.print("[yellow]⚠️ Graphviz not found (needed only for FC-Attack)")
+        display_warning("Graphviz not found (needed only for FC-Attack)")
 
-    console.print("\n[cyan]📊 Summary")
+    console.print()
     if not report.issues:
-        console.print(
-            "[bold green]✅ All checks passed! You're ready to use HackAgent."
-        )
+        display_success("Ready to use HackAgent")
     else:
-        console.print(
-            f"[bold yellow]⚠️ Found {len(report.issues)} issue(s) that should be addressed."
-        )
-        console.print("\n[cyan]💡 Quick fixes:")
-        console.print("  hackagent init          # Interactive setup")
-        console.print("  hackagent config set    # Set specific values")
-        console.print("  hackagent --help        # Show all commands")
+        count = len(report.issues)
+        display_warning(f"{count} {'issue' if count == 1 else 'issues'} to address")
+        display_hint("Set up again", "hackagent init")
+        display_hint("Change one setting", "hackagent config set")
 
 
 cli.add_command(campaign_cmd.campaign)

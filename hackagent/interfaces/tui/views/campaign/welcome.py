@@ -21,14 +21,11 @@ from textual.widgets import Button, Footer, Static
 
 
 from hackagent.interfaces.tui.keys import key
-from hackagent.interfaces.cli.banner import HACKAGENT_BANNER
+from hackagent.interfaces.brand import BANNER, TAGLINE
 
-TAGLINE = "Red-team an AI model with a campaign you can save, share and re-run."
-
-#: The logo, without the blank lines the constant is written with. There is
-#: one banner and the welcome screen always shows it: a terminal too narrow
-#: for it gets less of it, never a substitute for it.
-LOGO = HACKAGENT_BANNER.strip("\n")
+#: There is one logo and the welcome screen always shows it: a terminal too
+#: narrow for it gets less of it, never a substitute for it.
+LOGO = BANNER
 
 _LOCAL_MODEL: dict[str, Any] = {
     "name": "local-model",

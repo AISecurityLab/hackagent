@@ -109,11 +109,11 @@ class TestDisplayResultDetails(unittest.TestCase):
     def test_renders_enum_status_datetime_and_json_data(self):
         from io import StringIO
 
-        from rich.console import Console
+        from hackagent.interfaces.palette import console as themed
 
         result = _result()
         buffer = StringIO()
-        console = Console(file=buffer, width=120, force_terminal=True)
+        console = themed(file=buffer, width=120, force_terminal=True)
         with patch("hackagent.interfaces.cli.commands.results.console", console):
             _display_result_details(result)
         printed = buffer.getvalue()
@@ -139,7 +139,6 @@ class TestResultsCommands(unittest.TestCase):
         backend = MagicMock()
         backend.get_result.return_value = record
         with (
-            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
             patch("hackagent.client._open_store", return_value=backend),
         ):
             result = runner.invoke(
@@ -158,7 +157,6 @@ class TestResultsCommands(unittest.TestCase):
         backend.get_run.return_value = SimpleNamespace(campaign_run_id=campaign_id)
         backend.get_campaign_run.return_value = SimpleNamespace(audit=_AUDIT)
         with (
-            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
             patch("hackagent.client._open_store", return_value=backend),
         ):
             result = runner.invoke(
@@ -174,7 +172,6 @@ class TestResultsCommands(unittest.TestCase):
         backend = MagicMock()
         backend.get_result.side_effect = RuntimeError("missing")
         with (
-            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
             patch("hackagent.client._open_store", return_value=backend),
         ):
             result = runner.invoke(
@@ -201,7 +198,6 @@ class TestResultsCommands(unittest.TestCase):
         backend = MagicMock()
         backend.list_results.return_value = page
         with (
-            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
             patch("hackagent.client._open_store", return_value=backend),
         ):
             result = runner.invoke(
@@ -210,7 +206,7 @@ class TestResultsCommands(unittest.TestCase):
                 obj={"config": _config()},
             )
         self.assertEqual(result.exit_code, 0, result.output)
-        self.assertIn("Total Results: 1", result.output)
+        self.assertIn("\n1 result\n", result.output)
         self.assertIn("keep-me", result.output)
         self.assertNotIn("skip-me", result.output)
 

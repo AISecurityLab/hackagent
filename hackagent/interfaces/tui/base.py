@@ -8,7 +8,6 @@ Base class for all TUI tabs with common functionality.
 """
 
 import httpx
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
@@ -35,11 +34,10 @@ class HackAgentHeader(Container):
     """
 
     def compose(self) -> ComposeResult:
-        from hackagent.interfaces.cli.banner import HACKAGENT_BANNER
+        from hackagent.interfaces.brand import BANNER
 
-        # Display the ASCII logo as-is (now side-by-side format)
-        logo_text = Text(HACKAGENT_BANNER, style="bold red")
-        yield Static(logo_text)
+        # Coloured by the CSS above: $brand, as on the welcome screen.
+        yield Static(BANNER)
 
 
 class BaseTab(Container):

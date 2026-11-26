@@ -18,7 +18,6 @@ from hackagent.interfaces.cli.commands.results import (
     _display_result_details,
     _display_result_summary,
     _generate_result_statistics,
-    _show_logo_once,
     show,
     summary,
 )
@@ -37,28 +36,6 @@ def _result(**fields):
 
 def _page(items, total=None):
     return SimpleNamespace(items=list(items), total=total or len(items))
-
-
-class TestShowLogoOnce(unittest.TestCase):
-    def setUp(self):
-        if hasattr(_show_logo_once, "_shown"):
-            del _show_logo_once._shown
-        self.addCleanup(
-            lambda: (
-                hasattr(_show_logo_once, "_shown")
-                and delattr(_show_logo_once, "_shown")
-            )
-        )
-
-    def test_splash_is_displayed_only_on_the_first_call(self):
-        with patch(
-            "hackagent.interfaces.cli.banner.display_hackagent_splash"
-        ) as splash:
-            _show_logo_once()
-            _show_logo_once()
-            _show_logo_once()
-
-        splash.assert_called_once_with()
 
 
 class TestResultsShow(unittest.TestCase):
@@ -167,7 +144,7 @@ class TestDisplayResultDetails(unittest.TestCase):
 
         printed = " ".join(str(call.args[0]) for call in printer.call_args_list[1:])
         self.assertIn('"asr": 0.5', printed)
-        self.assertIn("Result Data", printed)
+        self.assertIn("Data", printed)
 
     def test_non_dict_data_is_stringified(self):
         printer = self._render(_result(data="raw blob"))

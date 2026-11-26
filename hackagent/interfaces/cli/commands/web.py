@@ -21,9 +21,14 @@ import time
 import webbrowser
 
 import click
-from rich.console import Console
+from rich.markup import escape
 
-console = Console()
+from hackagent.interfaces.cli.utils import (
+    console,
+    display_error,
+    display_hint,
+    display_warning,
+)
 
 
 def _port_in_use(host: str, port: int) -> bool:
@@ -76,9 +81,8 @@ def _free_port(host: str, port: int) -> bool:
     for pid in pids:
         if not _is_hackagent_process(pid):
             return False  # foreign process — never kill it
-        console.print(
-            f"[yellow]Stopping previous HackAgent instance on port {port} "
-            f"(PID {pid})…[/yellow]"
+        display_warning(
+            f"Stopping the previous HackAgent dashboard on port {port} (PID {pid})…"
         )
         try:
             os.kill(int(pid), signal.SIGTERM)
@@ -98,9 +102,8 @@ def _open_browser_when_up(url: str, host: str, port: int, timeout: float = 15.0)
         while time.monotonic() < deadline:
             if _port_in_use(host, port):
                 if not webbrowser.open(url):
-                    console.print(
-                        "[yellow]⚠️ Could not auto-open a browser. "
-                        "Open the URL above manually.[/yellow]"
+                    display_warning(
+                        "Could not open a browser: open the address above yourself."
                     )
                 return
             time.sleep(0.25)
@@ -142,7 +145,7 @@ def _open_browser_when_up(url: str, host: str, port: int, timeout: float = 15.0)
 )
 @click.pass_context
 def web(ctx, host, port, db_path, force_local, no_browser):
-    """🌐 Launch the web dashboard.
+    """Open the web dashboard.
 
     With ``--backend remote``, the dashboard shows your hosted HackAgent data;
     the key stays in this process and is never exposed to the browser. With
@@ -165,10 +168,8 @@ def web(ctx, host, port, db_path, force_local, no_browser):
     try:
         from hackagent.interfaces.web import MissingBundleError, create_app
     except ImportError as exc:
-        console.print(
-            f"[bold red]❌ Web UI dependencies are not installed: {exc}[/bold red]"
-        )
-        console.print("\n[cyan]Install with:[/cyan] pip install 'hackagent[web]'")
+        display_error(f"The dashboard needs its dependencies: {exc}")
+        display_hint("Install them", "pip install 'hackagent[web]'")
         ctx.exit(1)
         return
 
@@ -187,34 +188,31 @@ def web(ctx, host, port, db_path, force_local, no_browser):
         app = create_app(session, hosts=[host])
     except MissingBundleError as exc:
         session.close()
-        console.print(f"[bold red]❌ {exc}[/bold red]")
+        display_error(escape(str(exc)))
         ctx.exit(1)
         return
 
     url = f"http://{host}:{port}"
 
     console.print()
-    console.print("[bold]🌐  HackAgent Dashboard[/bold]")
-    console.print(f"    [cyan]→  {url}[/cyan]")
+    console.print("[heading]HackAgent dashboard[/heading]")
+    console.print(f"  [accent]{url}[/accent]")
     if session.settings.mode is Mode.REMOTE:
-        console.print("    Mode : [cyan]remote[/cyan]")
-        console.print(f"    API  : [dim]{app.config['HACKAGENT_TARGET']}[/dim]")
+        console.print("  [secondary]backend[/secondary]  remote")
+        console.print(
+            f"  [secondary]API[/secondary]      {escape(str(app.config['HACKAGENT_TARGET']))}"
+        )
     else:
         resolved_db = db_path or "~/.local/share/hackagent/hackagent.db"
-        console.print("    Mode : [cyan]local[/cyan]")
-        console.print(f"    DB   : [dim]{resolved_db}[/dim]")
+        console.print("  [secondary]backend[/secondary]  local")
+        console.print(f"  [secondary]database[/secondary] {escape(str(resolved_db))}")
     console.print()
-    console.print("    Press [bold]Ctrl+C[/bold] to stop.\n")
+    console.print("  [secondary]ctrl+c to stop[/secondary]\n")
 
     # ── Reclaim the port only if a previous HackAgent instance holds it ──────
     if not _free_port(host, port):
-        console.print(
-            f"[bold red]❌ Port {port} is already in use by another process.[/bold red]"
-        )
-        console.print(
-            "[cyan]Pick a free port with[/cyan] [bold]--port <PORT>[/bold] "
-            "[cyan]or stop the conflicting process first.[/cyan]"
-        )
+        display_error(f"Port {port} is already in use by another process.")
+        display_hint("Pick a free one", "hackagent web --port PORT")
         session.close()
         ctx.exit(1)
         return

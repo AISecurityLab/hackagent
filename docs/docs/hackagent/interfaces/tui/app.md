@@ -128,7 +128,7 @@ Show error notification with X mark.
 def show_warning(message: str) -> None
 ```
 
-Show warning notification with warning sign.
+Show a warning, marked `!` as the CLI marks one.
 
 #### show\_info
 
@@ -136,5 +136,5 @@ Show warning notification with warning sign.
 def show_info(message: str) -> None
 ```
 
-Show info notification with info icon.
+Show a message in passing, unmarked as the CLI says one.
 

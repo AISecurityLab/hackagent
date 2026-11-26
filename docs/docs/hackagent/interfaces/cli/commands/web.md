@@ -52,7 +52,7 @@ from the dashboard run on this machine, in this process.
 def web(ctx, host, port, db_path, force_local, no_browser)
 ```
 
-🌐 Launch the web dashboard.
+Open the web dashboard.
 
 With `--backend remote`, the dashboard shows your hosted HackAgent data;
 the key stays in this process and is never exposed to the browser. With

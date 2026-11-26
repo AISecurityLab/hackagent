@@ -19,13 +19,18 @@ from typing import Any, Iterator, Optional
 from uuid import UUID
 
 import click
-from rich.console import Console
 
 from hackagent._version import get_version
 from hackagent.interfaces.cli.logging_setup import show_run
-from hackagent.interfaces.cli.utils import display_error, display_warning, handle_errors
-
-console = Console()
+from hackagent.interfaces.cli.utils import (
+    console,
+    display_error,
+    display_hint,
+    display_info,
+    display_success,
+    display_warning,
+    handle_errors,
+)
 
 EXIT_REFUSED = 1
 EXIT_INVALID_KEY = 2
@@ -54,7 +59,7 @@ def ask_before_cancelling(confirm=None) -> Iterator[None]:
     def handler(signum: int, frame: Any) -> None:
         if (confirm or confirm_cancel)():
             raise KeyboardInterrupt
-        console.print("[dim]Continuing the run.[/dim]")
+        display_info("Continuing the run.")
 
     try:
         previous = signal.signal(signal.SIGINT, handler)
@@ -190,8 +195,8 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
         _check_environment(spec)
 
         if settings.dashboard_url and not as_json:
-            console.print(
-                f"Follow it at {settings.dashboard_url}/attacks?runId={run_uuid}"
+            display_hint(
+                "Follow it", f"{settings.dashboard_url}/attacks?runId={run_uuid}"
             )
         try:
             with ask_before_cancelling(), show_run(as_json):
@@ -221,7 +226,7 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
             )
         )
     elif outcome.status == "COMPLETED":
-        console.print(f"[green]Run {outcome.status.lower()}.[/green]")
+        display_success(f"Run {outcome.status.lower()}.")
     else:
         display_error(f"Run {outcome.status.lower()}: {outcome.note}")
     raise SystemExit(0 if outcome.status == "COMPLETED" else 1)

@@ -42,7 +42,11 @@ class TestCLIVersion(unittest.TestCase):
             cli, ["--config-file", "/nonexistent-hackagent-test-config", "version"]
         )
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("HackAgent CLI", result.output)
+        from hackagent._version import get_version
+        from hackagent.interfaces.brand import TAGLINE
+
+        self.assertIn(f"v{get_version()}", result.output)
+        self.assertIn(TAGLINE, result.output)
 
 
 class TestCLIHelp(unittest.TestCase):
@@ -55,8 +59,14 @@ class TestCLIHelp(unittest.TestCase):
             cli, ["--config-file", "/nonexistent-hackagent-test-config", "--help"]
         )
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("HackAgent CLI", result.output)
-        self.assertIn("Quick Start", result.output)
+        from hackagent.interfaces.brand import QUICK_START, TAGLINE
+
+        self.assertIn(TAGLINE, result.output)
+        self.assertIn("Quick start", result.output)
+        # The welcome screen's way through, as commands that exist.
+        for _, command in QUICK_START:
+            self.assertIn(command, result.output)
+        self.assertNotIn("agent create", result.output)
 
     def test_help_shows_commands(self):
         """Test help output lists available commands."""
@@ -225,7 +235,7 @@ class TestCLIDoctor(unittest.TestCase):
             cli, ["--config-file", "/nonexistent-hackagent-test-config", "doctor"]
         )
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("API key is set", result.output)
+        self.assertIn("✓ API key set", result.output)
 
 
 class TestCLINoCommand(unittest.TestCase):

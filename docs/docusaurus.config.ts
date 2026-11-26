@@ -105,7 +105,7 @@ const MOVED_API_PAGES: Record<string, string[]> = {
 
 const config: Config = {
   title: 'HackAgent',
-  tagline: 'Test the security of your agents and models',
+  tagline: 'The open-source red-team toolkit for AI models and agents',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here

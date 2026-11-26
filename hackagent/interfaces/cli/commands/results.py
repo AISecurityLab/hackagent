@@ -11,29 +11,21 @@ View and manage attack results.
 from datetime import datetime
 
 import click
-from rich.console import Console
 from rich.table import Table
 
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.cli.utils import handle_errors
-
-console = Console()
+from hackagent.interfaces.cli.utils import (
+    Failed,
+    console,
+    display_heading,
+    display_warning,
+    handle_errors,
+)
 
 
 @click.group()
 def results():
-    """📊 View and manage attack results"""
-    # Show logo when results commands are used
-    _show_logo_once()
-
-
-def _show_logo_once():
-    """Show the logo once per session"""
-    if not hasattr(_show_logo_once, "_shown"):
-        from hackagent.interfaces.cli.banner import display_hackagent_splash
-
-        display_hackagent_splash()
-        _show_logo_once._shown = True
+    """Show what past runs found."""
 
 
 @results.command()
@@ -50,7 +42,7 @@ def show(ctx, result_id):
         from hackagent import HackAgent
 
         session = HackAgent(cli_config.settings)
-        with console.status(f"[bold green]Fetching result {result_id}..."):
+        with console.status(f"Fetching result {result_id}…"):
             result = session.result(result_id)
             audit = _campaign_audit(session, result)
 
@@ -61,7 +53,7 @@ def show(ctx, result_id):
     except click.ClickException:
         raise
     except Exception as e:
-        raise click.ClickException(f"Failed to fetch result: {e}")
+        raise Failed(f"Failed to fetch result: {e}")
 
 
 def _campaign_audit(session, result):
@@ -88,16 +80,16 @@ def _display_audit(audit) -> None:
         console.print()
         console.print(audit_markup(audit))
     except (TypeError, ValueError):
-        console.print("[yellow]Judge audit recorded but could not be read.")
+        display_warning("Judge audit recorded but could not be read.")
 
 
 def _display_result_details(result) -> None:
     """Display detailed information about a result"""
 
     # Basic info table
-    table = Table(title="Result Details", show_header=True, header_style="bold cyan")
-    table.add_column("Property", style="cyan")
-    table.add_column("Value", style="green")
+    table = Table(title="Result", show_header=True, header_style="heading")
+    table.add_column("Property", style="accent")
+    table.add_column("Value")
 
     table.add_row("ID", str(result.id))
 
@@ -128,7 +120,7 @@ def _display_result_details(result) -> None:
 
     # Show additional data if available
     if hasattr(result, "data") and result.data:
-        console.print("\n[bold cyan]📋 Result Data:")
+        display_heading("Data")
         try:
             import json
 
@@ -136,9 +128,9 @@ def _display_result_details(result) -> None:
                 data_str = json.dumps(result.data, indent=2)
             else:
                 data_str = str(result.data)
-            console.print(f"[dim]{data_str}")
+            console.print(data_str, style="secondary", markup=False)
         except (json.JSONDecodeError, TypeError, AttributeError):
-            console.print(f"[dim]{result.data}")
+            console.print(str(result.data), style="secondary", markup=False)
 
 
 @results.command()
@@ -164,7 +156,7 @@ def summary(ctx, status, agent, attack_type, days):
         session = HackAgent(cli_config.settings)
         result_items = []
         page = 1
-        with console.status("[bold green]Analyzing results..."):
+        with console.status("Analysing results…"):
             while True:
                 page_data = session.results(page=page, page_size=200)
                 result_items.extend(page_data.items)
@@ -222,7 +214,7 @@ def summary(ctx, status, agent, attack_type, days):
         _display_result_summary(stats)
 
     except Exception as e:
-        raise click.ClickException(f"Failed to generate summary: {e}")
+        raise Failed(f"Failed to generate summary: {e}")
 
 
 def _generate_result_statistics(results, days: int) -> dict:
@@ -288,16 +280,17 @@ def _generate_result_statistics(results, days: int) -> dict:
 
 def _display_result_summary(stats: dict) -> None:
     """Display result statistics summary"""
-    console.print(f"\n[bold cyan]📊 Results Summary (Last {stats['period_days']} days)")
-    console.print(f"[green]Total Results: {stats['total_results']}")
+    display_heading(f"Results of the last {stats['period_days']} days")
+    total = stats["total_results"]
+    console.print(f"{total} {'result' if total == 1 else 'results'}")
 
     # Status breakdown
     if stats["status_breakdown"]:
-        console.print("\n[bold cyan]📈 By Status:")
-        status_table = Table(show_header=True, header_style="bold cyan")
-        status_table.add_column("Status", style="cyan")
-        status_table.add_column("Count", style="green")
-        status_table.add_column("Percentage", style="yellow")
+        display_heading("By status")
+        status_table = Table(show_header=True, header_style="heading")
+        status_table.add_column("Status", style="accent")
+        status_table.add_column("Count", justify="right")
+        status_table.add_column("Share", justify="right")
 
         for status, count in stats["status_breakdown"].items():
             percentage = (
@@ -311,10 +304,10 @@ def _display_result_summary(stats: dict) -> None:
 
     # Top agents
     if stats["agent_breakdown"]:
-        console.print("\n[bold cyan]🤖 By Agent:")
-        agent_table = Table(show_header=True, header_style="bold cyan")
-        agent_table.add_column("Agent", style="cyan")
-        agent_table.add_column("Count", style="green")
+        display_heading("By agent")
+        agent_table = Table(show_header=True, header_style="heading")
+        agent_table.add_column("Agent", style="accent")
+        agent_table.add_column("Count", justify="right")
 
         # Sort by count and show top 5
         sorted_agents = sorted(
@@ -327,10 +320,10 @@ def _display_result_summary(stats: dict) -> None:
 
     # Attack types
     if stats["attack_type_breakdown"]:
-        console.print("\n[bold cyan]🎯 By Attack Type:")
-        attack_table = Table(show_header=True, header_style="bold cyan")
-        attack_table.add_column("Attack Type", style="cyan")
-        attack_table.add_column("Count", style="green")
+        display_heading("By attack")
+        attack_table = Table(show_header=True, header_style="heading")
+        attack_table.add_column("Attack", style="accent")
+        attack_table.add_column("Count", justify="right")
 
         for attack_type, count in stats["attack_type_breakdown"].items():
             attack_table.add_row(attack_type, str(count))
@@ -338,10 +331,10 @@ def _display_result_summary(stats: dict) -> None:
         console.print(attack_table)
 
     # NEW: Show average metrics
-    console.print("\n[bold cyan]📊 Average Evaluation Metrics Across Results:")
-    metrics_table = Table(show_header=True, header_style="bold cyan")
-    metrics_table.add_column("Metric", style="cyan")
-    metrics_table.add_column("Average", style="green")
+    display_heading("Average evaluation metrics")
+    metrics_table = Table(show_header=True, header_style="heading")
+    metrics_table.add_column("Metric", style="accent")
+    metrics_table.add_column("Average", justify="right")
 
     metrics_table.add_row("Majority Vote ASR", f"{stats['avg_majority_vote_asr']:.3f}")
     metrics_table.add_row("Fleiss' Kappa", f"{stats['avg_fleiss_kappa']:.3f}")

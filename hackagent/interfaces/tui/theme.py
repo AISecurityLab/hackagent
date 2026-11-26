@@ -21,12 +21,14 @@ Two rules keep the interface coherent:
 from dataclasses import dataclass
 from typing import Any
 
+from hackagent.interfaces.palette import BRAND
+
 # --------------------------------------------------------------------------
 # Brand palette
 # --------------------------------------------------------------------------
 
-BRAND_RED = "#ff0000"
-"""Primary brand red — borders, logo, accents."""
+BRAND_RED = BRAND
+"""Primary brand red — borders, logo, accents: the palette's brand colour."""
 
 BRAND_RED_DARK = "#8b0000"
 """Dark red — headers, active tabs, primary buttons."""

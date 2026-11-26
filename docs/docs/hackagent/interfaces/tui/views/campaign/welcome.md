@@ -11,9 +11,8 @@ something worth reading rather than an empty form.
 
 #### LOGO
 
-The logo, without the blank lines the constant is written with. There is
-one banner and the welcome screen always shows it: a terminal too narrow
-for it gets less of it, never a substitute for it.
+There is one logo and the welcome screen always shows it: a terminal too
+narrow for it gets less of it, never a substitute for it.
 
 ## Template Objects
 

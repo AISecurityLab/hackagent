@@ -19,20 +19,22 @@ from pathlib import Path
 from typing import Any, Optional
 
 import click
-from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
 from hackagent.interfaces.checks import issue_markup, ready_markup, to_fix_markup
-from hackagent.interfaces.cli.utils import display_error, display_success, handle_errors
-from hackagent.interfaces.palette import FAILED, paint
-
-console = Console()
+from hackagent.interfaces.cli.utils import (
+    Failed,
+    console,
+    display_error,
+    display_success,
+    handle_errors,
+)
 
 
 @click.group()
 def campaign() -> None:
-    """🎯 Run declarative campaign files (campaign.yaml)."""
+    """Check and run campaign files (campaign.yaml)."""
 
 
 @campaign.command("list")
@@ -40,8 +42,8 @@ def list_attacks() -> None:
     """List available attack techniques, their category and tags."""
     from hackagent.client import catalog_entries
 
-    table = Table(title="Campaign attacks")
-    table.add_column("Name", no_wrap=True)
+    table = Table(title="Campaign attacks", header_style="heading")
+    table.add_column("Name", style="name", no_wrap=True)
     table.add_column("Category")
     table.add_column("Tags")
     table.add_column("Description")
@@ -223,7 +225,7 @@ def run(
             gateway_url, gateway_key = settings.base_url, settings.api_key
         spec = bind_gateway(spec, gateway_url)
         if uses_gateway(spec) and not gateway_key:
-            raise click.ClickException(
+            raise Failed(
                 "This campaign uses the HackAgent gateway; set an API key with: "
                 "hackagent config set --api-key"
             )
@@ -250,7 +252,7 @@ def run(
                 ),
             )
         except (ValueError, RuntimeError) as exc:
-            raise click.ClickException(str(exc)) from exc
+            raise Failed(str(exc)) from exc
 
     with show_run(as_json):
         if tracked:
@@ -287,7 +289,7 @@ def validate(file: str) -> None:
     try:
         resolved = resolve_campaign(spec, settings=_runtime_settings())
     except Exception as exc:
-        console.print(f"{paint('✗', FAILED)} campaign rejected: {escape(str(exc))}")
+        display_error(f"campaign rejected: {escape(str(exc))}")
         raise SystemExit(1) from exc
     # What resolving found, unless the log has just said it (at INFO).
     console.print(
@@ -306,7 +308,7 @@ def _load_or_report(path: Path) -> Any:
     except CampaignInvalid as exc:
         _report(exc.issues)
     except (CredentialError, FileNotFoundError, ValueError) as exc:
-        console.print(f"{paint('✗', FAILED)} {escape(str(exc))}")
+        display_error(escape(str(exc)))
     raise SystemExit(1)
 
 

@@ -1,9 +1,9 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""The colours of what a run found, wherever it is shown: the log in a
-terminal and in the TUI's run view, the TUI's results and builder, the
-CLI's audit tables. Nothing else names a colour for these.
+"""The colours of HackAgent, wherever it is shown: the log in a terminal and
+in the TUI's run view, the TUI's results and builder, every CLI command.
+Nothing else names a colour.
 
 **Defender polarity.** A result is coloured from the point of view of the
 target, never the attacker: a jailbreak is red, a mitigated goal green, and
@@ -14,7 +14,12 @@ warning, and what is not decided yet is dim.
 
 from __future__ import annotations
 
+from rich.console import Console
 from rich.markup import escape
+from rich.theme import Theme
+
+#: The logo's colour, on the welcome screen and on the command line.
+BRAND = "#ff0000"
 
 #: A log line's level name, by severity.
 LEVEL_STYLES: dict[str, str] = {
@@ -61,6 +66,30 @@ TAG_STYLES: tuple[str, ...] = (
 )
 
 
+#: Something worth knowing that is not a failure.
+WARNING = "yellow"
+
+#: The same colours by what they mean, for a CLI command's markup and tables
+#: (``[passed]✓[/passed] saved``), so no command picks a colour of its own.
+THEME = Theme(
+    {
+        "brand": f"bold {BRAND}",
+        "heading": f"bold {ACCENT}",
+        "accent": ACCENT,
+        "name": NAME,
+        "passed": PASSED,
+        "failed": FAILED,
+        "warning": WARNING,
+        "secondary": SECONDARY,
+    }
+)
+
+
+def console(**options: object) -> Console:
+    """A Rich console that knows :data:`THEME`'s names."""
+    return Console(theme=THEME, **options)  # type: ignore[arg-type]
+
+
 def paint(text: str, style: str) -> str:
     """``text``, escaped, as Rich markup in ``style`` (as is without one)."""
     said = escape(text)
@@ -74,14 +103,18 @@ def verdict(word: str) -> str:
 
 __all__ = [
     "ACCENT",
+    "BRAND",
     "FAILED",
     "LEVEL_STYLES",
     "NAME",
     "PASSED",
     "SECONDARY",
     "TAG_STYLES",
+    "THEME",
     "UNDECIDED",
     "VERDICT_STYLES",
+    "WARNING",
+    "console",
     "paint",
     "verdict",
 ]

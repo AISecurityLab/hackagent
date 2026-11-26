@@ -14,7 +14,7 @@ Launch ready-to-run example scenarios from the CLI.
 def examples()
 ```
 
-🧪 Launch built-in examples from the CLI
+List, copy and run the example campaigns.
 
 #### list\_examples
 
@@ -24,7 +24,7 @@ def examples()
 def list_examples()
 ```
 
-📋 List every example campaign.
+List every example campaign.
 
 #### CAMPAIGN\_SCHEMA\_URL
 
@@ -43,7 +43,7 @@ Where the docs site serves the campaign JSON Schema.
 def copy_example(name: str, destination: Optional[Path], force: bool)
 ```
 
-📄 Copy an example campaign here, to edit and run as your own.
+Copy an example campaign here, to edit and run as your own.
 
 DESTINATION is a file or a folder, the current folder by default.
 
@@ -56,7 +56,7 @@ DESTINATION is a file or a folder, the current folder by default.
 def run_example(name: str)
 ```
 
-▶ Run one example by name, starting its target if it has one.
+Run one example by name, starting its target if it has one.
 
 #### ollama
 

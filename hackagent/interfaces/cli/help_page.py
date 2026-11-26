@@ -4,67 +4,41 @@
 """Rich-formatted ``hackagent --help`` page for the top-level CLI group."""
 
 import click
-from rich.console import Console
-from rich.panel import Panel
 
-from hackagent._version import get_version
 from hackagent import resolve_remote_base_url
-
-console = Console()
+from hackagent.interfaces.brand import APP, QUICK_START
+from hackagent.interfaces.palette import console as themed
 
 
 def _render_rich_help(ctx: click.Context) -> None:
     """Print the Rich-formatted help page for the main CLI group."""
     from rich.rule import Rule
-    from rich.syntax import Syntax
     from rich.table import Table
-    from rich.text import Text
 
-    from hackagent.interfaces.cli.banner import HACKAGENT_BANNER
+    from hackagent.interfaces.cli.banner import splash
 
-    c = Console()
-    version = get_version()
+    c = themed()
 
     # ── Logo ──────────────────────────────────────────────────────────────────
-    c.print(
-        Panel(
-            Text(HACKAGENT_BANNER, style="bold dark_red"),
-            border_style="red",
-            padding=(0, 2),
-            expand=False,
-        )
-    )
-    c.print(
-        f"  [bold white]HackAgent CLI[/bold white] [dim]v{version}[/dim]"
-        f"  [dim]·[/dim]  [italic cyan]AI Agent Security Testing Toolkit[/italic cyan]\n"
-    )
+    c.print(splash())
+    c.print()
 
     # ── Quick Start ───────────────────────────────────────────────────────────
-    c.print(Rule("[bold]Quick Start[/bold]", style="dim"))
-    qs_code = (
-        "# 1. Interactive first-time setup\n"
-        "hackagent init\n\n"
-        "# 2. Register a target agent\n"
-        'hackagent agent create --name "my-bot" --type google-adk \\\n'
-        "    --endpoint http://localhost:8000\n\n"
-        "# 3. Run a campaign\n"
-        "hackagent campaign run campaign.yaml\n\n"
-        "# 4. Review findings\n"
-        "hackagent results summary"
-    )
-    c.print(
-        Panel(
-            Syntax(qs_code, "bash", theme="monokai", background_color="default"),
-            border_style="dim",
-            padding=(0, 1),
-        )
-    )
+    # The welcome screen's way through a first campaign, as commands.
+    c.print(Rule("[heading]Quick start[/heading]", style="secondary"))
+    steps = Table.grid(padding=(0, 3))
+    steps.add_column(style="secondary", no_wrap=True)
+    steps.add_column(style="accent", no_wrap=True)
+    for number, (what, command) in enumerate(QUICK_START, 1):
+        steps.add_row(f"  {number}. {what}", command)
+    steps.add_row(f"  {APP[0]}", APP[1])
+    c.print(steps)
     c.print()
 
     # ── Commands ──────────────────────────────────────────────────────────────
-    c.print(Rule("[bold]Commands[/bold]", style="dim"))
+    c.print(Rule("[heading]Commands[/heading]", style="secondary"))
     cmd_table = Table.grid(padding=(0, 3))
-    cmd_table.add_column(style="bold cyan", no_wrap=True, min_width=12)
+    cmd_table.add_column(style="accent", no_wrap=True, min_width=12)
     cmd_table.add_column()
     group: click.Group = ctx.command  # type: ignore[assignment]
     for name in group.list_commands(ctx):
@@ -76,10 +50,10 @@ def _render_rich_help(ctx: click.Context) -> None:
     c.print()
 
     # ── Options ───────────────────────────────────────────────────────────────
-    c.print(Rule("[bold]Options[/bold]", style="dim"))
+    c.print(Rule("[heading]Options[/heading]", style="secondary"))
     opt_table = Table.grid(padding=(0, 3))
-    opt_table.add_column(style="bold yellow", no_wrap=True, min_width=36)
-    opt_table.add_column(style="dim")
+    opt_table.add_column(style="accent", no_wrap=True, min_width=36)
+    opt_table.add_column(style="secondary")
     for param in ctx.command.params:
         if not isinstance(param, click.Option):
             continue
@@ -97,10 +71,10 @@ def _render_rich_help(ctx: click.Context) -> None:
     c.print()
 
     # ── Environment Variables ─────────────────────────────────────────────────
-    c.print(Rule("[bold]Environment Variables[/bold]", style="dim"))
+    c.print(Rule("[heading]Environment variables[/heading]", style="secondary"))
     env_table = Table.grid(padding=(0, 3))
-    env_table.add_column(style="bold magenta", no_wrap=True, min_width=24)
-    env_table.add_column(style="dim")
+    env_table.add_column(style="accent", no_wrap=True, min_width=24)
+    env_table.add_column(style="secondary")
     env_table.add_row("  HACKAGENT_API_KEY", "API key (overrides config file value)")
     env_table.add_row(
         "  HACKAGENT_BASE_URL", f"API base URL (default: {resolve_remote_base_url()})"
@@ -112,26 +86,26 @@ def _render_rich_help(ctx: click.Context) -> None:
     c.print()
 
     # ── Operating Modes ───────────────────────────────────────────────────────
-    c.print(Rule("[bold]Operating Modes[/bold]", style="dim"))
+    c.print(Rule("[heading]Where results are kept[/heading]", style="secondary"))
     mode_table = Table.grid(padding=(0, 3))
     mode_table.add_column(no_wrap=True, min_width=10)
-    mode_table.add_column(style="dim")
+    mode_table.add_column(style="secondary")
     mode_table.add_row(
-        "  [bold green]Local[/bold green]",
-        "No API key needed — results stored in local SQLite database",
+        "  local",
+        "No API key needed: results stay in a SQLite database on this machine",
     )
     mode_table.add_row(
-        "  [bold cyan]Cloud[/bold cyan]",
-        "With HACKAGENT_API_KEY — results synced to HackAgent cloud",
+        "  remote",
+        "With HACKAGENT_API_KEY: results go to the HackAgent platform",
     )
     c.print(mode_table)
     c.print()
 
     # ── Footer ────────────────────────────────────────────────────────────────
-    c.print(Rule(style="dim"))
+    c.print(Rule(style="secondary"))
     c.print(
-        "  [dim]Docs[/dim]  [link=https://docs.hackagent.dev]https://docs.hackagent.dev[/link]"
-        "    [dim]API Keys[/dim]  [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]\n"
+        "  [secondary]Docs[/secondary]  [link=https://docs.hackagent.dev]https://docs.hackagent.dev[/link]"
+        "    [secondary]API keys[/secondary]  [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]\n"
     )
 
 

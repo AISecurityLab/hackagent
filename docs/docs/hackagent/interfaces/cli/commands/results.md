@@ -14,7 +14,7 @@ View and manage attack results.
 def results()
 ```
 
-📊 View and manage attack results
+Show what past runs found.
 
 #### show
 

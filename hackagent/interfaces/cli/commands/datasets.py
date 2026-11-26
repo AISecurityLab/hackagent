@@ -13,13 +13,17 @@ import json
 from typing import Any, Dict, List, Optional
 
 import click
-from rich.console import Console
 from rich.table import Table
 
 from hackagent.client import load_goals, preset as get_preset, presets
-from hackagent.interfaces.cli.utils import display_info, handle_errors
-
-console = Console()
+from hackagent.interfaces.cli.utils import (
+    Failed,
+    console,
+    display_heading,
+    display_hint,
+    display_info,
+    handle_errors,
+)
 
 # Fields that are metadata for display, not raw runtime config only.
 _DISPLAY_SKIP_KEYS = frozenset({"description"})
@@ -27,8 +31,7 @@ _DISPLAY_SKIP_KEYS = frozenset({"description"})
 
 @click.group()
 def datasets():
-    """📚 Browse and sample dataset presets"""
-    pass
+    """Browse and sample dataset presets."""
 
 
 def _source_for_preset(config: Dict[str, Any]) -> str:
@@ -106,11 +109,11 @@ def list_cmd(provider: Optional[str], query: Optional[str], as_json: bool):
     table = Table(
         title=f"Dataset Presets ({len(filtered)})",
         show_header=True,
-        header_style="bold cyan",
+        header_style="heading",
     )
-    table.add_column("Name", style="cyan", no_wrap=True)
-    table.add_column("Provider", style="green")
-    table.add_column("Source", style="dim", overflow="fold")
+    table.add_column("Name", style="name", no_wrap=True)
+    table.add_column("Provider")
+    table.add_column("Source", style="secondary", overflow="fold")
     table.add_column("Description", overflow="fold")
 
     for name, config in filtered.items():
@@ -122,10 +125,9 @@ def list_cmd(provider: Optional[str], query: Optional[str], as_json: bool):
         )
 
     console.print(table)
-    console.print(
-        "\n[dim]Tip:[/dim] use [cyan]hackagent datasets show <name>[/cyan] "
-        "or [cyan]hackagent datasets sample <name>[/cyan]"
-    )
+    console.print()
+    display_hint("About one", "hackagent datasets show NAME")
+    display_hint("Some of its goals", "hackagent datasets sample NAME")
 
 
 @datasets.command("show")
@@ -149,10 +151,10 @@ def show_cmd(preset: str, as_json: bool):
     table = Table(
         title=f"Dataset Preset: {preset}",
         show_header=True,
-        header_style="bold cyan",
+        header_style="heading",
     )
-    table.add_column("Property", style="cyan")
-    table.add_column("Value", style="green", overflow="fold")
+    table.add_column("Property", style="accent")
+    table.add_column("Value", overflow="fold")
 
     description = config.get("description", "No description")
     table.add_row("Description", str(description))
@@ -167,9 +169,8 @@ def show_cmd(preset: str, as_json: bool):
         table.add_row(key, rendered)
 
     console.print(table)
-    console.print(
-        f"\n[dim]Sample goals:[/dim] [cyan]hackagent datasets sample {preset} --limit 5[/cyan]"
-    )
+    console.print()
+    display_hint("Some of its goals", f"hackagent datasets sample {preset} --limit 5")
 
 
 @datasets.command("sample")
@@ -194,12 +195,12 @@ def sample_cmd(
     """Load and print sample goals from a dataset preset"""
 
     if limit < 1:
-        raise click.ClickException("--limit must be at least 1")
+        raise Failed("--limit must be at least 1")
 
     # Validate preset early for a clear error before network I/O.
     get_preset(preset)
 
-    with console.status(f"[bold green]Loading up to {limit} goals from '{preset}'..."):
+    with console.status(f"Loading up to {limit} goals from '{preset}'…"):
         goals: List[str] = load_goals(
             preset=preset,
             limit=limit,
@@ -221,14 +222,15 @@ def sample_cmd(
         )
         return
 
-    console.print(
-        f"[bold cyan]Sample goals from '{preset}'[/bold cyan] "
-        f"[dim]({len(goals)} shown)[/dim]\n"
-    )
+    display_heading(f"Goals from {preset} [secondary]({len(goals)} shown)[/secondary]")
+    listed = Table.grid(padding=(0, 1))
+    listed.add_column(style="secondary", justify="right", no_wrap=True)
+    listed.add_column()
     for index, goal in enumerate(goals, start=1):
-        console.print(f"[cyan]{index}.[/cyan] {goal}")
+        listed.add_row(f"{index}.", goal)
+    console.print(listed)
 
-    console.print(
-        f"\n[dim]Use in campaigns:[/dim] "
-        f"[cyan]hackagent campaign run <file>[/cyan] with dataset preset {preset}"
+    console.print()
+    display_hint(
+        "In a campaign", f"dataset: {{source: {{type: preset, name: {preset}}}}}"
     )

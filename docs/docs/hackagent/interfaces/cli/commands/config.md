@@ -14,7 +14,7 @@ Manage HackAgent CLI configuration settings.
 def config()
 ```
 
-🔧 Manage HackAgent CLI configuration
+Show and change the CLI&#x27;s settings.
 
 #### set
 

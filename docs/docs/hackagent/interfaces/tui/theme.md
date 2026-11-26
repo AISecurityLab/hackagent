@@ -20,7 +20,7 @@ Two rules keep the interface coherent:
 
 #### BRAND\_RED
 
-Primary brand red — borders, logo, accents.
+Primary brand red — borders, logo, accents: the palette&#x27;s brand colour.
 
 #### BRAND\_RED\_DARK
 

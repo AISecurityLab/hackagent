@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import click
-from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -22,8 +22,19 @@ from rich.traceback import Traceback
 
 from hackagent import ApiError, HackAgentError
 from hackagent.core.settings import tls_error_hint
+from hackagent.interfaces.palette import console as themed
 
-console = Console()
+console = themed()
+
+
+class Failed(click.ClickException):
+    """A command that failed, said as every failure is: ``✗ what went
+    wrong``, in the palette's colour, rather than Click's ``Error:``."""
+
+    def show(self, file=None) -> None:  # noqa: D102 - Click's own hook
+        themed(stderr=True).print(
+            f"[failed]✗[/failed] {escape(self.format_message())}", soft_wrap=True
+        )
 
 
 def handle_errors(func):
@@ -40,33 +51,24 @@ def handle_errors(func):
             raise
         # ApiError is a HackAgentError, so it is caught first.
         except ApiError as e:
-            console.print(f"[bold red]❌ API Error: {str(e)}")
-            if console._environ.get("HACKAGENT_DEBUG"):
-                console.print(Traceback())
-            raise click.ClickException(str(e))
-        except HackAgentError as e:
-            console.print(f"[bold red]❌ HackAgent Error: {str(e)}")
-            if console._environ.get("HACKAGENT_DEBUG"):
-                console.print(Traceback())
-            raise click.ClickException(str(e))
-        except ValueError as e:
-            console.print(f"[bold red]❌ Configuration Error: {str(e)}")
-            raise click.ClickException(str(e))
-        except FileNotFoundError as e:
-            console.print(f"[bold red]❌ File Not Found: {str(e)}")
-            raise click.ClickException(str(e))
+            _traceback_when_debugging()
+            raise Failed(f"API error: {e}") from e
+        except (HackAgentError, ValueError, FileNotFoundError) as e:
+            _traceback_when_debugging()
+            raise Failed(str(e)) from e
         except Exception as e:
             hint = tls_error_hint(e)
             if hint:
-                console.print(f"[bold red]❌ TLS certificate error: {str(e)}")
-                console.print(f"[yellow]{hint}")
-                raise click.ClickException(f"{e}. {hint}")
-            console.print(f"[bold red]❌ Unexpected error: {str(e)}")
-            if console._environ.get("HACKAGENT_DEBUG"):
-                console.print(Traceback())
-            raise click.ClickException(str(e))
+                raise Failed(f"TLS certificate error: {e}\n{hint}") from e
+            _traceback_when_debugging()
+            raise Failed(f"Unexpected error: {e}") from e
 
     return wrapper
+
+
+def _traceback_when_debugging() -> None:
+    if console._environ.get("HACKAGENT_DEBUG"):
+        console.print(Traceback())
 
 
 def load_config_file(path: str) -> Dict[str, Any]:
@@ -84,27 +86,27 @@ def load_config_file(path: str) -> Dict[str, Any]:
 
                     return yaml.safe_load(f) or {}
                 except ImportError:
-                    raise click.ClickException(
+                    raise Failed(
                         "PyYAML required for YAML config files. Install with: pip install pyyaml"
                     )
             else:
                 return json.load(f)
     except json.JSONDecodeError as e:
-        raise click.ClickException(f"Invalid JSON in config file {path}: {e}")
+        raise Failed(f"Invalid JSON in config file {path}: {e}")
     except Exception as e:
-        raise click.ClickException(f"Failed to load config file {path}: {e}")
+        raise Failed(f"Failed to load config file {path}: {e}")
 
 
 def display_results_table(results: Any, title: str = "Results") -> None:
     """Display results in a formatted table"""
     if isinstance(results, list):
         if not results:
-            console.print(f"[yellow]ℹ️ No {title.lower()} found")
+            console.print(f"[secondary]No {title.lower()} found[/secondary]")
             return
 
         # Try to create table from list of dicts
         if results and isinstance(results[0], dict):
-            table = Table(title=title, show_header=True, header_style="bold cyan")
+            table = Table(title=title, show_header=True, header_style="heading")
 
             # Get all unique keys for columns
             all_keys = set()
@@ -126,43 +128,61 @@ def display_results_table(results: Any, title: str = "Results") -> None:
             console.print(table)
 
             if len(results) > 20:
-                console.print(f"[dim]... and {len(results) - 20} more rows")
+                console.print(
+                    f"[secondary]… and {len(results) - 20} more rows[/secondary]"
+                )
         else:
             # Simple list display
             for i, item in enumerate(results[:20], 1):
                 console.print(f"{i}. {item}")
 
             if len(results) > 20:
-                console.print(f"[dim]... and {len(results) - 20} more items")
+                console.print(
+                    f"[secondary]… and {len(results) - 20} more items[/secondary]"
+                )
 
     else:
         # Fallback to JSON-like display
         console.print_json(data=results)
 
 
+# One mark for each kind of message, coloured; the message itself is not.
+# The TUI's builder marks a campaign's check the same way (interfaces.checks).
+
+
 def display_success(message: str) -> None:
-    """Display success message with formatting"""
-    console.print(f"[bold green]✅ {message}")
+    """``✓ message``: something done, or a check passed."""
+    console.print(f"[passed]✓[/passed] {message}")
 
 
 def display_warning(message: str) -> None:
-    """Display warning message with formatting"""
-    console.print(f"[bold yellow]⚠️ {message}")
+    """``! message``: worth knowing, not a failure."""
+    console.print(f"[warning]![/warning] {message}")
 
 
 def display_error(message: str) -> None:
-    """Display error message with formatting"""
-    console.print(f"[bold red]❌ {message}")
+    """``✗ message``: something that failed."""
+    console.print(f"[failed]✗[/failed] {message}")
 
 
 def display_info(message: str) -> None:
-    """Display info message with formatting"""
-    console.print(f"[cyan]ℹ️ {message}")
+    """A message in passing."""
+    console.print(f"[secondary]{message}[/secondary]")
+
+
+def display_heading(title: str) -> None:
+    """A section's title, with a blank line above it."""
+    console.print(f"\n[heading]{title}[/heading]")
+
+
+def display_hint(what: str, command: str) -> None:
+    """What to do next, and the command that does it."""
+    console.print(f"  [secondary]{what}:[/secondary] [accent]{command}[/accent]")
 
 
 def confirm_action(message: str, default: bool = False) -> bool:
     """Get user confirmation for dangerous actions"""
-    return click.confirm(f"⚠️ {message}", default=default)
+    return click.confirm(message, default=default)
 
 
 def format_duration(seconds: float) -> str:
@@ -180,13 +200,13 @@ def format_duration(seconds: float) -> str:
 def create_status_panel(title: str, content: str, status: str = "info") -> Panel:
     """Create a status panel with appropriate styling"""
     style_map = {
-        "success": "green",
-        "error": "red",
-        "warning": "yellow",
-        "info": "cyan",
+        "success": "passed",
+        "error": "failed",
+        "warning": "warning",
+        "info": "accent",
     }
 
-    style = style_map.get(status, "cyan")
+    style = style_map.get(status, "accent")
     return Panel(
         Text(content, style=style), title=title, border_style=style, padding=(1, 2)
     )
@@ -208,11 +228,9 @@ def launch_tui(cli_config, initial_tab: str = "dashboard", initial_data: dict = 
         )
         app.run()
 
-    except ImportError:
-        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
-        console.print("\n[cyan]💡 Install with:[/cyan]")
-        console.print("  uv add textual")
-        raise click.ClickException("TUI dependencies not installed")
+    except ImportError as e:
+        raise Failed(
+            "The terminal app needs its dependencies: pip install 'hackagent[tui]'"
+        ) from e
     except Exception as e:
-        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
-        raise click.ClickException(f"TUI failed to start: {e}")
+        raise Failed(f"The terminal app failed to start: {e}") from e

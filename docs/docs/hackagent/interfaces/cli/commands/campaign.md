@@ -18,7 +18,7 @@ before a run starts; `schema` prints the campaign format as JSON Schema. Both bu
 def campaign() -> None
 ```
 
-🎯 Run declarative campaign files (campaign.yaml).
+Check and run campaign files (campaign.yaml).
 
 #### list\_attacks
 
