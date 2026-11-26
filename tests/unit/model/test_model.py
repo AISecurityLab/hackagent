@@ -294,3 +294,68 @@ def test_model_config_options_reach_the_native_backend():
         model = build_model(config)
     assert model.binary == "/custom/claude"
     assert model.max_turns == 3
+
+
+class _FailingModel(Model):
+    """Fails with ``status`` for the first ``failures`` calls, then answers."""
+
+    def __init__(self, status, failures):
+        self.status, self.failures, self.calls = status, failures, 0
+
+    def complete(self, messages, **overrides):
+        self.calls += 1
+        if self.calls <= self.failures:
+            return ModelResponse.failed(_StatusError(self.status))
+        return ModelResponse(text="ok")
+
+    async def acomplete(self, messages, **overrides):
+        return self.complete(messages, **overrides)
+
+
+class _StatusError(Exception):
+    def __init__(self, status):
+        super().__init__(f"status {status}")
+        self.status_code = status
+
+
+@pytest.mark.parametrize("status", [None, 408, 429, 500, 503])
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_retrying_model_repeats_transient_errors(status, asynchronous):
+    model = _FailingModel(status, failures=2)
+    retrying = RetryingModel(model, retries=2, backoff=0)
+    messages = [{"role": "user", "content": "hi"}]
+    result = (
+        asyncio.run(retrying.acomplete(messages))
+        if asynchronous
+        else retrying.complete(messages)
+    )
+    assert result.ok and result.text == "ok"
+    assert model.calls == 3
+
+
+@pytest.mark.parametrize("status", [400, 401, 402, 403, 404, 422])
+def test_retrying_model_does_not_repeat_errors_that_would_recur(status):
+    model = _FailingModel(status, failures=5)
+    result = RetryingModel(model, retries=3, backoff=0).complete(
+        [{"role": "user", "content": "hi"}]
+    )
+    assert result.error.status_code == status
+    assert model.calls == 1
+
+
+def test_retrying_model_backs_off_between_attempts():
+    model = _FailingModel(503, failures=5)
+    retrying = RetryingModel(model, retries=3, backoff=0.5)
+    with (
+        patch("hackagent.models.retry.time.sleep") as sleep,
+        patch("hackagent.models.retry.random.uniform", side_effect=lambda lo, hi: hi),
+    ):
+        result = retrying.complete([{"role": "user", "content": "hi"}])
+    assert result.error.status_code == 503
+    assert model.calls == 4
+    assert [call.args[0] for call in sleep.call_args_list] == [0.5, 1.0, 2.0]
+
+
+def test_retrying_model_rejects_negative_backoff():
+    with pytest.raises(ValueError):
+        RetryingModel(_FailingModel(None, 0), retries=1, backoff=-1)

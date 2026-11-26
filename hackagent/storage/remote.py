@@ -1600,14 +1600,13 @@ class RemoteBackend:
     def delete_attack(self, attack_id: UUID) -> None:
         """Delete every run of the attack, then the attack itself."""
         # Delete all runs belonging to the attack first, then the attack.
-        page = 1
+        # Always read page 1: each deletion shifts the later runs onto it.
         while True:
-            rp = self.list_runs(attack_id=attack_id, page=page, page_size=100)
+            rp = self.list_runs(attack_id=attack_id, page=1, page_size=100)
             for run in rp.items:
                 self.delete_run(run.id)
             if len(rp.items) < 100:
                 break
-            page += 1
         attack_destroy.sync_detailed(id=attack_id, client=self._client)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
