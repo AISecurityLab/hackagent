@@ -65,30 +65,30 @@ It is a campaign file, so you can read the whole attack without reading any
 Python, and change the target, the goals or the judge by editing it. Check it
 first with `hackagent campaign validate flipattack-ollama.yaml`.
 
-Or use the interactive TUI preset:
+Or open the terminal UI and start from this example there:
 
-    hackagent claude
+    hackagent
 
 ---
 
 ### How the target is wired
 
-Both scripts create a `HackAgent` with:
-
-    agent_type="claude-code"
-
-The difference is the local binary used to launch the target.
+Both campaigns point their `target` at a local `CLAUDE_CODE` connection; they
+differ only in the executable HackAgent launches.
 
 #### `flipattack-claude.yaml`
 
-Uses the Claude Code CLI directly:
+Runs the Claude Code CLI directly:
 
-    adapter_operational_config={
-        "name": TARGET_MODEL,
-        "binary": "claude",
-    }
+    target:
+      name: claude-opus-4-8
+      connection:
+        provider: local
+        type: CLAUDE_CODE
+      options:
+        binary: claude
 
-The configured model name is passed to Claude Code.
+`name` is passed to Claude Code with `--model`.
 
 #### `flipattack-ollama.yaml`
 
@@ -102,17 +102,16 @@ Uses Ollama as the launcher:
       options:
         binary: ollama
 
-`name` is passed to Ollama; `options.binary` is the executable to launch.
+`name` is passed to `ollama launch claude --model`; `options.binary` is the executable to launch.
 
 ---
 
 ### Notes
 
-- The `endpoint` field is present for HackAgent compatibility, but it is ignored for this local Claude Code setup.
 - The target is executed locally through the configured CLI binary.
 - No HTTP server or bridge is required.
 - If the configured binary is not on `PATH`, the setup will fail before the attack runs.
-- The scripts are intentionally small examples and are meant to be edited for different models, goals, and attack configurations.
+- The campaigns are intentionally small examples and are meant to be edited for different models, goals, and attack configurations.
 
 ---
 

@@ -4,12 +4,12 @@ This example red-teams a locally installed Codex instance using HackAgent.
 
 The repo includes two execution modes:
 
-| Script | Target | Judge / Attacker | Notes |
+| Campaign | Target | Judge / Attacker | Notes |
 |---|---|---|---|
 | `h4rm3l-codex.yaml` | Local Codex via `codex exec` | OpenAI via LiteLLM | Requires `OPENAI_API_KEY` |
 | `h4rm3l-ollama.yaml` | Local Codex launched through Ollama | Local Ollama model | Fully local setup |
 
-Both scripts use the `codex` agent type, so HackAgent drives Codex natively through a local CLI. No HTTP endpoint or bridge is required.
+Both campaigns use the `CODEX` connection type, so HackAgent drives Codex natively through a local CLI. No HTTP endpoint or bridge is required.
 
 ---
 
@@ -47,7 +47,7 @@ Install Ollama and confirm it runs:
 
     ollama --version
 
-Make sure the Ollama model configured in the script is available locally.
+Make sure the Ollama model configured in the campaign is available locally.
 
 ---
 
@@ -61,51 +61,53 @@ Run the Ollama/local version:
 
     hackagent campaign run h4rm3l-ollama.yaml
 
-Or use the interactive TUI preset:
+Or open the terminal UI and start from this example there:
 
-    hackagent codex
+    hackagent
 
 ---
 
 ### How the target is wired
 
-Both scripts create a `HackAgent` with:
-
-    agent_type="codex"
-
-The difference is the local binary used to launch the target.
+Both campaigns point their `target` at a local `CODEX` connection; they
+differ only in the executable HackAgent launches.
 
 #### `h4rm3l-codex.yaml`
 
-Uses the Codex CLI directly:
+Runs the Codex CLI directly:
 
-    adapter_operational_config={
-        "name": TARGET_MODEL,
-        "binary": "codex",
-    }
+    target:
+      name: gpt-5.5
+      connection:
+        provider: local
+        type: CODEX
+      options:
+        binary: codex
 
-The configured model name is passed to Codex.
+`name` is passed to Codex with `-m`.
 
 #### `h4rm3l-ollama.yaml`
 
 Uses Ollama as the launcher:
 
-    adapter_operational_config={
-        "name": TARGET_MODEL,
-        "binary": "ollama",
-    }
+    target:
+      name: llama3.2:3b
+      connection:
+        provider: local
+        type: CODEX
+      options:
+        binary: ollama
 
-The configured model name is passed to Ollama.
+`name` is passed to `ollama launch codex --model`; `options.binary` is the executable to launch.
 
 ---
 
 ### Notes
 
-- The `endpoint` field is present for HackAgent compatibility, but it is ignored for this local Codex setup.
 - The target is executed locally through the configured CLI binary.
 - No HTTP server or bridge is required.
 - If the configured binary is not on `PATH`, the setup will fail before the attack runs.
-- The scripts are intentionally small examples and are meant to be edited for different models, goals, and attack configurations.
+- The campaigns are intentionally small examples and are meant to be edited for different models, goals, and attack configurations.
 
 ---
 

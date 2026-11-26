@@ -144,7 +144,6 @@ artifacts = [
 [tool.hatch.build.targets.sdist]
 include = [
     "/hackagent",
-    "/assets",
 ]
 
 [tool.coverage.run]
