@@ -511,6 +511,10 @@ class ResultRequest(BaseModel):
     model_config = ConfigDict(
         frozen=True,
     )
+    id: UUID | None = None
+    """
+    Unique identifier of the result. On create the client may choose it, so that a repeat of the request returns the stored result; the server picks one otherwise. It never changes afterwards.
+    """
     run: UUID
     request_payload: Any | None = None
     """

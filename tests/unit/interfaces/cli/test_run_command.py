@@ -155,7 +155,7 @@ def test_completed_exit_0(store, monkeypatch):
     with patch("hackagent.orchestrator.execution.execute_run", return_value=outcome):
         result = _invoke(RUN_ID)
     assert result.exit_code == 0, result.output
-    assert f"https://dash.test/attacks?runId={RUN_ID}" in result.output
+    assert f"https://dash.test/runs?run={RUN_ID}" in result.output
 
 
 def test_json_outcome_line(store, monkeypatch):

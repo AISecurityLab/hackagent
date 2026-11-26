@@ -48,15 +48,17 @@ disabled and only ever talks to `127.0.0.1`.
 
 ## What each page shows
 
+The pages are named after the resources they show, as in the API and the CLI: **Agents** (`/agents`), **Campaigns** (`/campaigns`), **Runs** (`/runs`), **Credentials** (`/credentials`), **Usage** (`/usage`) and, in the account menu, **Settings** (`/settings`). A run opens at `/runs?run=<run id>`.
+
 Click a screenshot to open it full size.
 
 <ScreenshotGrid>
-  <Screenshot src="/img/dashboard/home.png" alt="Home: one target, two runs, five jailbreaks and a 38% risk overview" title="Home">
+  <Screenshot src="/img/dashboard/home.png" alt="Home: one agent, two runs, five jailbreaks and a 38% risk overview" title="Home">
 
-Totals across your targets, and the risk overview of the latest one: the share of its results that were jailbreaks, next to how many were mitigated, errored or are still pending.
+Totals across your agents, and the risk overview of the latest one: the share of its results that were jailbreaks, next to how many were mitigated, errored or are still pending.
 
   </Screenshot>
-  <Screenshot src="/img/dashboard/runs.png" alt="Stats: the PAIR run expanded into its ten results" title="Stats">
+  <Screenshot src="/img/dashboard/runs.png" alt="Runs: the PAIR run expanded into its ten results" title="Runs">
 
 Every run, newest first. Expand one to list its results, one per attempt, with the risk category of the goal, the verdict and the judge's note. **Success** means the attack worked.
 
@@ -155,7 +157,7 @@ they stop reporting.
 
 ## Launching campaigns in local mode
 
-In local mode, **Attacks** builds a campaign against one of your agents, saves
+In local mode, **Campaigns** builds a campaign against one of your agents, saves
 it to the local database and launches it on this machine: the `hackagent web`
 process runs it, and the run page follows its attacks and results as they land.
 Cancel stops it at its next step. There is nothing to choose: without a
@@ -509,7 +511,7 @@ bash deploy/web/build_webui.sh ../hackagent-webapp
 hackagent web --local --no-browser
 ```
 
-Open `http://127.0.0.1:7860/stats`, forwarding port 7860 if using remote VS Code.
+Open `http://127.0.0.1:7860/runs`, forwarding port 7860 if using remote VS Code.
 Rebuild after frontend edits and restart the CLI after Python changes.
 
 ## Troubleshooting
