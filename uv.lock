@@ -2998,11 +2998,11 @@ docs = [
 
 [[package]]
 name = "hackagent-webui"
-version = "0.3.3"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/db/32/af412d0d3849abdcb34cf5685aa8b78c090b44a935d32b8372e2d8ae584c/hackagent_webui-0.3.3.tar.gz", hash = "sha256:f498482d35320908fdbecf214521178136da6e6daa157d5da7946d72ca6a2d76", size = 839117, upload-time = "2026-10-28T20:30:55.098Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/63/1e/f56edd170da7f3edc667c7f1757686b7075cd07842994460ff47e116a279/hackagent_webui-0.4.0.tar.gz", hash = "sha256:27b4c554bff3a509455e93a0619c45a162047c8f9b77ca8f004dc5128b307862", size = 1079451, upload-time = "2026-11-21T13:18:21.369Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b4/55/ae687fe62ce4d7fb68fdfb75026dfaefa8c1283e1a677ad986455ba6275d/hackagent_webui-0.3.3-py3-none-any.whl", hash = "sha256:1dee292e1d49c01ae5fa49d8f869c20005b5d324499635364627bdfc4cfd8184", size = 890966, upload-time = "2026-10-28T20:30:53.539Z" },
+    { url = "https://files.pythonhosted.org/packages/94/40/b2b5cdac785346dedc922d7b087160a3157763f13d4cb4e22ff784234e11/hackagent_webui-0.4.0-py3-none-any.whl", hash = "sha256:6fe8a04a16f0be61066c584736f18721372b47f89668a550249110b29dc37d01", size = 1142428, upload-time = "2026-11-21T13:18:19.386Z" },
 ]
 
 [[package]]
