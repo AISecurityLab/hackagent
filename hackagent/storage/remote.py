@@ -30,11 +30,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 from urllib.parse import quote
 from uuid import UUID
 
-import httpx
 from pydantic import AnyUrl
 
 from hackagent.storage._http.client import AuthenticatedClient
-from hackagent.storage._http.retry import RetryingTransport, repeatable_api_call
+from hackagent.storage._http.retry import RetryPolicy
 from hackagent.storage._http.api.agent import (
     agent_create,
     agent_list,
@@ -325,10 +324,9 @@ class RemoteBackend:
 
         A request the server drops before answering (a closed keep-alive
         connection, a restarting API) is sent again when that is safe; see
-        :class:`RetryingTransport` and :meth:`_repeatable`.
+        :class:`RetryPolicy`.
         """
-        transport = RetryingTransport(httpx.HTTPTransport(verify=verify))
-        backend = cls(
+        return cls(
             AuthenticatedClient(
                 base_url=base_url.strip().rstrip("/"),
                 verify_ssl=verify,
@@ -336,11 +334,9 @@ class RemoteBackend:
                 prefix="Bearer",
                 raise_on_unexpected_status=raise_on_unexpected_status,
                 timeout=timeout,
-                httpx_args={"transport": transport},
+                retry=RetryPolicy(),
             )
         )
-        transport.repeatable = backend._repeatable
-        return backend
 
     def check_connection(self) -> int:
         """Probe the API with this backend's credentials; return the HTTP status.
@@ -396,9 +392,6 @@ class RemoteBackend:
     def __init__(self, client: AuthenticatedClient) -> None:
         self._client = client
         self._context: Optional[OrganizationContext] = None  # cached
-        # Whether the server keeps the id this client gives a new result, so
-        # that sending POST /result again cannot create a second one.
-        self._result_ids_kept = False
 
         # Append-only writes (traces, result-status updates) are persistence
         # only — never read back during a run — so they are pushed onto a queue
@@ -420,16 +413,6 @@ class RemoteBackend:
         self._writer.start()
         # Safety net: flush anything still queued on interpreter exit.
         atexit.register(self.close)
-
-    def _repeatable(self, request: httpx.Request) -> bool:
-        """Whether ``request`` may be sent again after a dropped connection:
-        :func:`repeatable_api_call`, plus creating a result once the server
-        has shown it keeps the client's id."""
-        if request.method == "POST" and request.url.path.rstrip("/").endswith(
-            "/result"
-        ):
-            return self._result_ids_kept
-        return repeatable_api_call(request)
 
     # ── Async write queue ─────────────────────────────────────────────────────
 
@@ -493,12 +476,30 @@ class RemoteBackend:
             self.flush()
             return run_notes
         self._drain()
+        lost, note = self._with_losses(run_notes)
+        if lost:
+            logger.error("RemoteBackend: %s; the run ends %s", note, status)
+        return note
+
+    def _with_losses(self, note: str) -> tuple[int, str]:
+        """``(lost, note)``: the background writes lost so far, which are then
+        reported (once), and ``note`` with them."""
         lost = self._take_failures()
         if not lost:
-            return run_notes
+            return 0, note
         loss = f"{lost} background audit write(s) failed"
-        logger.error("RemoteBackend: %s; the run ends %s", loss, status)
-        return f"{run_notes} ({loss})" if run_notes else loss
+        return lost, f"{note} ({loss})" if note else loss
+
+    def _learn_result_ids(self, kept: bool) -> None:
+        """Tell the client's transport whether the server keeps result ids.
+
+        Kept on the transport, not the store: stores sharing the client (an
+        AdoptedRunStore and the backend that claimed its run) send through
+        the same transport.
+        """
+        policy = getattr(self._client, "retry", None)
+        if isinstance(policy, RetryPolicy):
+            policy.result_ids_kept = kept
 
     def _drain(self) -> None:
         """Block until every queued write has been attempted."""
@@ -837,7 +838,7 @@ class RemoteBackend:
         if final:
             # Built from the finish response: finishing a campaign run revokes
             # its run token, so it may not be read back afterwards.
-            run = self.finish_run(campaign_run_id, status, run_notes or "")
+            run = self._send_finish(campaign_run_id, status, run_notes or "")
         if run is None:
             return self.get_campaign_run(campaign_run_id)
         return _campaign_record(run)
@@ -964,7 +965,7 @@ class RemoteBackend:
                     f"RemoteBackend: update_run {run_id} returned {resp.status_code}"
                 )
         if final:
-            self.finish_run(run_id, status, run_notes or "")
+            self._send_finish(run_id, status, run_notes or "")
         return RunRecord(
             id=run_id,
             attack_id=UUID("00000000-0000-0000-0000-000000000000"),
@@ -1215,8 +1216,28 @@ class RemoteBackend:
     def finish_run(self, run_id: UUID, status: str, note: str = "") -> Run:
         """End the run as COMPLETED, FAILED or CANCELLED, with ``note`` as its
         run notes, and return the finished run. Queued writes go first:
-        finishing a campaign run revokes its run token. Raises
-        :class:`ExecutorRejected` on 401 or 403."""
+        finishing a campaign run revokes its run token.
+
+        Writes lost so far are added to the note, and a run they leave
+        incomplete ends FAILED, not COMPLETED: the executor ends a cloud run
+        this way once all its attacks are over, so the losses are its own.
+        Raises :class:`ExecutorRejected` on 401 or 403.
+        """
+        if status not in _FINAL_STATUSES:
+            raise ValueError(f"RemoteBackend: {status!r} is not a final run status")
+        self._drain()
+        lost, note = self._with_losses(note)
+        if lost:
+            if status == FinishStatusEnum.COMPLETED.value:
+                status = FinishStatusEnum.FAILED.value
+            logger.error("RemoteBackend: %s; run %s ends %s", note, run_id, status)
+        return self._send_finish(run_id, status, note)
+
+    def _send_finish(self, run_id: UUID, status: str, note: str) -> Run:
+        """POST the run's end, after the queued writes. Losses are the
+        caller's to settle (see :meth:`_settle_writes`): a run ended from
+        :meth:`update_run` must not take the losses of another attack still
+        running on this store."""
         if status not in _FINAL_STATUSES:
             raise ValueError(f"RemoteBackend: {status!r} is not a final run status")
         self._drain()
@@ -1268,7 +1289,7 @@ class RemoteBackend:
         # 200: stored by an earlier try of this same request.
         if resp.status_code in (200, 201) and resp.parsed:
             r = resp.parsed
-            self._result_ids_kept = str(r.id) == str(result_id)
+            self._learn_result_ids(str(r.id) == str(result_id))
             return ResultRecord(
                 id=r.id,
                 run_id=run_id,
