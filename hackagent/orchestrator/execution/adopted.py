@@ -117,17 +117,20 @@ class AdoptedRunStore(RemoteBackend):
         audit: Optional[Dict[str, Any]] = None,
         run_notes: Optional[str] = None,
     ) -> CampaignRunRecord:
-        """Send the audit and interim notes; keep a final status for the executor."""
+        """Send the audit and interim notes; keep a final status for the executor.
+
+        Lost result writes keep the run from ending COMPLETED (raises); a
+        FAILED or CANCELLED one is kept with the loss in its note.
+        """
         final = status in _FINAL_STATUSES
+        if final:
+            run_notes = self._settle_writes(str(status), run_notes or "")
         if audit is not None or (run_notes is not None and not final):
             super().update_campaign_run(
                 campaign_run_id,
                 audit=audit,
                 run_notes=None if final else run_notes,
             )
-        elif final:
-            # Lost result writes surface before the run can end as COMPLETED.
-            self.flush()
         if final:
             self.final_status = (str(status), run_notes or "")
         record = self._record or self.start_campaign(self.agent_id, {})
