@@ -15,11 +15,12 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from textual.app import ComposeResult
-from textual.binding import Binding
 from textual.containers import Center, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Static
 
+
+from hackagent.interfaces.tui.keys import key
 from hackagent.interfaces.cli.banner import HACKAGENT_BANNER
 
 TAGLINE = "Red-team an AI model with a campaign you can save, share and re-run."
@@ -120,8 +121,8 @@ class WelcomeScreen(Screen[str]):
     """
 
     BINDINGS = [
-        Binding("escape", "choose('build')", "Build a campaign", show=False),
-        Binding("q", "app.quit", "Quit"),
+        key("back", "choose('build')", show=False),
+        key("quit", "app.quit"),
     ]
 
     def compose(self) -> ComposeResult:

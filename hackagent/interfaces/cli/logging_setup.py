@@ -51,6 +51,12 @@ from rich.console import Console
 from rich.text import Text
 from rich.traceback import Traceback
 
+from hackagent.interfaces.palette import (
+    LEVEL_STYLES,
+    SECONDARY,
+    TAG_STYLES,
+    VERDICT_STYLES,
+)
 from hackagent.core.logging import (
     CAMPAIGN_LOGGER,
     CLIENT_RETRY_LOGGERS,
@@ -70,21 +76,9 @@ _VERBOSITY_LEVELS = {
     3: logging.DEBUG,
 }
 
-#: Colours an attack's tag can take; each attack keeps one for the whole run.
-_ATTACK_COLOURS = (
-    "cyan",
-    "magenta",
-    "blue",
-    "yellow",
-    "bright_cyan",
-    "bright_magenta",
-    "bright_blue",
-    "bright_yellow",
-)
-
 
 def _attack_style(attack: str) -> str:
-    return _ATTACK_COLOURS[zlib.crc32(attack.encode()) % len(_ATTACK_COLOURS)]
+    return TAG_STYLES[zlib.crc32(attack.encode()) % len(TAG_STYLES)]
 
 
 def logs_to_terminal() -> bool:
@@ -121,21 +115,12 @@ class LogLineHandler(logging.Handler):
             self.handleError(record)
 
 
-#: Colour of each level's name in a coloured log line.
-_LEVEL_STYLES = {
-    "DEBUG": "dim",
-    "INFO": "green",
-    "WARNING": "yellow",
-    "ERROR": "bold red",
-    "CRITICAL": "bold reverse red",
-}
-
-#: Words a coloured log line picks out wherever they appear, coloured as the
-#: dashboard colours verdicts.
+#: Words a coloured log line picks out wherever they appear, in their
+#: verdict's colour.
 _WORD_STYLES = (
-    (r"\bjailbroken\b", "bold red"),
-    (r"\bmitigated\b", "green"),
-    (r"\b(?:failed|unreachable|FAILED)\b", "red"),
+    (r"\bjailbroken\b", VERDICT_STYLES["jailbroken"]),
+    (r"\bmitigated\b", VERDICT_STYLES["mitigated"]),
+    (r"\b(?:failed|unreachable|FAILED)\b", VERDICT_STYLES["failed"]),
 )
 
 #: A count of none just before a word: "0 jailbroken", "0 of 20 goals
@@ -154,9 +139,9 @@ def log_text(record: logging.LogRecord) -> Text:
     Its plain text is the file's line, character for character."""
     line = Text(PlainFormatter().format(record))
     level_at = _STAMP_WIDTH + 1
-    line.stylize("dim", 0, _STAMP_WIDTH)
+    line.stylize(SECONDARY, 0, _STAMP_WIDTH)
     line.stylize(
-        _LEVEL_STYLES.get(record.levelname, "bold"),
+        LEVEL_STYLES.get(record.levelname, "bold"),
         level_at,
         level_at + len(record.levelname),
     )

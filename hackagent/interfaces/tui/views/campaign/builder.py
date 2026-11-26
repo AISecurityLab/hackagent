@@ -30,7 +30,6 @@ import yaml
 from rich.markup import escape
 from textual import on
 from textual.app import ComposeResult, SuspendNotSupported
-from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.events import DescendantFocus
 from textual.timer import Timer
@@ -47,6 +46,10 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 from textual.widgets.tree import TreeNode
 
+
+from hackagent.interfaces.palette import ACCENT, FAILED, PASSED, paint
+from hackagent.interfaces.tui.frame import TitleBar
+from hackagent.interfaces.tui.keys import key
 from hackagent.core.credentials import CredentialError
 from hackagent.core.logging import capture
 from hackagent.interfaces.cli.config import CLIConfig
@@ -56,20 +59,12 @@ from hackagent.orchestrator.campaign import CampaignSpec
 from .draft import CampaignDraft, Issue
 from .form import FieldRow
 from .outline import Group, Node, Outline, build_outline, issue_matches
-from .screens import RUN_LINES, ConfirmScreen, HelpScreen, PathScreen, RunScreen
+from .screens import RUN_LINES, ConfirmScreen, PathScreen, RunScreen
 
 #: How often the run view draws what the run logged, in seconds, and at most
 #: how many lines each time.
 _DRAIN_S = 0.1
 _DRAIN_BATCH = 500
-
-_OUTLINE_HINT = (
-    "↑↓ choose a part · Tab edit its fields · Delete remove an attack · "
-    "ctrl+r run · F1 help"
-)
-_FORM_HINT = (
-    "Empty fields use the dimmed default · ctrl+t reset · Esc back to the outline"
-)
 
 
 class CampaignBuilder(Container):
@@ -77,12 +72,16 @@ class CampaignBuilder(Container):
 
     DEFAULT_CSS = """
     CampaignBuilder { layout: vertical; height: 100%; }
-    CampaignBuilder #doc-bar { height: 1; padding: 0 1; background: $panel; }
     CampaignBuilder #body { height: 1fr; }
     CampaignBuilder #outline-pane {
         width: 30; height: 100%;
         border-right: solid $primary-darken-2; background: $surface;
     }
+    CampaignBuilder #run-actions {
+        height: auto; align-horizontal: center;
+        border-top: solid $primary-darken-2;
+    }
+    CampaignBuilder #run-actions Button { margin: 0 1; min-width: 10; }
     CampaignBuilder #outline { height: 1fr; padding: 0 1; background: $surface; }
     CampaignBuilder #form { width: 1fr; height: 100%; padding: 0 2; }
     CampaignBuilder .panel-title { text-style: bold; margin-top: 1; }
@@ -100,25 +99,18 @@ class CampaignBuilder(Container):
     CampaignBuilder Collapsible { border: none; padding: 0; margin-top: 1; }
     CampaignBuilder Collapsible > Contents { padding: 0 0 0 2; }
     CampaignBuilder .attack-list { height: auto; max-height: 20; }
-    CampaignBuilder #run-actions {
-        height: auto; align-horizontal: center;
-        border-top: solid $primary-darken-2;
-    }
-    CampaignBuilder #run-actions Button { margin: 0 1; min-width: 10; }
-    CampaignBuilder #hint { height: 1; padding: 0 1; color: $text-muted; background: $panel; }
     """
 
     BINDINGS = [
-        Binding("f1", "help", "Help", show=False),
-        Binding("f2", "welcome", "Welcome"),
-        Binding("ctrl+s", "save", "Save"),
-        Binding("ctrl+o", "open", "Open"),
-        Binding("f4", "edit_yaml", "Edit YAML"),
-        Binding("ctrl+t", "reset_field", "Reset field"),
-        Binding("ctrl+r", "run", "Run"),
-        Binding("f3", "stop", "Stop"),
-        Binding("delete", "remove_node", "Remove", show=False),
-        Binding("escape", "focus_outline", "Outline", show=False),
+        key("home", "welcome"),
+        key("run"),
+        key("stop"),
+        key("save"),
+        key("open_file", "open"),
+        key("edit_yaml"),
+        key("reset", "reset_field", show=False),
+        key("remove", "remove_node", show=False),
+        key("back", "focus_outline", show=False),
     ]
 
     def __init__(
@@ -226,10 +218,6 @@ class CampaignBuilder(Container):
             self.app.show_welcome,
         )
 
-    def action_help(self) -> None:
-        """What this screen is and how to drive it."""
-        self.app.push_screen(HelpScreen())
-
     def _load_initial(self) -> None:
         path = self.initial_data.get("campaign_path")
         text = self.initial_data.get("campaign_yaml")
@@ -248,8 +236,8 @@ class CampaignBuilder(Container):
     # -- layout ------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
-        yield Static("", id="doc-bar")
-        with Horizontal(id="body"):
+        yield TitleBar(id="doc-bar")
+        with Horizontal(id="body", classes="frame-body"):
             # The outline and the run controls are one column: picking what to
             # build and starting the run are the two things this pane is for.
             with Vertical(id="outline-pane"):
@@ -261,7 +249,6 @@ class CampaignBuilder(Container):
                     yield Button("Run", id="run", variant="success")
                     yield Button("Stop", id="stop", variant="warning", disabled=True)
             yield VerticalScroll(id="form")
-        yield Static(_OUTLINE_HINT, id="hint")
 
     def on_mount(self) -> None:
         self.set_interval(_DRAIN_S, self._drain)
@@ -282,9 +269,9 @@ class CampaignBuilder(Container):
 
     def _label(self, node: Node) -> str:
         if node.kind == "add_attack":
-            return "[green]+ add attack[/green]"
+            return paint("+ add attack", ACCENT)
         if node.kind == "add_judge":
-            return "[green]+ add judge[/green]"
+            return paint("+ add judge", ACCENT)
         title = node.title
         if node.root[:2] == ("evaluation", "judges"):
             _, name = self.draft.get(node.root + ("name",))
@@ -295,9 +282,9 @@ class CampaignBuilder(Container):
         if not node.enabled(self.draft):
             return f"[dim]{title} · off[/dim]"
         if any(issue_matches(node.root, issue.loc) for issue in self._issues):
-            return f"{title} [red]✗[/red]"
+            return f"{title} {paint('✗', FAILED)}"
         if len(node.root) == 1:
-            return f"{title} [green]✓[/green]"
+            return f"{title} {paint('✓', PASSED)}"
         return title
 
     def _rebuild_outline(self, select: Optional[tuple] = None) -> None:
@@ -380,6 +367,10 @@ class CampaignBuilder(Container):
     async def _show(self, node: Optional[Node], *, force: bool = False) -> None:
         if node is None or (node == self._node and not force):
             return
+        if node != self._node:
+            # What the title bar said about the last part (a field, an attack
+            # in the list) is not about this one.
+            self.query_one("#doc-bar", TitleBar).show(context="")
         self._node = node
         form = self.query_one("#form", VerticalScroll)
         await form.remove_children()
@@ -565,9 +556,25 @@ class CampaignBuilder(Container):
         self._refresh_labels()
         self._apply_issues()
         self._update_doc_bar()
+        self._sync_run_controls()
+
+    def _sync_run_controls(self) -> None:
+        """Run and Stop, as buttons and as keys, follow the campaign: Run
+        needs a valid campaign and no run going, Stop a run going."""
         self.query_one("#run", Button).disabled = (
             self._campaign_running or self._spec is None
         )
+        self.query_one("#stop", Button).disabled = not self._campaign_running
+        self.refresh_bindings()
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Run is greyed out until the campaign is valid (while a run goes,
+        it shows the run); Stop is offered only while a run goes."""
+        if action == "run":
+            return True if self._campaign_running or self._spec is not None else None
+        if action == "stop":
+            return self._campaign_running
+        return True
 
     def _apply_issues(self) -> None:
         node = self._node
@@ -617,8 +624,8 @@ class CampaignBuilder(Container):
             if self._campaign_running
             else ""
         )
-        self.query_one("#doc-bar", Static).update(
-            f"{escape(name)}{dirty}  ·  {state}{running}"
+        self.query_one("#doc-bar", TitleBar).show(
+            title=f"{escape(name)}{dirty}  ·  {state}{running}"
         )
 
     def _is_dirty(self) -> bool:
@@ -663,14 +670,12 @@ class CampaignBuilder(Container):
             ),
             None,
         )
-        hint = self.query_one("#hint", Static)
+        # What the focused field is for; the keys are the footer's.
+        about = ""
         if row is not None:
             text = row.field.description or row.field.label
-            hint.update(f"[b]{escape(row.field.label)}[/b] — {escape(text)}")
-        elif isinstance(widget, Tree):
-            hint.update(_OUTLINE_HINT)
-        else:
-            hint.update(_FORM_HINT)
+            about = f"{escape(row.field.label)}: {escape(text)}"
+        self.query_one("#doc-bar", TitleBar).show(context=about)
 
     @on(Switch.Changed, ".enable-group")
     async def _toggle_group(self, event: Switch.Changed) -> None:
@@ -706,8 +711,8 @@ class CampaignBuilder(Container):
         from hackagent.client import catalog_by_id
 
         entry = catalog_by_id().get(str(event.option.id), {})
-        self.query_one("#hint", Static).update(
-            escape(str(entry.get("description") or event.option.id))
+        self.query_one("#doc-bar", TitleBar).show(
+            context=escape(str(entry.get("description") or event.option.id))
         )
 
     @on(OptionList.OptionSelected, ".attack-list")
@@ -903,8 +908,7 @@ class CampaignBuilder(Container):
         self._snapshot = self._spec
         self._campaign_running = True
         self._cancel.clear()
-        self.query_one("#run", Button).disabled = True
-        self.query_one("#stop", Button).disabled = False
+        self._sync_run_controls()
         self._run_lines.clear()
         self._note(
             logging.INFO,
@@ -983,8 +987,7 @@ class CampaignBuilder(Container):
         self._campaign_running = False
         if level is not None:
             self._note(level, message)
-        self.query_one("#stop", Button).disabled = True
-        self.query_one("#run", Button).disabled = self._spec is None
+        self._sync_run_controls()
         self._update_doc_bar()
 
     def action_stop(self) -> None:

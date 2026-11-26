@@ -97,9 +97,7 @@ async def test_results_tree_reads_and_renders_markup_from_sqlite(tmp_path, monke
         tab = app.query_one(ResultsTab)
         tab.refresh_data()
         tree = tab.query_one(Tree)
-        assert len(tree.root.children) == 1, str(
-            tab.query_one("#results-hint").render()
-        )
+        assert len(tree.root.children) == 1, str(tab.said)
         [campaign_node] = tree.root.children
         [attack_node] = campaign_node.children
         [goal_node] = attack_node.children
