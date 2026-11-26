@@ -7,6 +7,8 @@ from typing import Any, Optional, Union
 import httpx
 from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator
 
+from hackagent.storage._http.retry import RetryPolicy
+
 
 class Client(BaseModel):
     """A class for keeping track of data related to the API
@@ -166,6 +168,10 @@ class AuthenticatedClient(BaseModel):
 
         ``httpx_args``: A dictionary of additional arguments to be passed to the ``httpx.Client`` and ``httpx.AsyncClient`` constructor.
 
+        ``retry``: A RetryPolicy installed around every transport of the ``httpx.Client`` (its default one and the
+        proxies httpx mounts from the environment), so a dropped request that is safe to repeat is sent again. The
+        ``httpx.AsyncClient`` is left as it is.
+
 
     Attributes:
         raise_on_unexpected_status: Whether or not to raise an errors.UnexpectedStatus if the API returns a
@@ -189,6 +195,7 @@ class AuthenticatedClient(BaseModel):
     verify_ssl: Union[str, bool, ssl.SSLContext] = True
     follow_redirects: bool = False
     httpx_args: dict[str, Any] = {}
+    retry: Optional[RetryPolicy] = None
 
     _client: Optional[httpx.Client] = PrivateAttr(default=None)
     _async_client: Optional[httpx.AsyncClient] = PrivateAttr(default=None)
@@ -253,6 +260,8 @@ class AuthenticatedClient(BaseModel):
                 follow_redirects=self.follow_redirects,
                 **self.httpx_args,
             )
+            if self.retry is not None:
+                self.retry.install(self._client)
         return self._client
 
     def __enter__(self) -> "AuthenticatedClient":
