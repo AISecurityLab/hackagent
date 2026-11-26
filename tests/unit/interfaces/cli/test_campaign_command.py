@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+
+from hackagent.core.credentials import current_environment
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -249,7 +251,8 @@ def test_campaign_run_binds_gateway(monkeypatch, ambient):
 
     def fake_run(spec, **kwargs):
         captured["spec"] = spec
-        captured["key"] = os.environ.get("HACKAGENT_GATEWAY_KEY")
+        captured["key"] = current_environment().get("HACKAGENT_GATEWAY_KEY")
+        captured["process"] = os.environ.get("HACKAGENT_GATEWAY_KEY")
         return CampaignResult(campaign_name="demo", run_id="r1", dry_run=True)
 
     with (
@@ -276,7 +279,8 @@ def test_campaign_run_binds_gateway(monkeypatch, ambient):
     assert connection.endpoint == "https://api.example.test/v1"
     assert connection.api_key == "${HACKAGENT_GATEWAY_KEY}"
     assert captured["key"] == "dashboard-key"
-    os.environ.pop("HACKAGENT_GATEWAY_KEY", None)
+    # The process environment is left as it was.
+    assert captured["process"] == ambient
 
 
 def test_campaign_run_gateway_without_api_key_fails(monkeypatch):
