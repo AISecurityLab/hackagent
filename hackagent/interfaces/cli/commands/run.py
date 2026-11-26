@@ -190,9 +190,7 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
         _check_environment(spec)
 
         if settings.dashboard_url and not as_json:
-            console.print(
-                f"Follow it at {settings.dashboard_url}/attacks?runId={run_uuid}"
-            )
+            console.print(f"Follow it at {settings.dashboard_url}/runs?run={run_uuid}")
         try:
             with ask_before_cancelling(), show_run(as_json):
                 outcome = execute_run(

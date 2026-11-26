@@ -71,7 +71,7 @@ def _resolve_asset(bundle: Path, subpath: str) -> Optional[Path]:
     """Map a browser path onto a file in a Next.js static export.
 
     ``next build`` with ``output: 'export'`` writes ``/agents`` as
-    ``agents.html`` and nested routes as ``attacks/builder.html``, so a plain
+    ``agents.html`` and nested routes as ``campaigns/builder.html``, so a plain
     static handler would 404 on every route but the index.
     """
     if not subpath or subpath.endswith("/"):
