@@ -49,7 +49,7 @@ def test_target_errors_retry_without_duplicate_results(
     run, campaign_values, completion_server
 ):
     campaign_values["execution"]["retries"] = {"target": 1}
-    completion_server.replies["target"].append(Reply("try again", 400))
+    completion_server.replies["target"].append(Reply("try again", 503))
     execute, store = run
     result = execute()
     assert len(completion_server.calls("target")) == 3
