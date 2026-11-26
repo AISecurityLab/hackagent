@@ -78,9 +78,10 @@ SETTINGS: tuple[Setting, ...] = (
     Setting("base_url", "API location", "HackAgent API base URL"),
     Setting("ca_bundle", "CA bundle", "CA bundle (PEM) trusted for the HackAgent API"),
     Setting(
-        "verbose",
-        "Log level",
-        "Default verbosity level: 0/error, 1/warning, 2/info, 3/debug",
+        "verbosity",
+        "Verbosity",
+        "How much the log says, as many -v: 0 the run's log (the default), "
+        "1 every model call too, 2 other libraries' messages too, 3 everything",
         ("0", "1", "2", "3"),
     ),
 )
@@ -94,7 +95,7 @@ def change_settings(
     Saving is the caller's, once."""
     from pathlib import Path
 
-    from hackagent.interfaces.cli.config import VERBOSITY_LEVELS, VERBOSITY_NAMES
+    from hackagent.interfaces.cli.config import MAX_VERBOSITY, VERBOSITY
 
     changed: list[str] = []
     refused: list[str] = []
@@ -117,40 +118,53 @@ def change_settings(
             changed.append(f"CA bundle updated to: {cli_config.ca_bundle}")
         else:
             refused.append(f"CA bundle not found: {ca_bundle}")
-    verbose = values.get("verbose")
-    if verbose is not None and str(verbose) != "":
-        text = str(verbose).strip()
-        level: Optional[int] = None
-        if text.isdigit():
-            if 0 <= int(text) <= 3:
-                level = int(text)
-            else:
-                refused.append("Verbosity level must be between 0 and 3")
-        elif text.lower() in VERBOSITY_LEVELS:
-            level = VERBOSITY_LEVELS[text.lower()]
+    verbosity = values.get("verbosity")
+    if verbosity is not None and str(verbosity) != "":
+        text = str(verbosity).strip()
+        if text.isdigit() and 0 <= int(text) <= MAX_VERBOSITY:
+            cli_config.set_user_override("verbosity", int(text))
+            changed.append(f"Verbosity updated to: {text} ({VERBOSITY[int(text)]})")
         else:
             refused.append(
-                f"Invalid verbosity level. Use: 0-3 or {', '.join(VERBOSITY_LEVELS)}"
-            )
-        if level is not None:
-            cli_config.set_user_override("verbose", level)
-            changed.append(
-                f"Verbosity level updated to: {level} ({VERBOSITY_NAMES[level]})"
+                f"Verbosity is a number from 0 to {MAX_VERBOSITY}, not {text}"
             )
     return changed, refused
+
+
+def _api_check(cli_config: Any) -> Check:
+    """Whether the HackAgent API answers, when results are kept there."""
+    from hackagent import HackAgent
+    from hackagent.core.settings import tls_error_hint
+
+    where = str(cli_config.base_url)
+    try:
+        status = HackAgent(cli_config.settings).check_connection()
+    except Exception as exc:  # noqa: BLE001 - a check, said rather than raised
+        hint = tls_error_hint(exc)
+        return Check(
+            "failed",
+            "The API did not answer",
+            f"{where}: {exc}" + (f". {hint}" if hint else ""),
+        )
+    if status == 200:
+        return Check("passed", "The API answers", where)
+    return Check(
+        "failed",
+        f"The API answered with status {status}",
+        where,
+        ("Check the location", "hackagent config set --base-url URL"),
+    )
 
 
 def setup_report(cli_config: Any) -> tuple[tuple[Section, ...], Check]:
     """The checks, by section, and the verdict on all of them."""
     from hackagent import HackAgent
-    from hackagent.interfaces.cli.config import VERBOSITY_NAMES
 
     # Diagnostics only read settings. A throwaway backend keeps this from
     # opening SQLite or the remote API, which would create the local database
     # before the "database exists" check.
     report = HackAgent(cli_config.settings, backend=object()).doctor()
 
-    verbosity = VERBOSITY_NAMES.get(cli_config.verbose, "?").lower()
     settings = (
         Check(
             "passed" if report.config_exists else "warning",
@@ -158,8 +172,6 @@ def setup_report(cli_config: Any) -> tuple[tuple[Section, ...], Check]:
             report.config_path,
             None if report.config_exists else ("Create one", "hackagent init"),
         ),
-        Check("info", f"Results kept: {cli_config.backend}"),
-        Check("info", f"Log level: {cli_config.verbose} ({verbosity})"),
         Check(
             "passed" if report.api_key_set else "warning",
             "API key set" if report.api_key_set else "API key not set",
@@ -168,6 +180,8 @@ def setup_report(cli_config: Any) -> tuple[tuple[Section, ...], Check]:
             else ("Set it", "export HACKAGENT_API_KEY=..."),
         ),
     )
+    if cli_config.backend == "remote":
+        settings += (_api_check(cli_config),)
     storage = (
         Check("passed", "Local database", report.db_path)
         if report.db_exists

@@ -202,7 +202,7 @@ export const TERMS: Record<string, TermEntry> = {
     summary: 'Every attempt is recorded with its prompt, reply and verdict, in a local database and as JSON under ./logs/runs.',
     body: (
       <p>
-        Browse them with <code>hackagent results list</code>, the terminal UI (<code>hackagent tui</code>)
+        Browse them with <code>hackagent results summary</code>, the terminal UI (<code>hackagent</code>)
         or the dashboard (<code>hackagent web</code>). Set <code>execution.storage.backend</code> to{' '}
         <code>remote</code> to record them on a HackAgent server instead.
       </p>

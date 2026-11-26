@@ -36,16 +36,16 @@ class TestSetupPackageLogging(unittest.TestCase):
         logger.setLevel(logging.NOTSET)
 
     def test_setup_logging_default_level(self):
-        """Test setup with default WARNING level (no env var)."""
+        """By default the CLI's log shows from INFO, as every interface does."""
         # Make sure env var is not set
         env_backup = os.environ.pop("HACKAGENT_LOG_LEVEL", None)
         try:
             setup_package_logging()
             logger = logging.getLogger("hackagent")
             # The logger lets every record through; the CLI's handler shows
-            # warnings, and a run's other handlers choose their own level.
+            # INFO, and a run's other handlers choose their own level.
             self.assertEqual(logger.level, logging.DEBUG)
-            self.assertEqual(shown_level(), logging.WARNING)
+            self.assertEqual(shown_level(), logging.INFO)
         finally:
             if env_backup:
                 os.environ["HACKAGENT_LOG_LEVEL"] = env_backup

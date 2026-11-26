@@ -20,38 +20,6 @@ Set up HackAgent for the first time.
 
 Asks where results are kept and how much the log says, and saves it.
 
-#### version
-
-```python
-@cli.command()
-@click.pass_context
-@handle_errors
-def version(ctx)
-```
-
-Show the version, and where the configuration is.
-
-#### tui
-
-```python
-@cli.command()
-@click.pass_context
-@handle_errors
-def tui(ctx)
-```
-
-Open the terminal app: build, check and run a campaign.
-
-The same as `hackagent` alone. Start from an example or open an
-existing campaign.yaml; the app checks it as you type, and runs it.
-
-
-Keys:
-  F1      what this screen is, and every key
-  ctrl+r  run the campaign
-  ctrl+s  save it to a file
-  q       quit
-
 #### doctor
 
 ```python

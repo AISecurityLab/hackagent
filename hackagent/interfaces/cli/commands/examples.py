@@ -7,7 +7,6 @@ Examples Commands
 Launch ready-to-run example scenarios from the CLI.
 """
 
-import importlib
 import re
 import os
 import socket
@@ -16,7 +15,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from types import ModuleType
 from typing import Optional
 from urllib.error import URLError
 from urllib.parse import urljoin
@@ -25,7 +23,6 @@ from urllib.request import urlopen
 import click
 from rich.markup import escape
 
-from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.cli.utils import (
     Failed,
     console,
@@ -37,62 +34,6 @@ from hackagent.interfaces.cli.utils import (
 )
 from hackagent import examples as examples_catalog
 from hackagent import resolve_ollama_base_url
-
-
-def _get_repo_root() -> Path:
-    """Return repository root directory from this module location."""
-    return Path(__file__).resolve().parents[4]
-
-
-def _resolve_example_dir(
-    relative_path: str, required_files: tuple[str, ...] = ()
-) -> Path:
-    """Resolve an example directory across editable and installed layouts."""
-    relative = Path(relative_path)
-    candidates = [
-        _get_repo_root() / "examples" / relative,
-        Path(__file__).resolve().parents[3] / "examples" / relative,
-    ]
-
-    for candidate in candidates:
-        if not candidate.exists() or not candidate.is_dir():
-            continue
-
-        if required_files and not all(
-            (candidate / required_file).exists() for required_file in required_files
-        ):
-            continue
-
-        if candidate.exists() and candidate.is_dir():
-            return candidate
-
-    searched = "\n".join(f" - {candidate}" for candidate in candidates)
-    required = ""
-    if required_files:
-        required = "\nRequired files:\n" + "\n".join(
-            f" - {Path(relative_path) / required_file}"
-            for required_file in required_files
-        )
-    raise Failed(
-        f"Example directory '{relative_path}' not found. Checked:\n{searched}{required}"
-    )
-
-
-def _run_python_script(script_path: Path, env: dict[str, str] | None = None) -> None:
-    """Run a Python script and stream output to the current terminal."""
-    if not script_path.exists() or not script_path.is_file():
-        raise Failed(f"Script not found: {script_path}")
-
-    result = subprocess.run(
-        [sys.executable, script_path.name],
-        cwd=str(script_path.parent),
-        env=env,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise Failed(
-            f"Script failed ({script_path.name}) with exit code {result.returncode}"
-        )
 
 
 def _run_hackagent_cli_command(args: list[str]) -> None:
@@ -177,46 +118,6 @@ def _stop_background_process(process: subprocess.Popen, process_name: str) -> No
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=5)
-
-
-def _extract_ollama_models_from_demo_cfg(demo_cfg: dict) -> dict[str, str]:
-    """Extract target, attacker, and judge Ollama model names from demo config."""
-    models: dict[str, str] = {}
-
-    agent_cfg = demo_cfg.get("agent", {})
-    adapter_cfg = agent_cfg.get("adapter_operational_config", {})
-    target_model = adapter_cfg.get("name")
-    if target_model:
-        models["target"] = str(target_model)
-
-    attack_cfg = demo_cfg.get("attack_config", {})
-    attacker_cfg = attack_cfg.get("attacker", {})
-    attacker_model = attacker_cfg.get("identifier")
-    if attacker_model:
-        models["attacker"] = str(attacker_model)
-
-    judge_model = None
-    judge_cfg = attack_cfg.get("judge", {})
-    if isinstance(judge_cfg, dict):
-        judge_model = judge_cfg.get("identifier")
-
-    if not judge_model:
-        judges_cfg = attack_cfg.get("judges")
-        if isinstance(judges_cfg, list) and judges_cfg:
-            first_judge = judges_cfg[0]
-            if isinstance(first_judge, dict):
-                judge_model = first_judge.get("identifier")
-
-    if judge_model:
-        models["judge"] = str(judge_model)
-
-    embedder_cfg = attack_cfg.get("embedder", {})
-    if isinstance(embedder_cfg, dict):
-        embedder_model = embedder_cfg.get("identifier")
-        if embedder_model:
-            models["embedder"] = str(embedder_model)
-
-    return models
 
 
 def _is_ollama_running(endpoint: str) -> bool:
@@ -347,6 +248,13 @@ def _run_example(name: str) -> None:
     """Start whatever the example needs, run its campaign, then clean up."""
     key, campaign_path = _resolve_example_name(name)
     folder = key.rsplit("/", 1)[0] if "/" in key else ""
+    if folder == "web":
+        # A website chatbot is someone's production system, so this example
+        # has no target of its own: it says what to copy and edit instead.
+        _explain_web_example()
+        return
+    if folder == "ollama":
+        _preflight_ollama_campaign(campaign_path)
     if folder in _MANUAL_TARGETS:
         display_warning("This example needs its agent running first:")
         console.print(f"    {_MANUAL_TARGETS[folder]}", markup=False)
@@ -371,6 +279,21 @@ def _run_example(name: str) -> None:
         _run_campaign_file(campaign_path)
     finally:
         _stop_background_process(process, target.label)
+
+
+def _explain_web_example() -> None:
+    """How to red-team a website chatbot you are authorized to test."""
+    console.print(
+        "The web example attacks a live site, so it needs one you are "
+        "authorized to test.\n"
+        "  1. Copy it: [accent]hackagent examples copy web/tap-site-chatbot campaign.yaml[/accent]\n"
+        "  2. Set [name]target.connection.endpoint[/name] and "
+        "[name]target.options.url[/name] to that site\n"
+        "  3. Run it: [accent]hackagent campaign run campaign.yaml[/accent]",
+        highlight=False,
+        # The path is copied from here; wrapping it would break it.
+        soft_wrap=True,
+    )
 
 
 def _preflight_ollama_campaign(campaign_path: Path) -> None:
@@ -398,47 +321,6 @@ def _preflight_ollama_campaign(campaign_path: Path) -> None:
         console.print(f"   - {where}: {model_name}")
     _ensure_ollama_models(required)
     display_success("Ollama is ready")
-
-
-def _preflight_ollama_requirements(demo_cfg: dict) -> None:
-    """Validate Ollama availability and required models before launching the TUI."""
-    display_info("Checking Ollama…")
-
-    if shutil.which("ollama") is None:
-        display_hint("Install it first", "https://ollama.ai")
-        raise Failed("Ollama is not installed")
-
-    endpoint = demo_cfg.get("agent", {}).get("endpoint") or resolve_ollama_base_url()
-    display_info(f"Checking the Ollama server at {endpoint}")
-
-    if not _is_ollama_running(str(endpoint)):
-        display_hint("Start it and retry", "ollama serve")
-        raise Failed("Ollama server is not reachable")
-
-    display_success("Ollama server is running")
-
-    required_models = _extract_ollama_models_from_demo_cfg(demo_cfg)
-    display_info("Models the demo needs:")
-    for role in ["target", "judge", "attacker", "embedder"]:
-        model_name = required_models.get(role)
-        if model_name:
-            console.print(f"   - {role}: {model_name}")
-
-    _ensure_ollama_models(required_models)
-    display_success("Ollama is ready")
-
-
-def _load_ollama_demo_module() -> ModuleType:
-    """Load hackagent/examples/ollama/demo.py as a module."""
-    demo_path = _resolve_example_dir("ollama", required_files=("demo.py",)) / "demo.py"
-
-    spec = importlib.util.spec_from_file_location("hackagent_ollama_demo", demo_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot load demo module from {demo_path}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 @click.group()
@@ -513,66 +395,3 @@ def copy_example(name: str, destination: Optional[Path], force: bool):
 def run_example(name: str):
     """Run one example by name, starting its target if it has one."""
     _run_example(name)
-
-
-@examples.command()
-@click.pass_context
-@handle_errors
-def ollama(ctx):
-    """Run the Ollama h4rm3l demo via CLI (no TUI)."""
-    cli_config: CLIConfig = ctx.obj["config"]
-    cli_config.validate()
-
-    example_dir = _resolve_example_dir("ollama", required_files=("h4rm3l-demo.yaml",))
-    campaign_path = example_dir / "h4rm3l-demo.yaml"
-
-    _preflight_ollama_campaign(campaign_path)
-    _run_campaign_file(campaign_path)
-
-
-@examples.command(name="quick-evaluation")
-@handle_errors
-def quick_evaluation():
-    """Run the OpenRouter quick evaluation example (h4rm3l)."""
-    _run_example("openai_sdk/quick_evaluation/h4rm3l-granite")
-
-
-@examples.command(name="pc-tool")
-@handle_errors
-def pc_tool():
-    """Run the PC Tool sandbox example: start agent, then launch attack."""
-    _run_example("openai_sdk/pc_tool_sandbox/pair-vaultdesk")
-
-
-@examples.command(name="db-tool")
-@handle_errors
-def db_tool():
-    """Run the DB Tool sandbox example: start agent, then launch attack."""
-    _run_example("openai_sdk/db_tool_sandbox/flipattack-sqldesk")
-
-
-@examples.command(name="rag")
-@handle_errors
-def rag_example():
-    """Run the RAG indirect-injection example."""
-    _run_example("rag/indirect-injection")
-
-
-@examples.command(name="web")
-@handle_errors
-def web_example():
-    """Show how to red-team a website chatbot you are authorized to test."""
-    # A website chatbot is someone's production system, so this example has
-    # no target of its own: it points at the campaign to copy and edit.
-    _resolve_example_name("web/tap-site-chatbot")
-    console.print(
-        "The web example attacks a live site, so it needs one you are "
-        "authorized to test.\n"
-        "  1. Copy it: [accent]hackagent examples copy web/tap-site-chatbot campaign.yaml[/accent]\n"
-        "  2. Set [name]target.connection.endpoint[/name] and "
-        "[name]target.options.url[/name] to that site\n"
-        "  3. Run it: [accent]hackagent campaign run campaign.yaml[/accent]",
-        highlight=False,
-        # The path is copied from here; wrapping it would break it.
-        soft_wrap=True,
-    )

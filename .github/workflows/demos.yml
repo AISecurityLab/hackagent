@@ -1,11 +1,12 @@
 name: Demo recordings
 
-# The README and the docs show the terminal UI as a GIF. It is recorded from
-# code (docs/scripts/demos/), so it can follow every change instead of being
-# re-recorded by hand. After something lands on stage, record it again; when
-# a frame changed, push the new GIF to a disposable demos/update branch and
-# open (or update) a PR against stage. When nothing changed, nothing is
-# pushed: the GIF carries a hash of its frames.
+# The README and the docs show the terminal UI, the command line and the web
+# dashboard as GIFs. Each is recorded from code (docs/scripts/demos/: tui_demo.py,
+# cli_demo.py, dashboard_demo.py), so it follows every change instead of being
+# re-recorded by hand. After something lands on stage, record them again;
+# when a frame changed, push the new GIFs to a disposable demos/update branch
+# and open (or update) a PR against stage. When nothing changed, nothing is
+# pushed: each GIF carries a hash of its frames.
 
 on:
   push:
@@ -15,6 +16,10 @@ on:
       - "docs/scripts/demos/**"
       - "pyproject.toml"
       - "uv.lock"
+  # The dashboard also changes when hackagent-webapp publishes a new build,
+  # which no push here announces: look once a week.
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -35,6 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # A scheduled run starts from the default branch; the demos are
+          # recorded from stage, and proposed against it.
+          ref: stage
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -49,11 +58,22 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --group dev
-          uv run playwright install --with-deps chromium
+          uv sync --group dev --extra web
+          # The dashboard the demo shows: the newest hackagent-webui
+          # pre-release, built from hackagent-webapp's stage branch, as the
+          # dashboard smoke check uses. --no-sync below keeps uv from
+          # reinstalling the locked release over it.
+          uv pip install --prerelease allow --upgrade "hackagent-webui<1.0"
+          uv run --no-sync playwright install --with-deps chromium
 
       - name: Record the terminal UI
-        run: uv run python docs/scripts/demos/tui_demo.py
+        run: uv run --no-sync python docs/scripts/demos/tui_demo.py
+
+      - name: Record the command line
+        run: uv run --no-sync python docs/scripts/demos/cli_demo.py
+
+      - name: Record the web dashboard
+        run: uv run --no-sync python docs/scripts/demos/dashboard_demo.py
 
       - name: Check whether a GIF changed
         id: changed
@@ -79,18 +99,20 @@ jobs:
             echo "::error::PROMOTE_GITHUB_TOKEN secret is not set; it opens the demos PR."
             exit 1
           fi
+          # The commit recorded: stage's, which a scheduled run's GITHUB_SHA is not.
+          recorded="$(git rev-parse HEAD)"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "${DEMOS_HEAD}"
           git add docs/static/gifs
           git commit -m "docs: record the demos again" \
-            -m "Recorded from ${GITHUB_SHA} by docs/scripts/demos/."
+            -m "Recorded from ${recorded} by docs/scripts/demos/."
           git push --force \
             "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
             "HEAD:refs/heads/${DEMOS_HEAD}"
           existing="$(gh pr list --repo "${REPO}" --base stage \
             --head "${DEMOS_HEAD}" --state open --json number --jq '.[0].number // empty')"
-          body="The demos, recorded again from ${GITHUB_SHA}: an interface they show changed. Recorded by \`docs/scripts/demos/\`; nothing here is edited by hand."
+          body="The demos, recorded again from ${recorded}: an interface they show changed. Recorded by \`docs/scripts/demos/\`; nothing here is edited by hand."
           if [[ -n "${existing}" ]]; then
             gh pr edit "${existing}" --repo "${REPO}" --body "${body}"
             echo "Updated PR #${existing}."

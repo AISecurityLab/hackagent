@@ -95,14 +95,16 @@ hackagent campaign validate campaign.yaml
 names, then stops. It attacks nothing. Building a model reads its key, so the
 variables the file's `api_key` references name must be set. It checks the file
 as the terminal UI's builder does, in the same words. A good file is ready to
-run, and says what it resolved:
+run; the log says what it resolved:
 
 ```text
-✓ ready to run · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
+11-23 10:02:10 INFO    dataset · 1 goal loaded
+11-23 10:02:11 INFO    campaign · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
+✓ ready to run
 ```
 
-With `-vv` the log already says what resolving found, so the result is just
-`✓ ready to run`.
+With `HACKAGENT_LOG_LEVEL` above `INFO`, which hides those lines, the result
+says it instead: `✓ ready to run · 2 models ready · 1 attack: flipattack · …`.
 
 A bad one names each problem where it is, then how many there are, and exits
 with code 1; `campaign run` reports a bad file the same way:
@@ -128,15 +130,19 @@ hackagent campaign run campaign.yaml
 
 Before the first attack, the command checks that every Ollama server, and every
 vLLM server, the campaign names is up and lists the model the campaign asks
-for. Then it prints the campaign's own lines: as it starts, as each attack
-starts and finishes, and how it ended, with a line per attack:
+for. Then it shows the run's log, as the terminal UI's run view shows it: from
+`INFO`, each line with its time and level. What the campaign resolved to, each
+attack starting and finishing, each goal's result, how it ended, and a line
+per attack:
 
 ```text
-campaign First run · started · loading goals and models
-flipattack started · 1 goal · run 3f2a9c1e
-flipattack finished · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 3.0s
-campaign First run succeeded · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 1 attack · 3.4s · output → ./logs/runs
-summary · flipattack · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken)
+11-23 10:02:10 INFO    campaign First run · started · loading goals and models
+11-23 10:02:12 INFO    campaign · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
+11-23 10:02:12 INFO    flipattack started · 1 goal · run 3f2a9c1e
+11-23 10:02:15 INFO    flipattack · goal 1 · result: jailbroken at attempt 1 · 1 attempt · 3.0s
+11-23 10:02:15 INFO    flipattack finished · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 3.0s
+11-23 10:02:15 INFO    campaign First run succeeded · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 1 attack · 3.4s · output → ./logs/runs
+11-23 10:02:15 INFO    summary · flipattack · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken)
 ```
 
 A goal is jailbroken when the judges called any attempt at it a jailbreak, as
@@ -145,16 +151,10 @@ the attempts are counted too. "Succeeded" means every attack ran to the end
 with no attempt failing, not that any jailbreak was found. An attack that
 stopped early says why, as an error.
 
-With `-vv` the log says all of it, and more: what the campaign resolved to,
-the judge audit's table, each goal's result, and after the closing line a
-line per attack and the most common attempt errors:
-
-```text
-11-23 10:02:12 INFO    campaign · 2 models ready · 1 attack: flipattack · 1 judge · guardrails off · classifier off · escalate off
-…
-11-23 10:02:15 INFO    campaign First run succeeded · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken) · 1 attack · 3.4s · output → ./logs/runs
-11-23 10:02:15 INFO    summary · flipattack · 1 of 1 goal jailbroken · 1 attempt (1 jailbroken)
-```
+`HACKAGENT_LOG_LEVEL=WARNING` keeps the terminal's log to warnings; the
+campaign's own lines (each attack starting and finishing, how it ended) still
+show then, on stdout and without time or level, so a quiet run still says
+where it is.
 
 ### Rehearse with `--dry-run`
 
@@ -165,12 +165,12 @@ to run anywhere.
 ### Follow what an attack does
 
 Every attack records what it does as it searches: its steps, each model call,
-and why it stopped, pruned or skipped. Run with `-vv` to see those decisions and
-each verdict as they happen, or `-vvv` to also see every call with a snippet of
-its text:
+and why it stopped, pruned or skipped. A run shows those decisions and each
+verdict as they happen; `-v` also shows every call with a snippet of its
+text:
 
 ```bash
-hackagent -vv campaign run campaign.yaml
+hackagent -v campaign run campaign.yaml
 ```
 
 ```text
@@ -198,20 +198,20 @@ writes, each at a level of its own:
 
 | Interface | Shows |
 |---|---|
-| The terminal (stderr) | Warnings, or what `-v`, `-vv`, `-vvv` ask for |
-| The TUI's run view | `INFO` and above, or `DEBUG` with `-vvv` |
+| The terminal (stderr) | `INFO` and above; `DEBUG` with `-v`; other libraries' messages too with `-vv` and `-vvv` |
+| The TUI's run view | `INFO` and above, or `DEBUG` with `-v` |
 | The run page's activity log | `INFO` and above |
 | `run.log` in the run's folder | `INFO` and above |
 
-Without `-vv`, the campaign's own lines (each attack starting and finishing,
-how the campaign ended) still show, on stdout.
+With `HACKAGENT_LOG_LEVEL` above `INFO`, the campaign's own lines (each attack
+starting and finishing, how the campaign ended) still show, on stdout.
 
-`-vv` never prints a prompt or a reply, only decisions, counts and scores.
-`-vvv` quotes the first 100 characters of what each call returned, which can be
+The log at `INFO` never prints a prompt or a reply, only decisions, counts and
+scores. `-v` quotes the first 100 characters of what each call returned, which can be
 harmful text. Those lines stay on your machine: nothing below `INFO` reaches
 the activity log, and nothing at `INFO` or above quotes model text.
 
-`HACKAGENT_LOG_LEVEL=INFO` or `DEBUG` does the same as `-vv` or `-vvv`, and wins
+`HACKAGENT_LOG_LEVEL=DEBUG` does the same as `-v`, and wins
 when both are set. Both set what the terminal shows; the other interfaces
 keep their own levels.
 
@@ -302,7 +302,7 @@ The run then fails before it starts if the key is missing.
 hackagent results summary              # the latest campaigns and their attacks
 hackagent results summary --goals      # and each goal, jailbroken or mitigated
 hackagent results show RESULT_ID       # one result in detail
-hackagent tui                          # browse them in the terminal app
+hackagent                              # browse them in the terminal app
 hackagent web                          # browse them in the dashboard
 ```
 

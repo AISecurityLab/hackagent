@@ -31,10 +31,12 @@ BRAND = "#ff0000"
 #: The colours, by hue. A verdict, a check and a log level take theirs from
 #: here by meaning: green holds, red failed, yellow is worth knowing.
 GREEN, RED, YELLOW, CYAN, VIOLET = "#5fd75f", "#ff5f5f", "#ffd75f", "#5fd7ff", "#c9a0ff"
+SAND = "#d7af87"
 
 #: A log line's level name, by severity.
 LEVEL_STYLES: dict[str, str] = {
-    "DEBUG": "dim",
+    # Sand: not the time's gray it sits beside, nor any verdict's colour.
+    "DEBUG": SAND,
     "INFO": GREEN,
     "WARNING": YELLOW,
     "ERROR": f"bold {RED}",

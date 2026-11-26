@@ -133,3 +133,9 @@ def test_a_result_is_called_what_the_log_calls_it(status, notes, word):
     result = SimpleNamespace(evaluation_status=status, evaluation_notes=notes)
     assert verdict_of(result) == word
     assert word in palette.VERDICT_STYLES
+
+
+def test_no_log_level_is_drawn_in_the_time_s_gray():
+    """The level sits beside the time: in its gray, DEBUG vanished into it."""
+    assert palette.SECONDARY not in palette.LEVEL_STYLES.values()
+    assert palette.LEVEL_STYLES["DEBUG"] == palette.SAND

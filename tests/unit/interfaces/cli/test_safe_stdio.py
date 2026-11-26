@@ -155,7 +155,8 @@ def test_install_on_click_command_configures_before_main(
     "args",
     [
         ["--version"],
-        ["version"],
+        # The logo, as the Windows binary's smoke check prints it.
+        ["--help"],
         ["campaign", "--help"],
     ],
 )

@@ -15,15 +15,11 @@ from hackagent.core.settings import Source
 from hackagent.interfaces.cli.utils import (
     Failed,
     console,
-    display_error,
-    display_hint,
     display_info,
     display_success,
     display_warning,
     handle_errors,
 )
-from hackagent import resolve_remote_base_url
-from hackagent.core.settings import tls_error_hint
 
 
 @click.group()
@@ -48,10 +44,10 @@ def _setting(key: str) -> str:
     type=click.Path(exists=True, dir_okay=True),
     help=_setting("ca_bundle"),
 )
-@click.option("--verbose", type=str, help=_setting("verbose"))
+@click.option("--verbosity", type=str, help=_setting("verbosity"))
 @click.pass_context
 @handle_errors
-def set(ctx, backend, base_url, ca_bundle, verbose):
+def set(ctx, backend, base_url, ca_bundle, verbosity):
     """Set storage, API location, CA bundle and verbosity defaults
 
     The terminal app's Settings screen changes the same settings.
@@ -65,14 +61,13 @@ def set(ctx, backend, base_url, ca_bundle, verbose):
             "backend": backend,
             "base_url": base_url,
             "ca_bundle": ca_bundle,
-            "verbose": verbose,
+            "verbosity": verbosity,
         },
     )
     for problem in refused:
         display_warning(problem)
-    if cli_config.should_show_info() or cli_config.verbose > 0:
-        for change in changed:
-            display_success(change)
+    for change in changed:
+        display_success(change)
     updated = bool(changed)
 
     if updated:
@@ -90,37 +85,37 @@ def show(ctx):
 
     cli_config: CLIConfig = ctx.obj["config"]
 
+    from hackagent.interfaces.cli.config import VERBOSITY
+
+    # By the keys `hackagent config set` and the configuration file use.
     table = Table(title="Configuration", show_header=True, header_style="heading")
     table.add_column("Setting", style="accent")
     table.add_column("Value")
-    table.add_column("Source", style="secondary")
-
-    api_key_display = "Set" if cli_config.api_key else "Not set"
-    api_key_source = cli_config.source_of("api_key")
-    from hackagent.interfaces.cli.config import VERBOSITY_NAMES
-
+    table.add_column("From", style="secondary")
+    table.add_row("backend", cli_config.backend, cli_config.source_of("backend"))
     table.add_row(
-        "Storage Backend", cli_config.backend, cli_config.source_of("backend")
+        "api_key",
+        "set" if cli_config.api_key else "not set",
+        cli_config.source_of("api_key"),
     )
-    table.add_row("API Key", api_key_display, api_key_source)
-    table.add_row("Base URL", cli_config.base_url, cli_config.source_of("base_url"))
-    verbosity_display = (
-        f"{cli_config.verbose} ({VERBOSITY_NAMES.get(cli_config.verbose, 'UNKNOWN')})"
-    )
-    table.add_row("Verbosity", verbosity_display, "Default/Config")
+    table.add_row("base_url", cli_config.base_url, cli_config.source_of("base_url"))
     table.add_row(
-        "Config File", str(cli_config.default_config_path), "Default location"
+        "ca_bundle",
+        str(cli_config.ca_bundle or "—"),
+        cli_config.source_of("ca_bundle"),
     )
-
+    table.add_row(
+        "verbosity",
+        f"{cli_config.verbose} ({VERBOSITY[cli_config.verbose]})",
+        cli_config.source_of("verbose"),
+    )
     console.print(table)
-
-    if cli_config.should_show_info():
-        if cli_config.default_config_path.exists():
-            display_info(f"Configuration file: {cli_config.default_config_path}")
-        else:
-            display_info(
-                "No configuration file found. Use 'hackagent config set' to create one."
-            )
+    path = cli_config.default_config_path
+    display_info(
+        f"Configuration file: {path}"
+        if path.exists()
+        else f"No configuration file at {path}: hackagent config set creates it."
+    )
 
 
 @config.command()
@@ -142,61 +137,9 @@ def reset(ctx, confirm):
     if cli_config.default_config_path.exists():
         cli_config.default_config_path.unlink()
         display_success("Configuration reset to defaults")
-        if cli_config.should_show_info():
-            display_info(
-                "API keys are read from environment variables (HACKAGENT_API_KEY by default)"
-            )
+        display_info("The API key is read from HACKAGENT_API_KEY.")
     else:
         display_info("No configuration file to reset")
-
-
-@config.command()
-@click.pass_context
-@handle_errors
-def validate(ctx):
-    """Validate current configuration"""
-
-    cli_config: CLIConfig = ctx.obj["config"]
-
-    try:
-        cli_config.validate()
-
-        from contextlib import nullcontext
-
-        from hackagent import HackAgent
-
-        session = HackAgent(cli_config.settings)
-        spinner = (
-            console.status("Testing the API connection…")
-            if cli_config.should_show_info()
-            else nullcontext()
-        )
-        with spinner:
-            status_code = session.check_connection()
-
-        if status_code == 200:
-            display_success("Configuration valid, and the API answers")
-        else:
-            display_warning(
-                f"Configuration valid, but the API answered with status {status_code}"
-            )
-
-    except ValueError as e:
-        display_error(f"Configuration not valid: {e}")
-        display_hint("Set the API key", "export HACKAGENT_API_KEY=...")
-        display_hint(
-            "Set the API location",
-            f"hackagent config set --base-url {resolve_remote_base_url()}",
-        )
-        raise Failed("Configuration not valid") from e
-    except Exception as e:
-        display_warning(f"Could not test the API connection: {e}")
-        hint = tls_error_hint(e)
-        if hint:
-            display_info(hint)
-        display_info(
-            "Configuration appears valid, but API connection could not be tested"
-        )
 
 
 @config.command()
@@ -234,15 +177,17 @@ def import_config(ctx, config_file):
             cli_config.set_user_override("ca_bundle", config_data["ca_bundle"])
             updated_fields.append("CA bundle")
 
-        if "verbose" in config_data:
-            cli_config.verbose = config_data["verbose"]
+        from hackagent.interfaces.cli.config import _from_file
+
+        verbosity = _from_file(config_data)
+        if verbosity is not None:
+            cli_config.set_user_override("verbosity", verbosity)
             updated_fields.append("Verbosity")
 
         if updated_fields:
             cli_config.save()
             display_success(f"Configuration imported: {', '.join(updated_fields)}")
-            if cli_config.should_show_info():
-                display_info(f"Saved to: {cli_config.default_config_path}")
+            display_info(f"Saved to: {cli_config.default_config_path}")
         else:
             display_info("No valid configuration found in file")
 

@@ -40,3 +40,28 @@ def test_every_dashboard_page_renders_without_failed_requests():
     if missing:
         pytest.skip(missing)
     assert smoke_webui.main([]) == 0
+
+
+# The demo seeds its database by running a campaign, then browses.
+@pytest.mark.timeout(300)
+def test_the_dashboard_demo_tells_its_story(tmp_path):
+    """The README's dashboard GIF is recorded from a storyboard
+    (docs/scripts/demos/dashboard_demo.py): it still gets from the home page to
+    one goal's conversation, and records the same frames each time."""
+    import importlib
+    import sys
+
+    missing = _missing_prerequisite()
+    if missing:
+        pytest.skip(missing)
+    demos = Path(__file__).resolve().parents[2] / "docs" / "scripts" / "demos"
+    sys.path.insert(0, str(demos))
+    try:
+        dashboard = importlib.import_module("dashboard_demo")
+        first = dashboard.film(tmp_path / "first")
+        second = dashboard.film(tmp_path / "second")
+    finally:
+        sys.path.remove(str(demos))
+
+    assert first.digest() == second.digest()
+    assert "Target response" in first.keys[-3]

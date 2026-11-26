@@ -35,7 +35,7 @@ The attack is a campaign file, so you can read it end to end and change the
 goals, the decorator program or the judge without touching Python.
 `hackagent campaign validate h4rm3l-corpbot.yaml` checks it without attacking.
 
-Note: `hackagent examples rag` runs a different, fully-local example (no API key
+Note: `hackagent examples run rag/indirect-injection` runs a different, fully-local example (no API key
 required) — see `hackagent/examples/rag/indirect-injection.yaml`. Start this
 example's server as shown above, then run its campaign.
 

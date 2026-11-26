@@ -251,7 +251,7 @@ def more_line(shown: int, total: int) -> Optional[str]:
     """That there are more goals than are shown."""
     if total <= shown:
         return None
-    return paint(f"…{total - shown} more, export for the rest", SECONDARY)
+    return paint(f"…{total - shown} more", SECONDARY)
 
 
 __all__ = [

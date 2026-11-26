@@ -245,9 +245,21 @@ def _models(gate: Gate) -> Any:
     def run(spec: Any, **kwargs: Any) -> Any:
         return runner.run_campaign(one_at_a_time(spec), **kwargs)
 
-    return patch.multiple(
-        "hackagent.orchestrator.campaign", resolve_campaign=resolve, run_campaign=run
-    )
+    @contextlib.contextmanager
+    def patched() -> Any:
+        # The builder and ``campaign validate`` resolve through the package;
+        # ``campaign run`` through the runner, which imported it itself.
+        with (
+            patch.multiple(
+                "hackagent.orchestrator.campaign",
+                resolve_campaign=resolve,
+                run_campaign=run,
+            ),
+            patch.object(runner, "resolve_campaign", resolve),
+        ):
+            yield
+
+    return patched()
 
 
 @contextlib.contextmanager

@@ -42,11 +42,10 @@ is listed in [Commands](./commands.md), with all its options.
 | [`hackagent results`](./commands.md#hackagent-results) | Summarize recent results, or show one result in detail. |
 | [`hackagent web`](./commands.md#hackagent-web) | Serve the dashboard from this machine. See [The dashboard server](./dashboard.md). |
 | [`hackagent run`](./commands.md#hackagent-run) | Run a campaign queued from the dashboard on this machine. See [Running queued runs](./run-worker.md). |
-| [`hackagent config`](./commands.md#hackagent-config) | Show, set, validate, import and reset settings. See [Configuration](./configuration.md). |
+| [`hackagent config`](./commands.md#hackagent-config) | Show, set, import and reset settings. See [Configuration](./configuration.md). |
 | [`hackagent init`](./commands.md#hackagent-init) | Answer a few questions and save a config file. |
-| [`hackagent doctor`](./commands.md#hackagent-doctor) | Check your setup. |
-| [`hackagent tui`](./commands.md#hackagent-tui) | Open the terminal app: build, check and run a campaign, and from its menu the results, datasets, queued runs, the dashboard and the settings. |
-| [`hackagent version`](./commands.md#hackagent-version) | Print the version and the config file path. |
+| [`hackagent doctor`](./commands.md#hackagent-doctor) | Check your setup, and on the remote backend that the API answers. |
+| `hackagent` | Open the terminal app: build, check and run a campaign, and from its menu the results, datasets, queued runs, the dashboard and the settings. |
 
 Options such as `--backend` and `--config-file` belong to `hackagent` itself, so
 they go before the command: `hackagent --backend remote results summary`.

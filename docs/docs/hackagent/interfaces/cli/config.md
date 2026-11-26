@@ -12,21 +12,11 @@ CLI args &gt; Environment &gt; Config file &gt; Default.
 API keys come from HACKAGENT_API_KEY or an explicit $\{VARIABLE\} file reference.
 The local storage default is independent of credentials.
 
-#### VERBOSITY\_ERROR
+#### VERBOSITY
 
-Only errors
-
-#### VERBOSITY\_WARNING
-
-Errors and warnings
-
-#### VERBOSITY\_INFO
-
-Errors, warnings, and info
-
-#### VERBOSITY\_DEBUG
-
-Everything including debug
+How much the terminal&#x27;s log says, by the number of `-v`: what each one
+adds. With none, it is the run&#x27;s log from INFO, as every interface shows
+it. The configuration file&#x27;s `verbosity` is the same number.
 
 ## CLIConfig Objects
 
@@ -75,6 +65,16 @@ def source_of(key: str) -> str
 ```
 
 Where the current value of `key` came from.
+
+#### verbosity
+
+```python
+@property
+def verbosity() -> int
+```
+
+The number of `-v` in effect (:data:`VERBOSITY`), as the
+configuration file&#x27;s `verbosity` names it.
 
 #### set\_user\_override
 

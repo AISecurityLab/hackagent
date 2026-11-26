@@ -96,8 +96,9 @@ ends: coloured in a terminal, the file&#x27;s line elsewhere.
 def show_run(as_json: bool, logger_name: str = "hackagent") -> Iterator[None]
 ```
 
-Show on stdout the campaign&#x27;s own lines the log hides, unless stdout
-is for `--json`, which prints only the run&#x27;s summary at the end.
+Show on stdout the campaign&#x27;s own lines the log hides, when
+`HACKAGENT_LOG_LEVEL` keeps it above INFO, unless stdout is for
+`--json`, which prints only the run&#x27;s summary at the end.
 
 #### shown\_level
 
@@ -116,17 +117,17 @@ def apply_verbosity(verbose: Optional[int],
                     logger_name: str = "hackagent") -> None
 ```
 
-Set what the CLI&#x27;s log shows from the `-v` count: its handler&#x27;s
-level, which leaves every other handler of the run its own.
+Set what the terminal shows from the number of `-v`
+(:data:`_VERBOSITY_LEVELS`): the CLI&#x27;s handlers only, which leaves every
+other handler of the run (the TUI&#x27;s, run.log, the platform&#x27;s) its own.
 
-`HACKAGENT_LOG_LEVEL`, when set, wins; so does an unset count.
+`HACKAGENT_LOG_LEVEL`, when set, wins for HackAgent&#x27;s own log.
 
 #### setup\_package\_logging
 
 ```python
-def setup_package_logging(
-        logger_name: str = "hackagent",
-        default_level_str: str = "WARNING") -> logging.Logger
+def setup_package_logging(logger_name: str = "hackagent",
+                          default_level_str: str = "INFO") -> logging.Logger
 ```
 
 Install the CLI&#x27;s log handler on the specified logger, if not already set.

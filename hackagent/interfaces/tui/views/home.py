@@ -260,7 +260,7 @@ class SettingsScreen(_FormScreen):
     ]
 
     #: Each setting's built-in value, which the form calls its default.
-    _DEFAULTS = {"backend": "local", "ca_bundle": None, "verbose": 1}
+    _DEFAULTS = {"backend": "local", "ca_bundle": None, "verbosity": 0}
 
     def __init__(self, cli_config: Any) -> None:
         super().__init__()
@@ -287,10 +287,10 @@ class SettingsScreen(_FormScreen):
             _field("base_url", "str", resolve_remote_base_url(), about["base_url"]),
             _field("ca_bundle", "str", None, about["ca_bundle"]),
             _field(
-                "verbose",
+                "verbosity",
                 "choice",
-                1,
-                about["verbose"],
+                0,
+                about["verbosity"],
                 choices=("0", "1", "2", "3"),
                 choice_values=(0, 1, 2, 3),
             ),
@@ -320,7 +320,7 @@ class SettingsScreen(_FormScreen):
             for key_, words in (
                 ("backend", "backend"),
                 ("ca_bundle", "CA bundle"),
-                ("verbose", "erbosity"),
+                ("verbosity", "Verbosity"),
             ):
                 if words in problem:
                     self.mark(key_, problem)
@@ -336,7 +336,7 @@ class SettingsScreen(_FormScreen):
         # read once, when hackagent starts.
         from hackagent.interfaces.cli.logging_setup import apply_verbosity
 
-        apply_verbosity(self._cli_config.verbose)
+        apply_verbosity(self._cli_config.verbosity)
         self.app.notify("\n".join(changed), title="Settings saved")
         self.action_check()
 

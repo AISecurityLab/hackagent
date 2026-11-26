@@ -7,7 +7,6 @@ Uses Click's CliRunner for realistic CLI invocation testing.
 """
 
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
@@ -27,26 +26,6 @@ class TestCLIVersion(unittest.TestCase):
         )
         self.assertEqual(result.exit_code, 0)
         self.assertIn("hackagent", result.output)
-
-    @patch("hackagent.interfaces.cli.main.CLIConfig")
-    def test_version_command(self, mock_config_class):
-        """Test 'version' command displays version."""
-        mock_config = MagicMock()
-        mock_config.api_key = "test-key-123456789"
-        mock_config.base_url = "https://api.hackagent.dev"
-        mock_config.default_config_path = Path("/tmp/config.json")
-        mock_config_class.return_value = mock_config
-
-        runner = CliRunner()
-        result = runner.invoke(
-            cli, ["--config-file", "/nonexistent-hackagent-test-config", "version"]
-        )
-        self.assertEqual(result.exit_code, 0)
-        from hackagent._version import get_version
-        from hackagent.interfaces.brand import TAGLINE
-
-        self.assertIn(f"v{get_version()}", result.output)
-        self.assertIn(TAGLINE, result.output)
 
 
 class TestCLIHelp(unittest.TestCase):
@@ -278,8 +257,7 @@ class TestCLIInit(unittest.TestCase):
         mock_config = MagicMock()
         mock_config.api_key = None
         mock_config.base_url = "https://api.hackagent.dev"
-        mock_config.verbose = 1
-        mock_config.should_show_info.return_value = False
+        mock_config.verbose = 0
         mock_config.default_config_path = MagicMock()
         mock_config.default_config_path.exists.return_value = False
         mock_config_class.return_value = mock_config
@@ -297,7 +275,7 @@ class TestCLIInit(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         mock_config.set_user_override.assert_any_call("backend", "remote")
         self.assertEqual(mock_config.base_url, "https://api.hackagent.dev")
-        self.assertEqual(mock_config.verbose, 2)
+        mock_config.set_user_override.assert_any_call("verbose", 2)
         mock_config.save.assert_called_once()
         mock_splash.assert_called_once()
 
@@ -316,8 +294,7 @@ class TestCLIInit(unittest.TestCase):
         mock_config = MagicMock()
         mock_config.api_key = "existing-key"
         mock_config.base_url = "https://api.hackagent.dev"
-        mock_config.verbose = 1
-        mock_config.should_show_info.return_value = False
+        mock_config.verbose = 0
         mock_config.default_config_path = MagicMock()
         mock_config.default_config_path.exists.return_value = False
         mock_config_class.return_value = mock_config
@@ -334,7 +311,7 @@ class TestCLIInit(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         mock_config.set_user_override.assert_any_call("backend", "local")
         self.assertEqual(mock_config.api_key, "existing-key")
-        self.assertEqual(mock_config.verbose, 1)
+        mock_config.set_user_override.assert_any_call("verbose", 1)
         mock_config.save.assert_called_once()
         mock_splash.assert_called_once()
 

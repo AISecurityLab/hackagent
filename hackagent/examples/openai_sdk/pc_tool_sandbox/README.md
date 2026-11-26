@@ -37,7 +37,7 @@ export PORT=5001
 ## Run from CLI
 
 ```bash
-hackagent examples pc-tool
+hackagent examples run openai_sdk/pc_tool_sandbox/pair-vaultdesk
 ```
 
 This command starts `agent.py` first, then runs `pair-vaultdesk.yaml`.
