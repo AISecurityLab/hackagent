@@ -138,8 +138,9 @@ def cli(ctx, config_file, backend, base_url, ca_bundle, verbose):
             )
         ctx.exit(1)
 
-    # -vv shows what attacks decide, -vvv every call they make; a count given
-    # here or saved in the configuration file sets the log level.
+    # The run's log from INFO by default; -v adds every model call, -vv other
+    # libraries' messages, -vvv everything. A count given here or saved in
+    # the configuration file sets what the terminal shows.
     config = ctx.obj["config"]
     apply_verbosity(config.verbose)
 

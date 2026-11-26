@@ -67,8 +67,6 @@ from hackagent.core.logging import (
     trace_step,
 )
 
-#: ``-v`` count to log level: the default shows warnings, ``-vv`` what the
-#: attacks decide, ``-vvv`` every call they make.
 #: What the terminal shows by the number of ``-v``: HackAgent's own log,
 #: and every other library's. With none, the run's log from INFO, as every
 #: interface shows it.
