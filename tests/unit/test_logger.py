@@ -8,7 +8,10 @@ import os
 import unittest
 from unittest.mock import patch
 
-from hackagent.interfaces.cli.logging_setup import setup_package_logging
+from hackagent.interfaces.cli.logging_setup import (
+    setup_package_logging,
+    shown_level,
+)
 from hackagent.core.logging import get_logger
 
 
@@ -39,7 +42,10 @@ class TestSetupPackageLogging(unittest.TestCase):
         try:
             setup_package_logging()
             logger = logging.getLogger("hackagent")
-            self.assertEqual(logger.level, logging.WARNING)
+            # The logger lets every record through; the CLI's handler shows
+            # warnings, and a run's other handlers choose their own level.
+            self.assertEqual(logger.level, logging.DEBUG)
+            self.assertEqual(shown_level(), logging.WARNING)
         finally:
             if env_backup:
                 os.environ["HACKAGENT_LOG_LEVEL"] = env_backup
@@ -49,8 +55,7 @@ class TestSetupPackageLogging(unittest.TestCase):
         """Test setup with log level from environment variable."""
         setup_package_logging()
 
-        logger = logging.getLogger("hackagent")
-        self.assertEqual(logger.level, logging.DEBUG)
+        self.assertEqual(shown_level(), logging.DEBUG)
 
     def test_setup_logging_creates_handler(self):
         """Test that setup creates at least one handler."""

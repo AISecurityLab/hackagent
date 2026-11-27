@@ -9,13 +9,13 @@ from __future__ import annotations
 import logging
 import re
 
-from hackagent.core.logging import TRACE_LOGGER
-from hackagent.interfaces.cli.commands.campaign import _summary_lines
+import pytest
+
+from hackagent.core.logging import TRACE_LOGGER, plain_line, trace_breadcrumb
 from hackagent.interfaces.cli import logging_setup
 from hackagent.interfaces.cli.logging_setup import (
     PlainFormatter,
-    plain_line,
-    trace_breadcrumb,
+    log_text,
 )
 
 LINE = re.compile(r"^\d\d-\d\d \d\d:\d\d:\d\d (?P<level>[A-Z]+) +(?P<message>.*)$")
@@ -56,28 +56,50 @@ def test_every_message_starts_in_the_same_column():
     assert len({line.index("x") for line in lines}) == 1
 
 
-def test_the_summary_is_log_lines_in_a_file():
-    lines = _summary_lines(
-        {
-            "campaign": "demo",
-            "succeeded": False,
-            "attempt_errors": 2,
-            "attacks": [
-                {"name": "pair", "attempts": 10, "successes": 3, "error": None},
-                {"name": "tap", "attempts": 0, "successes": 0, "error": "timeout"},
-            ],
-            "output_directory": "./logs/runs",
-        }
+def _styles(text):
+    """Each styled stretch of ``text``, as ``(substring, style)``."""
+    return {(text.plain[span.start : span.end], str(span.style)) for span in text.spans}
+
+
+def test_a_coloured_line_reads_as_the_file_s_line():
+    """The TUI's line is the file's, character for character, coloured."""
+    info = record(
+        "hackagent.runner",
+        "baseline · goal 1 · result: jailbroken at attempt 2",
+        subject={"attack": "baseline", "goal": 1},
     )
-    assert lines == [
-        (
-            "WARNING",
-            "campaign demo failed · 2 attacks · 10 attempts · 3 jailbroken · 2 attempt errors",
-        ),
-        ("INFO", "summary · pair · 10 attempts · 3 jailbroken"),
-        ("ERROR", "summary · tap · 0 attempts · 0 jailbroken · failed: timeout"),
-        ("INFO", "output → ./logs/runs"),
-    ]
+    text = log_text(info)
+
+    assert text.plain == PlainFormatter().format(info)
+    styles = _styles(text)
+    assert (text.plain[:14], "dim") in styles
+    assert ("INFO", "green") in styles
+    assert ("baseline", logging_setup._attack_style("baseline")) in styles
+    assert ("jailbroken", "bold red") in styles
+
+
+def test_a_line_s_level_sets_its_colour():
+    warning = record("hackagent.runner", "a [bold]bracket[/bold] stays text")
+    warning.levelno, warning.levelname = logging.WARNING, "WARNING"
+    text = log_text(warning)
+
+    assert ("WARNING", "yellow") in _styles(text)
+    assert "[bold]bracket[/bold]" in text.plain
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "pair · 0 jailbroken · 10 jailbroken",
+        "pair finished · 0 of 20 goals jailbroken · 10 attempts (10 jailbroken)",
+        "pair finished · 0 of 1 goal jailbroken · 10 jailbroken",
+    ],
+)
+def test_none_jailbroken_is_not_picked_out(message):
+    """A count of none is no news, however it is counted."""
+    text = log_text(record("hackagent.runner", message))
+    [(span)] = [s for s in text.spans if str(s.style) == "bold red"]
+    assert text.plain[span.start - 3 : span.end] == "10 jailbroken"
 
 
 def test_a_message_with_line_breaks_stays_one_line():

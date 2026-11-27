@@ -22,7 +22,7 @@ import click
 from rich.console import Console
 
 from hackagent._version import get_version
-from hackagent.interfaces.cli.commands.campaign import event_printer
+from hackagent.interfaces.cli.logging_setup import show_run
 from hackagent.interfaces.cli.utils import display_error, display_warning, handle_errors
 
 console = Console()
@@ -146,7 +146,9 @@ def _choose_run(store: Any, as_json: bool) -> Optional[str]:
 
 @click.command(name="run")
 @click.argument("run_id", required=False)
-@click.option("--json", "as_json", is_flag=True, help="Emit events as JSON.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the run's outcome as JSON on stdout."
+)
 @click.pass_context
 @handle_errors
 def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
@@ -190,14 +192,13 @@ def run(ctx: click.Context, run_id: Optional[str], as_json: bool) -> None:
         if settings.dashboard_url and not as_json:
             console.print(f"Follow it at {settings.dashboard_url}/runs?run={run_uuid}")
         try:
-            with ask_before_cancelling():
+            with ask_before_cancelling(), show_run(as_json):
                 outcome = execute_run(
                     store,
                     run_uuid,
                     base_url=settings.base_url,
                     gateway_key=settings.api_key,
                     claimed_by=_local_executor(),
-                    on_event=event_printer(as_json),
                     settings=settings,
                 )
         except RunNotClaimable as exc:

@@ -50,7 +50,7 @@ hackagent campaign run [OPTIONS] [FILE]
 |---|---|---|---|
 | `FILE` | argument | no | Defaults to `campaign.yaml`. |
 | `--dry-run` | flag | no | Resolve and report without attacking. |
-| `--json` | flag | no | Emit events and summary as JSON. |
+| `--json` | flag | no | Print the run's summary as JSON on stdout. |
 | `--ollama-endpoint` | option | no | Repoint every Ollama model. |
 | `--openai-endpoint` | option | no | Repoint the target and the judges sharing its endpoint. |
 | `--judge-endpoint` | option | no | Repoint the other OpenAI judges. |
@@ -354,7 +354,7 @@ hackagent run [OPTIONS] [RUN_ID]
 | Name | Kind | Required | Description |
 |---|---|---|---|
 | `RUN_ID` | argument | no |  |
-| `--json` | flag | no | Emit events as JSON. |
+| `--json` | flag | no | Print the run's outcome as JSON on stdout. |
 
 ## `hackagent tui`
 

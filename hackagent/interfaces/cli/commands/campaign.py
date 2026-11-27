@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import click
 from rich.console import Console
@@ -63,41 +63,6 @@ def _runtime_settings():
     root = ctx.find_root()
     config = (root.obj or {}).get("config") if isinstance(root.obj, dict) else None
     return getattr(config, "settings", None)
-
-
-def event_printer(as_json: bool):
-    """The run-progress callback shared by ``campaign run`` and ``run``."""
-
-    from hackagent.interfaces.cli.logging_setup import plain_line
-
-    import logging
-
-    def say(markup: str, plain: str, level: str = "INFO") -> None:
-        if console.is_terminal:
-            console.print(markup)
-        # In a file the runner's own INFO line already says it; without
-        # INFO logging, this line does, in the same format.
-        elif not logging.getLogger("hackagent").isEnabledFor(logging.INFO):
-            click.echo(plain_line(level, plain))
-
-    def on_event(event: str, **payload: Any) -> None:
-        attack = payload.get("attack")
-        if as_json:
-            click.echo(json.dumps({"event": event, **payload}))
-        elif event == "attack_started":
-            say(f"[cyan]▶ {attack}[/cyan] started", f"▶ {attack} started")
-        elif event == "attack_finished":
-            error = payload.get("error")
-            if error:
-                say(
-                    f"[red]✗[/red] {attack} finished",
-                    f"✗ {attack} failed: {error}",
-                    "ERROR",
-                )
-            else:
-                say(f"[green]✓[/green] {attack} finished", f"✓ {attack} finished")
-
-    return on_event
 
 
 def _endpoint_options(func):
@@ -182,7 +147,7 @@ def _prepare(
 @click.argument("file", default="campaign.yaml", type=click.Path(dir_okay=False))
 @click.option("--dry-run", is_flag=True, help="Resolve and report without attacking.")
 @click.option(
-    "--json", "as_json", is_flag=True, help="Emit events and summary as JSON."
+    "--json", "as_json", is_flag=True, help="Print the run's summary as JSON on stdout."
 )
 @_endpoint_options
 @handle_errors
@@ -207,6 +172,7 @@ def run(
     from hackagent.interfaces.cli.logging_setup import (
         route_library_logs,
         setup_package_logging,
+        show_run,
         suppress_noisy_libraries,
     )
     from hackagent.core.settings import Settings
@@ -261,7 +227,7 @@ def run(
             # gateway models were just bound to the selected server.
             os.environ[GATEWAY_KEY_ENV] = gateway_key
 
-    setup_package_logging(default_level_str="INFO")
+    setup_package_logging()
     suppress_noisy_libraries("httpx", "httpcore", "LiteLLM")
     route_library_logs()
 
@@ -281,24 +247,25 @@ def run(
         except (ValueError, RuntimeError) as exc:
             raise click.ClickException(str(exc)) from exc
 
-    on_event = event_printer(as_json)
-
-    if tracked:
-        outcome = execute_spec(spec, on_event=on_event, settings=settings)
+    with show_run(as_json):
+        if tracked:
+            outcome = execute_spec(spec, settings=settings)
+        else:
+            outcome = None
+            result = run_campaign(spec, settings=settings)
+    if outcome is not None:
         if outcome.result is None:
             display_error(outcome.note or f"Campaign {outcome.status.lower()}.")
             raise SystemExit(1)
         result = outcome.result
         completed = outcome.status == "COMPLETED"
     else:
-        result = run_campaign(spec, on_event=on_event, settings=settings)
         completed = True
     report = summary(result)
     report["output_directory"] = spec.execution.output.directory
     if as_json:
         click.echo(json.dumps(report))
-    else:
-        _render_summary(report)
+    # Otherwise the run's log has said it: the summary is its last lines.
     raise SystemExit(0 if report["succeeded"] and completed else 1)
 
 
@@ -350,66 +317,6 @@ def schema(output: Optional[str]) -> None:
         display_success(f"Schema written to {output}")
     else:
         click.echo(text, nl=False)
-
-
-def _summary_lines(report: dict[str, Any]) -> list[tuple[str, str]]:
-    """The summary as ``(level, message)`` log lines, for a file."""
-    attacks = report["attacks"]
-    lines = [
-        (
-            "INFO" if report["succeeded"] else "WARNING",
-            f"campaign {report['campaign']} "
-            f"{'succeeded' if report['succeeded'] else 'failed'} · "
-            f"{len(attacks)} attacks · "
-            f"{sum(a['attempts'] for a in attacks)} attempts · "
-            f"{sum(a['successes'] for a in attacks)} jailbroken"
-            + (
-                f" · {report['attempt_errors']} attempt errors"
-                if report.get("attempt_errors")
-                else ""
-            ),
-        )
-    ]
-    for attack in attacks:
-        line = (
-            f"summary · {attack['name']} · {attack['attempts']} attempts · "
-            f"{attack['successes']} jailbroken"
-        )
-        lines.append(
-            ("ERROR", f"{line} · failed: {attack['error']}")
-            if attack["error"]
-            else ("INFO", line)
-        )
-    if report.get("output_directory"):
-        lines.append(("INFO", f"output → {report['output_directory']}"))
-    return lines
-
-
-def _render_summary(report: dict[str, Any]) -> None:
-    if not console.is_terminal:
-        # A file: the summary in the format of every other line.
-        from hackagent.interfaces.cli.logging_setup import plain_line
-
-        for level, message in _summary_lines(report):
-            click.echo(plain_line(level, message))
-        return
-    status = "[green]succeeded[/green]" if report["succeeded"] else "[red]failed[/red]"
-    console.print(f"\nCampaign [bold]{report['campaign']}[/bold] {status}")
-    table = Table(show_header=True, header_style="bold")
-    table.add_column("Attack")
-    table.add_column("Attempts", justify="right")
-    table.add_column("Successes", justify="right")
-    table.add_column("Error")
-    for attack in report["attacks"]:
-        table.add_row(
-            attack["name"],
-            str(attack["attempts"]),
-            str(attack["successes"]),
-            attack["error"] or "",
-        )
-    console.print(table)
-    if report.get("output_directory"):
-        console.print(f"[dim]Output → {report['output_directory']}[/dim]")
 
 
 __all__ = ["campaign"]

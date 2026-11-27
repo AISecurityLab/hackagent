@@ -29,7 +29,11 @@ def run_coroutine_blocking(coro_factory: Callable[[], Awaitable[T]]) -> T:
         # they were raised while handling instead of "no running event loop".
         return asyncio.run(coro_factory())
 
+    import contextvars
     from concurrent.futures import ThreadPoolExecutor
 
+    # The bridge thread runs in the caller's context, so what the caller set
+    # (such as the run a log handler captures) holds inside the coroutine.
+    context = contextvars.copy_context()
     with ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(lambda: asyncio.run(coro_factory())).result()
+        return pool.submit(context.run, lambda: asyncio.run(coro_factory())).result()

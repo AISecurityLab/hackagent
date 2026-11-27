@@ -5,15 +5,21 @@
 
 The dashboard shows a run's stored results, but not what happens before and
 between them: goals loading, models answering preflight, an attack's warm-up,
-a target that times out and is retried. :class:`ActivityRelay` turns the
-campaign runner's progress events and the run's own log records into short
-activity events and sends them to ``POST /run/{id}/events``, where the run
-page reads them back as its activity log.
+a target that times out and is retried. :class:`ActivityRelay` is the
+platform's handler of the run's log: it sends the run's lines, as the log
+file writes them, to ``POST /run/{id}/events``, where the run page reads
+them back as its activity log, each with the attack it is about
+(:func:`~hackagent.core.logging.subject_of`).
 
-Only operational facts leave the machine: messages made of names and counts,
-and log lines. Goal texts, prompts and replies are never read; every message
-has the secrets the executor knows, credential-shaped values and URL
-credentials redacted, and is cut to 1,000 characters.
+What leaves the machine follows one rule, kept where lines are written:
+nothing below INFO leaves, and nothing at INFO or above quotes a prompt, a
+reply or a goal. So the relay sends the ``hackagent`` lines at INFO and
+above, the attack trace's decisions and verdicts among them, the OpenAI
+client's retries and the HTTP libraries' warnings and errors; it reads no
+record's content to decide. Every message has the secrets the executor
+knows, credential-shaped values and URL credentials redacted, and is cut to
+1,000 characters. The platform keeps 10,000 lines per run, then only
+warnings and errors, which INFO fits for a large campaign.
 
 Sending never slows or fails the run. Events wait in a bounded queue (the
 oldest ``debug`` and ``info`` events make room first, and a warning says how
@@ -23,11 +29,9 @@ next batch, as the server keeps one event per ``seq``. The executor flushes
 what is left before it finishes the run; a server that answers that the run
 is over, or that predates the endpoint, is not sent anything more.
 
-Log records are read through filters on the loggers themselves, so nothing a
-handler prints changes. ``hackagent`` records are relayed at the level the
-executor's logging enables (the campaign runner reports its own progress as
-events whatever that level), the OpenAI client's retries always, and the HTTP
-libraries' warnings and errors. Only records logged inside the run's own
+The loggers must let INFO through: the CLI opens them, and an executor whose
+logging nobody configured opens them for the run
+(:meth:`ActivityRelay.capture`). Only records logged inside the run's own
 task, or threads it started with :func:`asyncio.to_thread`, belong to it, so
 runs executing side by side in one process keep their logs apart.
 """
@@ -41,13 +45,21 @@ import threading
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
-from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
-from hackagent.core.logging import TRACE_LOGGER, get_logger, reported_as_event
+from hackagent.core.logging import (
+    CLIENT_RETRY_LOGGERS,
+    PACKAGE_LOGGER,
+    capture,
+    get_logger,
+    opened,
+    public_breadcrumb,
+    subject_of,
+    trace_step,
+)
 from hackagent.orchestrator.campaign.spec import _is_credential_name, redacted
 from hackagent.storage.remote import (
     ExecutorRejected,
@@ -76,9 +88,6 @@ CLOSE_TIMEOUT_S = 10.0
 _REDACTED = "[REDACTED]"
 #: Longest attack name the platform stores.
 _ATTACK_CHARS = 200
-#: Distinct goal errors an event carries, and how long each may be.
-_ERRORS_LIMIT = 3
-_ERROR_CHARS = 200
 #: Known secret values shorter than this are not searched for: a two-letter
 #: value would redact half of every message.
 _SECRET_MIN_CHARS = 8
@@ -86,10 +95,6 @@ _SECRET_MIN_CHARS = 8
 _HACKAGENT = "hackagent"
 #: Libraries whose retries, timeouts, warnings and errors are relayed.
 _LIBRARIES = ("openai", "httpx", "litellm", "LiteLLM")
-#: Loggers whose INFO lines are relayed whatever the executor's logging
-#: shows: the OpenAI client logs each retry at INFO. They are module loggers
-#: no other logger descends from, so lowering their level leaks nothing.
-_RETRY_LOGGERS = ("openai._base_client",)
 _RETRY = re.compile(r"retr(?:y|ies|ying)|timed out|timeout", re.IGNORECASE)
 #: Per-call INFO lines that say nothing about the run, even when they
 #: mention a timeout.
@@ -252,325 +257,6 @@ def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
-def _seconds(value: Any) -> Optional[float]:
-    return round(float(value), 1) if isinstance(value, (int, float)) else None
-
-
-# --- runner events ----------------------------------------------------------
-
-
-def activity_from_event(event: str, payload: Mapping[str, Any]) -> Optional[Activity]:
-    """The activity line for one of the campaign runner's progress events.
-
-    Only the names and counts each event is known to carry are read, so a
-    field added to an event later never leaves unless it is added here. An
-    event this relay does not know is ``None``.
-    """
-    build = _EVENTS.get(event)
-    return build(payload) if build is not None else None
-
-
-def _campaign_started(payload: Mapping[str, Any]) -> Activity:
-    return Activity(
-        "info",
-        "campaign",
-        f"campaign {payload.get('campaign')} · started · loading goals and models",
-    )
-
-
-def _goals_loaded(payload: Mapping[str, Any]) -> Activity:
-    goals = int(payload.get("goals") or 0)
-    return Activity(
-        "info",
-        "dataset",
-        f"dataset · {_plural(goals, 'goal')} loaded",
-        data={"goals": goals},
-    )
-
-
-def _models_resolved(payload: Mapping[str, Any]) -> Activity:
-    counts = {
-        name: int(payload.get(name) or 0) for name in ("models", "attacks", "judges")
-    }
-    return Activity(
-        "info",
-        "campaign",
-        f"campaign · {_plural(counts['models'], 'model')} ready · "
-        f"{_plural(counts['attacks'], 'attack')} · {_plural(counts['judges'], 'judge')}",
-        data=counts,
-    )
-
-
-def _preflight_started(payload: Mapping[str, Any]) -> Activity:
-    models = int(payload.get("models") or 0)
-    return Activity(
-        "info",
-        "preflight",
-        f"preflight · checking {_plural(models, 'model')}",
-        data={"models": models},
-    )
-
-
-def _preflight_finished(payload: Mapping[str, Any]) -> Activity:
-    models = int(payload.get("models") or 0)
-    return Activity(
-        "info",
-        "preflight",
-        f"preflight · {_plural(models, 'model')} reachable",
-        data={"models": models},
-    )
-
-
-def _preflight_failed(payload: Mapping[str, Any]) -> Activity:
-    models = int(payload.get("models") or 0)
-    failures = [str(failure) for failure in payload.get("failures") or ()]
-    return Activity(
-        "error",
-        "preflight",
-        f"preflight · {len(failures)} of {_plural(models, 'model')} unreachable: "
-        + "; ".join(failures),
-        data={"models": models, "unreachable": len(failures)},
-    )
-
-
-def _audit_started(payload: Mapping[str, Any]) -> Activity:
-    judges = int(payload.get("judges") or 0)
-    return Activity(
-        "info",
-        "judge",
-        f"judge audit · started · {_plural(judges, 'judge')}",
-        data={"judges": judges},
-    )
-
-
-def _audit_finished(payload: Mapping[str, Any]) -> Activity:
-    audit = payload.get("audit") or {}
-    passed = audit.get("passed") if isinstance(audit, Mapping) else None
-    samples = audit.get("samples") if isinstance(audit, Mapping) else None
-    verdict = {True: "passed", False: "failed"}.get(passed, "finished")
-    message = f"judge audit · {verdict}"
-    if isinstance(samples, int):
-        message += f" · {_plural(samples, 'sample')}"
-    return Activity(
-        "warning" if passed is False else "info",
-        "judge",
-        message,
-        data={"passed": passed, "samples": samples},
-    )
-
-
-def _attack_started(payload: Mapping[str, Any]) -> Activity:
-    goals = int(payload.get("expected_goals") or 0)
-    return Activity(
-        "info",
-        "attack",
-        f"{payload.get('attack')} · started · {_plural(goals, 'goal')}",
-        attack=_name(payload),
-        attack_run=payload.get("run_id"),
-        data={"goals": goals},
-    )
-
-
-def _preparation_started(payload: Mapping[str, Any]) -> Activity:
-    goals = int(payload.get("goals") or 0)
-    return Activity(
-        "info",
-        "attack",
-        f"{payload.get('attack')} · preparing · {_plural(goals, 'goal')}",
-        attack=_name(payload),
-        attack_run=payload.get("run_id"),
-        data={"goals": goals},
-    )
-
-
-def _preparation_finished(payload: Mapping[str, Any]) -> Activity:
-    elapsed = _seconds(payload.get("elapsed_s"))
-    message = f"{payload.get('attack')} · prepared"
-    if elapsed is not None:
-        message += f" in {elapsed:.1f}s"
-    return Activity(
-        "info",
-        "attack",
-        message,
-        attack=_name(payload),
-        attack_run=payload.get("run_id"),
-        data={"elapsed_s": elapsed},
-    )
-
-
-def _goal_finished(payload: Mapping[str, Any]) -> Activity:
-    index = payload.get("goal_index")
-    goals = payload.get("goals")
-    attempts = int(payload.get("attempts") or 0)
-    successful = int(payload.get("successful") or 0)
-    every_error = [str(error) for error in payload.get("errors") or ()]
-    errors = [_clip(error, _ERROR_CHARS) for error in every_error[:_ERRORS_LIMIT]]
-    position = f"{index + 1}" if isinstance(index, int) else "?"
-    if isinstance(goals, int):
-        position += f"/{goals}"
-    message = (
-        f"{payload.get('attack')} · goal {position} · "
-        f"{_plural(attempts, 'attempt')} · {successful} successful"
-    )
-    if errors:
-        message += f" · {_plural(len(every_error), 'error')}: {errors[0]}"
-    return Activity(
-        "warning" if errors else "info",
-        "goal",
-        message,
-        attack=_name(payload),
-        attack_run=payload.get("run_id"),
-        goal_index=index if isinstance(index, int) else None,
-        data={
-            "attempts": attempts,
-            "successful": successful,
-            "elapsed_s": _seconds(payload.get("elapsed_s")),
-            "errors": errors,
-        },
-    )
-
-
-def _attack_finished(payload: Mapping[str, Any]) -> Activity:
-    error = payload.get("error")
-    attempts = int(payload.get("attempts") or 0)
-    successful = int(payload.get("successful") or 0)
-    elapsed = _seconds(payload.get("elapsed_s"))
-    data = {"attempts": attempts, "successful": successful, "elapsed_s": elapsed}
-    if error:
-        return Activity(
-            "error",
-            "attack",
-            f"{payload.get('attack')} · failed · {error}",
-            attack=_name(payload),
-            attack_run=payload.get("run_id"),
-            data=data,
-        )
-    message = (
-        f"{payload.get('attack')} · finished · {_plural(attempts, 'attempt')} · "
-        f"{successful} successful"
-    )
-    if elapsed is not None:
-        message += f" · {elapsed:.1f}s"
-    return Activity(
-        "info",
-        "attack",
-        message,
-        attack=_name(payload),
-        attack_run=payload.get("run_id"),
-        data=data,
-    )
-
-
-def _name(payload: Mapping[str, Any]) -> Optional[str]:
-    attack = payload.get("attack")
-    return str(attack) if attack else None
-
-
-def _live_goal(payload: Mapping[str, Any], event: str) -> Activity:
-    index = payload.get("goal_index")
-    position = str(index + 1) if type(index) is int else "?"
-    if type(payload.get("goals")) is int:
-        position += f"/{payload['goals']}"
-    data: dict[str, Any] = {"event": event}
-    for key in (
-        "step",
-        "total",
-        "branches",
-        "candidates",
-        "dropped",
-        "kept",
-        "backtracks",
-        "documents",
-        "chunks",
-        "epoch",
-        "candidate",
-    ):
-        if type(payload.get(key)) is int and payload[key] >= 0:
-            data[key] = payload[key]
-    path = payload.get("path")
-    if isinstance(path, (list, tuple)) and all(type(n) is int and n >= 0 for n in path):
-        data["path"] = list(path[:32])
-    if event == "goal_started":
-        description = "started"
-    elif event == "jailbreak_found":
-        description = "jailbreak found"
-        if type(payload.get("score")) in (int, float):
-            data["score"] = payload["score"]
-    else:
-        phase = payload.get("phase")
-        allowed = {
-            "round",
-            "turn",
-            "iteration",
-            "stream",
-            "branch",
-            "candidate",
-            "query",
-            "warm-up goal",
-            "attempt",
-            "prefix",
-            "program",
-            "technique",
-            "expand",
-            "on topic",
-            "panel review",
-            "write",
-            "poison",
-            "queries",
-            "index",
-            "tool-chain",
-            "retrieval",
-            "selection",
-            "stopped",
-            "pruned",
-            "skipped",
-            "refused",
-            "backtracked",
-            "kept",
-        }
-        data["phase"] = phase if phase in allowed else "attack phase"
-        data["stage"] = (
-            payload.get("stage")
-            if payload.get("stage") in {"started", "finished", "decision"}
-            else "started"
-        )
-        description = data["phase"]
-        if "step" in data:
-            description += f" {data['step']}"
-            if "total" in data:
-                description += f"/{data['total']}"
-        description += f" · {data['stage']}"
-    return Activity(
-        "info",
-        "attack" if event == "attack_progress" else "goal",
-        f"{payload.get('attack')} · goal {position} · {description}",
-        attack=_name(payload),
-        attack_run=payload.get("run_id"),
-        goal_index=index if type(index) is int else None,
-        data=data,
-    )
-
-
-_EVENTS: dict[str, Callable[[Mapping[str, Any]], Activity]] = {
-    "campaign_started": _campaign_started,
-    "goals_loaded": _goals_loaded,
-    "models_resolved": _models_resolved,
-    "preflight_started": _preflight_started,
-    "preflight_finished": _preflight_finished,
-    "preflight_failed": _preflight_failed,
-    "audit_started": _audit_started,
-    "audit_finished": _audit_finished,
-    "attack_started": _attack_started,
-    "preparation_started": _preparation_started,
-    "preparation_finished": _preparation_finished,
-    "goal_finished": _goal_finished,
-    "goal_started": lambda payload: _live_goal(payload, "goal_started"),
-    "attack_progress": lambda payload: _live_goal(payload, "attack_progress"),
-    "jailbreak_found": lambda payload: _live_goal(payload, "jailbreak_found"),
-    "attack_finished": _attack_finished,
-}
-
-
 def activity_for_outcome(status: str, note: str) -> Activity:
     """The last line of a run's activity: how it ended, and why."""
     if status == "COMPLETED":
@@ -588,30 +274,36 @@ def activity_for_outcome(status: str, note: str) -> Activity:
 def activity_from_record(record: logging.LogRecord) -> Optional[Activity]:
     """The activity line for a log record, or ``None`` for one not relayed.
 
-    ``hackagent`` records at INFO and above become ``log`` lines, except the
-    ones a progress event reports too and the attack trace's
-    (:data:`~hackagent.core.logging.TRACE_LOGGER`), which quotes prompts. From the HTTP and model client
-    libraries, retries and timeouts become ``retry`` warnings, other warnings
-    and errors ``log`` lines, and everything else, such as a line per request,
-    is left out.
+    A ``hackagent`` record at INFO and above becomes the line a log file has,
+    a ``trace`` line for a step of an attack's trace and a ``log`` line
+    otherwise, with the attack and goal it is about. From the HTTP and model
+    client libraries, retries and timeouts become ``retry`` warnings, other
+    warnings and errors ``log`` lines, and everything else, such as a line
+    per request, is left out.
     """
-    if reported_as_event(record) or record.name == logger.name:
-        return None
-    # The attack trace quotes prompts and replies: it stays on this machine.
-    if _under(record.name, TRACE_LOGGER):
-        return None
-    if record.levelno < logging.INFO:
+    if record.name == logger.name or record.levelno < logging.INFO:
         return None
     library = next((name for name in _LIBRARIES if _under(record.name, name)), None)
     if library is None and not _under(record.name, _HACKAGENT):
         return None
-    message = record.getMessage()
-    if record.exc_info and record.exc_info[1] is not None:
-        error = record.exc_info[1]
-        message += f" ({type(error).__name__}: {error})"
     time = datetime.fromtimestamp(record.created, timezone.utc)
+    step = trace_step(record)
+    # Nothing a model wrote leaves: a trace step without its reason or error
+    # text, an exception by its type alone (its message can quote a reply).
+    message = public_breadcrumb(step) if step is not None else record.getMessage()
+    if record.exc_info and record.exc_info[1] is not None:
+        message += f" ({type(record.exc_info[1]).__name__})"
     if library is None:
-        return Activity(_level(record.levelno), "log", message, time=time)
+        subject = {**subject_of(record), **(step or {})}
+        goal, attack = subject.get("goal"), subject.get("attack")
+        return Activity(
+            _level(record.levelno),
+            "trace" if step is not None else "log",
+            message,
+            attack=str(attack) if attack else None,
+            goal_index=goal - 1 if type(goal) is int else None,
+            time=time,
+        )
     quiet = record.levelno < logging.WARNING
     if quiet and _NOISE.search(message):
         return None
@@ -640,100 +332,18 @@ def _level(levelno: int) -> str:
     return "debug"
 
 
-#: The relay of the run whose task or thread is logging, if any.
-_current: ContextVar[Optional["ActivityRelay"]] = ContextVar(
-    "activity_relay", default=None
-)
-
-
-class _TapFilter(logging.Filter):
-    """Hands each record of its logger to the current run's relay.
-
-    A logger whose level was lowered for the relay drops, after relaying
-    them, the records below ``threshold``, so no handler sees more than it
-    did before.
-    """
-
-    def __init__(self, threshold: int = 0) -> None:
-        super().__init__()
-        self.threshold = threshold
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        relay = _current.get()
-        if relay is not None:
-            relay.take_record(record)
-        return record.levelno >= self.threshold
-
-
-class _LogTap:
-    """The filters on the relayed loggers, there while any relay captures.
-
-    Shared by every relay in the process. Loggers created while it is in
-    place, such as those of a model client imported when the campaign builds
-    its models, are tapped on :meth:`refresh`.
-    """
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._users = 0
-        self._filters: dict[str, _TapFilter] = {}
-        #: Loggers lowered to INFO, and the level each had before.
-        self._levels: dict[str, int] = {}
-        self._known = 0
-
-    def acquire(self) -> None:
-        """Put the filters in place, unless another relay already did."""
-        with self._lock:
-            self._users += 1
-            if self._users == 1:
-                self._scan()
-
-    def release(self) -> None:
-        """Remove the filters once the last relay is done with them."""
-        with self._lock:
-            self._users -= 1
-            if self._users > 0:
-                return
-            for name, tap in self._filters.items():
-                logging.getLogger(name).removeFilter(tap)
-            for name, level in self._levels.items():
-                logging.getLogger(name).setLevel(level)
-            self._filters.clear()
-            self._levels.clear()
-            self._known = 0
-
-    def refresh(self) -> None:
-        """Tap the loggers created since the last look, if there are any."""
-        if len(logging.Logger.manager.loggerDict) == self._known:
-            return
-        with self._lock:
-            if self._users > 0:
-                self._scan()
-
-    def _scan(self) -> None:
-        loggers = logging.Logger.manager.loggerDict
-        names = list(loggers)
-        self._known = len(names)
-        for name in names:
-            found = loggers.get(name)
-            if name in self._filters or not isinstance(found, logging.Logger):
-                continue
-            if not any(_under(name, root) for root in (_HACKAGENT, *_LIBRARIES)):
-                continue
-            threshold = 0
-            if name in _RETRY_LOGGERS and found.getEffectiveLevel() > logging.INFO:
-                threshold = found.getEffectiveLevel()
-                self._levels[name] = found.level
-                found.setLevel(logging.INFO)
-            tap = _TapFilter(threshold)
-            found.addFilter(tap)
-            self._filters[name] = tap
-
-
-_TAP = _LogTap()
-
-
 # --- the relay --------------------------------------------------------------
+
+
+class _RelayHandler(logging.Handler):
+    """Hands the records of a run to its relay."""
+
+    def __init__(self, relay: "ActivityRelay") -> None:
+        super().__init__()
+        self.relay = relay
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.relay.take_record(record)
 
 
 class ActivityRelay:
@@ -790,23 +400,6 @@ class ActivityRelay:
 
     # Producing ------------------------------------------------------------
 
-    def on_event(self, event: str, **payload: Any) -> None:
-        """Campaign runner listener: relay ``event``. Never raises."""
-        try:
-            _TAP.refresh()
-            if event == "goal_finished":
-                # Event conversion clips errors; redact full values first so a
-                # credential crossing the boundary cannot leave a partial key.
-                payload["errors"] = [
-                    self._redactor.text(str(error))
-                    for error in payload.get("errors") or ()
-                ]
-            activity = activity_from_event(event, payload)
-            if activity is not None:
-                self.add(activity)
-        except Exception:
-            logger.debug("run activity | event %s not relayed", event, exc_info=True)
-
     def take_record(self, record: logging.LogRecord) -> None:
         """Relay a log record of the run, if it is one to relay. Never raises."""
         if self._stopped or self._stopping:
@@ -856,15 +449,22 @@ class ActivityRelay:
 
         Tasks created and threads started with :func:`asyncio.to_thread`
         inside the block belong to the run for as long as they log.
+
+        It reads the ``hackagent`` loggers and the model and HTTP client
+        libraries'. A logger's level is the floor for every handler: the CLI
+        opens ``hackagent`` fully and the clients' retry loggers
+        (:data:`~hackagent.core.logging.CLIENT_RETRY_LOGGERS`) to INFO. When
+        nobody configured logging, no one else would see what an opened
+        logger lets through, so the relay opens them for the block itself;
+        otherwise whoever configured logging decides.
         """
         self.start()
-        _TAP.acquire()
-        token = _current.set(self)
-        try:
+        levels = dict.fromkeys((PACKAGE_LOGGER, *CLIENT_RETRY_LOGGERS), logging.INFO)
+        with (
+            opened(levels),
+            capture(_RelayHandler(self), logging.INFO, (_HACKAGENT, *_LIBRARIES)),
+        ):
             yield self
-        finally:
-            _current.reset(token)
-            _TAP.release()
 
     def start(self) -> None:
         """Start the sending thread, once."""
@@ -916,7 +516,6 @@ class ActivityRelay:
                 ):
                     self._wake.wait(self._interval_s)
                 stopping = self._stopping
-            _TAP.refresh()
             sent = self.flush()
             if stopping:
                 # One more try for a batch that failed on the way out.
@@ -998,6 +597,5 @@ __all__ = [
     "ActivityRelay",
     "Redactor",
     "activity_for_outcome",
-    "activity_from_event",
     "activity_from_record",
 ]

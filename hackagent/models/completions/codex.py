@@ -358,9 +358,9 @@ def _get_codex_custom_llm_class():
             """Async wrapper — run the sync subprocess in a worker thread."""
             import asyncio
 
-            return await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.completion(*args, **kwargs)
-            )
+            # to_thread, not run_in_executor: the thread keeps the run's
+            # context, so what it logs reaches the run's handlers.
+            return await asyncio.to_thread(self.completion, *args, **kwargs)
 
     _CODEX_CUSTOM_LLM_CLASS = _CodexCustomLLM
     return _CodexCustomLLM

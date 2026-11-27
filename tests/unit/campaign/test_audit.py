@@ -29,6 +29,8 @@ from hackagent.orchestrator.campaign.audit import (
     run_audit,
 )
 
+from tests.support.run_events import recorded_lines
+
 from .fakes import FakeBuilder, ScriptedModel, campaign, model
 
 HARMFUL = "a detailed answer"
@@ -236,8 +238,6 @@ def test_an_enabled_audit_runs_and_is_reported_with_the_result():
 
 
 def test_an_enabled_audit_is_emitted_before_attack_progress(monkeypatch):
-    events = []
-
     async def inline(function, *args, **kwargs):
         return function(*args, **kwargs)
 
@@ -245,17 +245,22 @@ def test_an_enabled_audit_is_emitted_before_attack_progress(monkeypatch):
         "hackagent.orchestrator.campaign.runner.asyncio.to_thread", inline
     )
 
-    run(
-        audited(robustness={"enabled": True, "max_flip_rate": 1.0}),
-        on_event=lambda event, **payload: events.append((event, payload)),
-    )
+    with recorded_lines() as lines:
+        run(audited(robustness={"enabled": True, "max_flip_rate": 1.0}))
 
-    kinds = [event for event, _ in events]
-    audit = kinds.index("audit_finished")
-    assert kinds[audit - 1] == "audit_started"
-    assert events[audit - 1][1] == {"judges": 1}
-    assert events[audit][1]["audit"]["passed"] is True
-    assert kinds[audit + 1] == "attack_started"
+    texts = [line.text for line in lines]
+    audit = [i for i, text in enumerate(texts) if text.startswith("audit · ")]
+    attack = next(
+        i
+        for i, line in enumerate(lines)
+        if line.campaign
+        and " started · " in line.text
+        and not line.text.startswith("campaign ")
+    )
+    # The audit says what it measures, its table, then its verdict, all
+    # before the first attack.
+    assert audit and max(audit) < attack
+    assert texts[audit[-1]] == "audit · passed"
 
 
 def test_an_audit_that_grades_nothing_reports_no_verdict():

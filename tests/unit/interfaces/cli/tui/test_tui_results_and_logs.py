@@ -6,13 +6,11 @@ Tests for TUI Results Visualization and Log Tracking.
 
 This module tests:
 1. Results visualization in the ResultsTab
-2. Log tracking through TUILogHandler
-3. Actions viewer display
-4. Escape function for Rich markup
+2. Escape function for Rich markup
+3. Copying the run's log
 """
 
 import json
-import logging
 from io import StringIO
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -68,168 +66,6 @@ class TestEscapeFunction:
         """Test dicts are converted to string and escaped."""
         result = _escape({"key": "[value]"})
         assert Text.from_markup(result).plain == str({"key": "[value]"})
-
-
-# ============================================================================
-# TUILogHandler Tests
-# ============================================================================
-
-
-class TestTUILogHandler:
-    """Tests for the TUILogHandler logging mechanism."""
-
-    def test_handler_creation(self) -> None:
-        """Test TUILogHandler can be created with proper parameters."""
-        from hackagent.interfaces.tui.logger import TUILogHandler
-
-        mock_app = MagicMock()
-        mock_callback = MagicMock()
-
-        handler = TUILogHandler(
-            app=mock_app,
-            callback=mock_callback,
-            max_buffer_size=100,
-            level=logging.INFO,
-        )
-
-        assert handler.app == mock_app
-        assert handler.callback == mock_callback
-        assert handler.max_buffer_size == 100
-        assert handler.level == logging.INFO
-
-    def test_handler_emit_buffers_logs(self) -> None:
-        """Test that emit() buffers log entries."""
-        from hackagent.interfaces.tui.logger import TUILogHandler
-
-        mock_app = MagicMock()
-        mock_callback = MagicMock()
-
-        handler = TUILogHandler(
-            app=mock_app,
-            callback=mock_callback,
-            max_buffer_size=100,
-            level=logging.INFO,
-        )
-
-        # Create a log record
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=1,
-            msg="Test message",
-            args=(),
-            exc_info=None,
-        )
-
-        handler.emit(record)
-
-        # Check buffer contains the log
-        buffer = handler.get_buffer()
-        assert len(buffer) == 1
-        assert "Test message" in buffer[0][0]
-        assert buffer[0][1] == "INFO"
-
-    def test_handler_respects_max_buffer_size(self) -> None:
-        """Test that buffer doesn't exceed max_buffer_size."""
-        from hackagent.interfaces.tui.logger import TUILogHandler
-
-        mock_app = MagicMock()
-        mock_callback = MagicMock()
-
-        handler = TUILogHandler(
-            app=mock_app,
-            callback=mock_callback,
-            max_buffer_size=5,
-            level=logging.INFO,
-        )
-
-        # Emit more logs than buffer size
-        for i in range(10):
-            record = logging.LogRecord(
-                name="test",
-                level=logging.INFO,
-                pathname="test.py",
-                lineno=1,
-                msg=f"Message {i}",
-                args=(),
-                exc_info=None,
-            )
-            handler.emit(record)
-
-        # Buffer should only contain last 5
-        buffer = handler.get_buffer()
-        assert len(buffer) == 5
-        # Should contain messages 5-9
-        assert "Message 5" in buffer[0][0]
-
-    def test_handler_clear_buffer(self) -> None:
-        """Test clearing the log buffer."""
-        from hackagent.interfaces.tui.logger import TUILogHandler
-
-        mock_app = MagicMock()
-        mock_callback = MagicMock()
-
-        handler = TUILogHandler(
-            app=mock_app,
-            callback=mock_callback,
-            max_buffer_size=100,
-            level=logging.INFO,
-        )
-
-        # Add some logs
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=1,
-            msg="Test message",
-            args=(),
-            exc_info=None,
-        )
-        handler.emit(record)
-
-        # Clear and verify
-        handler.clear_buffer()
-        assert len(handler.get_buffer()) == 0
-
-    def test_handler_deactivate_activate(self) -> None:
-        """Test activating and deactivating the handler."""
-        from hackagent.interfaces.tui.logger import TUILogHandler
-
-        mock_app = MagicMock()
-        mock_callback = MagicMock()
-
-        handler = TUILogHandler(
-            app=mock_app,
-            callback=mock_callback,
-            max_buffer_size=100,
-            level=logging.INFO,
-        )
-
-        # Initially active
-        assert handler._active
-
-        # Deactivate
-        handler.deactivate()
-        assert not handler._active
-
-        # Logs should not be processed when deactivated
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=1,
-            msg="Should not be buffered",
-            args=(),
-            exc_info=None,
-        )
-        handler.emit(record)
-        assert len(handler.get_buffer()) == 0
-
-        # Activate
-        handler.activate()
-        assert handler._active
 
 
 # ============================================================================
@@ -353,140 +189,6 @@ class TestResultsVisualization:
   ⚠️  [bold]Errors:[/bold] [bright_red]{summary["ERROR"]}[/bright_red]
 """
         console.print(details)
-
-
-# ============================================================================
-# Actions Viewer Tests
-# ============================================================================
-
-
-class TestActionsViewer:
-    """Tests for the AgentActionsViewer functionality."""
-
-    def test_escape_in_tool_call_display(self) -> None:
-        """Test that tool call arguments are properly escaped."""
-        arguments = {"location": "New York [USA]", "units": "metric"}
-
-        args_str = json.dumps(arguments, indent=2)
-        escaped_args = _escape(args_str)
-
-        assert Text.from_markup(escaped_args).plain == args_str
-
-    def test_escape_in_http_request_display(self) -> None:
-        """Test HTTP request URL escaping."""
-        url = "http://example.com/api?filter=[active]"
-        escaped_url = _escape(url)
-
-        assert Text.from_markup(escaped_url).plain == url
-
-    def test_escape_in_adk_event_content(self) -> None:
-        """Test ADK event content escaping."""
-        content = "Tool returned [success] with data [1, 2, 3]"
-        escaped = _escape(content)
-
-        assert Text.from_markup(escaped).plain == content
-
-
-# ============================================================================
-# Log Viewer Widget Tests
-# ============================================================================
-
-
-class TestLogViewer:
-    """Tests for the AttackLogViewer functionality."""
-
-    def test_log_level_color_mapping(self) -> None:
-        """Test log levels map to correct colors."""
-        level_colors = {
-            "DEBUG": "dim",
-            "INFO": "cyan",
-            "WARNING": "yellow",
-            "ERROR": "bold red",
-            "CRITICAL": "bold red on white",
-        }
-
-        for level, expected_color in level_colors.items():
-            # Verify the mapping exists
-            assert level in level_colors
-            assert level_colors[level] == expected_color
-
-    def test_log_message_escaping(self) -> None:
-        """Test log messages with markup characters are escaped."""
-        message = "Processing [data] from [source]"
-        escaped = _escape(message)
-
-        # Should be safe to render
-        console = Console(file=StringIO(), force_terminal=True)
-        markup = f"[cyan]{escaped}[/cyan]"
-        console.print(markup)
-
-    def test_step_header_formatting(self) -> None:
-        """Test step header separator formatting."""
-        step_name = "Attack [Phase 1]"
-        step_number = 1
-
-        escaped_name = _escape(step_name)
-        separator = "─" * 60
-        header = f"\n[bold magenta]{separator}\n🎯 STEP {step_number}: {escaped_name}\n{separator}[/bold magenta]\n"
-
-        console = Console(file=StringIO(), force_terminal=True)
-        console.print(header)
-
-
-# ============================================================================
-# Integration Tests - Log Tracking Flow
-# ============================================================================
-
-
-class TestLogTrackingFlow:
-    """Tests for the complete log tracking flow."""
-
-    # NOTE: tests for the removed ``attach_tui_handler`` / ``detach_tui_handler``
-    # helpers were dropped in the TUI cleanup pass — those helpers were never
-    # called by production code and have been removed.
-
-
-# ============================================================================
-# Actions Logger Pattern Matching Tests
-# ============================================================================
-
-
-class TestActionsLoggerPatterns:
-    """Tests for TUIActionsHandler pattern matching."""
-
-    def test_http_request_pattern_detection(self) -> None:
-        """Test HTTP request pattern detection in log messages."""
-        import re
-
-        message = "🌐 Sending request to agent endpoint: http://localhost:8000/run"
-
-        # Pattern from actions_logger.py
-        url_match = re.search(r"(https?://[^\s]+)", message)
-
-        assert url_match is not None
-        assert url_match.group(1) == "http://localhost:8000/run"
-
-    def test_tool_call_pattern_detection(self) -> None:
-        """Test tool call pattern detection in log messages."""
-        import re
-
-        message = "🔧 Agent actions for prefix #1: Tool: get_weather"
-
-        tool_match = re.search(r"Tool:\s*(\w+)", message)
-
-        assert tool_match is not None
-        assert tool_match.group(1) == "get_weather"
-
-    def test_model_query_pattern_detection(self) -> None:
-        """Test model query pattern detection."""
-        import re
-
-        message = "🌐 Querying model gpt-4-turbo"
-
-        model_match = re.search(r"model\s+(\S+)", message)
-
-        assert model_match is not None
-        assert model_match.group(1) == "gpt-4-turbo"
 
 
 # ============================================================================
@@ -975,7 +677,6 @@ class TestGetResultStatusInfo:
     def test_successful_jailbreak_is_vulnerable(self) -> None:
         """A jailbreak that got through is reported as a red vulnerability."""
         from hackagent.interfaces.tui.views.results import _get_result_status_info
-        from unittest.mock import MagicMock
 
         result = MagicMock()
         result.evaluation_status = MagicMock()
@@ -990,7 +691,6 @@ class TestGetResultStatusInfo:
     def test_failed_jailbreak_is_mitigated(self) -> None:
         """A refused jailbreak is reported as a green mitigation."""
         from hackagent.interfaces.tui.views.results import _get_result_status_info
-        from unittest.mock import MagicMock
 
         result = MagicMock()
         result.evaluation_status = MagicMock()
@@ -1005,7 +705,6 @@ class TestGetResultStatusInfo:
     def test_error_status(self) -> None:
         """Test ERROR status is reported as a yellow error."""
         from hackagent.interfaces.tui.views.results import _get_result_status_info
-        from unittest.mock import MagicMock
 
         result = MagicMock()
         result.evaluation_status = MagicMock()
@@ -1019,7 +718,6 @@ class TestGetResultStatusInfo:
     def test_no_evaluation_status(self) -> None:
         """Test result without evaluation_status is reported as unevaluated."""
         from hackagent.interfaces.tui.views.results import _get_result_status_info
-        from unittest.mock import MagicMock
 
         result = MagicMock(spec=[])  # No evaluation_status attribute
 
@@ -1040,7 +738,6 @@ class TestFormatResultSummary:
     def test_basic_summary(self, console: Console) -> None:
         """Test basic result summary formatting."""
         from hackagent.interfaces.tui.views.results import _format_result_summary
-        from unittest.mock import MagicMock
 
         result = MagicMock()
         result.evaluation_status = MagicMock()
@@ -1058,7 +755,6 @@ class TestFormatResultSummary:
     def test_summary_without_optional_fields(self, console: Console) -> None:
         """Test summary when optional fields are missing."""
         from hackagent.interfaces.tui.views.results import _format_result_summary
-        from unittest.mock import MagicMock
 
         result = MagicMock(spec=["evaluation_status", "id"])
         result.evaluation_status = MagicMock()
@@ -1082,7 +778,6 @@ class TestFormatResultFullDetails:
     def test_full_details_with_all_fields(self, console: Console) -> None:
         """Test full details with all fields present."""
         from hackagent.interfaces.tui.views.results import _format_result_full_details
-        from unittest.mock import MagicMock
 
         result = MagicMock()
         result.id = "test-result-id-123"
@@ -1106,7 +801,6 @@ class TestFormatResultFullDetails:
     def test_full_details_minimal(self, console: Console) -> None:
         """Test full details with minimal fields."""
         from hackagent.interfaces.tui.views.results import _format_result_full_details
-        from unittest.mock import MagicMock
 
         result = MagicMock(spec=["id", "evaluation_status"])
         result.id = "minimal-id"
@@ -1125,33 +819,7 @@ class TestFormatResultFullDetails:
 
 
 class TestLogCopy:
-    """The Logs panel 'Copy' button and the Ctrl+Y copy-selection binding."""
-
-    def test_copy_logs_uses_osc52_clipboard(self) -> None:
-        """Copy goes through Textual's native (OSC 52) clipboard first."""
-        from unittest.mock import MagicMock, PropertyMock, patch
-
-        from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
-
-        viewer = AttackLogViewer()
-        viewer._records = [("INFO", "hello world")]
-        fake_app = MagicMock()
-        # Force local clipboard tools to be unavailable so only OSC 52 applies.
-        with (
-            patch.object(
-                AttackLogViewer, "app", new_callable=PropertyMock, return_value=fake_app
-            ),
-            patch("subprocess.run", side_effect=FileNotFoundError()),
-        ):
-            ok = viewer.copy_logs()
-        assert ok is True
-        fake_app.copy_to_clipboard.assert_called_once()
-        assert "hello world" in fake_app.copy_to_clipboard.call_args.args[0]
-
-    def test_copy_logs_empty_returns_false(self) -> None:
-        from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
-
-        assert AttackLogViewer().copy_logs() is False
+    """The Ctrl+Y copy-selection binding: a selection, else the run's log."""
 
     def test_ctrl_y_binding_registered(self) -> None:
         from hackagent.interfaces.tui.app import HackAgentTUI
@@ -1160,7 +828,7 @@ class TestLogCopy:
         assert ("ctrl+y", "copy_selection") in pairs
 
     def test_action_copies_current_selection(self) -> None:
-        from unittest.mock import MagicMock, PropertyMock, patch
+        from unittest.mock import PropertyMock, patch
 
         from hackagent.interfaces.tui.app import HackAgentTUI
 
@@ -1180,14 +848,14 @@ class TestLogCopy:
         app.copy_to_clipboard.assert_called_once_with("selected log line")
 
     def test_action_falls_back_to_logs_when_no_selection(self) -> None:
-        from unittest.mock import MagicMock, PropertyMock, patch
+        from unittest.mock import PropertyMock, patch
 
         from hackagent.interfaces.tui.app import HackAgentTUI
 
         app = HackAgentTUI(MagicMock())
         app.copy_to_clipboard = MagicMock()
         app.notify = MagicMock()
-        # No selection, and _active_monitor_text returns visible log text.
+        # No selection: the run's log is copied.
         screen = MagicMock()
         screen.get_selected_text.return_value = ""
         with (
@@ -1196,8 +864,8 @@ class TestLogCopy:
             ),
             patch.object(
                 HackAgentTUI,
-                "_active_monitor_text",
-                return_value=("log line 1\nlog line 2", "logs"),
+                "_run_log_text",
+                return_value="log line 1\nlog line 2",
             ),
             patch("subprocess.run", side_effect=FileNotFoundError()),
         ):
@@ -1205,7 +873,7 @@ class TestLogCopy:
         app.copy_to_clipboard.assert_called_once_with("log line 1\nlog line 2")
 
     def test_action_warns_when_nothing_to_copy(self) -> None:
-        from unittest.mock import MagicMock, PropertyMock, patch
+        from unittest.mock import PropertyMock, patch
 
         from hackagent.interfaces.tui.app import HackAgentTUI
 
@@ -1218,9 +886,7 @@ class TestLogCopy:
             patch.object(
                 HackAgentTUI, "screen", new_callable=PropertyMock, return_value=screen
             ),
-            patch.object(
-                HackAgentTUI, "_active_monitor_text", return_value=("", "logs")
-            ),
+            patch.object(HackAgentTUI, "_run_log_text", return_value=""),
         ):
             app.action_copy_selection()
         app.copy_to_clipboard.assert_not_called()
@@ -1236,7 +902,7 @@ class TestClipboardHelper:
     """The shared copy_to_clipboard helper used by the log/actions Copy buttons."""
 
     def test_uses_osc52_via_app(self) -> None:
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         from hackagent.interfaces.tui.widgets.clipboard import copy_to_clipboard
 
@@ -1252,7 +918,6 @@ class TestClipboardHelper:
         assert copy_to_clipboard(None, "") is False
 
     def test_richlog_plaintext_joins_strip_text(self) -> None:
-        from unittest.mock import MagicMock
 
         from hackagent.interfaces.tui.widgets.clipboard import richlog_plaintext
 
@@ -1262,39 +927,3 @@ class TestClipboardHelper:
         log = MagicMock()
         log.lines = [s1, s2]
         assert richlog_plaintext(log) == "first line\nsecond line"
-
-
-class TestActionsCopy:
-    """The Copy button on the Agent Actions viewer."""
-
-    def test_copy_button_id_in_compose(self) -> None:
-        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
-
-        # The "copy-actions" button id is wired into compose().
-        assert "copy-actions" in AgentActionsViewer.compose.__code__.co_consts
-
-    def test_copy_actions_uses_rendered_text(self) -> None:
-        from unittest.mock import patch
-
-        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
-
-        viewer = AgentActionsViewer()
-        with (
-            patch.object(viewer, "get_actions_text", return_value="action log text"),
-            patch(
-                "hackagent.interfaces.tui.widgets.clipboard.copy_to_clipboard",
-                return_value=True,
-            ) as mock_copy,
-        ):
-            ok = viewer.copy_actions()
-        assert ok is True
-        assert mock_copy.call_args.args[1] == "action log text"
-
-    def test_copy_actions_empty_returns_false(self) -> None:
-        from unittest.mock import patch
-
-        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
-
-        viewer = AgentActionsViewer()
-        with patch.object(viewer, "get_actions_text", return_value=""):
-            assert viewer.copy_actions() is False

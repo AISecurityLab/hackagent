@@ -850,6 +850,64 @@ def test_tap_drops_an_off_topic_branch_before_it_costs_a_target_call():
     assert target.prompts == ["attempt 1", "attempt 3"]
 
 
+def test_tap_names_each_candidate_alike_in_every_step_of_its_log():
+    """A candidate's refinement, its on-topic check and its turn with the
+    target carry one number (the log names a step by the phases it is in),
+    so the log follows it even after another candidate is dropped."""
+    writer, topic = Writer(), Topic("attempt 2")
+    attack = TAPAttack(
+        TapParams(
+            depth=1, streams=1, branching_factor=3, attacker=writer, on_topic=topic
+        )
+    )
+    nodes = search_trace(attack, judge=Panel(1.0))
+    phases = {n.path: n for n in nodes if n.node == "phase"}
+
+    def named_under(label: str) -> list[str]:
+        parent = next(path for path, n in phases.items() if n.label == label)
+        return [n.label for path, n in phases.items() if path[:-1] == parent]
+
+    # Refinements are labelled "candidate" (the dashboard's attack map reads
+    # that label); the log numbers them in this same order.
+    assert named_under("expand") == ["candidate"] * 3
+    assert named_under("on topic") == ["candidate #1", "candidate #2", "candidate #3"]
+    # Candidate 2 drifted off the goal: the others reach the target under
+    # their own numbers, not renumbered 1 and 2.
+    turns = [
+        label for label in named_under("depth 1/1") if label.startswith("candidate")
+    ]
+    assert turns == ["candidate #1", "candidate #3"]
+
+
+def test_tap_numbers_a_candidate_as_the_log_numbers_its_refinement():
+    """The number a check or a turn carries is the one the log gave the
+    candidate's refinement ("candidate #k" under "expand")."""
+    writer, topic = Writer(), Topic("attempt 2")
+    attack = TAPAttack(
+        TapParams(
+            depth=2,
+            streams=2,
+            branching_factor=2,
+            width=2,
+            attacker=writer,
+            on_topic=topic,
+            early_stop=False,
+        )
+    )
+    with recording() as trace:
+        search(attack, judge=Panel(1.0))
+    logged = trace._phases  # each phase's label as the log writes it
+
+    named = [
+        n
+        for n in trace.nodes
+        if n.node == "phase" and n.label.startswith("candidate #")
+    ]
+    assert named
+    for node in named:
+        assert logged[tuple(node.data["candidate_path"])] == node.label
+
+
 def test_tap_keeps_a_branch_the_on_topic_judge_could_not_answer_about():
     writer, topic = Writer(), Topic(reply="I would rather not say")
     attack = TAPAttack(
@@ -916,7 +974,7 @@ def test_tap_records_a_phase_per_depth_branch_and_prune():
 
     labels = [n.label for n in nodes if n.node == "phase"]
     assert labels[:2] == ["depth 1/2", "expand"]
-    assert "branch 1/2" in labels
+    assert "candidate #1" in labels
     assert any(n.node == "decision" and n.label == "pruned" for n in nodes)
 
 
@@ -1170,8 +1228,12 @@ def test_crescendo_records_a_phase_per_turn_and_its_backtracks():
         attack, target=Target(REFUSAL, "sure", "sure"), judge=Panel(1.0)
     )
 
-    turns = [n for n in nodes if n.node == "phase"]
-    assert [n.label for n in turns] == ["turn 1/2", "turn 1/2", "turn 2/2"]
+    turns = [n for n in nodes if n.node == "phase" and n.label.startswith("turn")]
+    # The refused turn is tried again, and the log says which try it is.
+    assert [n.label for n in turns] == ["turn 1/2", "turn 1/2, try 2", "turn 2/2"]
+    # Each try's refusal check is a phase of its own inside the turn.
+    checks = [n for n in nodes if n.node == "phase" and n.label == "refusal check"]
+    assert {check.path[:-1] for check in checks} == {turn.path for turn in turns}
     backtracked = [
         n for n in nodes if n.node == "decision" and n.label == "backtracked"
     ]
@@ -1621,13 +1683,45 @@ def test_advprefix_stops_when_nothing_survives_the_filters():
     assert stopped[0].data["reason"] == "no candidate survived the filters"
 
 
+def test_advprefix_attacks_each_prefix_under_the_number_it_was_written_with():
+    """A prefix the filters drop does not renumber the others; each draw of
+    the target is a numbered sample of its prefix."""
+    writer = Writer2(f"{PREFIX_TAIL} one", f"{PREFIX_TAIL} one", f"{PREFIX_TAIL} three")
+    attack = AdvPrefixAttack(
+        advprefix(
+            attacker=writer,
+            samples_per_prefix=3,
+            samples_per_candidate=2,
+            candidates_per_goal=99,
+        )
+    )
+    nodes = search_trace(attack, judge=Panel(1.0))
+    phases = {n.path: n.label for n in nodes if n.node == "phase"}
+    write = next(path for path, label in phases.items() if label == "write")
+
+    written = [label for path, label in phases.items() if path[:-1] == write]
+    assert written == ["prefix 1/3", "prefix 2/3", "prefix 3/3"]
+    attacked = {
+        label: [phases[p] for p in phases if p[:-1] == path]
+        for path, label in phases.items()
+        if path[:-1] == () and label.startswith("prefix")
+    }
+    # Prefix 2 repeated prefix 1 and was dropped: 3 keeps its number.
+    assert attacked == {
+        "prefix 1/3": ["sample 1/2", "sample 2/2"],
+        "prefix 3/3": ["sample 1/2", "sample 2/2"],
+    }
+
+
 def test_advprefix_records_a_phase_per_stage():
     writer = Writer2()
     attack = AdvPrefixAttack(advprefix(attacker=writer, candidates_per_goal=99))
     nodes = search_trace(attack, judge=Panel(1.0))
 
     labels = [n.label for n in nodes if n.node == "phase"]
-    assert labels == ["write", "prefix 1/1"]
+    # The prefix is written and attacked under one number; each draw of the
+    # target is a sample of it.
+    assert labels == ["write", "prefix 1/1", "prefix 1/1", "sample 1/1"]
 
 
 def test_tap_probes_all_on_topic_branches_before_score_pruning():
@@ -1671,3 +1765,30 @@ def test_tap_drops_a_branch_the_panel_scored_zero():
     _findings, target = search(attack, judge=Panel(0.0, 4.0, 4.0, 4.0))
 
     assert len(target.requests) == 2 + 2
+
+
+def test_each_advprefix_sample_is_an_attempt_with_its_own_trace():
+    """Recorded under the prefix, every sample's calls went to the first
+    attempt; each attempt is its sample's, so each owns its own calls."""
+    writer = Writer2("a\nx")
+    attack = AdvPrefixAttack(
+        advprefix(
+            meta_prefixes=("",),
+            samples_per_candidate=2,
+            prefixes_per_goal=1,
+            candidates_per_goal=99,
+            attacker=writer,
+        )
+    )
+
+    async def run():
+        with recording() as trace:
+            found = await attack.run(GOAL, Target(), Panel(9.0, 1.0))
+        return found, trace.nodes
+
+    findings, nodes = asyncio.run(run())
+
+    # Each attempt is its sample's: the runner gives an attempt the calls
+    # recorded under its path, so under the prefix's, the first took them all.
+    samples = {n.label: n.path for n in nodes if n.node == "phase"}
+    assert [f.path for f in findings] == [samples["sample 1/2"], samples["sample 2/2"]]

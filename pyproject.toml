@@ -305,3 +305,6 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "No logging-handler setup outside interfaces"
 type = "logging_handlers"
+# capture() attaches the handler an interface (or the run activity relay)
+# passes it, for the length of one run; the library still installs none.
+allowed_modules = ["hackagent.core.logging"]

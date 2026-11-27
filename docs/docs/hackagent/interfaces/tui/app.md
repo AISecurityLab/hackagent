@@ -102,12 +102,13 @@ Refresh whatever view is on screen.
 def action_copy_selection() -> None
 ```
 
-Copy logs (or a text selection) to the clipboard — bound to Ctrl+Y.
+Copy a text selection, else the run&#x27;s log, to the clipboard — bound
+to Ctrl+Y.
 
-If you&#x27;ve dragged to select text, that selection is copied. Otherwise it
-copies the whole visible Logs (or Actions) panel — so you can copy
-without needing the mouse at all. Uses Textual&#x27;s terminal-native
-clipboard (OSC 52), which works locally and over SSH.
+If you&#x27;ve dragged to select text, that selection is copied. Otherwise
+it copies the campaign run&#x27;s log, so you can copy without needing the
+mouse at all. Uses Textual&#x27;s terminal-native clipboard (OSC 52), which
+works locally and over SSH.
 
 #### show\_success
 

@@ -151,7 +151,7 @@ These are the variables HackAgent reads, grouped by what they affect.
 
 | Variable | What it sets | Default |
 |---|---|---|
-| `HACKAGENT_LOG_LEVEL` | The level of HackAgent's log messages: `DEBUG`, `INFO`, `WARNING`, `ERROR`. | `WARNING` |
+| `HACKAGENT_LOG_LEVEL` | The level of the log messages the terminal shows: `DEBUG`, `INFO`, `WARNING`, `ERROR`. The TUI's run view and the platform's activity log keep their own. | `WARNING` |
 | `HACKAGENT_DEBUG` | Any non-empty value prints a full traceback with an error. | unset |
 
 ### FC-Attack

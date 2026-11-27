@@ -102,6 +102,7 @@ attack.
 | `./logs/runs/<run id>/results.json` | The same attempts as a file, for diffing or sharing. |
 | `./logs/runs/<run id>/traces.jsonl` | Every model call per attempt, and for adaptive attacks the search itself: every decision and branch. |
 | `./logs/runs/<run id>/audit.json` | When the judge audit is on, how the panel measured up. |
+| `./logs/runs/<run id>/run.log` | The run's log at `INFO`: what it loaded, what each attack decided, each goal's result and the closing summary. Written even when the run stops before attacking. |
 
 The output folder and formats are set under
 [`execution.output`](../cli/campaign-files/execution.md#outputspec).

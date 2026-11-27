@@ -5,6 +5,10 @@ title: hackagent.interfaces.tui.views.campaign.screens
 
 The screens the builder opens: the run view, and small dialogs.
 
+#### RUN\_LINES
+
+How many of a run&#x27;s lines the run view keeps and shows: the latest.
+
 ## ExampleScreen Objects
 
 ```python

@@ -7,21 +7,23 @@ Every field starts at its schema default, shown dimmed; typing overrides it and
 clearing it (or ``ctrl+t``) goes back to the default. Only overrides are saved.
 Rarely changed fields wait under *Advanced*. Problems are shown on the field
 they concern and flagged in the outline. *Run* resolves the campaign first —
-the goals, models and judges ``hackagent campaign validate`` checks — reports
-what it found, then executes that frozen snapshot while editing carries on.
+the goals, models and judges ``hackagent campaign validate`` checks — then
+executes that frozen snapshot while editing carries on, showing the run's log
+as ``hackagent campaign run`` writes it, coloured.
 """
 
 from __future__ import annotations
 
 import copy
+from collections import deque
+from queue import Empty, SimpleQueue
+import logging
 import os
 import shlex
 import subprocess
 import tempfile
-from collections import Counter
 from pathlib import Path as FilePath
 from threading import Event
-from time import monotonic
 from typing import Any, Callable, Optional
 
 import yaml
@@ -46,15 +48,20 @@ from textual.widgets.option_list import Option
 from textual.widgets.tree import TreeNode
 
 from hackagent.core.credentials import CredentialError
+from hackagent.core.logging import capture
 from hackagent.interfaces.cli.config import CLIConfig
-from hackagent.interfaces.audit import audit_markup
-from hackagent.orchestrator.campaign import CampaignCancelled, CampaignSpec
+from hackagent.interfaces.cli.logging_setup import log_markup, shown_level
+from hackagent.orchestrator.campaign import CampaignSpec
 
 from .draft import CampaignDraft, Issue
 from .form import FieldRow
 from .outline import Group, Node, Outline, build_outline, issue_matches
-from .report import attacks_markup, check_markup
-from .screens import ConfirmScreen, HelpScreen, PathScreen, RunScreen
+from .screens import RUN_LINES, ConfirmScreen, HelpScreen, PathScreen, RunScreen
+
+#: How often the run view draws what the run logged, in seconds, and at most
+#: how many lines each time.
+_DRAIN_S = 0.1
+_DRAIN_BATCH = 500
 
 _OUTLINE_HINT = (
     "↑↓ choose a part · Tab edit its fields · Delete remove an attack · "
@@ -134,16 +141,13 @@ class CampaignBuilder(Container):
         self._timer: Optional[Timer] = None
         self._campaign_running = False
         self._cancel = Event()
-        #: Every line the current run has produced, so the run view can be
-        #: left and reopened without losing any of it.
-        self._run_lines: list[str] = []
-        self._run_percent: float = 0
+        #: The current run's latest lines, so the run view can be left and
+        #: reopened without losing them; the oldest go past RUN_LINES.
+        self._run_lines: deque[str] = deque(maxlen=RUN_LINES)
+        #: What the run's log handler hands the view, from the run's thread:
+        #: drained on the UI's, so logging never waits for a repaint.
+        self._incoming: SimpleQueue[str] = SimpleQueue()
         self._snapshot: Optional[CampaignSpec] = None
-        self._attack_index = -1
-        self._expected = 0
-        self._done = 0
-        self._audit_rendered_for_run = False
-        self._run_errors: Counter[tuple[str, str]] = Counter()
 
     def start_from(self, template: Any) -> None:
         """Replace the draft with a starting template, as if freshly opened."""
@@ -260,6 +264,7 @@ class CampaignBuilder(Container):
         yield Static(_OUTLINE_HINT, id="hint")
 
     def on_mount(self) -> None:
+        self.set_interval(_DRAIN_S, self._drain)
         # Tab from the outline should land on the first field, not the scroller.
         self.query_one("#form").can_focus = False
         # Nor on the run controls, which sit between them in the left pane:
@@ -352,20 +357,25 @@ class CampaignBuilder(Container):
         if screen is not None:
             screen.write(markup)
 
-    def _set_progress(self, value: float) -> None:
-        self._run_percent = value
-        screen = self._run_screen
-        if screen is not None:
-            screen.set_progress(value)
+    def _drain(self, limit: Optional[int] = _DRAIN_BATCH) -> None:
+        """Show what the run's log handed over since the last look, at most
+        ``limit`` lines (all of them with ``None``), so a burst of lines
+        never holds the screen for long."""
+        taken = 0
+        while limit is None or taken < limit:
+            try:
+                markup = self._incoming.get_nowait()
+            except Empty:
+                return
+            self._log(markup)
+            taken += 1
 
     def _watch_run(self) -> None:
         """Open the run view on whatever the run has produced so far."""
         if self._run_screen is not None:
             return
         title = self._snapshot.campaign.name if self._snapshot else "Run"
-        self.app.push_screen(
-            RunScreen(title, self._run_lines, self._run_percent, self.action_stop)
-        )
+        self.app.push_screen(RunScreen(title, self._run_lines, self.action_stop))
 
     async def _show(self, node: Optional[Node], *, force: bool = False) -> None:
         if node is None or (node == self._node and not force):
@@ -893,155 +903,86 @@ class CampaignBuilder(Container):
         self._snapshot = self._spec
         self._campaign_running = True
         self._cancel.clear()
-        self._audit_rendered_for_run = False
-        self._run_errors.clear()
-        self._attack_index, self._expected, self._done = -1, 0, 0
         self.query_one("#run", Button).disabled = True
         self.query_one("#stop", Button).disabled = False
         self._run_lines.clear()
-        self._run_percent = 2
-        self._log(
-            "[dim]Running a snapshot: edits from now on apply to the next run.[/dim]"
+        self._note(
+            logging.INFO,
+            "campaign · running a snapshot: edits from now on apply to the next run",
         )
         self._watch_run()
         self._update_doc_bar()
         self.run_worker(self._execute, thread=True, exclusive=True, name="campaign-run")
 
     def _execute(self) -> None:
-        from hackagent.orchestrator.campaign import (
-            resolution_summary,
-            resolve_campaign,
-            run_campaign,
-            summary,
-        )
+        from hackagent.orchestrator.campaign import resolve_campaign, run_campaign
 
         spec = self._snapshot
         if spec is None:
             return
-        started = monotonic()
-
-        def on_event(event_type: str, **payload: Any) -> None:
-            self.app.call_from_thread(self._on_run_event, event_type, payload)
-            if self._cancel.is_set():
-                raise _Cancelled("Stopped by the user")
 
         # The checks ``hackagent campaign validate`` runs, before anything is
         # attacked: the form only knows the file is well formed, while this
         # loads the goals and builds every model. What it resolved is what the
-        # run then uses, so the report describes the run that follows.
-        self.app.call_from_thread(self._log, "[dim]Checking the campaign…[/dim]")
-        try:
-            resolved = resolve_campaign(spec, settings=self.cli_config.settings)
-        except Exception as exc:
-            self.app.call_from_thread(
-                self._finish, "[red]Campaign rejected[/]", str(exc), None
-            )
-            return
-        check = check_markup(resolution_summary(resolved))
-        # A blank line after it: what follows is the run, not the check.
-        self.app.call_from_thread(self._log, f"{check}\n")
-        if self._cancel.is_set():
-            self.app.call_from_thread(self._finish, "[yellow]Stopped[/]", None, None)
-            return
-
-        try:
-            result = run_campaign(
-                spec,
-                on_event=on_event,
-                settings=getattr(self.cli_config, "settings", None),
-                resolved=resolved,
-            )
-        except Exception as exc:
-            audit = getattr(exc, "report", None)
+        # run then uses. The view shows the log of both, down to the run's
+        # closing summary: from INFO, or DEBUG when the CLI's log shows it.
+        self.app.call_from_thread(
+            self._note, logging.INFO, "campaign · checking goals, models and judges"
+        )
+        with capture(_RunLog(self._incoming), min(shown_level(), logging.INFO)):
+            try:
+                resolved = resolve_campaign(spec, settings=self.cli_config.settings)
+            except Exception as exc:
+                self.app.call_from_thread(
+                    self._finish, logging.ERROR, f"campaign rejected: {exc}"
+                )
+                return
             if self._cancel.is_set():
                 self.app.call_from_thread(
-                    self._finish, "[yellow]Stopped[/]", None, audit
+                    self._finish, logging.WARNING, "campaign stopped"
                 )
-            else:
-                self.app.call_from_thread(
-                    self._finish, "[red]Failed[/]", str(exc), audit
+                return
+            try:
+                run_campaign(
+                    spec,
+                    cancel=self._cancel,
+                    settings=getattr(self.cli_config, "settings", None),
+                    resolved=resolved,
                 )
-            return
-        report = summary(result)
-        attempts = sum(attack["attempts"] for attack in report["attacks"])
-        broken = sum(attack["successes"] for attack in report["attacks"])
-        errored = result.attempt_errors
-        headline = (
-            f"[green]Done[/] · {attempts} attempts · [red]{broken} jailbroken[/] · "
-            + (f"[yellow]{errored} with errors[/] · " if errored else "")
-            + f"{monotonic() - started:.0f}s · run {escape(result.run_id)}"
-        )
-        messages = Counter(
-            message
-            for outcome in result.attacks
-            for attempt in outcome.attempts
-            for message in attempt.errors
-        )
-        for message, count in messages.most_common(5):
-            headline += f"\n  [yellow]! ×{count}[/] {escape(message)}"
-        if len(messages) > 5:
-            headline += (
-                f"\n  [dim]…{len(messages) - 5} more kinds, see the result file[/]"
-            )
-        table = attacks_markup(report)
-        closing = f"\n{table}\n\n{headline}" if table else headline
-        self.app.call_from_thread(self._finish, closing, None, result.audit)
+            except Exception as exc:
+                if self._cancel.is_set():
+                    self.app.call_from_thread(
+                        self._finish, logging.WARNING, "campaign stopped"
+                    )
+                else:
+                    self.app.call_from_thread(
+                        self._finish, logging.ERROR, f"campaign failed: {exc}"
+                    )
+                return
+        self.app.call_from_thread(self._finish)
 
-    def _on_run_event(self, event_type: str, payload: dict[str, Any]) -> None:
-        if event_type == "audit_finished":
-            audit = payload.get("audit")
-            if isinstance(audit, dict):
-                self._log("")
-                self._log(audit_markup(audit))
-                self._audit_rendered_for_run = True
-                self._set_progress(4)
-            return
-        total = max(1, len(self._snapshot.attacks) if self._snapshot else 1)
-        attack = escape(str(payload.get("attack") or "attack"))
-        if event_type == "attack_started":
-            self._attack_index += 1
-            self._expected = int(payload.get("expected_goals") or 0)
-            self._done = 0
-            self._log(f"[cyan]▶[/] {attack} · {self._expected} goals")
-        elif event_type == "goal_finished":
-            self._done += 1
-            # Goals run concurrently and finish in any order, so name the
-            # goal by its index rather than by how many have finished.
-            index = payload.get("goal_index")
-            goal = index + 1 if isinstance(index, int) else self._done
-            if payload.get("success"):
-                self._log(f"  [red]✗ goal {goal}: jailbroken[/]")
-            for message in payload.get("errors") or ():
-                key = (attack, str(message))
-                self._run_errors[key] += 1
-                # One error repeated for every goal would bury the log.
-                if self._run_errors[key] <= 2:
-                    self._log(f"  [yellow]! goal {goal}: {escape(key[1])}[/]")
-                elif self._run_errors[key] == 3:
-                    self._log("  [dim]… further repeats are counted in the summary[/]")
-        elif event_type == "attack_finished":
-            error = payload.get("error")
-            self._log(
-                f"[red]✗ {attack}: {escape(str(error))}[/]"
-                if error
-                else f"[green]✓ {attack}[/]"
+    def _note(self, level: int, message: str) -> None:
+        """A line of the view's own, written as a line of the run's log."""
+        self._log(
+            log_markup(
+                logging.makeLogRecord(
+                    {
+                        "name": __name__,
+                        "levelno": level,
+                        "levelname": logging.getLevelName(level),
+                        "msg": message,
+                    }
+                )
             )
-        within = min(1.0, self._done / max(1, self._expected))
-        share = (max(0, self._attack_index) + within) / total
-        self._set_progress(min(98, 2 + int(96 * share)))
+        )
 
-    def _finish(
-        self, summary: str, error: Optional[str], audit: Optional[Any] = None
-    ) -> None:
+    def _finish(self, level: Optional[int] = None, message: str = "") -> None:
+        """End the run; ``message`` says why it ended early, if it did."""
+        # The run's last lines come before how it ended.
+        self._drain(limit=None)
         self._campaign_running = False
-        if error:
-            self._log(f"[red]{escape(error)}[/]")
-        if audit is not None and not self._audit_rendered_for_run:
-            self._log("")
-            self._log(audit_markup(audit))
-        self._log(summary)
-        if error is None and not self._cancel.is_set():
-            self._set_progress(100)
+        if level is not None:
+            self._note(level, message)
         self.query_one("#stop", Button).disabled = True
         self.query_one("#run", Button).disabled = self._spec is None
         self._update_doc_bar()
@@ -1054,14 +995,29 @@ class CampaignBuilder(Container):
         if self._campaign_running:
             self._cancel.set()
             self.query_one("#stop", Button).disabled = True
-            self._log("[yellow]Stopping after the current step…[/]")
+            self._note(logging.WARNING, "campaign · stopping after the current step")
 
     def refresh_data(self) -> None:
         self._validate()
 
 
-class _Cancelled(CampaignCancelled):
-    """Raised from the event callback to stop a run cooperatively."""
+class _RunLog(logging.Handler):
+    """The run view's handler of the run's log: each line, written as the CLI
+    writes it to a file and coloured as a log viewer colours it.
+
+    It only queues them for the view, which draws them on its own thread:
+    the run never waits for the screen.
+    """
+
+    def __init__(self, queue: SimpleQueue[str]) -> None:
+        super().__init__()
+        self.queue = queue
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.queue.put(log_markup(record))
+        except Exception:
+            self.handleError(record)
 
 
 __all__ = ["CampaignBuilder"]

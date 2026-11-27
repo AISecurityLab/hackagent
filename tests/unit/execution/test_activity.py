@@ -6,20 +6,19 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import threading
 from uuid import uuid4
 
 import pytest
 
-from hackagent.core.logging import REPORTED_AS_EVENT
+from hackagent.core.logging import TRACE_LOGGER
 from hackagent.orchestrator.execution.activity import (
+    MESSAGE_LIMIT,
     Activity,
     ActivityRelay,
     Redactor,
     activity_for_outcome,
-    activity_from_event,
     activity_from_record,
 )
 from hackagent.storage.remote import (
@@ -68,195 +67,37 @@ def record(name, level, message, *args, **extra):
     return made
 
 
-# --- runner events ----------------------------------------------------------
+# --- the run's lines --------------------------------------------------------
 
 
-def test_a_goal_reads_as_the_executor_logs_it():
-    activity = activity_from_event(
-        "goal_finished",
-        {
-            "attack": "pair",
-            "run_id": RUN,
-            "goal_index": 15,
-            "goals": 1017,
-            "success": True,
-            "attempts": 5,
-            "successful": 4,
-            "errors": [],
-            "elapsed_s": 12.345,
-        },
+def test_a_line_is_relayed_as_written_with_what_it_is_about():
+    line = activity_from_record(
+        record(
+            "hackagent.campaign.goals",
+            logging.INFO,
+            "pair · goal 0016 · result: mitigated · 5 attempts · 12.3s",
+            subject={"attack": "pair", "goal": 16, "goals": 1017},
+        )
     )
 
-    assert activity.message == "pair · goal 16/1017 · 5 attempts · 4 successful"
-    assert activity.level == "info"
-    assert activity.kind == "goal"
-    assert activity.attack == "pair"
-    assert activity.attack_run == RUN
-    assert activity.goal_index == 15
-    assert activity.data == {
-        "attempts": 5,
-        "successful": 4,
-        "elapsed_s": 12.3,
-        "errors": [],
-    }
-
-
-def test_a_goal_with_errors_is_a_warning_with_its_first_reason():
-    errors = [f"target call failed: timeout {n}" for n in range(5)]
-    activity = activity_from_event(
-        "goal_finished",
-        {
-            "attack": "pair",
-            "goal_index": 0,
-            "goals": 2,
-            "attempts": 1,
-            "errors": errors,
-        },
+    assert (line.level, line.kind, line.attack, line.goal_index) == (
+        "info",
+        "log",
+        "pair",
+        15,
     )
-
-    assert activity.level == "warning"
-    assert activity.message.endswith("5 errors: target call failed: timeout 0")
-    assert activity.data["errors"] == errors[:3]
+    assert line.message == "pair · goal 0016 · result: mitigated · 5 attempts · 12.3s"
+    assert line.data == {}
 
 
 @pytest.mark.parametrize(
-    ("event", "payload", "level", "kind", "message"),
-    [
-        (
-            "campaign_started",
-            {"campaign": "Test 4"},
-            "info",
-            "campaign",
-            "campaign Test 4 · started · loading goals and models",
-        ),
-        (
-            "goals_loaded",
-            {"goals": 1017},
-            "info",
-            "dataset",
-            "dataset · 1017 goals loaded",
-        ),
-        (
-            "models_resolved",
-            {"models": 3, "attacks": 1, "judges": 1},
-            "info",
-            "campaign",
-            "campaign · 3 models ready · 1 attack · 1 judge",
-        ),
-        (
-            "preflight_started",
-            {"models": 3},
-            "info",
-            "preflight",
-            "preflight · checking 3 models",
-        ),
-        (
-            "preflight_finished",
-            {"models": 3},
-            "info",
-            "preflight",
-            "preflight · 3 models reachable",
-        ),
-        (
-            "preflight_failed",
-            {"models": 3, "failures": ["judge (evaluation.judges[0]): refused"]},
-            "error",
-            "preflight",
-            "preflight · 1 of 3 models unreachable: judge (evaluation.judges[0]): refused",
-        ),
-        (
-            "audit_started",
-            {"judges": 2},
-            "info",
-            "judge",
-            "judge audit · started · 2 judges",
-        ),
-        (
-            "audit_finished",
-            {"audit": {"passed": False, "samples": 40}},
-            "warning",
-            "judge",
-            "judge audit · failed · 40 samples",
-        ),
-        (
-            "attack_started",
-            {"attack": "pair", "run_id": RUN, "expected_goals": 1017},
-            "info",
-            "attack",
-            "pair · started · 1017 goals",
-        ),
-        (
-            "preparation_started",
-            {"attack": "autodan_turbo", "run_id": RUN, "goals": 10},
-            "info",
-            "attack",
-            "autodan_turbo · preparing · 10 goals",
-        ),
-        (
-            "preparation_finished",
-            {"attack": "autodan_turbo", "run_id": RUN, "elapsed_s": 312.44},
-            "info",
-            "attack",
-            "autodan_turbo · prepared in 312.4s",
-        ),
-        (
-            "attack_finished",
-            {
-                "attack": "pair",
-                "run_id": RUN,
-                "error": None,
-                "attempts": 5085,
-                "successful": 1200,
-                "elapsed_s": 3600.04,
-            },
-            "info",
-            "attack",
-            "pair · finished · 5085 attempts · 1200 successful · 3600.0s",
-        ),
-        (
-            "attack_finished",
-            {"attack": "pair", "run_id": RUN, "error": "TimeoutError: per-attack"},
-            "error",
-            "attack",
-            "pair · failed · TimeoutError: per-attack",
-        ),
-    ],
+    ("level", "expected"),
+    [(logging.INFO, "info"), (logging.WARNING, "warning"), (logging.ERROR, "error")],
 )
-def test_runner_events_become_activity(event, payload, level, kind, message):
-    activity = activity_from_event(event, payload)
+def test_a_line_keeps_its_level(level, expected):
+    line = activity_from_record(record("hackagent.campaign", level, "the line"))
 
-    assert (activity.level, activity.kind, activity.message) == (level, kind, message)
-
-
-def test_an_unknown_event_is_not_relayed():
-    assert activity_from_event("attempt_recorded", {"prompt": "x"}) is None
-
-
-def test_no_prompt_or_reply_a_payload_carries_ever_leaves():
-    sender = FakeSender()
-    activity = relay(sender)
-    payload = {
-        "attack": "pair",
-        "run_id": RUN,
-        "goal_index": 0,
-        "goals": 1,
-        "attempts": 1,
-        "successful": 0,
-        "errors": [],
-        "elapsed_s": 1.0,
-        "goal": "the goal text",
-        "prompt": "the attack prompt",
-        "response": "the target reply",
-        "messages": [{"role": "user", "content": "the attack prompt"}],
-    }
-    for event in ("attack_started", "goal_finished", "attack_finished"):
-        activity.on_event(event, **payload)
-    activity.flush()
-
-    sent = json.dumps(sender.events)
-    assert len(sender.events) == 3
-    for text in ("the goal text", "the attack prompt", "the target reply"):
-        assert text not in sent
+    assert (line.level, line.message, line.attack) == (expected, "the line", None)
 
 
 def test_the_outcome_is_the_last_line():
@@ -281,15 +122,36 @@ def test_hackagent_lines_are_relayed_from_info():
     assert activity_from_record(record("hackagent.x", logging.DEBUG, "detail")) is None
 
 
-def test_a_line_a_progress_event_reports_is_not_relayed_twice():
-    reported = record(
-        "hackagent.orchestrator.campaign.runner",
-        logging.INFO,
-        "pair | goal 1/2 | 1 attempts | 0 successful",
-        **REPORTED_AS_EVENT,
+def _step(level: int, what: str) -> logging.LogRecord:
+    return record(
+        TRACE_LOGGER,
+        level,
+        f"pair · goal 2 · round 1/3 › {what}",
+        trace_step={
+            "attack": "pair",
+            "goal": 2,
+            "source": "pair · goal 2",
+            "within": ["round 1/3"],
+            "what": what,
+        },
     )
 
-    assert activity_from_record(reported) is None
+
+def test_the_attack_trace_is_relayed_as_the_log_writes_it():
+    line = activity_from_record(_step(logging.INFO, "panel: jailbroken (score 9)"))
+
+    assert (line.level, line.kind, line.attack, line.goal_index) == (
+        "info",
+        "trace",
+        "pair",
+        1,
+    )
+    assert line.message == "pair · goal 2 · round 1/3 · panel: jailbroken (score 9)"
+
+
+def test_nothing_below_info_leaves():
+    """The calls that quote prompts and replies are DEBUG: they stay here."""
+    assert activity_from_record(_step(logging.DEBUG, 'target: "the reply"')) is None
 
 
 def test_a_client_retry_is_a_retry_warning():
@@ -343,7 +205,42 @@ def test_an_exception_on_a_record_is_named_not_traced():
             "hackagent.x", logging.ERROR, __file__, 1, "call failed", (), sys.exc_info()
         )
 
-    assert activity_from_record(failed).message == "call failed (TimeoutError: 120s)"
+    # By its type: an exception's message can quote what a model wrote.
+    assert activity_from_record(failed).message == "call failed (TimeoutError)"
+
+
+def test_what_a_model_wrote_never_leaves_in_a_step():
+    """A decision says what was decided and its numbers, not why: h4rm3l's
+    reason quotes the compiler's error on a program a model wrote. A failed
+    call says it failed, not the provider's text. The log keeps both."""
+    from hackagent.attacks.techniques.trace import TraceNode
+    from hackagent.attacks.techniques.trace_log import describe
+    from hackagent.core.logging import trace_breadcrumb
+
+    written = "name 'EXFILTRATE_SECRETS_DECORATOR' is not defined"
+    skipped = TraceNode(
+        path=(0, 1),
+        node="decision",
+        label="skipped",
+        data={"reason": f"the program does not compile: {written}", "trials": 3},
+    )
+    failed = TraceNode(
+        path=(0, 2),
+        node="call",
+        label="target",
+        data={},
+        error=f"BadRequest: the prompt said {written}",
+    )
+    for node, level, said in (
+        (skipped, logging.INFO, "h4rm3l · goal 1 · program 1/1 · skipped (trials=3)"),
+        (failed, logging.WARNING, "h4rm3l · goal 1 · program 1/1 · target failed"),
+    ):
+        step = describe(node, {"attack": "h4rm3l", "goal": 1}, ["program 1/1"])
+        line = activity_from_record(
+            record(TRACE_LOGGER, level, step["message"], trace_step=step)
+        )
+        assert line.message == said
+        assert written in trace_breadcrumb(step)
 
 
 # --- redaction --------------------------------------------------------------
@@ -372,23 +269,18 @@ def test_secrets_never_leave(message, leaked):
     assert "[REDACTED]" in event["message"]
 
 
-@pytest.mark.parametrize("padding", [190, 199])
-def test_goal_errors_are_redacted_before_they_are_shortened(padding):
+@pytest.mark.parametrize("padding", [MESSAGE_LIMIT - 10, MESSAGE_LIMIT - 1])
+def test_a_line_is_redacted_before_it_is_shortened(padding):
+    """A secret cut in half by the limit must not leave its first half."""
     sender = FakeSender()
     activity = relay(sender)
-    activity.on_event(
-        "goal_finished",
-        attack="pair",
-        goal_index=0,
-        errors=["x" * padding + SECRET + " refused"],
+    activity.take_record(
+        record("hackagent.campaign", logging.ERROR, "x" * padding + SECRET + " refused")
     )
     activity.close()
 
-    [event] = sender.events
-    assert SECRET[:5] not in json.dumps(event)
-    assert event["data"]["errors"] == [
-        ("x" * padding + "[REDACTED] refused")[:199] + "…"
-    ]
+    [sent] = sender.events
+    assert SECRET[:5] not in sent["message"]
 
 
 def test_operational_text_is_kept():
@@ -593,7 +485,7 @@ def test_a_server_without_the_endpoint_is_told_once(caplog):
 
     with caplog.at_level(logging.INFO, logger="hackagent.orchestrator.execution"):
         activity.flush()
-        activity.on_event("goals_loaded", goals=1)
+        activity.add(info())
         activity.flush()
 
     assert sender.attempts == 1
@@ -692,20 +584,19 @@ def test_the_run_s_own_log_records_are_captured_in_its_context():
 
 
 def test_client_retries_are_captured_without_printing_more():
+    """The CLI opens the client's retry logger and shows only warnings."""
     sender = FakeSender()
     activity = relay(sender)
     client = logging.getLogger("openai._base_client")
     level = client.level
     shown = Collect()
+    shown.setLevel(logging.WARNING)
     logging.getLogger("openai").addHandler(shown)
-    client.setLevel(logging.WARNING)
+    client.setLevel(logging.INFO)
     try:
         with activity.capture():
-            assert client.isEnabledFor(logging.INFO)
             client.info("Retrying request to %s in %f seconds", "/chat", 0.5)
             client.warning("shown as before")
-        assert client.level == logging.WARNING
-        assert not [f for f in client.filters if type(f).__name__ == "_TapFilter"]
         activity.close()
     finally:
         logging.getLogger("openai").removeHandler(shown)
@@ -718,14 +609,59 @@ def test_client_retries_are_captured_without_printing_more():
 def test_a_logger_created_during_the_run_is_captured():
     sender = FakeSender()
     activity = relay(sender)
-    name = f"hackagent.tests.late_{uuid4().hex}"
+    package = logging.getLogger(f"hackagent.tests.late_{uuid4().hex}")
+    library = logging.getLogger(f"openai.late_{uuid4().hex}")
     with activity.capture():
-        late = logging.getLogger(name)
-        activity.on_event("goals_loaded", goals=1)  # any event looks again
-        late.warning("from a late logger")
+        package.warning("from a late hackagent logger")  # the library's looks again
+        library.warning("from a late library logger")
     activity.close()
 
     assert [event["message"] for event in sender.events] == [
-        "dataset · 1 goal loaded",
-        "from a late logger",
+        "from a late hackagent logger",
+        "openai · from a late library logger",
+    ]
+
+
+def test_info_lines_are_relayed_while_the_log_shows_only_warnings():
+    """The CLI opens the logger and shows warnings; the relay has its own level."""
+    sender = FakeSender()
+    activity = relay(sender)
+    package = logging.getLogger("hackagent")
+    level = package.level
+    shown = Collect()
+    shown.setLevel(logging.WARNING)
+    package.addHandler(shown)
+    package.setLevel(logging.DEBUG)
+    try:
+        with activity.capture():
+            logging.getLogger("hackagent.tests.quiet").info("relayed, not shown")
+        activity.close()
+    finally:
+        package.removeHandler(shown)
+        package.setLevel(level)
+
+    assert shown.records == []
+    assert [event["message"] for event in sender.events] == ["relayed, not shown"]
+
+
+def test_a_process_nobody_configured_is_opened_for_the_run(monkeypatch):
+    """An SDK script with no logging set up still relays the run's INFO."""
+    sender = FakeSender()
+    activity = relay(sender)
+    package = logging.getLogger("hackagent")
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setattr(package, "level", logging.NOTSET)
+    client = logging.getLogger("openai._base_client")
+    monkeypatch.setattr(client, "level", logging.NOTSET)
+    with activity.capture():
+        assert package.level == logging.INFO
+        logging.getLogger("hackagent.tests.sdk").info("relayed")
+        client.info("Retrying request to /chat in 0.5 seconds")
+    assert package.level == client.level == logging.NOTSET
+    activity.close()
+
+    assert [event["message"] for event in sender.events] == [
+        "relayed",
+        "openai · Retrying request to /chat in 0.5 seconds",
     ]
