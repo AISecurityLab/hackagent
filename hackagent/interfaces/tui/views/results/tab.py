@@ -23,7 +23,6 @@ from typing import Any, Callable, Optional
 from uuid import UUID
 
 from textual.app import ComposeResult
-from textual.binding import Binding
 from textual.widgets import Static, Tree
 from textual.widgets.tree import TreeNode
 
@@ -33,6 +32,16 @@ from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.audit import audit_summary
 from hackagent.orchestrator.campaign.audit import format_report
 from hackagent.interfaces.tui.base import BaseTab
+from hackagent.interfaces.palette import (
+    ACCENT,
+    PASSED,
+    SECONDARY,
+    UNDECIDED,
+    VERDICT_STYLES,
+    paint,
+)
+from hackagent.interfaces.tui.frame import title_bar
+from hackagent.interfaces.tui.keys import key
 from hackagent.interfaces.tui.theme import (
     MITIGATED,
     VULNERABLE,
@@ -66,13 +75,15 @@ def _outcome(broken: int, goals: int, status: str, recorded: int) -> str:
     """What came of it, or why nothing did."""
     state = (status or "").upper()
     if state in {"FAILED", "CANCELLED"} and not recorded:
-        return "[yellow]did not finish[/yellow]"
+        return paint("did not finish", UNDECIDED)
     if not recorded:
-        return "[dim]nothing recorded[/dim]"
+        return paint("nothing recorded", SECONDARY)
     total = goals or recorded
     if broken:
-        return f"[red]{broken} of {total} goals jailbroken[/red]"
-    return f"[green]0 of {total} goals jailbroken[/green]"
+        return paint(
+            f"{broken} of {total} goals jailbroken", VERDICT_STYLES["jailbroken"]
+        )
+    return paint(f"0 of {total} goals jailbroken", PASSED)
 
 
 @dataclass(frozen=True)
@@ -88,17 +99,17 @@ class ResultsTab(ResultsExportMixin, BaseTab):
 
     DEFAULT_CSS = """
     ResultsTab { layout: vertical; }
-    ResultsTab #results-tree { height: 1fr; padding: 0 1; }
-    ResultsTab #results-hint {
-        height: 1; padding: 0 1; color: $text-muted; background: $panel;
+    ResultsTab #results-tree { height: 1fr; padding: 1 1 0 1; }
+    ResultsTab #results-empty {
+        dock: top; margin: 1 1 0 1; color: $text-muted; display: none;
     }
     """
 
     BINDINGS = [
-        Binding("f5", "refresh", "Refresh", show=False),
-        Binding("s", "switch_store", "Switch store", show=False),
-        Binding("ctrl+e", "export_csv", "Export CSV", show=False),
-        Binding("ctrl+j", "export_json", "Export JSON", show=False),
+        key("refresh"),
+        key("switch_store"),
+        key("export_csv"),
+        key("export_json"),
     ]
 
     #: Goals listed under one attack before the rest are summarised.
@@ -114,6 +125,8 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         self._agent_map: dict[str, str] = {}
         self._attack_map: dict[str, str] = {}
         self._result_counts: dict[str, tuple] = {}
+        #: Where the runs on screen come from, as the title bar says it.
+        self.said = ""
         self._results_of_run: dict[str, list[Any]] = {}
         #: The store on screen. Set by every refresh, and by the switch key,
         #: which is what makes it a choice rather than a guess.
@@ -127,7 +140,11 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         tree.show_root = False
         tree.guide_depth = 2
         yield tree
-        yield Static("", id="results-hint")
+        yield Static(
+            "No campaign recorded here yet: run one from the builder, or press s "
+            "to read the other store.",
+            id="results-empty",
+        )
 
     # -- loading -------------------------------------------------------------
 
@@ -152,7 +169,6 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         show an empty screen while this machine holds what was just run.
         Once ``s`` has chosen one, that is the one read, empty or not.
         """
-        hint = self.query_one("#results-hint", Static)
         stores = self._stores()
         if self._store_chosen:
             # Asked for by name: showing a different store instead would be
@@ -183,9 +199,9 @@ class ResultsTab(ResultsExportMixin, BaseTab):
         said = "; ".join(f"{label}: {message}" for label, message in problems)
         self._store_label = stores[0].label if stores else None
         switch = self._switch_hint(problems)
-        hint.update(
-            f"[$error]Could not read results — {_escape(said)}[/]"
-            + (f" [dim]· {switch}[/dim]" if switch else "")
+        self._say(
+            f"[$error]could not read results: {_escape(said)}[/]"
+            + (f" · {switch}" if switch else "")
         )
 
     def _show(self, source: str, problems: Sequence[tuple[str, str]]) -> None:
@@ -329,6 +345,7 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             key=lambda c: str(getattr(c, "created_at", "")),
             reverse=True,
         )
+        self.query_one("#results-empty", Static).display = not campaigns
         for campaign in campaigns:
             runs = self._runs_of(str(campaign.id))
             node = tree.root.add(self._campaign_label(campaign, runs), expand=False)
@@ -343,8 +360,14 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             said.append(_escape(source))
         if switch := self._switch_hint(problems):
             said.append(switch)
-        said.append("enter expands · f5 refresh · ctrl+e CSV · ctrl+j JSON")
-        self.query_one("#results-hint", Static).update(f"[dim]{' · '.join(said)}[/dim]")
+        self._say(" · ".join(said))
+
+    def _say(self, markup: str) -> None:
+        """Say where the runs come from, in the screen's title bar."""
+        self.said = markup
+        bar = title_bar(self)
+        if bar is not None:
+            bar.show(context=markup)
 
     def _campaign_label(self, campaign: Any, runs: list[Any]) -> str:
         broken, goals, recorded = self._totals_of(runs)
@@ -370,7 +393,7 @@ class ResultsTab(ResultsExportMixin, BaseTab):
             report = AuditReport.model_validate(dict(audit))
         except (TypeError, ValueError):
             return
-        node = parent.add(f"[cyan]judge audit[/cyan] · {audit_summary(report)}")
+        node = parent.add(f"{paint('judge audit', ACCENT)} · {audit_summary(report)}")
         for line in format_report(report).splitlines():
             node.add_leaf(f"[dim]{_escape(line)}[/dim]")
 

@@ -12,15 +12,33 @@ How many of a run&#x27;s lines the run view keeps and shows: the latest.
 ## ExampleScreen Objects
 
 ```python
-class ExampleScreen(ModalScreen[Optional[Path]])
+class ExampleScreen(FramedScreen[Optional[Path]])
 ```
 
-Pick one of the shipped examples. Dismisses with its path, or None.
+Pick one of the shipped examples, from a tree of the folders they are
+in, drawn open: each example on one line and what it is for on the next.
+Dismisses with its path, or None.
+
+#### action\_move
+
+```python
+def action_move(direction: str) -> None
+```
+
+Move to the next or the previous example.
+
+#### action\_open
+
+```python
+def action_open() -> None
+```
+
+Open the highlighted example.
 
 ## ResultsScreen Objects
 
 ```python
-class ResultsScreen(Screen[None])
+class ResultsScreen(FramedScreen[None])
 ```
 
 Past runs, on a screen of their own.
@@ -28,7 +46,7 @@ Past runs, on a screen of their own.
 ## RunScreen Objects
 
 ```python
-class RunScreen(Screen[None])
+class RunScreen(FramedScreen[None])
 ```
 
 A running campaign, with the whole terminal to show it.
@@ -43,5 +61,6 @@ and reopening replays what was missed.
 class HelpScreen(ModalScreen[None])
 ```
 
-What this screen is for, and every key that does something.
+What the screen it is opened on is for, and every key it answers to,
+read from its bindings (:mod:`hackagent.interfaces.tui.keys`).
 

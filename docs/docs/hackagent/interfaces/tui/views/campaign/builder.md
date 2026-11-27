@@ -49,13 +49,14 @@ def action_welcome() -> None
 
 Back to the ways in. Asks first if the draft would be lost.
 
-#### action\_help
+#### check\_action
 
 ```python
-def action_help() -> None
+def check_action(action: str, parameters: tuple[object, ...]) -> bool | None
 ```
 
-What this screen is and how to drive it.
+Run is greyed out until the campaign is valid (while a run goes,
+it shows the run); Stop is offered only while a run goes.
 
 #### open\_path
 

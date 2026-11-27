@@ -15,8 +15,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from textual.content import Content
 from textual.app import App, ComposeResult
-from textual.widgets import Static
 
 from hackagent import HackAgent, Settings
 from hackagent.core.contracts import EvalStatus
@@ -87,7 +87,7 @@ def _state(tab: ResultsTab) -> tuple[list[str], str]:
     tree = tab.query_one("#results-tree")
     return (
         [str(node.label) for node in tree.root.children],
-        str(tab.query_one("#results-hint", Static).render()),
+        Content.from_markup(tab.said).plain,
     )
 
 
@@ -173,7 +173,7 @@ async def test_nothing_readable_anywhere_reports_every_store(
 
     _labels, hint = await _shown(tab)
 
-    assert "Could not read results" in hint
+    assert "could not read results" in hint
     assert "the account: Name or service not known" in hint
     assert "this machine: unable to open database file" in hint
 
@@ -347,7 +347,7 @@ async def test_switching_to_a_store_that_fails_shows_nothing(
     labels, hint = await _shown(tab, switches=1)
 
     assert labels == []
-    assert "Could not read results" in hint
+    assert "could not read results" in hint
     assert "s: this machine" in hint
 
 

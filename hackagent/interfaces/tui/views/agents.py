@@ -147,7 +147,7 @@ class AgentsTab(BaseTab):
         # Details panel
         with VerticalScroll(classes="agent-details", id="agent-details-container"):
             yield Static(
-                "[dim italic]💡 Select an agent from the table above to view detailed information[/dim]",
+                "[dim italic]💡 Select an agent from the table above to view detailed information[/dim italic]",
                 id="agent-details",
             )
 
@@ -358,7 +358,7 @@ class AgentsTab(BaseTab):
                 f"• Total: [yellow]{rows_added}[/yellow]\n"
                 f"• Active (with endpoint): [green]{active_count}[/green]\n"
                 f"• Inactive: [yellow]{inactive_count}[/yellow]\n\n"
-                f"[dim italic]💡 Click on any target agent in the table to view detailed information[/dim]"
+                f"[dim italic]💡 Click on any target agent in the table to view detailed information[/dim italic]"
             )
 
         except Exception as e:
@@ -463,8 +463,6 @@ class AgentsTab(BaseTab):
                 details += f"  {_escape(str(agent.metadata))}\n"
 
         details += "\n╰────────────────────────────────────────────────────────────╯\n"
-        details += (
-            "\n[dim italic]💡 Press 'd' to delete this agent or 'F5' to refresh[/dim]"
-        )
+        details += "\n[dim italic]💡 Press 'd' to delete this agent or 'F5' to refresh[/dim italic]"
 
         details_widget.update(details)

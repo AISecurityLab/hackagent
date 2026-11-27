@@ -96,3 +96,33 @@ class TestCssVariables:
         assert variables["brand-dark"] == theme.BRAND_RED_DARK
         # Brand colours are referenced through the palette, not re-declared.
         assert not re.search(r"#[0-9a-fA-F]{6}", HackAgentTUI.CSS)
+
+
+def test_updated_screens_use_the_shared_palette():
+    """The redesigned screens draw their colours from the shared palette."""
+    import re
+    from pathlib import Path
+
+    import hackagent.interfaces.tui as tui
+
+    literal = re.compile(
+        r"\[/?(?:bold |dim |italic |b )*(?:red|green|yellow|cyan|magenta|blue|white"
+        r"|bright_\w+)[\] ]|style=\"(?:bold )?(?:red|green|yellow|cyan|magenta|blue)"
+    )
+    root = Path(tui.__file__).parent
+    screens = [
+        "app.py",
+        "frame.py",
+        "keys.py",
+        "views/campaign/builder.py",
+        "views/campaign/screens.py",
+        "views/campaign/welcome.py",
+        "views/results/tab.py",
+    ]
+    found = [
+        f"{path.relative_to(Path(tui.__file__).parent)}:{number}"
+        for path in (root / name for name in screens)
+        for number, line in enumerate(path.read_text().splitlines(), 1)
+        if literal.search(line)
+    ]
+    assert found == []
