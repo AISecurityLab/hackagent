@@ -241,4 +241,11 @@ def log_node(
     logger.log(level, "%s", step["message"], extra={"trace_step": step})
 
 
-__all__ = ["describe", "level_of", "log_node", "proposal", "safe_details", "snippet"]
+__all__ = [
+    "describe",
+    "level_of",
+    "log_node",
+    "proposal",
+    "safe_details",
+    "snippet",
+]

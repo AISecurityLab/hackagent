@@ -73,19 +73,14 @@ hackagent campaign run acme.yaml
 <summary>What it prints</summary>
 
 ```text
-▶ baseline started
-✓ baseline finished
-▶ pair started
-✓ pair finished
-
-Campaign Acme support bot succeeded
-┏━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━┓
-┃ Attack   ┃ Attempts ┃ Successes ┃ Error ┃
-┡━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━┩
-│ baseline │        3 │         1 │       │
-│ pair     │       10 │         4 │       │
-└──────────┴──────────┴───────────┴───────┘
-Output → ./logs/runs
+campaign Acme support bot · started · loading goals and models
+baseline started · 3 goals · run 8c41d0b2
+baseline finished · 1 of 3 goals jailbroken · 3 attempts (1 jailbroken) · 12.4s
+pair started · 3 goals · run 1f07a6e9
+pair finished · 2 of 3 goals jailbroken · 10 attempts (4 jailbroken) · 96.2s
+campaign Acme support bot succeeded · 2 of 3 goals jailbroken · 13 attempts (5 jailbroken) · 2 attacks · 109.0s · output → ./logs/runs
+summary · baseline · 1 of 3 goals jailbroken · 3 attempts (1 jailbroken)
+summary · pair · 2 of 3 goals jailbroken · 10 attempts (4 jailbroken)
 ```
 
 </details>

@@ -22,6 +22,7 @@ from hackagent.storage import remote
 from hackagent.storage import ExecutorRejected
 from hackagent.storage.remote import ClaimResult
 from tests.fakes import RecordingStore
+from tests.support.run_events import recorded_lines
 from tests.unit.campaign.fakes import FakeBuilder, ScriptedModel, campaign, goals, model
 
 BASE_URL = "https://exec.example/api"
@@ -152,21 +153,24 @@ def models(target="a reply", judge="yes", **others):
     return {"target": scripted(target), "judge": scripted(judge), **others}
 
 
-def execute_with(config, *, builder=None, texts=("goal one",), **kwargs):
+def execute_with(config, *, builder=None, texts=("goal one",), on_event=None, **kwargs):
+    """Execute ``config`` as a claimed run; ``on_event(line)`` is called as
+    each line of the run's log is logged, and may raise into the run."""
     run = run_detail(config)
     claim = ClaimResult(run=run, run_token=None, env={})
     store = SimpleNamespace(client=MagicMock())
-    outcome = execute.execute_run(
-        store,
-        run["id"],
-        base_url=BASE_URL,
-        gateway_key=GATEWAY_KEY,
-        claimed_by="local:test",
-        claim=claim,
-        build=builder or FakeBuilder(models()),
-        load=goals(*texts),
-        **kwargs,
-    )
+    with recorded_lines(on_event):
+        outcome = execute.execute_run(
+            store,
+            run["id"],
+            base_url=BASE_URL,
+            gateway_key=GATEWAY_KEY,
+            claimed_by="local:test",
+            claim=claim,
+            build=builder or FakeBuilder(models()),
+            load=goals(*texts),
+            **kwargs,
+        )
     return outcome, RecordingAdoptedStore.instances[-1], run
 
 
@@ -214,8 +218,8 @@ def test_claims_the_run_when_no_claim_is_given(tmp_path):
 
 
 def test_cancel_request_finishes_cancelled(tmp_path, fake_heartbeat):
-    def on_event(event, **payload):
-        if event == "goal_finished":
+    def on_event(line):
+        if line.goal:
             fake_heartbeat[-1].trip(fake_heartbeat[-1].cancel_requested)
 
     outcome, store, _ = execute_with(
@@ -407,8 +411,8 @@ def test_a_refused_finish_does_not_escape(tmp_path, monkeypatch):
 
 
 def test_rejected_heartbeat_returns_failed_without_finish(tmp_path, fake_heartbeat):
-    def on_event(event, **payload):
-        if event == "goal_finished":
+    def on_event(line):
+        if line.goal:
             fake_heartbeat[-1].trip(fake_heartbeat[-1].rejected)
 
     outcome, store, _ = execute_with(
@@ -424,8 +428,8 @@ def test_rejected_heartbeat_returns_failed_without_finish(tmp_path, fake_heartbe
 
 
 def test_interrupt_finishes_cancelled_then_passes_on(tmp_path):
-    def on_event(event, **payload):
-        if event == "goal_finished":
+    def on_event(line):
+        if line.goal:
             raise KeyboardInterrupt
 
     with pytest.raises(KeyboardInterrupt):
@@ -436,8 +440,8 @@ def test_interrupt_finishes_cancelled_then_passes_on(tmp_path):
 
 
 def test_interrupt_after_a_rejection_passes_on_without_finish(tmp_path, fake_heartbeat):
-    def on_event(event, **payload):
-        if event == "goal_finished":
+    def on_event(line):
+        if line.goal:
             fake_heartbeat[-1].trip(fake_heartbeat[-1].rejected)
             raise KeyboardInterrupt
 
@@ -679,15 +683,14 @@ def test_execute_spec_needs_the_storage_key(tmp_path, starting_store, monkeypatc
 def test_an_interrupted_async_campaign_finishes_then_passes_on(
     tmp_path, starting_store
 ):
-    def on_event(event, **payload):
-        if event == "goal_finished":
+    def on_event(line):
+        if line.goal:
             raise KeyboardInterrupt
 
-    with pytest.raises(KeyboardInterrupt):
+    with recorded_lines(on_event), pytest.raises(KeyboardInterrupt):
         asyncio.run(
             execute.arun_remote_campaign(
                 remote_spec(tmp_path),
-                on_event=on_event,
                 build=FakeBuilder(models()),
                 load=goals("goal one"),
             )
@@ -760,14 +763,13 @@ def test_run_campaign_with_remote_storage_raises_when_cancelled(
 ):
     from hackagent.orchestrator.campaign import run_campaign
 
-    def on_event(event, **payload):
-        if event == "goal_finished":
+    def on_event(line):
+        if line.goal:
             fake_heartbeat[-1].trip(fake_heartbeat[-1].cancel_requested)
 
-    with pytest.raises(execute.RunEnded) as ended:
+    with recorded_lines(on_event), pytest.raises(execute.RunEnded) as ended:
         run_campaign(
             remote_spec(tmp_path),
-            on_event=on_event,
             build=FakeBuilder(models()),
             load=goals("one", "two", "three", "four"),
         )
@@ -859,8 +861,8 @@ def test_interrupt_during_the_finish_lets_the_finish_land(tmp_path, monkeypatch)
 
 
 def test_interrupt_ends_the_run_as_the_executor_says(tmp_path):
-    def on_event(event, **payload):
-        if event == "goal_finished":
+    def on_event(line):
+        if line.goal:
             raise KeyboardInterrupt
 
     with pytest.raises(KeyboardInterrupt):
@@ -968,33 +970,33 @@ def test_the_platform_receives_the_run_s_activity_before_the_finish(tmp_path):
     seqs = [event["seq"] for event in store.events]
     assert seqs == list(range(1, len(seqs) + 1))
 
-    by_kind = [(event["kind"], event["message"]) for event in store.events]
-    assert by_kind[:3] == [
-        ("campaign", "campaign test-campaign · started · loading goals and models"),
-        ("dataset", "dataset · 2 goals loaded"),
-        ("campaign", "campaign · 2 models ready · 1 attack · 1 judge"),
-    ]
-    assert ("attack", "baseline · started · 2 goals") in by_kind
-    goals = [
-        event
-        for event in store.events
-        if event["kind"] == "goal" and "event" not in event["data"]
-    ]
-    assert sorted(event["goal_index"] for event in goals) == [0, 1]
-    assert {event["message"].split(" · ", 2)[2] for event in goals} == {
-        "1 attempt · 1 successful"
-    }
-    attack_run = goals[0]["attack_run"]
-    assert attack_run is not None
-    assert all(event["attack"] == "baseline" for event in goals)
+    # The platform shows the lines the log shows, at INFO and above.
+    messages = [event["message"] for event in store.events]
+    assert messages[0] == "campaign test-campaign · started · loading goals and models"
+    assert "dataset · 2 goals loaded" in messages
+    assert (
+        "campaign · 2 models ready · 1 attack: baseline · 1 judge · "
+        "guardrails off · classifier off · escalate off"
+    ) in messages
+    assert all(event["level"] != "debug" for event in store.events)
+    # Each line names the attack and goal it is about.
+    [started] = [e for e in store.events if " started · 2 goals · run " in e["message"]]
+    assert started["attack"] == "baseline"
+    results = [e for e in store.events if " · result: " in e["message"]]
+    assert sorted(event["goal_index"] for event in results) == [0, 1]
+    assert all(event["attack"] == "baseline" for event in results)
+    assert {
+        event["message"].split(" · ", 2)[2].rsplit(" · ", 1)[0] for event in results
+    } == {"result: jailbroken at attempt 1 · 1 attempt"}
     assert any(
-        message.startswith("baseline · finished · 2 attempts · 2 successful")
-        for _, message in by_kind
+        m.startswith("baseline finished · 2 of 2 goals jailbroken · 2 attempts")
+        for m in messages
     )
-    assert by_kind[-1] == ("campaign", "campaign · completed")
+    assert messages[-1] == "campaign · completed"
 
     sent = str(store.events)
     assert "goal one" not in sent and "goal two" not in sent
+    # No prompt or reply leaves: the lines quoting them are DEBUG.
     assert "a reply" not in sent
     assert GATEWAY_KEY not in sent
 
@@ -1087,16 +1089,15 @@ def test_activity_redacts_literal_model_keys(tmp_path, starting_store):
     spec = remote_spec(tmp_path, target=target)
     library = logging.getLogger("hackagent.tests.literal_key")
 
-    def leaky(event, **payload):
-        if event == "goals_loaded":
+    def leaky(line):
+        if line.text.startswith("dataset · "):
             library.warning("provider rejected %s", literal_key)
 
     disabled = logging.root.manager.disable
     logging.disable(logging.NOTSET)
     try:
-        execute.execute_spec(
-            spec, build=FakeBuilder(models()), load=goals("one"), on_event=leaky
-        )
+        with recorded_lines(leaky):
+            execute.execute_spec(spec, build=FakeBuilder(models()), load=goals("one"))
     finally:
         logging.disable(disabled)
 
@@ -1121,11 +1122,8 @@ def test_unparsed_judge_replies_never_reach_activity(tmp_path, reply):
 
     assert "private judge reply" not in json.dumps(store.events)
     assert any("Unknown response" in e["message"] for e in store.events)
-    [goal] = [
-        e for e in store.events if e["kind"] == "goal" and "event" not in e["data"]
-    ]
-    assert goal["data"]["errors"]
-    assert not any(e["data"].get("event") == "jailbreak_found" for e in store.events)
+    [goal] = [e for e in store.events if " · result: " in e["message"]]
+    assert "abstained" in goal["message"]
 
 
 @pytest.mark.parametrize("signal_name", ["SIGINT", "SIGTERM"])
@@ -1162,11 +1160,11 @@ def _run_with_a_leaky_library(tmp_path, logging):
     seen = []
     library = logging.getLogger("hackagent.tests.leak")
 
-    def leaky(event, **payload):
-        if event == "goals_loaded":
+    def leaky(line):
+        if line.text.startswith("dataset · "):
             # A library logging the keys it was given, inside the run.
             library.warning("using %s and %s", GATEWAY_KEY, os.environ["OPENAI_KEY"])
-            seen.append(event)
+            seen.append(line.text)
 
     outcome, store, _ = execute_with(
         stored_campaign(tmp_path),
@@ -1174,67 +1172,6 @@ def _run_with_a_leaky_library(tmp_path, logging):
         on_event=leaky,
     )
 
-    assert seen == ["goals_loaded"]
+    assert seen == ["dataset · 1 goal loaded"]
     [leak] = [e for e in store.events if e["message"].startswith("using")]
     assert leak["message"] == "using [REDACTED] and [REDACTED]"
-
-
-def test_tap_reports_rounds_branches_and_a_jailbreak_before_goal_completion(tmp_path):
-    import json
-
-    outcome, store, _ = execute_with(
-        stored_campaign(
-            tmp_path,
-            attacks=[
-                {
-                    "name": "tap",
-                    "parameters": {
-                        "depth": 2,
-                        "streams": 2,
-                        "branching_factor": 2,
-                        "width": 2,
-                    },
-                    "roles": {"attacker": model("attacker")},
-                }
-            ],
-        ),
-        texts=("private goal one", "private goal two"),
-        builder=FakeBuilder(
-            models(
-                attacker=ScriptedModel(
-                    json.dumps(
-                        {
-                            "prompt": "private attack prompt",
-                            "improvement": "private improvement",
-                        }
-                    )
-                )
-            )
-        ),
-    )
-
-    assert outcome.status == "COMPLETED"
-    for index in (0, 1):
-        events = [event for event in store.events if event["goal_index"] == index]
-        assert events[0]["data"]["event"] == "goal_started"
-        assert any(
-            event["data"].get("phase") == "round"
-            and event["data"].get("step") == 1
-            and event["data"].get("total") == 2
-            for event in events
-        )
-        assert any(event["data"].get("phase") == "branch" for event in events)
-        found = next(
-            i
-            for i, event in enumerate(events)
-            if event["data"].get("event") == "jailbreak_found"
-        )
-        finished = next(
-            i
-            for i, event in enumerate(events)
-            if "attempts" in event["data"] and event["kind"] == "goal"
-        )
-        assert found < finished
-        assert events[found]["attack_run"] == events[finished]["attack_run"]
-    assert "private" not in json.dumps(store.events)
-    assert "a reply" not in json.dumps(store.events)

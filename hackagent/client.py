@@ -18,7 +18,7 @@ import importlib.util
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from hackagent.core.contracts import AgentType
@@ -27,8 +27,6 @@ from hackagent.core.credentials import CredentialError
 from hackagent.core.settings import Mode, Settings
 
 logger = get_logger(__name__)
-
-EventCallback = Callable[..., None]
 
 _SKIP_FORM_KEYS = {"attack_type", "goals", "dataset", "intents", "output_dir"}
 _CATEGORY_ORDER = ("static", "adaptive", "multi_turn")

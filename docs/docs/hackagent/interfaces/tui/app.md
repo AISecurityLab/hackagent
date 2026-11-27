@@ -7,11 +7,9 @@ Main TUI Application
 
 One screen, one job: build a campaign, check it, run it.
 
-The app opens on :class:`WelcomeScreen` — the logo, and a working campaign to
-start from — then hands over to :class:`CampaignBuilder`. The other views
-(results, targets, config) are no longer part of that flow: each is a whole
-app of its own, opened by starting `HackAgentTUI` on it, which is how the
-welcome screen reaches past results.
+The app opens on :class:`WelcomeScreen` — the logo, and the ways in — then
+hands over to :class:`CampaignBuilder`; past runs open on a screen of their
+own.
 
 ## HackAgentTUI Objects
 
@@ -21,10 +19,9 @@ class HackAgentTUI(App)
 
 HackAgent Terminal User Interface Application
 
-#### VIEWS
+#### ENABLE\_COMMAND\_PALETTE
 
-The view this app shows. `campaign` is the app proper; the others
-are opened one at a time by whoever constructs the app.
+Textual&#x27;s command palette is not one of HackAgent&#x27;s keys.
 
 #### \_\_init\_\_
 
@@ -39,10 +36,9 @@ Initialize the TUI application.
 **Arguments**:
 
 - `cli_config` - CLI configuration object
-- `initial_tab` - Which view to show. Defaults to the campaign builder;
-  the legacy names `results`, `agents` and `config` open
-  that view on its own.
-- `initial_data` - Data to pre-fill the view with (default: None)
+- `initial_tab` - The view to open, defaulting to the campaign builder.
+- `initial_data` - A campaign to open in the builder instead of the
+  welcome screen (`campaign_path` or `campaign_yaml`).
 
 #### get\_css\_variables
 
@@ -86,7 +82,7 @@ Offer the ways in, and take the one chosen.
 def action_help() -> None
 ```
 
-Show the keys and what this screen is for.
+Show every key of the screen on top, and what each one does.
 
 #### action\_refresh
 
@@ -102,12 +98,13 @@ Refresh whatever view is on screen.
 def action_copy_selection() -> None
 ```
 
-Copy logs (or a text selection) to the clipboard — bound to Ctrl+Y.
+Copy a text selection, else the run&#x27;s log, to the clipboard — bound
+to Ctrl+Y.
 
-If you&#x27;ve dragged to select text, that selection is copied. Otherwise it
-copies the whole visible Logs (or Actions) panel — so you can copy
-without needing the mouse at all. Uses Textual&#x27;s terminal-native
-clipboard (OSC 52), which works locally and over SSH.
+If you&#x27;ve dragged to select text, that selection is copied. Otherwise
+it copies the campaign run&#x27;s log, so you can copy without needing the
+mouse at all. Uses Textual&#x27;s terminal-native clipboard (OSC 52), which
+works locally and over SSH.
 
 #### show\_success
 

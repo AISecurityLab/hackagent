@@ -47,7 +47,7 @@ dev = [
     "pytest-timeout>=2.0",
     "google-adk>=2.11.0",
     "anyio>=4.3.0",
-    "pytest-asyncio>=0.23.7,<1.5.0",
+    "pytest-asyncio>=0.23.7,<1.6.0",
     "mcp>=1.21.2",
     # vllm needs Python 3.11+ and pulls CUDA-only wheels, so it is Linux-only.
     "vllm>=0.32.0; python_version >= '3.11' and sys_platform == 'linux'",
@@ -305,3 +305,6 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "No logging-handler setup outside interfaces"
 type = "logging_handlers"
+# capture() attaches the handler an interface (or the run activity relay)
+# passes it, for the length of one run; the library still installs none.
+allowed_modules = ["hackagent.core.logging"]

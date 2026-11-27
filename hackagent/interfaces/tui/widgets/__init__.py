@@ -4,10 +4,5 @@
 """
 TUI Widgets
 
-Reusable Textual widgets for the HackAgent TUI interface.
+Helpers shared by the HackAgent TUI's views, such as the clipboard.
 """
-
-from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
-from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
-
-__all__ = ["AttackLogViewer", "AgentActionsViewer"]

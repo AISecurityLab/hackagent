@@ -6,11 +6,9 @@ Main TUI Application
 
 One screen, one job: build a campaign, check it, run it.
 
-The app opens on :class:`WelcomeScreen` — the logo, and a working campaign to
-start from — then hands over to :class:`CampaignBuilder`. The other views
-(results, targets, config) are no longer part of that flow: each is a whole
-app of its own, opened by starting ``HackAgentTUI`` on it, which is how the
-welcome screen reaches past results.
+The app opens on :class:`WelcomeScreen` — the logo, and the ways in — then
+hands over to :class:`CampaignBuilder`; past runs open on a screen of their
+own.
 """
 
 import os
@@ -18,9 +16,9 @@ from pathlib import Path
 from typing import Any
 
 from textual.app import App, ComposeResult
-from textual.binding import Binding
-from textual.widgets import Footer, TabbedContent
+from textual.widgets import Footer
 
+from hackagent.interfaces.tui.keys import key
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.theme import css_variables
 from hackagent.interfaces.tui.views.agents import AgentsTab
@@ -50,154 +48,53 @@ def _start_multiprocessing_tracker() -> None:
         pass
 
 
+#: What a screen is for, said on its help (F1). The main screen is the
+#: builder.
+_ABOUT = {
+    "Screen": (
+        "Build a campaign, check it, run it. Every field starts at its "
+        "default, shown dimmed; problems appear on the field they concern, "
+        "and Run stays disabled until there are none."
+    ),
+    "RunScreen": "The run's log, as it happens. Leaving does not stop the run.",
+    "ResultsScreen": "Every campaign recorded, its attacks, and each goal's verdict.",
+    "ExampleScreen": "The example campaigns, by folder. One opens in the builder.",
+    "WelcomeScreen": "The ways in: build a campaign, start from an example, open one.",
+}
+
+
 class HackAgentTUI(App):
     """HackAgent Terminal User Interface Application"""
 
+    #: Textual's command palette is not one of HackAgent's keys.
+    ENABLE_COMMAND_PALETTE = False
+
     CSS = """
-    Screen {
-        background: $surface;
+    Screen { background: $surface; }
+    Footer { background: $brand-darker; color: $brand-text; }
+    /* Every screen's content in one box, with the same space between it
+       and the title bar above as between it and the footer below. */
+    .frame-body {
+        height: 1fr; margin: 1 1; border: round $primary; background: $surface;
     }
-
-    Footer {
-        background: $brand-darker;  /* darker red */
-        color: $brand-text;
+    /* Inside it, a list, a tree or a log needs no box of its own. */
+    .frame-body OptionList, .frame-body OptionList:focus,
+    .frame-body Tree, .frame-body Tree:focus,
+    .frame-body RichLog, .frame-body RichLog:focus {
+        border: none; background-tint: $foreground 0%;
     }
-
-    TabbedContent {
-        height: 100%;
-        border: solid $brand;  /* red - HackAgent brand color */
-    }
-
-    TabPane {
-        padding: 1 2;
-        height: 100%;
-    }
-
-    TabbedContent > ContentSwitcher {
-        height: 1fr;
-    }
-
-    TabbedContent > ContentSwitcher > * > * {
-        background: $surface;
-    }
-
-    Tabs {
-        background: $brand-darker;
-    }
-
-    Tab {
-        color: $brand-text-muted;
-        background: $brand-darker;
-    }
-
-    Tab.-active {
-        color: $brand-text;
-        background: $brand;  /* brighter red when active — clear contrast */
-        text-style: bold underline;
-    }
-
-    Tab:hover {
-        background: $brand-hover;
-    }
-
-    .title-bar {
-        dock: top;
-        width: 100%;
-        background: $brand-dark;
-        color: $brand-text;
-        height: 3;
-        content-align: center middle;
-    }
-
-    .section {
-        border: solid $brand;
-        padding: 1;
-        margin: 1;
-        height: auto;
-    }
-
-    .info-box {
-        background: $panel;
-        border: solid $brand;
-        padding: 1;
-        margin: 1;
-    }
-
-    Button {
-        margin: 1;
-    }
-
-    Button.-primary {
-        background: $brand-dark;
-        color: $brand-text;
-    }
-
-    Button.-primary:hover {
-        background: $brand;
-    }
-
-    DataTable {
-        height: 100%;
-    }
-
-    DataTable > .datatable--header {
-        background: $brand-dark;
-        color: $brand-text;
-        text-style: bold;
-    }
-
-    DataTable > .datatable--cursor {
-        background: $brand-hover;
-    }
-
-    /* Results tab specific styles - horizontal split 20-80 */
-    ResultsTab #results-left-panel {
-        border-right: solid $brand;
-        background: $panel;
-    }
-
-    ResultsTab #results-right-panel {
-        background: $panel;
-    }
-
-    ResultsTab #results-title {
-        height: 3;
-        width: 100%;
-        text-align: center;
-        background: $brand-dark;
-        color: $brand-text;
-        padding: 1;
-    }
-
-    ResultsTab #details-title {
-        height: 3;
-        width: 100%;
-        text-align: center;
-        background: $brand-dark;
-        color: $brand-text;
-        padding: 1;
-    }
-
-    ResultsTab .toolbar {
-        height: 3;
-        width: 100%;
-        padding: 0 1;
-    }
+    * { scrollbar-size-vertical: 1; }
     """
 
     TITLE = "HackAgent"
     SUB_TITLE = "Build a campaign, check it, run it"
-
-    #: The view this app shows. ``campaign`` is the app proper; the others
-    #: are opened one at a time by whoever constructs the app.
     VIEWS = ("campaign", "results", "agents", "config")
 
     BINDINGS = [
         # Not a priority binding: a text field must be able to receive 'q'.
-        Binding("q", "quit", "Quit"),
-        Binding("f1", "help", "Help"),
-        Binding("f5", "refresh", "Refresh", show=False),
-        Binding("ctrl+y", "copy_selection", "Copy logs", show=False),
+        key("quit"),
+        key("help"),
+        key("copy", "copy_selection", show=False),
     ]
 
     def __init__(
@@ -210,17 +107,16 @@ class HackAgentTUI(App):
 
         Args:
             cli_config: CLI configuration object
-            initial_tab: Which view to show. Defaults to the campaign builder;
-                the legacy names ``results``, ``agents`` and ``config`` open
-                that view on its own.
-            initial_data: Data to pre-fill the view with (default: None)
+            initial_tab: The view to open, defaulting to the campaign builder.
+            initial_data: A campaign to open in the builder instead of the
+                welcome screen (``campaign_path`` or ``campaign_yaml``).
         """
         super().__init__()
         self.cli_config = cli_config
         self.view = initial_tab if initial_tab in self.VIEWS else "campaign"
         self.initial_tab = self.view
         self.initial_data = initial_data or {}
-        self.dark = True  # Use dark theme by default
+        self.dark = True
 
     def get_css_variables(self) -> dict[str, str]:
         """Expose the HackAgent brand palette as CSS variables."""
@@ -330,10 +226,20 @@ class HackAgentTUI(App):
         self.push_screen(ResultsScreen(self.cli_config), lambda _: self.show_welcome())
 
     def action_help(self) -> None:
-        """Show the keys and what this screen is for."""
-        builder = self.query(CampaignBuilder)
-        if builder:
-            builder.first().action_help()
+        """Show every key of the screen on top, and what each one does."""
+        from hackagent.interfaces.tui.keys import known
+        from hackagent.interfaces.tui.views.campaign.screens import HelpScreen
+
+        if isinstance(self.screen, HelpScreen):
+            return
+        rows: dict[str, tuple[str, str]] = {}
+        for active in self.screen.active_bindings.values():
+            item = known(active.binding)
+            if item is not None and item.word not in rows:
+                shown = item.display or self.get_key_display(active.binding)
+                rows[item.word] = (shown, item.does)
+        about = _ABOUT.get(type(self.screen).__name__, "")
+        self.push_screen(HelpScreen(list(rows.values()), about))
 
     def action_refresh(self) -> None:
         """Refresh whatever view is on screen."""
@@ -345,43 +251,26 @@ class HackAgentTUI(App):
         except Exception:
             pass
 
-    def _active_monitor_text(self) -> tuple[str, str]:
-        """Return ``(text, source)`` for the active attack-monitor panel.
+    def _run_log_text(self) -> str:
+        """The campaign run's log as plain text, as the run view shows it;
+        empty before any run."""
+        from rich.text import Text
 
-        Picks the Actions panel when its tab is active, otherwise the Logs
-        panel. Returns ``("", "logs")`` when no viewer is present.
-        """
-        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
-        from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
-
-        active = None
-        try:
-            monitor = self.query_one("#attack-monitor-container")
-            active = monitor.query_one(TabbedContent).active
-        except Exception:
-            active = None
-
-        if active == "actions-tab":
-            try:
-                return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
-            except Exception:
-                pass
-        try:
-            return self.query_one(AttackLogViewer).get_log_text(), "logs"
-        except Exception:
-            pass
-        try:
-            return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
-        except Exception:
-            return "", "logs"
+        builder = self.query(CampaignBuilder)
+        if not builder:
+            return ""
+        return "\n".join(
+            Text.from_markup(line).plain for line in builder.first()._run_lines
+        )
 
     def action_copy_selection(self) -> None:
-        """Copy logs (or a text selection) to the clipboard — bound to Ctrl+Y.
+        """Copy a text selection, else the run's log, to the clipboard — bound
+        to Ctrl+Y.
 
-        If you've dragged to select text, that selection is copied. Otherwise it
-        copies the whole visible Logs (or Actions) panel — so you can copy
-        without needing the mouse at all. Uses Textual's terminal-native
-        clipboard (OSC 52), which works locally and over SSH.
+        If you've dragged to select text, that selection is copied. Otherwise
+        it copies the campaign run's log, so you can copy without needing the
+        mouse at all. Uses Textual's terminal-native clipboard (OSC 52), which
+        works locally and over SSH.
         """
         from hackagent.interfaces.tui.widgets.clipboard import copy_to_clipboard
 
@@ -392,10 +281,10 @@ class HackAgentTUI(App):
         except Exception:
             text = ""
         if not text:
-            text, source = self._active_monitor_text()
+            text, source = self._run_log_text(), "the run's log"
         if not text:
             self.notify(
-                "Nothing to copy yet — run an attack, or drag to select text first.",
+                "Nothing to copy yet — run a campaign, or drag to select text first.",
                 title="Copy",
                 severity="warning",
             )

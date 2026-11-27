@@ -26,6 +26,8 @@ from hackagent.orchestrator.campaign import (
     summary,
 )
 
+from tests.support.run_events import recorded_lines
+
 from .fakes import FakeBuilder, ScriptedModel, campaign, goals, model
 
 TARGET_REPLY = "a reply the judge will read"
@@ -329,45 +331,50 @@ def test_a_generator_refusal_fails_the_goal_and_keeps_its_call(tmp_path):
     assert models["target"].requests == []
 
 
-def test_the_run_emits_lifecycle_events_per_attack_and_goal(tmp_path):
-    """``on_event`` sees the attack bracket its goals, each reported as it ends."""
-    events: list[tuple[str, dict]] = []
+def test_the_log_tells_the_run_and_ends_with_its_summary(tmp_path):
+    """The campaign's lines bracket the attack, each goal says how it ended
+    on the goals logger, about its attack and goal, and the summary closes."""
     values = campaign(
         attacks=[{"name": "baseline"}],
         execution={"output": {"directory": str(tmp_path)}},
     )
-    run_campaign(
-        values,
-        build=FakeBuilder(models_for()),
-        load=goals("goal one", "goal two"),
-        store=_store(),
-        on_event=lambda event, **payload: events.append((event, payload)),
+    with recorded_lines() as lines:
+        run_campaign(
+            values,
+            build=FakeBuilder(models_for()),
+            load=goals("goal one", "goal two"),
+            store=_store(),
+        )
+
+    story = [line.text for line in lines if line.campaign]
+    assert story[0] == "campaign test-campaign · started · loading goals and models"
+    assert story[1].startswith("baseline started · 2 goals · run ")
+    # Goals first, each jailbroken when any attempt at it was; then attempts.
+    assert story[2].startswith(
+        "baseline finished · 2 of 2 goals jailbroken · 2 attempts (2 jailbroken) · "
     )
+    assert story[3].startswith(
+        "campaign test-campaign succeeded · 2 of 2 goals jailbroken · "
+        "2 attempts (2 jailbroken) · 1 attack · "
+    )
+    assert story[3].endswith(f"s · output → {tmp_path}")
+    assert story[4:] == [
+        "summary · baseline · 2 of 2 goals jailbroken · 2 attempts (2 jailbroken)"
+    ]
 
-    kinds = [event for event, _ in events]
-    assert kinds[:3] == ["campaign_started", "goals_loaded", "models_resolved"]
-    assert kinds[3] == "attack_started"
-    assert kinds[-1] == "attack_finished"
-    assert kinds.count("goal_finished") == 2
+    # Loading and resolving say so themselves, before the attack starts.
+    texts = [line.text for line in lines]
+    assert "dataset · 2 goals loaded" in texts
+    assert (
+        "campaign · 2 models ready · 1 attack: baseline · 1 judge · "
+        "guardrails off · classifier off · escalate off"
+    ) in texts
 
-    assert events[0][1] == {"campaign": "test-campaign"}
-    assert events[1][1] == {"goals": 2}
-    assert events[2][1]["attacks"] == 1
-
-    started = events[3][1]
-    assert started["attack"] == "baseline"
-    assert started["expected_goals"] == 2
-
-    finished = [payload for event, payload in events if event == "goal_finished"]
-    assert {payload["goal_index"] for payload in finished} == {0, 1}
-    assert all(payload["success"] is True for payload in finished)
-    assert all(payload["successful"] == 1 for payload in finished)
-    assert all(payload["goals"] == 2 for payload in finished)
-    assert all("elapsed_s" in payload and "attempts" in payload for payload in finished)
-
-    assert events[-1][1]["error"] is None
-    assert events[-1][1]["attempts"] == 2
-    assert events[-1][1]["successful"] == 2
+    results = [line for line in lines if line.goal]
+    assert sorted(line.subject["goal"] for line in results) == [1, 2]
+    assert all(line.subject["attack"] == "baseline" for line in results)
+    assert all(line.subject["goals"] == 2 for line in results)
+    assert all(" · result: jailbroken at attempt 1 · " in line.text for line in results)
 
 
 # --- the iterative path ------------------------------------------------------
@@ -1073,15 +1080,14 @@ def test_a_run_scoped_prepare_runs_once_and_is_traced(tmp_path):
             "summarizer": ScriptedModel(strategy),
         }
     )
-    events = []
-    result = run_campaign(
-        values,
-        build=builder,
-        load=goals("goal one", "goal two"),
-        store=RecordingStore(),
-        build_embed=lambda _config: embed,
-        on_event=lambda event, **payload: events.append((event, payload)),
-    )
+    with recorded_lines() as lines:
+        result = run_campaign(
+            values,
+            build=builder,
+            load=goals("goal one", "goal two"),
+            store=RecordingStore(),
+            build_embed=lambda _config: embed,
+        )
 
     [outcome] = result.attacks
     # The warm-up produced a run-scoped trace, distinct from the per-goal ones.
@@ -1090,30 +1096,28 @@ def test_a_run_scoped_prepare_runs_once_and_is_traced(tmp_path):
     # Two warm-up goals plus lifelong epochs reached the target.
     assert len(builder.models["target"].requests) >= 2
     # The warm-up is reported, between the attack's start and its first goal.
-    kinds = [event for event, _ in events]
-    started = kinds.index("preparation_started")
-    assert kinds[started - 1] == "attack_started"
-    assert kinds[started + 1] == "preparation_finished"
-    assert "goal_finished" not in kinds[:started]
-    assert events[started][1]["goals"] == 2
-    assert events[started][1]["run_id"] == outcome.run_id
-    assert events[started + 1][1]["elapsed_s"] >= 0
+    story = [line.text for line in lines if line.campaign]
+    started = story.index("autodan_turbo preparing · 2 goals")
+    assert story[started - 1].startswith("autodan_turbo started · 2 goals · run ")
+    assert story[started + 1].startswith("autodan_turbo prepared in ")
+    first_goal = next(i for i, line in enumerate(lines) if line.goal)
+    preparing = next(i for i, line in enumerate(lines) if "preparing" in line.text)
+    assert preparing < first_goal
 
 
 def test_an_attack_without_setup_reports_no_preparation(tmp_path):
-    events = []
-    run_campaign(
-        campaign(
-            attacks=[{"name": "pair", "roles": {"attacker": attacker_role()}}],
-            execution={"output": {"directory": str(tmp_path)}},
-        ),
-        build=FakeBuilder(models_for(attacker=ScriptedModel("[[PROMPT]]: p"))),
-        load=goals("goal one"),
-        store=_store(),
-        on_event=lambda event, **payload: events.append((event, payload)),
-    )
+    with recorded_lines() as lines:
+        run_campaign(
+            campaign(
+                attacks=[{"name": "pair", "roles": {"attacker": attacker_role()}}],
+                execution={"output": {"directory": str(tmp_path)}},
+            ),
+            build=FakeBuilder(models_for(attacker=ScriptedModel("[[PROMPT]]: p"))),
+            load=goals("goal one"),
+            store=_store(),
+        )
 
-    assert not [event for event, _ in events if event.startswith("preparation")]
+    assert not [line for line in lines if " prepar" in line.text]
 
 
 # --- a resolution the caller already made -----------------------------------
@@ -1155,3 +1159,61 @@ def test_a_resolution_of_a_different_campaign_is_refused(tmp_path):
 
     with pytest.raises(ValueError, match="different campaign"):
         run_campaign(spec, resolved=resolved, store=_store())
+
+
+def test_a_run_keeps_its_log_beside_its_results(tmp_path):
+    """The run folder's run.log is the log's lines at INFO, as a file has them."""
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    with recorded_lines():
+        result = run_campaign(
+            values,
+            build=FakeBuilder(models_for()),
+            load=goals("goal one"),
+            store=_store(),
+        )
+
+    log = tmp_path / result.run_id / "run.log"
+    assert log in result.outputs
+    lines = log.read_text(encoding="utf-8").splitlines()
+    assert "campaign test-campaign · started" in lines[0]
+    assert any("campaign test-campaign succeeded" in line for line in lines)
+    # INFO and above: what the attacks decide, never a quoted reply.
+    assert not any(" DEBUG " in line for line in lines)
+
+
+def test_a_dry_run_writes_no_log(tmp_path):
+    values = campaign(
+        attacks=[{"name": "baseline"}],
+        execution={"output": {"directory": str(tmp_path)}, "dry_run": True},
+    )
+    with recorded_lines():
+        run_campaign(values, build=FakeBuilder(models_for()), load=goals("goal one"))
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_goal_counts_once_however_many_attempts_broke_it(tmp_path):
+    """Goals first: two jailbroken attempts at one goal are one goal."""
+    values = campaign(
+        attacks=[
+            {"name": "static_template", "parameters": {"templates_per_category": 1}}
+        ],
+        execution={"output": {"directory": str(tmp_path)}},
+    )
+    with recorded_lines() as lines:
+        run_campaign(
+            values,
+            build=FakeBuilder(models_for()),
+            load=goals("goal one"),
+            store=_store(),
+        )
+
+    [finished] = [line.text for line in lines if " finished · " in line.text]
+    attempts = int(finished.split(" · ")[2].split()[0])
+    assert attempts > 1
+    assert f"1 of 1 goal jailbroken · {attempts} attempts ({attempts} jailbroken)" in (
+        finished
+    )

@@ -30,6 +30,7 @@ Playwright ships with hackagent; the Chromium binary it drives is fetched
 automatically on first use.
 """
 
+import contextvars
 import atexit
 import re
 import threading
@@ -292,7 +293,8 @@ def _get_web_agent_custom_llm_class():
             directly instead.
             """
             self._ensure_executor()
-            return self._executor.submit(fn).result()
+            # In the caller's context, so what it logs reaches its run.
+            return self._executor.submit(contextvars.copy_context().run, fn).result()
 
         # ---- lifecycle ---------------------------------------------------
 
@@ -680,9 +682,9 @@ def _get_web_agent_custom_llm_class():
         async def acompletion(self, *args, **kwargs):
             import asyncio
 
-            return await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.completion(*args, **kwargs)
-            )
+            # to_thread, not run_in_executor: the thread keeps the run's
+            # context, so what it logs reaches the run's handlers.
+            return await asyncio.to_thread(self.completion, *args, **kwargs)
 
     _WebAgentCustomLLM._session_cls = _BrowserSession  # type: ignore[attr-defined]
     _WEB_AGENT_CUSTOM_LLM_CLASS = _WebAgentCustomLLM

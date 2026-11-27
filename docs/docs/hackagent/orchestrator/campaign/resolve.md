@@ -35,6 +35,12 @@ Parameters and role model names, as recorded with the run.
 class ResolvedCampaign()
 ```
 
+Everything a campaign spec describes, built and ready to run.
+
+Produced by :func:`resolve_campaign`: the loaded goals, the target, the
+judge panel and the constructed attacks. `probes` holds one reachability
+check per distinct model, which preflight runs before any attack.
+
 #### probes
 
 One reachability check per distinct model, for preflight.
@@ -42,13 +48,12 @@ One reachability check per distinct model, for preflight.
 #### resolve\_campaign
 
 ```python
-def resolve_campaign(
-        spec: CampaignSpec,
-        *,
-        build: ModelBuilder = build_model,
-        load: GoalLoader = load_goals,
-        build_embed: EmbedderBuilder = build_embedder,
-        settings: Optional[Settings] = None) -> ResolvedCampaign
+def resolve_campaign(spec: CampaignSpec,
+                     *,
+                     build: ModelBuilder = build_model,
+                     load: GoalLoader = load_goals,
+                     build_embed: EmbedderBuilder = build_embedder,
+                     settings: Optional[Settings] = None) -> ResolvedCampaign
 ```
 
 Instantiate everything `spec` describes.

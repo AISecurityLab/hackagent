@@ -29,14 +29,6 @@ def list_attacks() -> None
 
 List available attack techniques, their category and tags.
 
-#### event\_printer
-
-```python
-def event_printer(as_json: bool)
-```
-
-The run-progress callback shared by `campaign run` and `run`.
-
 #### run
 
 ```python
@@ -50,7 +42,7 @@ The run-progress callback shared by `campaign run` and `run`.
 @click.option("--json",
               "as_json",
               is_flag=True,
-              help="Emit events and summary as JSON.")
+              help="Print the run's summary as JSON on stdout.")
 @_endpoint_options
 @handle_errors
 def run(file: str, dry_run: bool, as_json: bool,

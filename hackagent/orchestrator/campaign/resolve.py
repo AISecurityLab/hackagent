@@ -21,6 +21,7 @@ from hackagent.attacks.techniques.registry import get_attack_class
 from hackagent.attacks.techniques.static.base import StaticAttack
 from hackagent.attacks.techniques.trace import traced_completion
 from hackagent.core.contracts import Goal
+from hackagent.core.logging import get_logger
 from hackagent.core.settings import Settings
 from hackagent.models.factory import ModelFactory
 from hackagent.datasets.config import DatasetSpec, load_goals
@@ -47,6 +48,9 @@ ModelBuilder = Callable[..., Model]
 #: Builds the texts-in, vectors-out callable an embedder role receives.
 EmbedderBuilder = Callable[[ModelConfig], Any]
 GoalLoader = Callable[[DatasetSpec], list[Goal]]
+
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -110,9 +114,11 @@ def resolve_campaign(
         return embed
 
     retries = spec.execution.retries
+    goals = tuple(load(spec.dataset))
+    logger.info("dataset · %s loaded", _count(len(goals), "goal"))
     resolved = ResolvedCampaign(
         spec=spec,
-        goals=tuple(load(spec.dataset)),
+        goals=goals,
         target=_guarded(
             recorded_build(spec.target, retries=retries.target),
             spec.guardrails,
@@ -135,7 +141,25 @@ def resolve_campaign(
             else None
         ),
     )
-    return replace(resolved, probes=model_probes(spec, models, embedders))
+    resolved = replace(resolved, probes=model_probes(spec, models, embedders))
+    rows = resolution_summary(resolved)
+    logger.info(
+        "campaign · %s ready · %s: %s · %s · guardrails %s · classifier %s"
+        " · escalate %s",
+        _count(len(resolved.probes), "model"),
+        _count(len(resolved.attacks), "attack"),
+        rows["Attacks"],
+        _count(len(spec.evaluation.judges), "judge"),
+        rows["Guardrails"],
+        rows["Classifier"],
+        rows["Escalate"],
+    )
+    return resolved
+
+
+def _count(number: int, noun: str) -> str:
+    """``3 attacks``, ``1 judge``: a count for a log line."""
+    return f"{number} {noun}{'' if number == 1 else 's'}"
 
 
 def resolve_attack(

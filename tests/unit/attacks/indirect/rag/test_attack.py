@@ -179,6 +179,28 @@ def test_only_the_poisoned_ratio_of_documents_is_poisoned():
     assert len(poisoned) == 1
 
 
+def test_each_payload_is_written_under_the_query_it_is_for():
+    """The writes are told apart in the log by the query each is for, the
+    number its retrieval step carries later."""
+    from hackagent.attacks.techniques.trace import recording
+
+    attack = RagAttack(params(payloads_per_query=2))
+
+    async def go():
+        with recording() as trace:
+            await attack.run(GOAL, Target(), Panel(1.0))
+        return trace.nodes
+
+    labels = [n.label for n in asyncio.run(go()) if n.node == "phase"]
+    writes = [label for label in labels if "payload" in label]
+    assert writes == [
+        "query 1/2, payload 1/2",
+        "query 1/2, payload 2/2",
+        "query 2/2, payload 1/2",
+        "query 2/2, payload 2/2",
+    ]
+
+
 def test_the_payload_is_inserted_into_the_corpus():
     attacker = Attacker(payload="INJECTED-DIRECTIVE")
     attack = RagAttack(params(attacker=attacker))

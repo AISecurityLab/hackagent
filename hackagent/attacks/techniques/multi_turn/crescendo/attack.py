@@ -125,10 +125,15 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
         findings: list[Finding] = []
         backtracks = 0
         turn = 0
+        #: Which try at the current turn this is: a backtrack rephrases the
+        #: same step, and the log tells the tries apart.
+        tries = 1
 
         while turn < params.max_turns:
-            label = f"turn {turn + 1}/{params.max_turns}"
-            with phase(label, turn=turn, backtracks=backtracks) as path:
+            label = f"turn {turn + 1}/{params.max_turns}" + (
+                f", try {tries}" if tries > 1 else ""
+            )
+            with phase(label, turn=turn, backtracks=backtracks, attempt=tries) as path:
                 question = await self._ask(plan)
                 if question is None:
                     decision("stopped", "the attacker proposed no usable question")
@@ -140,6 +145,7 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
                     decision("skipped", "the target gave no usable reply")
                     self._feed_back(goal, plan, "[no reply]", None, refused=True)
                     turn += 1
+                    tries = 1
                     continue
 
                 refused, why = await self._refused(goal, reply.text)
@@ -187,10 +193,12 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
                     )
                     # The turn index does not advance, and this exchange
                     # never joins the target's history.
+                    tries += 1
                     continue
 
                 history = conversation + [{"role": "assistant", "content": reply.text}]
                 turn += 1
+                tries = 1
 
                 if params.early_stop and succeeded(verdict):
                     decision("stopped", "a turn reached a reply the panel passed")
@@ -218,7 +226,9 @@ class CrescendoAttack(IterativeAttack[CrescendoParams]):
         undetermined, which does not trigger a backtrack.
         """
         try:
-            with evaluation_request(goal, reply):
+            # Its own phase: the call says what it is for, whichever model
+            # answers it (the attacker, when no refusal role is set).
+            with phase("refusal check"), evaluation_request(goal, reply):
                 answer = await self.refusal_judge(
                     [
                         {"role": "system", "content": prompts.REFUSAL_JUDGE_PROMPT},

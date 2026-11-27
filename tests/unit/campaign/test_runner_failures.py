@@ -13,6 +13,7 @@ run marked as still running.
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +26,8 @@ from hackagent.orchestrator.campaign import (
     arun_campaign,
     run_campaign,
 )
+
+from tests.support.run_events import Line, recorded_lines
 
 from .fakes import FakeBuilder, ScriptedModel, campaign, goals
 
@@ -128,61 +131,67 @@ def test_a_failed_write_stops_the_other_goals_of_its_attack(tmp_path):
     assert failed_run not in written
 
 
-def _stopped_by(exc: Exception, tmp_path):
-    """Run two attacks with a listener that raises ``exc`` as the first starts."""
+def _cancelled_at(said: str, tmp_path):
+    """Run two attacks, setting ``cancel`` as a line containing ``said`` is
+    logged."""
+    cancel = threading.Event()
 
-    def on_event(event: str, **_payload: Any) -> None:
-        if event == "attack_started":
-            raise exc
+    def then(line: Line) -> None:
+        if said in line.text:
+            cancel.set()
 
     store = _store()
-    with pytest.raises(type(exc)):
+    with recorded_lines(then), pytest.raises(CampaignCancelled):
         run_campaign(
             _baseline(tmp_path, "baseline", "baseline"),
             build=FakeBuilder({"judge": ScriptedModel("yes")}),
             load=goals("goal one"),
             store=store,
-            on_event=on_event,
+            cancel=cancel,
         )
-    [campaign_run] = store.campaign_runs.values()
-    return store, campaign_run
+    return store
 
 
-def test_a_listener_that_raises_stops_the_campaign(tmp_path):
-    store, campaign_run = _stopped_by(RuntimeError("listener broke"), tmp_path)
+def test_cancel_records_the_runs_as_cancelled(tmp_path):
+    store = _cancelled_at("baseline started", tmp_path)
 
     # The second attack never starts, and the first is not left running.
-    assert _statuses(store) == {RunStatus.FAILED.value}
-    assert campaign_run.status == RunStatus.FAILED.value
+    assert _statuses(store) == {RunStatus.CANCELLED.value}
+    [campaign_run] = store.campaign_runs.values()
+    assert campaign_run.status == RunStatus.CANCELLED.value
 
 
-def test_a_listener_that_raises_before_any_attack_stops_the_campaign(tmp_path):
-    def on_event(event: str, **_payload: Any) -> None:
-        if event == "goals_loaded":
-            raise RuntimeError("listener broke")
-
-    store = _store()
-    with pytest.raises(RuntimeError, match="listener broke"):
-        run_campaign(
-            _baseline(tmp_path, "baseline"),
-            build=FakeBuilder({"judge": ScriptedModel("yes")}),
-            load=goals("goal one"),
-            store=store,
-            on_event=on_event,
-        )
+def test_cancel_before_any_attack_records_nothing(tmp_path):
+    store = _cancelled_at("goal loaded", tmp_path)
 
     assert not store.runs
     assert not store.campaign_runs
 
 
-def test_a_listener_that_cancels_records_the_runs_as_cancelled(tmp_path):
-    store, campaign_run = _stopped_by(CampaignCancelled("stopped"), tmp_path)
+def test_cancel_stops_a_goal_that_is_still_running(tmp_path):
+    target = _Target(delays={"goal one": [30]})
+    store = _store()
+    cancel = threading.Event()
+
+    def then(line: Line) -> None:
+        if "baseline started" in line.text:
+            # Set from another thread while the goal waits on the target.
+            threading.Timer(0.1, cancel.set).start()
+
+    with recorded_lines(then), pytest.raises(CampaignCancelled):
+        run_campaign(
+            _baseline(tmp_path),
+            build=FakeBuilder({"target": target, "judge": ScriptedModel("yes")}),
+            load=goals("goal one"),
+            store=store,
+            cancel=cancel,
+        )
 
     assert _statuses(store) == {RunStatus.CANCELLED.value}
-    assert campaign_run.status == RunStatus.CANCELLED.value
 
 
-def test_a_cancelled_run_is_recorded_as_cancelled(tmp_path):
+@pytest.mark.parametrize("with_cancel_event", [False, True])
+def test_a_cancelled_run_is_recorded_as_cancelled(tmp_path, with_cancel_event):
     target = _Target(delays={"goal one": [30]})
     store = _store()
 
@@ -193,6 +202,7 @@ def test_a_cancelled_run_is_recorded_as_cancelled(tmp_path):
                 build=FakeBuilder({"target": target, "judge": ScriptedModel("yes")}),
                 load=goals("goal one"),
                 store=store,
+                cancel=threading.Event() if with_cancel_event else None,
             )
         )
         for _ in range(500):
@@ -203,6 +213,12 @@ def test_a_cancelled_run_is_recorded_as_cancelled(tmp_path):
         with pytest.raises(asyncio.CancelledError):
             await task
 
+        # Check before asyncio.run tears down pending tasks: the caller must
+        # be able to close its store as soon as awaiting cancellation returns.
+        assert _statuses(store) == {RunStatus.CANCELLED.value}
+        [campaign_run] = store.campaign_runs.values()
+        assert campaign_run.status == RunStatus.CANCELLED.value
+
     asyncio.run(cancel_while_running())
 
     assert _statuses(store) == {RunStatus.CANCELLED.value}
@@ -210,8 +226,10 @@ def test_a_cancelled_run_is_recorded_as_cancelled(tmp_path):
     assert campaign_run.status == RunStatus.CANCELLED.value
 
 
+@pytest.mark.parametrize("with_cancel_event", [False, True])
 def test_a_run_cancelled_while_it_is_being_created_is_recorded_as_cancelled(
     tmp_path,
+    with_cancel_event,
 ):
     """The run is created in a worker thread; a cancel can land meanwhile."""
     import time
@@ -238,12 +256,17 @@ def test_a_run_cancelled_while_it_is_being_created_is_recorded_as_cancelled(
                 build=FakeBuilder({"judge": ScriptedModel("yes")}),
                 load=goals("goal one"),
                 store=store,
+                cancel=threading.Event() if with_cancel_event else None,
             )
         )
         await asyncio.wait_for(created.wait(), timeout=5)
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+
+        assert _statuses(store) == {RunStatus.CANCELLED.value}
+        [campaign_run] = store.campaign_runs.values()
+        assert campaign_run.status == RunStatus.CANCELLED.value
 
     loop = None
     asyncio.run(cancel_during_creation())

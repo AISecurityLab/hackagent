@@ -190,15 +190,25 @@ class RagAttack(IterativeAttack[RagParams]):
         params = self.params
         n = max(1, math.ceil(len(corpus) * params.poisoned_ratio))
         anchors = queries or [goal]
-        for doc in corpus[:n]:
-            for anchor in anchors:
+        payloads = params.payloads_per_query
+        for number, doc in enumerate(corpus[:n], start=1):
+            for query, anchor in enumerate(anchors, start=1):
                 used: set[int] = set()
-                for _ in range(params.payloads_per_query):
+                for written in range(1, payloads + 1):
                     index = await self._placement(anchor, doc.paragraphs, used)
                     if index is None:
                         break
                     context = _context(doc.paragraphs, index)
-                    payload = await self._payload(goal, context)
+                    # Named by the query it is for (as its retrieval step is
+                    # later), and the document and payload when there are
+                    # more than one, so each write is told apart in the log.
+                    label = ", ".join(
+                        [f"query {query}/{len(anchors)}"]
+                        + ([f"document {number}/{n}"] if n > 1 else [])
+                        + ([f"payload {written}/{payloads}"] if payloads > 1 else [])
+                    )
+                    with phase(label, document=doc.id, query=query - 1):
+                        payload = await self._payload(goal, context)
                     if not payload:
                         continue
                     doc.paragraphs.insert(index + 1, payload)

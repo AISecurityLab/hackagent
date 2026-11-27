@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from textual.widgets import Button, Input, Static, Tree
+from textual.widgets import Button, Input, OptionList, Tree
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.app import HackAgentTUI
@@ -105,6 +105,20 @@ def _logo_rows(app) -> list[str]:
 
 class TestShell:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("initial_tab", ["agents", "config", "results"])
+    async def test_standalone_views_remain_available(self, cli_config, initial_tab):
+        from hackagent.interfaces.tui.views import AgentsTab, ConfigTab, ResultsTab
+
+        view = {"agents": AgentsTab, "config": ConfigTab, "results": ResultsTab}[
+            initial_tab
+        ]
+        app = HackAgentTUI(cli_config, initial_tab=initial_tab)
+        with patch.object(view, "on_mount", return_value=None):
+            async with app.run_test(size=WIDE) as pilot:
+                await pilot.pause()
+                assert app.query_one(view) is not None
+
+    @pytest.mark.asyncio
     async def test_the_view_starts_at_the_top_of_the_screen(self, cli_config):
         """No title strip above it: the builder already says what it is."""
         app = HackAgentTUI(cli_config)
@@ -150,18 +164,6 @@ class TestShell:
                 builder._execute()
 
         assert captured["settings"] is cli_config.settings
-
-    @pytest.mark.asyncio
-    async def test_config_view_says_runs_are_recorded_here(self, cli_config):
-        """A configured account is for reading, and must not look like more."""
-        app = HackAgentTUI(cli_config, initial_tab="config")
-        async with app.run_test(size=WIDE) as pilot:
-            await pilot.pause()
-            rendered = str(app.query_one("#mode-indicator", Static).render())
-
-        assert "Local" in rendered and "SQLite" in rendered
-        assert cli_config.base_url in rendered
-        assert "storage.backend: remote" in rendered
 
 
 class TestWelcome:
@@ -234,7 +236,9 @@ class TestWelcome:
 
             assert not isinstance(app.screen, WelcomeScreen)
             builder = app.query_one(CampaignBuilder)
+            assert builder.check_action("run", ()) is True
             assert builder.query_one("#run", Button).disabled is False
+            assert builder.query_one("#stop", Button).disabled is True
 
     @pytest.mark.asyncio
     async def test_a_campaign_handed_to_the_app_skips_the_welcome(self, cli_config):
@@ -273,16 +277,6 @@ class TestOneScreen:
             await pilot.press("escape")
             await pilot.pause()
             assert not isinstance(app.screen, HelpScreen)
-
-    @pytest.mark.parametrize("view", ["results", "agents", "config"])
-    @pytest.mark.asyncio
-    async def test_the_other_views_still_open_on_their_own(self, cli_config, view):
-        """`hackagent results` and `hackagent agent` open these directly."""
-        app = HackAgentTUI(cli_config, initial_tab=view)
-        async with app.run_test(size=WIDE) as pilot:
-            await pilot.pause()
-            assert not isinstance(app.screen, WelcomeScreen)
-            assert len(app.query(CampaignBuilder)) == 0
 
 
 class TestRemovingAttacks:
@@ -419,6 +413,79 @@ class TestWelcomeDestinations:
         assert spec is not None and spec.campaign.name == "Ollama h4rm3l demo"
         # Opened as a file, so its explanatory comments survive.
         assert builder._has_comments
+
+    @pytest.mark.asyncio
+    async def test_the_example_list_fits_a_small_terminal(self, cli_config):
+        """The shared frame: the title bar on top, the list in its box taking
+        the rest and scrolling, the footer with the keys at the bottom."""
+        from textual.widgets import Footer
+
+        from hackagent.interfaces.tui.frame import TitleBar
+
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=(80, 24)) as pilot:
+            await self._choose(app, pilot, "example")
+            screen = app.screen.region
+            bar = app.screen.query_one(TitleBar).region
+            box = app.screen.query_one(".frame-body").region
+            footer = app.screen.query_one(Footer).region
+            assert (bar.y, footer.bottom) == (screen.y, screen.bottom)
+            # The content's box, with as much space above it as below.
+            assert bar.bottom < box.y and box.bottom < footer.y
+            assert box.y - bar.bottom == footer.y - box.bottom
+            listing = app.screen.query_one(OptionList)
+            assert listing.max_scroll_y > 0
+            # Nothing is chosen until you move; the first move lands on an
+            # example, never on a folder.
+            assert listing.highlighted is None
+            await pilot.press("down")
+            first = listing.get_option_at_index(listing.highlighted)
+            assert not first.disabled and first.id
+
+    @pytest.mark.asyncio
+    async def test_the_examples_are_an_open_tree_of_their_folders(self, cli_config):
+        """Folders and subfolders as on disk, all open, and coloured; a
+        campaign is its name and, on the next line, what it is for. Only a
+        campaign can be chosen."""
+
+        from hackagent import examples as examples_catalog
+
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await self._choose(app, pilot, "example")
+            listing = app.screen.query_one(OptionList)
+            options = [
+                listing.get_option_at_index(i) for i in range(listing.option_count)
+            ]
+            lines = [option.prompt.plain for option in options]
+            name = "openai_sdk/rag/h4rm3l-corpbot"
+            path = examples_catalog.campaign_files()[name]
+
+            sdk = lines.index("openai_sdk/")
+            rag = next(i for i in range(sdk, len(lines)) if lines[i].endswith("rag/"))
+            assert lines[rag] == "└─ rag/"
+            leaf = options[rag + 1]
+            assert leaf.id == name
+            first, second = leaf.prompt.plain.split("\n")
+            assert first == "   └─ h4rm3l-corpbot"
+            assert second.strip() == examples_catalog.describe(path)
+            # Folders and subfolders are headings, all in one colour.
+            colours = set()
+            for heading in (options[sdk], options[rag]):
+                assert heading.disabled
+                colours.add(str(heading.prompt.spans[-1].style))
+            from hackagent.interfaces.palette import ACCENT, NAME
+
+            assert colours == {f"bold {ACCENT}"}
+            # A campaign's name has a colour of its own.
+            assert any(NAME in str(span.style) for span in leaf.prompt.spans)
+
+            chosen = []
+            app.screen.dismiss = chosen.append
+            listing.highlighted = rag + 1
+            listing.action_select()
+            await pilot.pause()
+            assert chosen == [path]
 
     @pytest.mark.asyncio
     async def test_looking_at_an_attack_does_not_change_it(self, cli_config):
@@ -593,13 +660,54 @@ class TestRunView:
             await pilot.pause()
 
             builder._log("while away")
-            builder._set_progress(60)
             builder._watch_run()
             await pilot.pause()
             rows = _rendered(app)
 
         assert any("before watching" in row for row in rows)
         assert any("while away" in row for row in rows)
+
+
+class TestTitleBarContext:
+    @pytest.mark.asyncio
+    async def test_leaving_a_part_clears_what_was_said_about_it(self, cli_config):
+        """The attack list's description of an attack is not about the part
+        shown next."""
+        from hackagent.interfaces.tui.frame import TitleBar
+
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            builder = await TestRunView()._builder(app, pilot)
+            bar = builder.query_one("#doc-bar", TitleBar)
+            bar.show(context="Prefilling attack: about advprefix")
+            others = [n for n in builder._tree_nodes.values() if n.data is not None]
+            other = next(n.data for n in others if n.data != builder._node)
+            await builder._show(other)
+            await pilot.pause()
+            said = str(bar._about.render())
+
+        assert "Prefilling attack" not in said
+
+
+class TestRunViewOrder:
+    @pytest.mark.asyncio
+    async def test_a_line_written_while_the_view_opens_comes_after_the_rest(
+        self, cli_config
+    ):
+        """The view replays the run's lines when it mounts; one logged in
+        between must not jump ahead of them."""
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            builder = await TestRunView()._builder(app, pilot)
+            builder._log("first line")
+            builder._watch_run()
+            builder._log("second line")
+            await pilot.pause()
+            rows = _rendered(app)
+
+        first = next(i for i, row in enumerate(rows) if "first line" in row)
+        second = next(i for i, row in enumerate(rows) if "second line" in row)
+        assert first < second
 
 
 class TestKeysThatMustNotBeShadowed:
@@ -730,3 +838,51 @@ async def test_a_field_row_being_torn_down_can_still_refresh(cli_config):
         row = app.screen.query(FieldRow).first()
         await row.remove_children()
         row.refresh_state()  # no raise
+
+
+class TestKeys:
+    """One key table: every screen binds from it, and help is read from it."""
+
+    def test_every_screen_binds_its_keys_from_the_table(self):
+        from hackagent.interfaces.tui import app as app_module
+        from hackagent.interfaces.tui.keys import known
+        from hackagent.interfaces.tui.views.campaign import builder, screens, welcome
+        from hackagent.interfaces.tui.views.results import tab
+
+        owners = [
+            app_module.HackAgentTUI,
+            builder.CampaignBuilder,
+            welcome.WelcomeScreen,
+            tab.ResultsTab,
+            *(
+                cls
+                for cls in vars(screens).values()
+                if isinstance(cls, type)
+                and cls.__module__ == screens.__name__
+                and hasattr(cls, "BINDINGS")
+            ),
+        ]
+        strays = [
+            f"{owner.__name__}: {binding.key}"
+            for owner in owners
+            for binding in owner.BINDINGS
+            if binding.key != "up" and known(binding) is None
+        ]
+        assert strays == []
+
+    @pytest.mark.asyncio
+    async def test_help_lists_the_keys_of_the_screen_it_is_opened_on(self, cli_config):
+        from textual.widgets import Static
+
+        app = HackAgentTUI(cli_config)
+        async with app.run_test(size=WIDE) as pilot:
+            await pilot.pause()
+            await pilot.press("escape")  # take the default starting point
+            await pilot.pause()
+            await pilot.press("f1")
+            await pilot.pause()
+            text = "\n".join(str(w.render()) for w in app.screen.query(Static))
+
+        assert "run the campaign" in text and "save the campaign to a file" in text
+        # Textual's own keys, such as the command palette, are not ours to list.
+        assert "palette" not in text

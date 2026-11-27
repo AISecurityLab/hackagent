@@ -50,7 +50,10 @@ def test_cli_campaign_round_trips_through_http_sqlite_and_results(
     output = cli(
         tmp_path, isolated_campaign_env, "campaign", "run", str(path), "--json"
     )
-    assert '"event": "goal_finished"' in output
+    # --json prints the run's summary, one object, and nothing else.
+    report = json.loads(output)
+    assert report["succeeded"] is True
+    assert [(a["name"], a["attempts"]) for a in report["attacks"]] == [("baseline", 2)]
     rows = json.loads(next((tmp_path / "runs").glob("*/results.json")).read_text())
     assert [r["goal"] for r in rows] == ["Goal one", "Goal two"]
     assert all(r["response"] == "The target replied." for r in rows)
@@ -134,7 +137,11 @@ def test_cli_preflight_failure_records_the_model_error_without_an_attack(
         assert store.list_runs().total == 0
     finally:
         store.close()
-    assert not (tmp_path / "runs").exists()
+    # Stopped before it attacked, the run wrote no results: its folder holds
+    # only the log that says why.
+    files = [p for p in (tmp_path / "runs").rglob("*") if p.is_file()]
+    assert [p.name for p in files] == ["run.log"]
+    assert "target" in files[0].read_text()
 
 
 def test_cli_retention_settings_apply_to_files_database_and_traces(

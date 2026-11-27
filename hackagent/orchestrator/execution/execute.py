@@ -53,7 +53,6 @@ from hackagent.orchestrator.campaign.resolve import (
 from hackagent.orchestrator.campaign.results import CampaignResult
 from hackagent.orchestrator.campaign.runner import (
     CampaignCancelled,
-    EventCallback,
     arun_campaign,
 )
 from hackagent.orchestrator.campaign.spec import CampaignSpec, StorageSpec
@@ -104,7 +103,6 @@ def execute_run(
     gateway_key: str,
     claimed_by: str,
     env: Optional[Mapping[str, str]] = None,
-    on_event: Optional[EventCallback] = None,
     claim: Optional[ClaimResult] = None,
     interrupted_as: tuple[Status, str] = CANCELLED_ON_INTERRUPT,
     build: ModelBuilder = build_model,
@@ -159,7 +157,6 @@ def execute_run(
             base_url=base_url,
             gateway_key=gateway_key,
             env=env,
-            on_event=on_event,
             build=build,
             load=load,
             interrupted_as=interrupted_as,
@@ -180,7 +177,6 @@ def execute_run(
 def execute_spec(
     spec: CampaignSpec,
     *,
-    on_event: Optional[EventCallback] = None,
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
     settings: Optional[Settings] = None,
@@ -202,7 +198,6 @@ def execute_spec(
                 base_url,
                 api_key,
                 settings,
-                on_event=on_event,
                 build=build,
                 load=load,
             )
@@ -214,7 +209,6 @@ def execute_spec(
 async def arun_remote_campaign(
     spec: CampaignSpec,
     *,
-    on_event: Optional[EventCallback] = None,
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
     calibration: CalibrationLoader = load_calibration,
@@ -236,7 +230,6 @@ async def arun_remote_campaign(
             base_url,
             api_key,
             settings,
-            on_event=on_event,
             build=build,
             load=load,
             calibration=calibration,
@@ -370,7 +363,6 @@ class _Execution:
         base_url: str,
         gateway_key: str,
         env: Optional[Mapping[str, str]],
-        on_event: Optional[EventCallback],
         build: ModelBuilder,
         load: GoalLoader,
         calibration: CalibrationLoader = load_calibration,
@@ -389,7 +381,6 @@ class _Execution:
             partial(adopted.send_run_events, adopted.run_id),
             secrets=_secrets(self.spec, self.environment, adopted),
         )
-        self.on_event = on_event
         self.build = build
         self.load = load
         self.calibration = calibration
@@ -419,7 +410,6 @@ class _Execution:
                 arun_campaign(
                     self.spec,
                     store=self.adopted,
-                    on_event=self._on_event,
                     build=self.credits.wrap(self.build),
                     load=self.load,
                     calibration=self.calibration,
@@ -438,12 +428,6 @@ class _Execution:
             self.credits.on_trip = stop
             with self.heartbeat:
                 return await task
-
-    def _on_event(self, event: str, **payload: Any) -> None:
-        """Relay ``event``, then hand it to the caller's listener."""
-        self.activity.on_event(event, **payload)
-        if self.on_event is not None:
-            self.on_event(event, **payload)
 
     def settle(
         self, result: Optional[CampaignResult], error: Optional[BaseException]

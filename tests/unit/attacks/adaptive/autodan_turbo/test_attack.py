@@ -146,6 +146,23 @@ def test_prepare_explores_every_goal_and_builds_the_library():
     assert attack.library.size() >= 1
 
 
+def test_each_warmup_epoch_is_numbered():
+    """Each epoch's exchange is told apart in the log, as lifelong rounds are."""
+    attack = AutoDANTurboAttack(params(epochs=3))
+
+    async def go():
+        with recording() as trace:
+            await attack.prepare(["g1"], Target(), Panel(1.0))
+        return trace.nodes
+
+    labels = [n.label for n in asyncio.run(go()) if n.node == "phase"]
+    assert [label for label in labels if label.startswith("epoch")] == [
+        "epoch 1/3",
+        "epoch 2/3",
+        "epoch 3/3",
+    ]
+
+
 def test_prepare_stops_a_goals_warmup_once_it_jailbreaks():
     attack = AutoDANTurboAttack(params(epochs=5))
     target = Target()

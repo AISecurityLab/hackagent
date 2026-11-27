@@ -13,6 +13,7 @@ import pytest
 from hackagent.orchestrator.campaign import CampaignCancelled
 from hackagent.orchestrator.campaign.preflight import PreflightError
 from tests.support.campaigns import Reply
+from tests.support.run_events import recorded_lines
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
@@ -48,7 +49,7 @@ async def test_preflight_failure_records_failed_campaign_without_attack(
         for r in completion_server.requests
     )
     persisted(execution, "FAILED", [], 0)
-    assert not execution.directory.exists()
+    assert _only_its_log(execution.directory)
 
 
 async def test_preflight_probes_are_separate_from_attack_requests(
@@ -185,7 +186,7 @@ async def test_cancelled_http_request_cannot_write_after_finalization(
     assert completion_server.calls("judge") == []
     assert len(completion_server.calls("target")) == 1
     persisted(execution, "CANCELLED", ["CANCELLED"], 0)
-    assert not execution.directory.exists()
+    assert _only_its_log(execution.directory)
 
 
 @pytest.mark.parametrize("policy", ["stop", "continue"])
@@ -225,26 +226,20 @@ async def test_attack_timeout_honors_error_policy_and_rejects_late_results(
     assert len(completion_server.calls("judge")) == int(continues)
 
 
-@pytest.mark.parametrize(
-    "exception,status",
-    [
-        (CampaignCancelled("stop"), "CANCELLED"),
-        (RuntimeError("listener failed"), "FAILED"),
-    ],
-)
-async def test_listener_stops_subsequent_attacks_and_preserves_completed_work(
-    execution, completion_server, exception, status
+async def test_cancel_stops_subsequent_attacks_and_preserves_completed_work(
+    execution, completion_server
 ):
     execution.values["dataset"]["source"]["goals"] = ["Goal one"]
     execution.values["attacks"] = [{"name": "baseline"}, {"name": "flipattack"}]
+    cancel = threading.Event()
 
-    def listener(event, **payload):
-        if event == "goal_finished":
-            raise exception
+    def then(line):
+        if line.goal:
+            cancel.set()
 
-    with pytest.raises(type(exception), match=str(exception)):
-        await execution.run(on_event=listener)
-    [run] = persisted(execution, status, [status], 1)
+    with recorded_lines(then), pytest.raises(CampaignCancelled):
+        await execution.run(cancel=cancel)
+    [run] = persisted(execution, "CANCELLED", ["CANCELLED"], 1)
     assert len(completion_server.calls("target")) == 1
     assert len(completion_server.calls("judge")) == 1
     [record] = execution.store.list_results(run_id=run.id).items
@@ -285,3 +280,10 @@ async def test_required_judge_abstention_overrides_an_otherwise_successful_panel
         r.evaluation_status == "ERROR_TEST_FRAMEWORK"
         for r in execution.store.list_results(run_id=run.id).items
     )
+
+
+def _only_its_log(directory) -> bool:
+    """A run stopped before it attacked writes no results: its run folder
+    holds only the log that says why."""
+    files = [path for path in directory.rglob("*") if path.is_file()]
+    return all(path.name == "run.log" for path in files)

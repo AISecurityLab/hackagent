@@ -2,22 +2,22 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-"""Rich console logging for the CLI and TUI.
+"""The CLI's and TUI's log: one line per record, the same everywhere.
 
 The library never installs handlers; the command-line entry point calls
 :func:`setup_package_logging` once at startup, and :func:`apply_verbosity`
-once the ``-v`` count is known.
-
-In a terminal, records of the attack trace
-(:data:`hackagent.core.logging.TRACE_LOGGER`) are drawn from their fields
-rather than their message: a coloured tag per attack and goal, indented like
-the search tree, with the role of each call, verdicts coloured like the
-dashboard, and quoted text that is never read as markup.
+once the ``-v`` count is known. The package logger is opened fully and the
+``-v`` count is the level of the CLI's own handler (:func:`shown_level`):
+every other handler of a run has a level of its own.
 
 Logs go to stderr, so a command's own output on stdout (``--json`` lines)
-stays machine-readable. Anywhere but a terminal (a file, a Slurm job, a
-pipe) every record is one plain line: date and time, level, message, the
-first three in fixed columns, so each line stands alone in a grep. Line
+stays machine-readable. Every record is one line: date and time, level,
+message, the first three in fixed columns, so each line stands alone in a
+grep. In a terminal the line is coloured (:func:`log_text`): the time
+dimmed, the level by severity, each attack in its own colour, verdicts
+picked out; anywhere else (a file, a Slurm job, a pipe) it is plain. The
+words are the same either way, and the same the TUI, ``run.log`` and the
+platform's activity log show. Line
 breaks inside a message, a traceback's among them, are shown as ``⏎``.
 A trace record's message says where it happened, attack, goal and the
 steps it is nested in, as a breadcrumb::
@@ -30,20 +30,42 @@ steps it is nested in, as a breadcrumb::
 Other libraries write through the same handler: their warnings, Python's
 ``warnings``, and the Hugging Face ``datasets`` messages
 (:func:`route_library_logs`), so a log has one format throughout.
+
+While a campaign runs, :func:`show_run` prints on stdout the campaign's own
+lines the log level hides (each attack starting and finishing, how the run
+ended), unless stdout is for ``--json``.
+
+The TUI shows the same coloured lines (:func:`log_markup`).
 """
 
 import logging
 import os
+import re
 import sys
-import time
 import zlib
-from typing import Any, Mapping, Optional
+from contextlib import contextmanager
+from typing import Iterator, Optional
 
-from rich.console import Console, ConsoleRenderable
-from rich.logging import RichHandler
+import click
+from rich.console import Console
 from rich.text import Text
+from rich.traceback import Traceback
 
-from hackagent.core.logging import goal_label, trace_step
+from hackagent.interfaces.palette import (
+    LEVEL_STYLES,
+    SECONDARY,
+    TAG_STYLES,
+    VERDICT_STYLES,
+)
+from hackagent.core.logging import (
+    CAMPAIGN_LOGGER,
+    CLIENT_RETRY_LOGGERS,
+    LEVEL_WIDTH,
+    PlainFormatter,
+    capture,
+    subject_of,
+    trace_step,
+)
 
 #: ``-v`` count to log level: the default shows warnings, ``-vv`` what the
 #: attacks decide, ``-vvv`` every call they make.
@@ -54,140 +76,9 @@ _VERBOSITY_LEVELS = {
     3: logging.DEBUG,
 }
 
-#: Colours an attack's tag can take; each attack keeps one for the whole run.
-_ATTACK_COLOURS = (
-    "cyan",
-    "magenta",
-    "blue",
-    "yellow",
-    "bright_cyan",
-    "bright_magenta",
-    "bright_blue",
-    "bright_yellow",
-)
-
-_ROLE_STYLES = {
-    "target": "bold blue",
-    "panel": "bold",
-    "attacker": "bold magenta",
-    "scorer": "bold cyan",
-    "on_topic": "cyan",
-}
-
 
 def _attack_style(attack: str) -> str:
-    return _ATTACK_COLOURS[zlib.crc32(attack.encode()) % len(_ATTACK_COLOURS)]
-
-
-def render_trace_step(step: Mapping[str, Any]) -> Text:
-    """One trace record as a line: tag, indentation, then what happened."""
-    line = Text()
-    attack = str(step.get("attack") or "run")
-    tag = " · ".join(
-        [attack]
-        + (
-            [goal_label(step["goal"], step.get("goals"))]
-            if step.get("goal") is not None
-            else []
-        )
-        + ([f"attempt {step['attempt']}"] if step.get("attempt") is not None else [])
-    )
-    line.append(tag, style=_attack_style(attack))
-    line.append("  " + "  " * max(0, int(step.get("depth") or 1) - 1))
-    within = step.get("within") or []
-    node = step.get("node")
-    if node != "phase" and within:
-        # The whole path: "stream 1/1" alone does not say which round.
-        line.append(" › ".join(within) + " › ", style="dim")
-    error = step.get("error")
-    if node == "phase":
-        line.append("▸ ", style="dim")
-        line.append(str(step.get("label") or ""), style="bold")
-    elif node == "decision":
-        line.append("◆ ", style="yellow")
-        line.append(str(step.get("label") or ""), style="bold yellow")
-        if step.get("reason"):
-            line.append(f" {step['reason']}")
-        details = step.get("details") or {}
-        if details:
-            line.append(
-                " (" + ", ".join(f"{k}={v}" for k, v in details.items()) + ")",
-                style="dim",
-            )
-    elif node == "artifact":
-        line.append("▪ ", style="dim")
-        line.append(f"{step.get('label')}", style="bold")
-        uri = (step.get("details") or {}).get("uri")
-        if uri:
-            line.append(f" {uri}", style="dim")
-    elif node == "call":
-        role = str(step.get("role") or step.get("label") or "call")
-        line.append(f"{role:<8}", style=_ROLE_STYLES.get(role, "bold"))
-        if error:
-            line.append(f" failed: {error}", style="red")
-        elif role == "panel":
-            score = step.get("score")
-            if isinstance(score, (int, float)):
-                line.append(f" {score:g}")
-            success = step.get("success")
-            if success is True:
-                line.append(" jailbroken", style="bold red")
-            elif success is False:
-                line.append(" mitigated", style="green")
-        elif step.get("text"):
-            line.append(f' "{step["text"]}"', style="italic")
-        details = []
-        if step.get("tokens") is not None:
-            details.append(f"{step['tokens']} tok")
-        if step.get("latency_s") is not None:
-            details.append(f"{step['latency_s']:.1f}s")
-        if details:
-            line.append("  " + " · ".join(details), style="dim")
-    else:
-        line.append(str(step.get("message") or ""))
-    return line
-
-
-#: Width of the level column: the longest level name, ``WARNING``.
-LEVEL_WIDTH = 7
-
-
-def plain_line(level: str, message: str, created: Optional[float] = None) -> str:
-    """One record as written to a file: date and time, level, message."""
-    stamp = time.strftime("%m-%d %H:%M:%S", time.localtime(created))
-    return f"{stamp} {level:<{LEVEL_WIDTH}} {message}"
-
-
-#: What a line break inside a message is written as, to keep it one line.
-LINE_BREAK = " ⏎ "
-
-
-def one_line(message: str) -> str:
-    """``message`` with its line breaks shown as :data:`LINE_BREAK`, so a
-    provider error or a captured warning is one line like every other."""
-    return LINE_BREAK.join(
-        line.strip() for line in message.splitlines() if line.strip()
-    )
-
-
-def trace_breadcrumb(step: Mapping[str, Any]) -> str:
-    """A trace record as one sentence: attack, goal, the steps it is nested
-    in, then what happened, joined by ``·``."""
-    parts = [str(step.get("source") or "run"), *map(str, step.get("within") or ())]
-    return " · ".join([*parts, str(step.get("what") or step.get("body") or "")])
-
-
-class PlainFormatter(logging.Formatter):
-    """Format a record as :func:`plain_line`; a trace record's message is its
-    :func:`trace_breadcrumb`. Never padded or wrapped."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        step = trace_step(record)
-        message = trace_breadcrumb(step) if step is not None else record.getMessage()
-        if record.exc_info:
-            # The traceback joins the message, so the record stays one line.
-            message += "\n" + self.formatException(record.exc_info)
-        return plain_line(record.levelname, one_line(message), record.created)
+    return TAG_STYLES[zlib.crc32(attack.encode()) % len(TAG_STYLES)]
 
 
 def logs_to_terminal() -> bool:
@@ -199,53 +90,177 @@ def logs_to_terminal() -> bool:
         return False
 
 
-class HackAgentRichHandler(RichHandler):
-    """A :class:`RichHandler` that draws attack trace records from their fields."""
+class LogLineHandler(logging.Handler):
+    """The CLI's log in a terminal: each record as the line a log file has
+    (:func:`log_text`), coloured, one record per line; the terminal wraps a
+    long one rather than the handler. A record's traceback is drawn below
+    its line."""
 
-    def render_message(
-        self, record: logging.LogRecord, message: str
-    ) -> ConsoleRenderable:
-        step = trace_step(record)
-        if step is not None:
-            return render_trace_step(step)
-        return super().render_message(record, message)
+    def __init__(self, console: Optional[Console] = None) -> None:
+        super().__init__()
+        self.console = console or Console(stderr=True)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            error = record.exc_info
+            if error:
+                # The line without the traceback, which follows it drawn.
+                record = logging.makeLogRecord(
+                    {**record.__dict__, "exc_info": None, "exc_text": None}
+                )
+            self.console.print(log_text(record), soft_wrap=True, highlight=False)
+            if error and error[1] is not None:
+                self.console.print(Traceback.from_exception(*error))
+        except Exception:
+            self.handleError(record)
+
+
+#: Words a coloured log line picks out wherever they appear, in their
+#: verdict's colour.
+_WORD_STYLES = (
+    (r"\bjailbroken\b", VERDICT_STYLES["jailbroken"]),
+    (r"\bmitigated\b", VERDICT_STYLES["mitigated"]),
+    (r"\b(?:failed|unreachable|FAILED)\b", VERDICT_STYLES["failed"]),
+)
+
+#: A count of none just before a word: "0 jailbroken", "0 of 20 goals
+#: jailbroken". A word it counts is no news, so it is not picked out.
+_NONE_BEFORE = re.compile(r"(?:^|\D)0 (?:of \d+ goals? )?$")
+
+#: Width of :func:`plain_line`'s date and time, ``11-20 15:58:12``.
+_STAMP_WIDTH = 14
+
+
+def log_text(record: logging.LogRecord) -> Text:
+    """``record`` as :class:`PlainFormatter` writes it to a file, coloured as
+    a log viewer colours it: the time dimmed, the level by severity, the
+    attack the record is about in its own colour, and verdicts picked out.
+
+    Its plain text is the file's line, character for character."""
+    line = Text(PlainFormatter().format(record))
+    level_at = _STAMP_WIDTH + 1
+    line.stylize(SECONDARY, 0, _STAMP_WIDTH)
+    line.stylize(
+        LEVEL_STYLES.get(record.levelname, "bold"),
+        level_at,
+        level_at + len(record.levelname),
+    )
+    message_at = _message_at(record)
+    attack = (trace_step(record) or subject_of(record)).get("attack")
+    if attack and line.plain.startswith(str(attack), message_at):
+        line.stylize(_attack_style(str(attack)), message_at, message_at + len(attack))
+    for pattern, style in _WORD_STYLES:
+        for match in re.finditer(pattern, line.plain):
+            if not _NONE_BEFORE.search(line.plain[: match.start()]):
+                line.stylize(style, match.start(), match.end())
+    return line
+
+
+def _message_at(record: logging.LogRecord) -> int:
+    """Where the message starts in :func:`plain_line`'s line."""
+    return _STAMP_WIDTH + 1 + max(LEVEL_WIDTH, len(record.levelname)) + 1
+
+
+def log_markup(record: logging.LogRecord) -> str:
+    """:func:`log_text` as Rich markup."""
+    return log_text(record).markup
+
+
+class RunStatusHandler(logging.Handler):
+    """The campaign's own lines (:data:`~hackagent.core.logging.CAMPAIGN_LOGGER`:
+    each attack starting and finishing, how the run ended) that the log
+    hides, on stdout, so a quiet log does not say nothing until the run
+    ends: coloured in a terminal, the file's line elsewhere."""
+
+    def __init__(self, hidden_below: int, console: Optional[Console] = None) -> None:
+        super().__init__()
+        self.hidden_below = hidden_below
+        self.console = console or Console()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.name != CAMPAIGN_LOGGER or record.levelno >= self.hidden_below:
+            return
+        try:
+            if self.console.is_terminal:
+                message = log_text(record)[_message_at(record) :]
+                self.console.print(message, soft_wrap=True, highlight=False)
+            else:
+                click.echo(PlainFormatter().format(record))
+        except Exception:
+            self.handleError(record)
+
+
+@contextmanager
+def show_run(as_json: bool, logger_name: str = "hackagent") -> Iterator[None]:
+    """Show on stdout the campaign's own lines the log hides, unless stdout
+    is for ``--json``, which prints only the run's summary at the end."""
+    shown = shown_level(logger_name)
+    if as_json or shown <= logging.INFO:
+        yield
+        return
+    with capture(RunStatusHandler(shown), logging.INFO, logger_name):
+        yield
+
+
+def _cli_handler(logger_name: str = "hackagent") -> Optional[logging.Handler]:
+    """The CLI's log handler on ``logger_name``, if the CLI installed one."""
+    return next(
+        (
+            handler
+            for handler in logging.getLogger(logger_name).handlers
+            if getattr(handler, "hackagent_cli", False)
+        ),
+        None,
+    )
+
+
+def shown_level(logger_name: str = "hackagent") -> int:
+    """The level the CLI's log shows: its handler's level, never below what
+    the logger lets through. Without the CLI's handler (the SDK, a test), the
+    logger's own level."""
+    effective = logging.getLogger(logger_name).getEffectiveLevel()
+    handler = _cli_handler(logger_name)
+    return max(handler.level, effective) if handler is not None else effective
 
 
 def apply_verbosity(verbose: Optional[int], logger_name: str = "hackagent") -> None:
-    """Set the package's log level from the ``-v`` count.
+    """Set what the CLI's log shows from the ``-v`` count: its handler's
+    level, which leaves every other handler of the run its own.
 
     ``HACKAGENT_LOG_LEVEL``, when set, wins; so does an unset count.
     """
     if not isinstance(verbose, int) or os.getenv(f"{logger_name.upper()}_LOG_LEVEL"):
         return
     level = _VERBOSITY_LEVELS[max(0, min(verbose, max(_VERBOSITY_LEVELS)))]
-    logging.getLogger(logger_name).setLevel(level)
+    handler = _cli_handler(logger_name)
+    if handler is not None:
+        handler.setLevel(level)
+    else:
+        logging.getLogger(logger_name).setLevel(level)
 
 
 def setup_package_logging(
     logger_name: str = "hackagent", default_level_str: str = "WARNING"
 ) -> logging.Logger:
-    """Configures RichHandler for the specified logger if not already set.
+    """Install the CLI's log handler on the specified logger, if not already set.
+
+    The logger lets every record through and the handler shows
+    ``HACKAGENT_LOG_LEVEL`` (else ``default_level_str``) and above, so a
+    run's other handlers (the TUI's pane, ``--json``, the platform relay)
+    each choose their own level.
 
     Idempotent: a logger that already has the CLI's handler is left as is.
     """
     package_logger = logging.getLogger(logger_name)
 
-    # Use RichHandler specifically — StreamHandler is too broad since
-    # RichHandler is a subclass and would incorrectly match the guard.
-    has_rich_handler = any(
-        isinstance(h, RichHandler) or getattr(h, "hackagent_cli", False)
-        for h in package_logger.handlers
-    )
-
-    if not has_rich_handler:
+    if not any(getattr(h, "hackagent_cli", False) for h in package_logger.handlers):
         log_level_env = os.getenv(
             f"{logger_name.upper()}_LOG_LEVEL", default_level_str
         ).upper()
         level = getattr(logging, log_level_env, logging.WARNING)
-        package_logger.setLevel(level)
+        package_logger.setLevel(logging.DEBUG)
 
-        package_logger.addHandler(_handler())
+        package_logger.addHandler(_handler(level))
         package_logger.propagate = False  # Avoid duplicate logs with root logger
         if logger_name == "hackagent":
             _route_other_loggers()
@@ -254,17 +269,10 @@ def setup_package_logging(
 
 
 def _handler(level: int = logging.NOTSET) -> logging.Handler:
-    """The CLI's log handler: Rich in a terminal, plain lines elsewhere."""
+    """The CLI's log handler: the log line coloured in a terminal
+    (:class:`LogLineHandler`), plain elsewhere; the same words either way."""
     if logs_to_terminal():
-        handler: logging.Handler = HackAgentRichHandler(
-            console=Console(stderr=True),
-            show_time=True,
-            show_level=True,
-            show_path=False,
-            markup=True,
-            rich_tracebacks=True,
-            tracebacks_show_locals=False,
-        )
+        handler: logging.Handler = LogLineHandler(Console(stderr=True))
     else:
         # A file or a pipe: one plain line per record, as vLLM writes.
         handler = logging.StreamHandler(sys.stderr)
@@ -282,6 +290,10 @@ def _route_other_loggers() -> None:
     if not any(getattr(h, "hackagent_cli", False) for h in root.handlers):
         root.addHandler(_handler(logging.WARNING))
     logging.captureWarnings(True)
+    # Each retry is an INFO line: the run's activity relays them, while the
+    # handler above still shows only warnings.
+    for name in CLIENT_RETRY_LOGGERS:
+        logging.getLogger(name).setLevel(logging.INFO)
 
 
 def route_library_logs() -> None:

@@ -29,33 +29,26 @@ error in one goal or request becomes an attempt with `error` set; setup
 failures, a store that refuses a write, and the per-attack timeout fail an
 attack, and stop its other goals so nothing writes into a finished run.
 
-An `on_event` listener that raises stops the whole campaign; raising
-:class:`CampaignCancelled` records the runs as cancelled rather than
-failed. Cancelling the task that runs :func:`arun_campaign` does the same.
+What happens is logged, as text: the campaign&#x27;s own story here (each attack
+starting and finishing, the closing summary), each goal&#x27;s result on
+:data:`GOALS_LOGGER`, what loading, preflight and the audit do in their own
+modules, and each step of an attack by its trace. Every line logged while a
+goal runs names its attack and goal (:func:`~hackagent.core.logging.about`).
+Interfaces show a run by handling those records
+(:func:`~hackagent.core.logging.capture`).
 
-#### EventCallback
+Setting the `cancel` event stops the campaign and records its runs as
+cancelled rather than failed. Cancelling the task that runs
+:func:`arun_campaign` does the same.
 
-Receives `(event_name, **payload)`. Payloads hold names and counts,
-never goal texts, prompts or replies. In order, a run emits:
+#### logger
 
-- `campaign_started` (`campaign`), before goals and models are loaded;
-- `goals_loaded` (`goals`) and `models_resolved` (`attacks`,
-  `judges`, `models`: distinct models built);
-- with `execution.preflight`, `preflight_started` (`models`), then
-  `preflight_finished` (`models`) or `preflight_failed` (`models`,
-  `failures`: one reason per unreachable model);
-- with `evaluation.audit`, `audit_started` (`judges`), then
-  `audit_finished` (`audit`);
-- per attack, `attack_started` (`attack`, `run_id`,
-  `expected_goals`); for an attack with run-scoped setup (AutoDAN-Turbo&#x27;s
-  warm-up, h4rm3l&#x27;s program search), `preparation_started` (`attack`,
-  `run_id`, `goals`) and `preparation_finished` (`attack`,
-  `run_id`, `elapsed_s`); a `goal_finished` per goal (`attack`,
-  `run_id`, `goal_index`, `goals` (the campaign&#x27;s goal count),
-  `success`, `attempts`, `successful`, `errors` (distinct messages
-  of its failed attempts and abstaining judges), `elapsed_s`); and
-  `attack_finished` (`attack`, `run_id`, `error`, `attempts`,
-  `successful`, `elapsed_s`).
+The campaign&#x27;s story is logged on its own logger, whatever module tells it.
+
+#### RUN\_LOG
+
+The run&#x27;s log file in its run folder: what its log says at INFO, as the
+CLI writes a log to a file (:func:`~hackagent.core.logging.run_log`).
 
 ## CampaignCancelled Objects
 
@@ -63,7 +56,7 @@ never goal texts, prompts or replies. In order, a run emits:
 class CampaignCancelled(Exception)
 ```
 
-Raised by an `on_event` listener to stop a campaign.
+Raised by :func:`run_campaign` when its `cancel` event stopped it.
 
 The runs it leaves are recorded as cancelled, not failed.
 
@@ -73,7 +66,7 @@ The runs it leaves are recorded as cancelled, not failed.
 def run_campaign(
         source: str | Path | Mapping[str, Any] | CampaignSpec,
         *,
-        on_event: Optional[EventCallback] = None,
+        cancel: Optional[threading.Event] = None,
         build: ModelBuilder = build_model,
         load: GoalLoader = load_goals,
         store: Optional[Store] = None,
@@ -90,15 +83,14 @@ Takes the same arguments and raises the same errors.
 
 **Example**:
 
-  Run a campaign file, printing each progress event:
+  Run a campaign file, printing what it logs:
   
     ```python
+    import logging
     from hackagent.orchestrator.campaign import run_campaign, summary
 
-    def show(event, **data):
-        print(event)
-
-    result = run_campaign("campaign.yaml", on_event=show)
+    logging.basicConfig(level=logging.INFO)
+    result = run_campaign("campaign.yaml")
     print(summary(result))
     ```
 
@@ -108,7 +100,7 @@ Takes the same arguments and raises the same errors.
 async def arun_campaign(
         source: str | Path | Mapping[str, Any] | CampaignSpec,
         *,
-        on_event: Optional[EventCallback] = None,
+        cancel: Optional[threading.Event] = None,
         build: ModelBuilder = build_model,
         load: GoalLoader = load_goals,
         store: Optional[Store] = None,
@@ -140,9 +132,8 @@ bound to that server, and finished once (see
 
 - `source` - A campaign file path, an already-decoded mapping, or a
   :class:`CampaignSpec`.
-- `on_event` - Called as `on_event(name, **payload)` for each progress
-  event, on the event loop. An exception it raises stops the
-  campaign; raising `CampaignCancelled` ends it as cancelled.
+- `cancel` - Set from any thread to stop the campaign; its runs are
+  recorded as cancelled and :class:`CampaignCancelled` is raised.
 - `build` - Builds a model from its config; replaced in tests.
 - `load` - Loads the goals of the dataset spec.
 - `store` - Store to record the run in, instead of the one
@@ -166,6 +157,7 @@ bound to that server, and finished once (see
 - `ValueError` - When `resolved` was built from a different campaign,
   or the campaign is invalid.
 - `AuditFailed` - When the judge audit fails and is configured to stop.
+- `CampaignCancelled` - When `cancel` was set.
   
 
 **Example**:

@@ -9,8 +9,9 @@ Every field starts at its schema default, shown dimmed; typing overrides it and
 clearing it (or `ctrl+t`) goes back to the default. Only overrides are saved.
 Rarely changed fields wait under *Advanced*. Problems are shown on the field
 they concern and flagged in the outline. *Run* resolves the campaign first —
-the goals, models and judges `hackagent campaign validate` checks — reports
-what it found, then executes that frozen snapshot while editing carries on.
+the goals, models and judges `hackagent campaign validate` checks — then
+executes that frozen snapshot while editing carries on, showing the run&#x27;s log
+as `hackagent campaign run` writes it, coloured.
 
 ## CampaignBuilder Objects
 
@@ -48,13 +49,14 @@ def action_welcome() -> None
 
 Back to the ways in. Asks first if the draft would be lost.
 
-#### action\_help
+#### check\_action
 
 ```python
-def action_help() -> None
+def check_action(action: str, parameters: tuple[object, ...]) -> bool | None
 ```
 
-What this screen is and how to drive it.
+Run is greyed out until the campaign is valid (while a run goes,
+it shows the run); Stop is offered only while a run goes.
 
 #### open\_path
 

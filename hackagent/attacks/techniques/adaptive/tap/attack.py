@@ -99,6 +99,10 @@ class Branch:
     path: Path = ()
     parent_path: Path = ()
     response: Any = None
+    #: The candidate's number at its depth, as its ``candidate`` phase is
+    #: numbered in the trace log: its on-topic check and its turn with the
+    #: target carry the same number, so the log follows one candidate.
+    number: int = 0
 
     @property
     def score(self) -> float:
@@ -195,12 +199,16 @@ class TAPAttack(IterativeAttack[TapParams]):
     async def _expand(self, goal: str, branches: list[Branch]) -> list[Branch]:
         """Ask the attacker for every refinement of every surviving branch."""
         _ = goal
+        parents = [
+            branch for branch in branches for _ in range(self.params.branching_factor)
+        ]
         with phase("expand", branches=len(branches)):
+            # Each refinement opens its "candidate" phase before its first
+            # await, in this order, so the log numbers them 1, 2, … as here.
             grown = await asyncio.gather(
                 *(
-                    self._refine(branch)
-                    for branch in branches
-                    for _ in range(self.params.branching_factor)
+                    self._refine(parent, number)
+                    for number, parent in enumerate(parents, start=1)
                 )
             )
         kept = [branch for branch in grown if branch is not None]
@@ -212,9 +220,10 @@ class TAPAttack(IterativeAttack[TapParams]):
             )
         return kept
 
-    async def _refine(self, parent: Branch) -> Optional[Branch]:
-        """One refinement of one branch, retried while the attacker rambles."""
+    async def _refine(self, parent: Branch, number: int) -> Optional[Branch]:
+        """Refinement ``number`` of one branch, retried while the attacker rambles."""
         branch = parent.child()
+        branch.number = number
         with phase("candidate", parent_path=list(parent.path)) as path:
             branch.path = path
             for _ in range(self.params.max_attempts):
@@ -239,7 +248,7 @@ class TAPAttack(IterativeAttack[TapParams]):
             return branches
         with phase("on topic", branches=len(branches)):
             answers = await asyncio.gather(
-                *(self._ask_on_topic(goal, branch.prompt) for branch in branches)
+                *(self._check_on_topic(goal, branch) for branch in branches)
             )
         # An unreadable answer keeps the branch: a stuttering judge should
         # not narrow the search.
@@ -257,6 +266,12 @@ class TAPAttack(IterativeAttack[TapParams]):
                 candidate_paths=[list(b.path) for b in branches if b not in kept],
             )
         return kept
+
+    async def _check_on_topic(self, goal: str, branch: Branch) -> Optional[bool]:
+        """Ask about one candidate, under its number, so each check's line
+        says which candidate it is about."""
+        with phase(f"candidate #{branch.number}", candidate_path=list(branch.path)):
+            return await self._ask_on_topic(goal, branch.prompt)
 
     async def _ask_on_topic(self, goal: str, prompt: str) -> Optional[bool]:
         """Ask the ``on_topic`` role about one prompt; ``None`` when it gave no answer."""
@@ -276,7 +291,7 @@ class TAPAttack(IterativeAttack[TapParams]):
         """Send every surviving branch to the target and judge what comes back."""
         results = await asyncio.gather(
             *(
-                self._attempt(goal, index, len(branches), branch, target, judge)
+                self._attempt(goal, index, branch, target, judge)
                 for index, branch in enumerate(branches)
             )
         )
@@ -291,14 +306,15 @@ class TAPAttack(IterativeAttack[TapParams]):
         self,
         goal: str,
         index: int,
-        total: int,
         branch: Branch,
         target: Target,
         judge: Optional[Judge],
     ) -> tuple[Branch, Optional[Finding]]:
         """One branch's turn: send, judge, and feed the result back."""
+        # Named by the candidate's number, as its refinement and its on-topic
+        # check are, not by its place among those still standing.
         with phase(
-            f"branch {index + 1}/{total}",
+            f"candidate #{branch.number}",
             branch=index,
             candidate_path=list(branch.path),
         ) as path:

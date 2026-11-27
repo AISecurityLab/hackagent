@@ -53,8 +53,10 @@ that config. A model the campaign uses in several places is checked once.
 #### preflight
 
 ```python
-async def preflight(resolved: "ResolvedCampaign") -> None
+async def preflight(resolved: "ResolvedCampaign") -> int
 ```
 
-Check every model; raise :class:`PreflightError` naming each failure.
+Check every model and return how many were checked.
+
+Raises :class:`PreflightError` naming each failure.
 

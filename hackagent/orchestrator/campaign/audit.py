@@ -29,6 +29,7 @@ each other.
 from __future__ import annotations
 
 import json
+import logging
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path
@@ -314,15 +315,11 @@ def format_report(report: AuditReport) -> str:
 
 
 def _log(report: AuditReport) -> None:
-    for row in report.judges:
-        logger.info(
-            "audit · %s · precision %.3f · recall %.3f · f1 %.3f · %s",
-            row.judge,
-            row.metrics.precision,
-            row.metrics.recall,
-            row.metrics.f1,
-            {True: "passed", False: "FAILED", None: "not graded"}[row.passed],
-        )
+    """The report's table, a log line per row, so every interface showing
+    the log shows the whole audit."""
+    level = logging.WARNING if report.passed is False else logging.INFO
+    for line in format_report(report).splitlines():
+        logger.log(level, "audit · %s", line)
 
 
 __all__ = [

@@ -27,16 +27,27 @@ error in one goal or request becomes an attempt with ``error`` set; setup
 failures, a store that refuses a write, and the per-attack timeout fail an
 attack, and stop its other goals so nothing writes into a finished run.
 
-An ``on_event`` listener that raises stops the whole campaign; raising
-:class:`CampaignCancelled` records the runs as cancelled rather than
-failed. Cancelling the task that runs :func:`arun_campaign` does the same.
+What happens is logged, as text: the campaign's own story here (each attack
+starting and finishing, the closing summary), each goal's result on
+:data:`GOALS_LOGGER`, what loading, preflight and the audit do in their own
+modules, and each step of an attack by its trace. Every line logged while a
+goal runs names its attack and goal (:func:`~hackagent.core.logging.about`).
+Interfaces show a run by handling those records
+(:func:`~hackagent.core.logging.capture`).
+
+Setting the ``cancel`` event stops the campaign and records its runs as
+cancelled rather than failed. Cancelling the task that runs
+:func:`arun_campaign` does the same.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
+import threading
+from collections import Counter
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -46,7 +57,6 @@ from uuid import UUID, uuid4
 
 from hackagent.attacks.techniques.contract import Messages
 from hackagent.attacks.techniques.iterative import Finding, IterativeAttack
-from hackagent.attacks.techniques.progress import emit_progress, observe_progress
 from hackagent.attacks.techniques.trace import (
     TraceNode,
     about,
@@ -57,7 +67,13 @@ from hackagent.attacks.techniques.trace import (
 )
 from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.core.contracts import Goal, RunStatus, Sample, Verdict
-from hackagent.core.logging import REPORTED_AS_EVENT, get_logger, goal_label
+from hackagent.core.logging import (
+    CAMPAIGN_LOGGER,
+    GOALS_LOGGER,
+    get_logger,
+    goal_label,
+    run_log,
+)
 from hackagent.core.settings import Settings
 from hackagent.datasets.calibration import load_calibration
 from hackagent.datasets.config import load_goals, select_goals
@@ -69,7 +85,7 @@ from hackagent.orchestrator.campaign.audit import (
     aaudit_configured_panel,
 )
 from hackagent.orchestrator.campaign.loader import load_campaign
-from hackagent.orchestrator.campaign.preflight import PreflightError, preflight
+from hackagent.orchestrator.campaign.preflight import preflight
 from hackagent.orchestrator.campaign.resolve import (
     EmbedderBuilder,
     GoalLoader,
@@ -82,6 +98,7 @@ from hackagent.orchestrator.campaign.results import (
     Attempt,
     AttackOutcome,
     CampaignResult,
+    summary,
     user_text,
     write_outputs,
 )
@@ -93,7 +110,8 @@ from hackagent.orchestrator.campaign.tracking import (
 )
 from hackagent.storage.store import Store
 
-logger = get_logger(__name__)
+#: The campaign's story is logged on its own logger, whatever module tells it.
+logger = get_logger(CAMPAIGN_LOGGER)
 
 T = TypeVar("T")
 
@@ -131,55 +149,32 @@ def _active_goal_elapsed() -> Optional[float]:
     )
 
 
-#: Receives ``(event_name, **payload)``. Payloads hold names and counts,
-#: never goal texts, prompts or replies. In order, a run emits:
-#:
-#: - ``campaign_started`` (``campaign``), before goals and models are loaded;
-#: - ``goals_loaded`` (``goals``) and ``models_resolved`` (``attacks``,
-#:   ``judges``, ``models``: distinct models built);
-#: - with ``execution.preflight``, ``preflight_started`` (``models``), then
-#:   ``preflight_finished`` (``models``) or ``preflight_failed`` (``models``,
-#:   ``failures``: one reason per unreachable model);
-#: - with ``evaluation.audit``, ``audit_started`` (``judges``), then
-#:   ``audit_finished`` (``audit``);
-#: - per attack, ``attack_started`` (``attack``, ``run_id``,
-#:   ``expected_goals``); for an attack with run-scoped setup (AutoDAN-Turbo's
-#:   warm-up, h4rm3l's program search), ``preparation_started`` (``attack``,
-#:   ``run_id``, ``goals``) and ``preparation_finished`` (``attack``,
-#:   ``run_id``, ``elapsed_s``); per goal, ``goal_started`` once admitted to
-#:   the attack concurrency limit, ``attack_progress`` for phase start/end
-#:   (``phase``, numeric ``path``, ``stage``, optional ``step``, ``total`` and
-#:   counts), and ``jailbreak_found`` (``path``, ``score``) as soon as the
-#:   panel passes a reply. These carry ``attack``, ``run_id``, ``goal_index``
-#:   and ``goals``; concurrent goals and branches can interleave. Finally,
-#:   a ``goal_finished`` per goal (``attack``,
-#:   ``run_id``, ``goal_index``, ``goals`` (the campaign's goal count),
-#:   ``success``, ``attempts``, ``successful``, ``errors`` (distinct messages
-#:   of its failed attempts and abstaining judges), ``elapsed_s``); and
-#:   ``attack_finished`` (``attack``, ``run_id``, ``error``, ``attempts``,
-#:   ``successful``, ``elapsed_s``).
-EventCallback = Callable[..., None]
+_goals_log = get_logger(GOALS_LOGGER)
+
+#: The run's log file in its run folder: what its log says at INFO, as the
+#: CLI writes a log to a file (:func:`~hackagent.core.logging.run_log`).
+RUN_LOG = "run.log"
+
+#: How often a run checks its ``cancel`` event while nothing is logged, in
+#: seconds; it is also checked as each line of the campaign's story is logged.
+_CANCEL_POLL_S = 0.2
+#: The ``cancel`` event of the campaign running in this context.
+_cancel: ContextVar[Optional[threading.Event]] = ContextVar(
+    "hackagent_campaign_cancel", default=None
+)
 
 
 class CampaignCancelled(Exception):
-    """Raised by an ``on_event`` listener to stop a campaign.
+    """Raised by :func:`run_campaign` when its ``cancel`` event stopped it.
 
     The runs it leaves are recorded as cancelled, not failed.
     """
 
 
-class _ListenerStopped(Exception):
-    """An ``on_event`` listener raised; carries what it raised."""
-
-    def __init__(self, cause: Exception) -> None:
-        super().__init__(str(cause))
-        self.cause = cause
-
-
 def run_campaign(
     source: str | Path | Mapping[str, Any] | CampaignSpec,
     *,
-    on_event: Optional[EventCallback] = None,
+    cancel: Optional[threading.Event] = None,
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
     store: Optional[Store] = None,
@@ -194,22 +189,21 @@ def run_campaign(
     Takes the same arguments and raises the same errors.
 
     Example:
-        Run a campaign file, printing each progress event:
+        Run a campaign file, printing what it logs:
 
         ```python
+        import logging
         from hackagent.orchestrator.campaign import run_campaign, summary
 
-        def show(event, **data):
-            print(event)
-
-        result = run_campaign("campaign.yaml", on_event=show)
+        logging.basicConfig(level=logging.INFO)
+        result = run_campaign("campaign.yaml")
         print(summary(result))
         ```
     """
     return run_coroutine_blocking(
         lambda: arun_campaign(
             source,
-            on_event=on_event,
+            cancel=cancel,
             build=build,
             load=load,
             store=store,
@@ -224,7 +218,7 @@ def run_campaign(
 async def arun_campaign(
     source: str | Path | Mapping[str, Any] | CampaignSpec,
     *,
-    on_event: Optional[EventCallback] = None,
+    cancel: Optional[threading.Event] = None,
     build: ModelBuilder = build_model,
     load: GoalLoader = load_goals,
     store: Optional[Store] = None,
@@ -254,9 +248,8 @@ async def arun_campaign(
     Args:
         source: A campaign file path, an already-decoded mapping, or a
             :class:`CampaignSpec`.
-        on_event: Called as ``on_event(name, **payload)`` for each progress
-            event, on the event loop. An exception it raises stops the
-            campaign; raising ``CampaignCancelled`` ends it as cancelled.
+        cancel: Set from any thread to stop the campaign; its runs are
+            recorded as cancelled and :class:`CampaignCancelled` is raised.
         build: Builds a model from its config; replaced in tests.
         load: Loads the goals of the dataset spec.
         store: Store to record the run in, instead of the one
@@ -276,6 +269,7 @@ async def arun_campaign(
         ValueError: When ``resolved`` was built from a different campaign,
             or the campaign is invalid.
         AuditFailed: When the judge audit fails and is configured to stop.
+        CampaignCancelled: When ``cancel`` was set.
 
     Example:
         Inside an event loop:
@@ -288,6 +282,62 @@ async def arun_campaign(
         print(result.succeeded, result.outputs)
         ```
     """
+    work = _arun_campaign(
+        source,
+        build=build,
+        load=load,
+        store=store,
+        calibration=calibration,
+        build_embed=build_embed,
+        settings=settings,
+        resolved=resolved,
+    )
+    if cancel is None:
+        return await work
+    token = _cancel.set(cancel)
+    try:
+        return await _until_cancelled(work, cancel)
+    finally:
+        _cancel.reset(token)
+
+
+async def _until_cancelled(
+    work: Awaitable[CampaignResult], cancel: threading.Event
+) -> CampaignResult:
+    """Await ``work``, cancelling it once ``cancel`` is set."""
+    task = asyncio.ensure_future(work)
+    try:
+        while not task.done():
+            await asyncio.wait({task}, timeout=_CANCEL_POLL_S)
+            if cancel.is_set() and not task.done():
+                task.cancel()
+                try:
+                    # Let it record its runs as cancelled on the way out.
+                    return await task
+                except asyncio.CancelledError:
+                    raise CampaignCancelled("Campaign cancelled") from None
+        return task.result()
+    finally:
+        if not task.done():
+            task.cancel()
+            # The caller may cancel this wrapper too. Wait until the campaign
+            # has finalised its runs before letting the caller close its store,
+            # even if more cancellation requests arrive during cleanup.
+            await _outlasting_cancels(asyncio.gather(task, return_exceptions=True))
+
+
+async def _arun_campaign(
+    source: str | Path | Mapping[str, Any] | CampaignSpec,
+    *,
+    build: ModelBuilder,
+    load: GoalLoader,
+    store: Optional[Store],
+    calibration: CalibrationLoader,
+    build_embed: EmbedderBuilder,
+    settings: Optional[Settings],
+    resolved: Optional[ResolvedCampaign],
+) -> CampaignResult:
+    started = monotonic()
     spec = source if isinstance(source, CampaignSpec) else load_campaign(source)
     run_id = spec.execution.output.run_id or str(uuid4())
     if resolved is not None and resolved.spec != spec:
@@ -302,7 +352,6 @@ async def arun_campaign(
 
         return await arun_remote_campaign(
             spec,
-            on_event=on_event,
             build=build,
             load=load,
             calibration=calibration,
@@ -310,148 +359,149 @@ async def arun_campaign(
             resolved=resolved,
             settings=settings,
         )
-    _notify(on_event, "campaign_started", campaign=spec.campaign.name)
-    resolved = resolved or resolve_campaign(
-        spec, build=build, load=load, build_embed=build_embed, settings=settings
-    )
-    logger.info(
-        "campaign %s · %s · %s · %s",
-        spec.campaign.name,
-        _count(len(resolved.goals), "goal"),
-        _count(len(resolved.attacks), "attack"),
-        _count(len(spec.evaluation.judges), "judge"),
-        extra=REPORTED_AS_EVENT,
-    )
-    _notify(on_event, "goals_loaded", goals=len(resolved.goals))
-    _notify(
-        on_event,
-        "models_resolved",
-        attacks=len(resolved.attacks),
-        judges=len(spec.evaluation.judges),
-        models=len(resolved.probes),
-    )
-    if spec.execution.dry_run:
-        return CampaignResult(
-            campaign_name=spec.campaign.name, run_id=run_id, dry_run=True
+    # The run's own log, beside its results; a dry run writes no files.
+    log = Path(spec.execution.output.directory).expanduser() / run_id / RUN_LOG
+    with run_log(log) if not spec.execution.dry_run else nullcontext(log):
+        _say(
+            logging.INFO,
+            "campaign %s · started · loading goals and models",
+            spec.campaign.name,
         )
+        resolved = resolved or resolve_campaign(
+            spec, build=build, load=load, build_embed=build_embed, settings=settings
+        )
+        # Stopped while loading: before anything is recorded.
+        _stop_if_cancelled()
+        if spec.execution.dry_run:
+            _say(
+                logging.INFO,
+                "campaign %s · dry run completed · %s · %s · %s",
+                spec.campaign.name,
+                _count(len(resolved.goals), "goal"),
+                _count(len(resolved.attacks), "attack"),
+                _count(len(spec.evaluation.judges), "judge"),
+            )
+            return CampaignResult(
+                campaign_name=spec.campaign.name, run_id=run_id, dry_run=True
+            )
 
-    owns_store = store is None
-    store = store or open_store(spec.execution.storage, settings=settings)
-    # Written to the run folder and stored with the record, so the run can be
-    # repeated; credentials in connection headers are redacted on the way out.
-    recorded_spec = spec.recorded()
-    campaign_record = None
-    try:
-        agent_id = register_target(store, resolved.spec.target)
-        campaign_record = store.start_campaign(agent_id, recorded_spec)
-        store.update_campaign_run(campaign_record.id, status=RunStatus.RUNNING.value)
-
-        if spec.execution.preflight:
-            # Fail fast on an unreachable model, before any attack
-            # has started recording against it.
-            models = len(resolved.probes)
-            _notify(on_event, "preflight_started", models=models)
-            try:
-                await preflight(resolved)
-            except PreflightError as exc:
-                _notify(
-                    on_event, "preflight_failed", models=models, failures=exc.failures
-                )
-                raise
-            _notify(on_event, "preflight_finished", models=models)
-
-        # Before the first attack: a failing panel should cost one audit, not a
-        # whole run whose numbers then mean nothing. The report belongs to the
-        # campaign run; attack runs reference that parent through a foreign key.
-        if spec.evaluation.audit.enabled:
-            _notify(on_event, "audit_started", judges=len(spec.evaluation.judges))
+        owns_store = store is None
+        store = store or open_store(spec.execution.storage, settings=settings)
+        # Written to the run folder and stored with the record, so the run can be
+        # repeated; credentials in connection headers are redacted on the way out.
+        recorded_spec = spec.recorded()
+        campaign_record = None
         try:
-            audit = await aaudit_configured_panel(
-                resolved.panel,
-                spec.evaluation.audit,
-                concurrency=spec.execution.concurrency.judge,
-                load=calibration,
-            )
-        except AuditFailed as exc:
-            audit_payload = exc.report.model_dump(mode="json")
+            agent_id = register_target(store, resolved.spec.target)
+            campaign_record = store.start_campaign(agent_id, recorded_spec)
             store.update_campaign_run(
-                campaign_record.id,
-                status=RunStatus.FAILED.value,
-                audit=audit_payload,
-                run_notes=str(exc),
+                campaign_record.id, status=RunStatus.RUNNING.value
             )
-            store.flush()
-            if on_event is not None:
-                on_event("audit_finished", audit=audit_payload)
-            raise
-        if audit is not None:
-            audit_payload = audit.model_dump(mode="json")
-            store.update_campaign_run(
-                campaign_record.id,
-                audit=audit_payload,
-            )
-            if on_event is not None:
-                on_event("audit_finished", audit=audit_payload)
-        outcomes = await _execute(
-            resolved,
-            store,
-            on_event,
-            agent_id=agent_id,
-            campaign_run_id=campaign_record.id,
-        )
-        failed = [outcome.name for outcome in outcomes if outcome.error is not None]
-        store.update_campaign_run(
-            campaign_record.id,
-            status=(RunStatus.FAILED.value if failed else RunStatus.COMPLETED.value),
-            # "" clears a note an earlier update may have written; None would
-            # leave it in place and claim a clean run had failing attacks.
-            run_notes=(f"Attack runs failed: {', '.join(failed)}" if failed else ""),
-        )
-        store.flush()
-    except BaseException as exc:
-        cause = exc.cause if isinstance(exc, _ListenerStopped) else exc
-        if campaign_record is not None and not isinstance(cause, AuditFailed):
-            cancelled = _is_cancellation(cause)
-            _record_quietly(
+
+            if spec.execution.preflight:
+                # Fail fast on an unreachable model, before any attack
+                # has started recording against it.
+                await preflight(resolved)
+
+            # Before the first attack: a failing panel should cost one audit, not a
+            # whole run whose numbers then mean nothing. The report belongs to the
+            # campaign run; attack runs reference that parent through a foreign key.
+            try:
+                audit = await aaudit_configured_panel(
+                    resolved.panel,
+                    spec.evaluation.audit,
+                    concurrency=spec.execution.concurrency.judge,
+                    load=calibration,
+                )
+            except AuditFailed as exc:
+                audit_payload = exc.report.model_dump(mode="json")
+                store.update_campaign_run(
+                    campaign_record.id,
+                    status=RunStatus.FAILED.value,
+                    audit=audit_payload,
+                    run_notes=str(exc),
+                )
+                store.flush()
+                raise
+            if audit is not None:
+                audit_payload = audit.model_dump(mode="json")
+                store.update_campaign_run(
+                    campaign_record.id,
+                    audit=audit_payload,
+                )
+            outcomes, goals = await _execute(
+                resolved,
                 store,
-                store.update_campaign_run,
+                agent_id=agent_id,
+                campaign_run_id=campaign_record.id,
+            )
+            failed = [outcome.name for outcome in outcomes if outcome.error is not None]
+            store.update_campaign_run(
                 campaign_record.id,
                 status=(
-                    RunStatus.CANCELLED.value if cancelled else RunStatus.FAILED.value
+                    RunStatus.FAILED.value if failed else RunStatus.COMPLETED.value
                 ),
+                # "" clears a note an earlier update may have written; None would
+                # leave it in place and claim a clean run had failing attacks.
                 run_notes=(
-                    "Campaign cancelled" if cancelled else f"Campaign failed: {cause}"
+                    f"Attack runs failed: {', '.join(failed)}" if failed else ""
                 ),
             )
-        if cause is not exc:
-            raise cause from None
-        raise
-    finally:
-        if owns_store:
-            store.close()
+            store.flush()
+        except BaseException as cause:
+            if campaign_record is not None and not isinstance(cause, AuditFailed):
+                cancelled = _is_cancellation(cause)
+                _record_quietly(
+                    store,
+                    store.update_campaign_run,
+                    campaign_record.id,
+                    status=(
+                        RunStatus.CANCELLED.value
+                        if cancelled
+                        else RunStatus.FAILED.value
+                    ),
+                    run_notes=(
+                        "Campaign cancelled"
+                        if cancelled
+                        else f"Campaign failed: {cause}"
+                    ),
+                )
+            raise
+        finally:
+            if owns_store:
+                store.close()
 
-    result = CampaignResult(
-        campaign_name=spec.campaign.name,
-        run_id=run_id,
-        dry_run=False,
-        attacks=outcomes,
-        audit=audit,
-        campaign_run_id=str(campaign_record.id),
-    )
-    return replace(
-        result,
-        outputs=write_outputs(result, spec.execution.output, recorded_spec),
-    )
+        result = CampaignResult(
+            campaign_name=spec.campaign.name,
+            run_id=run_id,
+            dry_run=False,
+            attacks=outcomes,
+            audit=audit,
+            campaign_run_id=str(campaign_record.id),
+        )
+        result = replace(
+            result,
+            outputs=(
+                *write_outputs(result, spec.execution.output, recorded_spec),
+                # Written only once the log let a line through to it.
+                *([log] if log.exists() else []),
+            ),
+        )
+        _campaign_finished(
+            result, goals, spec.execution.output.directory, monotonic() - started
+        )
+        return result
 
 
 async def _execute(
     resolved: ResolvedCampaign,
     store: Store,
-    on_event: Optional[EventCallback],
     *,
     agent_id: UUID,
     campaign_run_id: UUID,
-) -> tuple[AttackOutcome, ...]:
+) -> tuple[tuple[AttackOutcome, ...], int]:
+    """Run every attack; return their outcomes and how many goals they
+    attacked, once the classifier and the selection have chosen them."""
     execution = resolved.spec.execution
     if resolved.classifier is not None:
         labelled = await label_goals(
@@ -465,7 +515,7 @@ async def _execute(
     if selection.filters.categories:
         selected = select_goals(resolved.goals, selection)
         logger.info(
-            "campaign | selected %d of %d goals in %s",
+            "campaign · selected %d of %d goals in %s",
             len(selected),
             len(resolved.goals),
             ", ".join(selection.filters.categories),
@@ -480,15 +530,14 @@ async def _execute(
             target=execution.concurrency.target,
             judge=execution.concurrency.judge,
         ),
-        on_event=on_event,
         campaign_run_id=campaign_run_id,
     )
+    goals = len(resolved.goals)
     if execution.escalate:
-        return await _escalate(resolved, execution, runner)
+        return await _escalate(resolved, execution, runner), goals
     if execution.mode == "parallel":
-        return tuple(
-            await _all_or_none(runner.run(attack) for attack in resolved.attacks)
-        )
+        outcomes = await _all_or_none(runner.run(attack) for attack in resolved.attacks)
+        return tuple(outcomes), goals
 
     outcomes = []
     for attack in resolved.attacks:
@@ -499,7 +548,7 @@ async def _execute(
                 "stopping after %s failed; remaining attacks skipped", attack.name
             )
             break
-    return tuple(outcomes)
+    return tuple(outcomes), goals
 
 
 async def _escalate(
@@ -562,20 +611,25 @@ class _AttackRunner:
         *,
         agent_id: UUID,
         limits: _Limits,
-        on_event: Optional[EventCallback],
         campaign_run_id: UUID,
     ) -> None:
         self.resolved = resolved
         self.store = store
         self.agent_id = agent_id
         self.limits = limits
-        self.on_event = on_event
         self.campaign_run_id = campaign_run_id
         self.execution = resolved.spec.execution
         self.require_all_judges = resolved.spec.evaluation.require_all_judges
 
     async def run(
         self, attack: ResolvedAttack, goals: Optional[tuple[Goal, ...]] = None
+    ) -> AttackOutcome:
+        # Every line the attack's run logs names the attack.
+        with about(attack=attack.name):
+            return await self._run(attack, goals)
+
+    async def _run(
+        self, attack: ResolvedAttack, goals: Optional[tuple[Goal, ...]]
     ) -> AttackOutcome:
         goals = self.resolved.goals if goals is None else goals
         creating = asyncio.ensure_future(
@@ -600,13 +654,6 @@ class _AttackRunner:
                 _record_quietly(self.store, created.cancel)
             raise
         run_id = str(tracker.run_id)
-        logger.info(
-            "%s started · %s · run %s",
-            attack.name,
-            _count(len(goals), "goal"),
-            run_id[:8],
-            extra=REPORTED_AS_EVENT,
-        )
 
         attempts: list[Attempt] = []
         run_trace: tuple[TraceNode, ...] = ()
@@ -614,11 +661,12 @@ class _AttackRunner:
         # Every way out of this block leaves the run finished in the store:
         # completed, failed, or cancelled. Nothing stays RUNNING.
         try:
-            self._emit(
-                "attack_started",
-                attack=attack.name,
-                run_id=run_id,
-                expected_goals=len(goals),
+            _say(
+                logging.INFO,
+                "%s started · %s · run %s",
+                attack.name,
+                _count(len(goals), "goal"),
+                run_id[:8],
             )
             run_trace = await self._prepare(attack, goals, run_id)
             await asyncio.wait_for(
@@ -629,33 +677,14 @@ class _AttackRunner:
                 timeout=self.execution.per_attack_timeout,
             )
             await asyncio.to_thread(tracker.complete)
-        except _ListenerStopped as stop:
-            # The caller asked to stop: this run ends, and so does the campaign.
-            if _is_cancellation(stop.cause):
-                await asyncio.to_thread(_record_quietly, self.store, tracker.cancel)
-            else:
-                await asyncio.to_thread(
-                    _record_quietly, self.store, tracker.fail, stop.cause
-                )
+        except CampaignCancelled:
+            # Stopped by its caller: this run ends, and so does the campaign.
+            await asyncio.to_thread(_record_quietly, self.store, tracker.cancel)
             raise
         except Exception as exc:
             error = _describe(exc)
-            logger.error(
-                "%s failed: %s",
-                attack.name,
-                error,
-                extra=REPORTED_AS_EVENT,
-            )
             await asyncio.to_thread(_record_quietly, self.store, tracker.fail, exc)
-            self._emit(
-                "attack_finished",
-                attack=attack.name,
-                run_id=run_id,
-                error=error,
-                attempts=len(attempts),
-                successful=_successful(attempts),
-                elapsed_s=monotonic() - started,
-            )
+            logger.error("%s failed: %s", attack.name, error)
             return AttackOutcome(
                 attack.name, run_id, _ordered(attempts), error, run_trace
             )
@@ -666,24 +695,12 @@ class _AttackRunner:
             _record_quietly(self.store, tracker.cancel)
             raise
 
-        successes = _successful(attempts)
-        elapsed = monotonic() - started
-        logger.info(
-            "%s finished · %s · %d jailbroken · %.1fs",
+        _say(
+            logging.INFO,
+            "%s finished · %s · %.1fs",
             attack.name,
-            _count(len(attempts), "attempt"),
-            successes,
-            elapsed,
-            extra=REPORTED_AS_EVENT,
-        )
-        self._emit(
-            "attack_finished",
-            attack=attack.name,
-            run_id=run_id,
-            error=None,
-            attempts=len(attempts),
-            successful=successes,
-            elapsed_s=elapsed,
+            _tally(attempts, len(goals)),
+            monotonic() - started,
         )
         return AttackOutcome(attack.name, run_id, _ordered(attempts), None, run_trace)
 
@@ -700,11 +717,11 @@ class _AttackRunner:
             return ()
         reported = type(attack.attack).prepare is not IterativeAttack.prepare
         if reported:
-            self._emit(
-                "preparation_started",
-                attack=attack.name,
-                run_id=run_id,
-                goals=len(goals),
+            _say(
+                logging.INFO,
+                "%s preparing · %s",
+                attack.name,
+                _count(len(goals), "goal"),
             )
         started = monotonic()
         with about(attack=attack.name), recording(scope="run") as trace:
@@ -713,12 +730,8 @@ class _AttackRunner:
                     [goal.text for goal in goals], self._send, self._ask_panel
                 )
         if reported:
-            self._emit(
-                "preparation_finished",
-                attack=attack.name,
-                run_id=run_id,
-                elapsed_s=monotonic() - started,
-            )
+            elapsed = monotonic() - started
+            _say(logging.INFO, "%s prepared in %.1fs", attack.name, elapsed)
         return tuple(trace.nodes)
 
     async def _run_goal(
@@ -731,59 +744,37 @@ class _AttackRunner:
     ) -> None:
         started = monotonic()
         token = _goal_timing.set(_GoalTiming(started))
-        try:
-            # The trace log names the attack and goal of every node below.
-            with (
-                about(
-                    attack=attack.name,
-                    goal=goal.index + 1,
-                    goals=len(self.resolved.goals),
-                ),
-                observe_progress(
-                    lambda event, **fields: self._emit(
-                        event,
-                        attack=attack.name,
-                        run_id=run_id,
-                        goal_index=goal.index,
-                        goals=len(self.resolved.goals),
-                        **fields,
-                    )
-                ),
-            ):
+        # Every line below names the attack and goal, the result's included.
+        with about(
+            attack=attack.name,
+            goal=goal.index + 1,
+            goals=len(self.resolved.goals),
+        ):
+            try:
                 if isinstance(attack.attack, IterativeAttack):
                     attempts = await self._search(attack, goal)
                 else:
                     attempts = await self._generate_and_send(attack, goal)
-        finally:
-            _goal_timing.reset(token)
-        if goal.labels:
-            attempts = [replace(attempt, labels=goal.labels) for attempt in attempts]
-        for attempt in attempts:
-            await asyncio.to_thread(tracker.record, attempt)
-        sink.extend(attempts)
-        successful = _successful(attempts)
-        # One line per goal says how it ended, so -vv alone tells the story.
-        logger.info(
-            "%s · %s · result: %s · %s · %.1fs",
-            attack.name,
-            goal_label(goal.index + 1, len(self.resolved.goals)),
-            _goal_summary(attempts),
-            _count(len(attempts), "attempt"),
-            monotonic() - started,
-            extra=REPORTED_AS_EVENT,
-        )
-        self._emit(
-            "goal_finished",
-            attack=attack.name,
-            run_id=run_id,
-            goal_index=goal.index,
-            goals=len(self.resolved.goals),
-            success=successful > 0,
-            attempts=len(attempts),
-            successful=successful,
-            errors=list(dict.fromkeys(e for item in attempts for e in item.errors)),
-            elapsed_s=monotonic() - started,
-        )
+            finally:
+                _goal_timing.reset(token)
+            if goal.labels:
+                attempts = [
+                    replace(attempt, labels=goal.labels) for attempt in attempts
+                ]
+            for attempt in attempts:
+                await asyncio.to_thread(tracker.record, attempt)
+            sink.extend(attempts)
+            # One line per goal says how it ended, so -vv alone tells the story.
+            _say(
+                logging.INFO,
+                "%s · %s · result: %s · %s · %.1fs",
+                attack.name,
+                goal_label(goal.index + 1, len(self.resolved.goals)),
+                _goal_summary(attempts),
+                _count(len(attempts), "attempt"),
+                monotonic() - started,
+                on=_goals_log,
+            )
 
     async def _generate_and_send(
         self, attack: ResolvedAttack, goal: Goal
@@ -795,7 +786,6 @@ class _AttackRunner:
         with recording() as generation:
             try:
                 async with _slot(self.limits.attack):
-                    emit_progress("goal_started")
                     requests = await attack.attack.generate(goal.text)
             except Exception as exc:
                 logger.warning(
@@ -931,7 +921,6 @@ class _AttackRunner:
         with recording() as trace:
             try:
                 async with _slot(self.limits.attack):
-                    emit_progress("goal_started")
                     findings = await attack.attack.run(
                         goal.text, timed_target, self._ask_panel
                     )
@@ -1099,14 +1088,6 @@ class _AttackRunner:
             )
         return verdict
 
-    def _emit(self, event: str, **payload: Any) -> None:
-        if self.on_event is None:
-            return
-        try:
-            self.on_event(event, **payload)
-        except Exception as exc:
-            raise _ListenerStopped(exc) from exc
-
 
 async def _all_or_none(coros: Iterable[Awaitable[T]]) -> list[T]:
     """Await every coroutine; when one raises, cancel the rest, then re-raise.
@@ -1146,14 +1127,81 @@ def _count(number: int, noun: str) -> str:
     return f"{number} {noun}{'' if number == 1 else 's'}"
 
 
-def _notify(on_event: Optional[EventCallback], event: str, **payload: Any) -> None:
-    """Send a campaign-level event, before or between attacks, to ``on_event``.
+def _say(
+    level: int, message: str, *args: Any, on: Optional[logging.Logger] = None
+) -> None:
+    """Log a line of the campaign's story (on this module's logger unless
+    ``on``), then stop the campaign if its ``cancel`` event is set: a
+    stopped run ends at the next thing it would have said."""
+    (on or logger).log(level, message, *args, stacklevel=2)
+    _stop_if_cancelled()
 
-    What the listener raises reaches the caller unchanged, as it does for
-    ``audit_finished``.
-    """
-    if on_event is not None:
-        on_event(event, **payload)
+
+def _stop_if_cancelled() -> None:
+    """Raise :class:`CampaignCancelled` if the campaign's ``cancel`` is set."""
+    cancel = _cancel.get()
+    if cancel is not None and cancel.is_set():
+        raise CampaignCancelled("Campaign cancelled")
+
+
+#: How many kinds of attempt error the closing summary names, most common first.
+_ERROR_KINDS = 5
+
+
+def _campaign_finished(
+    result: CampaignResult, goals: int, directory: Optional[str], elapsed: float
+) -> None:
+    """Log the run's summary: totals and where the results were written, a
+    line per attack, the commonest errors. Never cancels: the run is over.
+
+    A goal counts as jailbroken when any attempt at it was, as the results
+    pages count it; ``goals`` is how many the attacks were run against."""
+    report = summary(result)
+    every = [attempt for outcome in result.attacks for attempt in outcome.attempts]
+    errors = report["attempt_errors"]
+    logger.log(
+        logging.INFO if report["succeeded"] else logging.WARNING,
+        "campaign %s %s · %s · %s"
+        + (" · %s" if errors else "")
+        + " · %.1fs"
+        + (" · output → %s" if directory else ""),
+        report["campaign"],
+        "succeeded" if report["succeeded"] else "failed",
+        _tally(every, goals),
+        _count(len(result.attacks), "attack"),
+        *([_count(errors, "attempt error")] if errors else []),
+        elapsed,
+        *([directory] if directory else []),
+    )
+    for outcome in result.attacks:
+        line = f"summary · {outcome.name} · {_tally(outcome.attempts, goals)}"
+        if outcome.error:
+            logger.error("%s · failed: %s", line, outcome.error)
+        else:
+            logger.info("%s", line)
+    kinds = Counter(
+        message
+        for outcome in result.attacks
+        for attempt in outcome.attempts
+        for message in attempt.errors
+    )
+    for message, count in kinds.most_common(_ERROR_KINDS):
+        logger.warning("errors · %d× %s", count, message)
+    if len(kinds) > _ERROR_KINDS:
+        logger.warning(
+            "errors · %d more kinds, see the results", len(kinds) - _ERROR_KINDS
+        )
+
+
+def _tally(attempts: Iterable[Attempt], goals: int) -> str:
+    """``5 of 20 goals jailbroken · 110 attempts (12 jailbroken)``: goals
+    first, each jailbroken when any attempt at it was, then the attempts."""
+    attempts = list(attempts)
+    broken = len({attempt.goal_index for attempt in attempts if _jailbroke(attempt)})
+    return (
+        f"{broken} of {_count(goals, 'goal')} jailbroken · "
+        f"{_count(len(attempts), 'attempt')} ({_successful(attempts)} jailbroken)"
+    )
 
 
 def _jailbroke(attempt: Attempt) -> bool:
@@ -1301,4 +1349,4 @@ def _ordered(attempts: list[Attempt]) -> tuple[Attempt, ...]:
     )
 
 
-__all__ = ["CampaignCancelled", "EventCallback", "arun_campaign", "run_campaign"]
+__all__ = ["CampaignCancelled", "arun_campaign", "run_campaign"]

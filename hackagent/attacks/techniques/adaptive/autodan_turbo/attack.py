@@ -135,17 +135,21 @@ class AutoDANTurboAttack(IterativeAttack[AutoDANTurboParams]):
     ) -> list[dict]:
         """Free exploration: attacker proposes, target replies, panel scores."""
         log: list[dict] = []
-        for _ in range(self.params.epochs):
-            prompt = await self._propose(prompts.warm_up_system(goal), goal)
-            reply, score = await self._try(goal, prompt, target, judge)
-            if reply is None:
-                continue
-            log.append({"prompt": prompt, "response": reply, "score": score})
-            if score >= self.params.break_score:
-                decision(
-                    "stopped", "warm-up reached a jailbreak", score=round(score, 2)
-                )
-                break
+        epochs = self.params.epochs
+        for epoch in range(epochs):
+            # Numbered, as the lifelong rounds are: each epoch's exchange is
+            # told apart from the others in the log.
+            with phase(f"epoch {epoch + 1}/{epochs}", epoch=epoch):
+                prompt = await self._propose(prompts.warm_up_system(goal), goal)
+                reply, score = await self._try(goal, prompt, target, judge)
+                if reply is None:
+                    continue
+                log.append({"prompt": prompt, "response": reply, "score": score})
+                if score >= self.params.break_score:
+                    decision(
+                        "stopped", "warm-up reached a jailbreak", score=round(score, 2)
+                    )
+                    break
         return log
 
     async def _learn_from(self, goal: str, log: list[dict]) -> None:
